@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  ssr: true,
+  ssr: false,
   srcDir: 'app',
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
@@ -25,8 +25,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000',
-      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws/audit/'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'http://185.194.219.211',
+      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://185.194.219.211/ws/audit/'
     }
   },
 
