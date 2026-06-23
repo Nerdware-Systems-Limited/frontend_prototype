@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  ssr: false,
+  // ssr: false,
   srcDir: 'app',
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
@@ -12,11 +12,12 @@ export default defineNuxtConfig({
     // back is a normalised ESM shape — which makes the CJS↔ESM
     // unwrap in UaptsMap.vue work reliably.
     optimizeDeps: {
-      include: ['leaflet'],
+      include: ['@vue/devtools-core', '@vue/devtools-kit', 'leaflet'],
     },
   },
 
   routeRules: {
+    '/**': { ssr: false },
     '/': { redirect: '/login' },
     '/map': { redirect: '/kenya-map' },
   },
