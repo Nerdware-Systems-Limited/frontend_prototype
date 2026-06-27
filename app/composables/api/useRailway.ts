@@ -1,6 +1,6 @@
 // app/composables/api/useRailway.ts
 // ─────────────────────────────────────────────────────────────────────
-// M08 — Railway Management (FR-M08-001..015)
+// M08 - Railway Management (FR-M08-001..015)
 //
 // Backend mounted at /api/v1/railway/. ViewSets implemented:
 //   lines, stations, trains, schedules, operations, freight, incidents, tickets
@@ -10,11 +10,11 @@
 // and /api/v1/geojson/rail-stations/ for the Leaflet map.
 //
 // Data sources:
-//   * RailLine + RailStation — real PostGIS geometries from
+//   * RailLine + RailStation - real PostGIS geometries from
 //     `hotosm_ken_railways_osm_shp/` (1,724 lines, 150 points) and
 //     `hotosm_ken_railways_osm_geojson/`. Classified SGR / MGR / Uganda
 //     Railway by OSM name tag.
-//   * Schedules / Operations / Freight / Tickets / Incidents — simulated
+//   * Schedules / Operations / Freight / Tickets / Incidents - simulated
 //     but calibrated to KRC + ASRO published timetables + 2.4 Mt/yr freight
 //     and SGR ridership.
 //

@@ -1,6 +1,6 @@
 // app/composables/api/useInfrastructure.ts
 // ─────────────────────────────────────────────────────────────────────
-// M06 — Infrastructure & Network Health Monitoring.
+// M06 - Infrastructure & Network Health Monitoring.
 //
 // Backend surface: /api/v1/infrastructure/
 //   /road-segments/, /maintenance-orders/, /regional-offices/,

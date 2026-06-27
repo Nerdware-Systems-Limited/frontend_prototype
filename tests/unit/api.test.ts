@@ -134,7 +134,7 @@ import { useIntegrations } from '~/composables/api/useIntegrations'
 import { useFleet } from '~/composables/api/useFleet'
 import { useSystemApi } from '~/composables/api/useSystem'
 
-describe('domain composables — endpoint mapping', () => {
+describe('domain composables - endpoint mapping', () => {
   let $api: any
   beforeEach(() => { $api = installNuxtApp() })
 
@@ -203,7 +203,7 @@ describe('domain composables — endpoint mapping', () => {
     expect(url).toContain('date_from=2026-06-01')
   })
 
-  it('useNotifications — list, unread count, mark one read, mark all read', async () => {
+  it('useNotifications - list, unread count, mark one read, mark all read', async () => {
     $api.mockResolvedValue({})
     const n = useNotifications()
     // list (unread only)

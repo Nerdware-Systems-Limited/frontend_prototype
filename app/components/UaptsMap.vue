@@ -17,7 +17,7 @@
  *                :markers="markers" :arrows="arrows" :lines="lines"
  *                :initial-bbox="[-4.677,33.913,4.677,41.859]" />
  *
- * Always wrap usage in <ClientOnly> — Leaflet touches `window` at
+ * Always wrap usage in <ClientOnly> - Leaflet touches `window` at
  * import time and the page is SSR-rendered.
  */
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
@@ -35,6 +35,10 @@ export interface MarkerSpec {
   lon: number
   title?: string
   subtitle?: string
+  /** Short type label shown above the title in the popup header. */
+  badge?: string
+  /** Structured key/value rows shown in the popup body. Takes precedence over subtitle. */
+  rows?: Array<{ label: string; value: string }>
   color?: MarkerColor
   size?: MarkerSize
 }
@@ -95,7 +99,7 @@ interface Props {
   lines?: LineSpec[]
   /** Pre-shaped OD-pair arrows. */
   arrows?: ArrowSpec[]
-  /** Initial bbox [S, W, N, E] — overrides `center`/`zoom` if set. */
+  /** Initial bbox [S, W, N, E] - overrides `center`/`zoom` if set. */
   initialBbox?: [number, number, number, number]
   /** Show the legend overlay (data-props mode). */
   showLegend?: boolean
@@ -304,8 +308,7 @@ function renderMarkers(Lc: any) {
     const marker = Lc.circleMarker([m.lat, m.lon], {
       radius, color: '#fff', weight: 1.5, fillColor: fill, fillOpacity: 0.9,
     })
-    const popupHtml = `<div class="uapts-popup"><div class="uapts-popup-title">${escape(m.title ?? m.id)}</div>${m.subtitle ? `<div class="uapts-popup-layer">${escape(m.subtitle)}</div>` : ''}</div>`
-    marker.bindPopup(popupHtml)
+    marker.bindPopup(buildMarkerPopup(m, fill), { maxWidth: 300, minWidth: 210 })
     marker.on('click', () => emit('feature-click', { layer: 'markers', feature: m }))
     marker.addTo(group)
   }
@@ -356,22 +359,77 @@ function renderArrows(Lc: any) {
   layerStates.value.push({ key: 'arrows', label: 'OD Arrows', color: '#a855f7', count: props.arrows.length, visible: true, instance: group })
 }
 
-// ── Popup + format helpers ──────────────────────────────────────────
+// ── Popup builders ──────────────────────────────────────────────────
+// All popups use inline styles - Leaflet injects popup DOM outside the
+// component's scoped CSS scope, so class-based styles never apply.
+
+const POPUP_WRAP = 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-width:210px;max-width:280px;overflow:hidden;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.18)'
+const POPUP_HEAD_BASE = 'padding:9px 12px 8px;border-radius:7px 7px 0 0'
+const POPUP_ROW_EVEN  = 'background:#f8fafc'
+const POPUP_ROW_ODD   = 'background:#fff'
+const POPUP_CELL_L = 'font-size:11px;color:#64748b;padding:4px 6px 4px 12px;white-space:nowrap'
+const POPUP_CELL_R = 'font-size:11px;font-weight:600;color:#1e293b;padding:4px 12px 4px 6px;text-align:right'
+
+function buildMarkerPopup(m: MarkerSpec, fill: string): string {
+  const head = `
+    <div style="${POPUP_HEAD_BASE};background:${fill}">
+      ${m.badge ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.75);margin-bottom:3px">${escape(m.badge)}</div>` : ''}
+      <div style="font-size:13px;font-weight:600;color:#fff;line-height:1.3">${escape(m.title ?? m.id)}</div>
+    </div>`
+
+  let body = ''
+  if (m.rows?.length) {
+    const trs = m.rows.map((r, i) =>
+      `<tr style="${i % 2 === 0 ? POPUP_ROW_EVEN : POPUP_ROW_ODD}">
+        <td style="${POPUP_CELL_L}">${escape(r.label)}</td>
+        <td style="${POPUP_CELL_R}">${escape(r.value)}</td>
+       </tr>`
+    ).join('')
+    body = `<table style="border-collapse:collapse;width:100%">${trs}</table>`
+  } else if (m.subtitle) {
+    body = `<div style="font-size:12px;color:#475569;padding:8px 12px">${escape(m.subtitle)}</div>`
+  }
+
+  return `<div style="${POPUP_WRAP}">${head}${body}</div>`
+}
+
 function buildPopup(layerKey: string, feature: any): string {
-  const props = feature.properties || {}
-  const rows = Object.entries(props)
-    .filter(([_, v]) => v !== null && v !== undefined && v !== '')
-    .map(([k, v]) => `<tr><td class="prop-k">${escape(k)}</td><td class="prop-v">${formatValue(v)}</td></tr>`)
-    .join('')
-  const title = props.name || props.route_name || props.station_name || props.stop_name ||
-                props.segment_id || props.origin_zone || feature.geometry?.type || layerKey
-  return `
-    <div class="uapts-popup">
-      <div class="uapts-popup-title">${escape(title)}</div>
-      <div class="uapts-popup-layer">${escape(layerKey)}</div>
-      <table class="uapts-popup-props">${rows}</table>
-    </div>
-  `
+  const p = feature.properties || {}
+  const title = p.name || p.route_name || p.station_name || p.stop_name ||
+                p.road_name || p.segment_id || p.origin_zone || feature.geometry?.type || layerKey
+  const LABEL_MAP: Record<string, string> = {
+    road_class: 'Road class', highway: 'Highway type', length_m: 'Length (m)',
+    speed_limit_kmh: 'Speed limit', service_type: 'Service type',
+    route_name: 'Route', station_name: 'Station', stop_name: 'Stop',
+    origin_zone: 'Origin', destination_zone: 'Destination',
+    congestion_level: 'Congestion', delay_minutes: 'Delay (min)',
+  }
+  const rows = Object.entries(p)
+    .filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== 'name' && k !== 'id')
+    .slice(0, 10)
+    .map(([k, v], i) => {
+      const label = LABEL_MAP[k] ?? k.replace(/_/g, ' ')
+      return `<tr style="${i % 2 === 0 ? POPUP_ROW_EVEN : POPUP_ROW_ODD}">
+        <td style="${POPUP_CELL_L}">${escape(label)}</td>
+        <td style="${POPUP_CELL_R}">${escape(formatValue(v))}</td>
+      </tr>`
+    }).join('')
+
+  const LAYER_LABELS: Record<string, string> = {
+    roads: 'Road Segment', boundary: 'Kenya', routes: 'PT Route',
+    markers: 'Marker', lines: 'Line', arrows: 'OD Flow',
+  }
+  const layerLabel = LAYER_LABELS[layerKey] ?? layerKey
+  const head = `
+    <div style="${POPUP_HEAD_BASE};background:#1e293b">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.55);margin-bottom:3px">${escape(layerLabel)}</div>
+      <div style="font-size:13px;font-weight:600;color:#fff;line-height:1.3">${escape(String(title))}</div>
+    </div>`
+  const body = rows
+    ? `<table style="border-collapse:collapse;width:100%">${rows}</table>`
+    : `<div style="font-size:12px;color:#94a3b8;padding:8px 12px">No properties</div>`
+
+  return `<div style="${POPUP_WRAP}">${head}${body}</div>`
 }
 
 function formatValue(v: any): string {
@@ -423,7 +481,7 @@ onMounted(async () => {
     map.setView(props.center, props.zoom)
   }
 
-  // Render — both modes are independent and can be combined.
+  // Render - both modes are independent and can be combined.
   await renderAllCatalogLayers(Lc)
   renderBoundary(Lc)
   renderRoads(Lc)

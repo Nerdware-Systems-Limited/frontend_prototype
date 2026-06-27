@@ -1,6 +1,6 @@
 // app/composables/api/useSafety.ts
 // ─────────────────────────────────────────────────────────────────────
-// M05 — Safety & Incident Management.
+// M05 - Safety & Incident Management.
 //
 // Backend surface: /api/v1/safety/
 //   /incidents/, /accidents/, /black-spots/, /emergency-dispatches/,

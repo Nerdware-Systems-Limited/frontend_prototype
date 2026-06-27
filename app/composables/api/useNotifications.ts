@@ -1,6 +1,6 @@
 // app/composables/api/useNotifications.ts
 // ─────────────────────────────────────────────────────────────────────
-// M11 — Event-Driven Notifications (Mongo-backed).
+// M11 - Event-Driven Notifications (Mongo-backed).
 //
 // Backend mounted at /api/v1/notifications/. Two collections:
 //
@@ -23,7 +23,7 @@
 //
 //   * /api/v1/notifications/_health/  Mongo backend status
 //
-// Live WebSocket push is at ws(s)://<host>/ws/notifications/ — see
+// Live WebSocket push is at ws(s)://<host>/ws/notifications/ - see
 // the `useNotificationStream` composable below for the client side.
 // ─────────────────────────────────────────────────────────────────────
 
@@ -281,7 +281,7 @@ export function useNotificationStream(onEvent?: (event: any) => void) {
     }
     ws.onclose = () => {
       connected.value = false
-      // Auto-reconnect after 5s — capped to avoid runaway loops.
+      // Auto-reconnect after 5s - capped to avoid runaway loops.
       setTimeout(() => connect(), 5000)
     }
     ws.onerror = (e) => {

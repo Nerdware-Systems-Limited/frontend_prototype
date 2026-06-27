@@ -72,7 +72,7 @@
               <GitBranch :size="13" class="text-fg-dim" />
               <div>
                 <div class="text-xs text-fg-dim">Department</div>
-                <div class="text-sm font-medium">{{ userData?.department_name || '—' }}</div>
+                <div class="text-sm font-medium">{{ userData?.department_name || '-' }}</div>
               </div>
             </div>
             <div class="meta-item">
@@ -304,17 +304,17 @@ const avatarInitials = computed(() => {
   return (first + last).toUpperCase() || '??'
 })
 
-const roleLabel = computed(() => userData.value?.role ?? '—')
+const roleLabel = computed(() => userData.value?.role ?? '-')
 
 const joinedDate = computed(() => {
   const d = userData.value?.date_of_joining || userData.value?.date_joined
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
 })
 
 const lastLoginTime = computed(() => {
   const d = userData.value?.last_login
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleString('en-KE', { hour12: false, dateStyle: 'short', timeStyle: 'short' })
 })
 

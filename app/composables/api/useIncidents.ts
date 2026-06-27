@@ -1,6 +1,6 @@
 // app/composables/api/useIncidents.ts
 // ─────────────────────────────────────────────────────────────────────
-// M05 — Safety & Incident Management (wireframes: m05-safety-command.html,
+// M05 - Safety & Incident Management (wireframes: m05-safety-command.html,
 //        m05-safety-analytics.html). Cross-modal incident reporting.
 // ─────────────────────────────────────────────────────────────────────
 

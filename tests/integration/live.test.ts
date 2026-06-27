@@ -1,7 +1,7 @@
 // @vitest-environment node
 // tests/integration/live.test.ts
 // ─────────────────────────────────────────────────────────────────────
-// Live-integration tests — talk to the actual UAPTS backend running at
+// Live-integration tests - talk to the actual UAPTS backend running at
 // http://127.0.0.1:8000 (per uapts_frontend/.env NUXT_PUBLIC_API_BASE).
 //
 // Runs under the `node` Vitest environment so the native fetch is used
@@ -17,7 +17,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest'
 
-// Vitest + happy-dom doesn't always expose Node's process.env — fall back
+// Vitest + happy-dom doesn't always expose Node's process.env - fall back
 // to import.meta.env if the conventional one is missing.
 const _env: any = (typeof process !== 'undefined' && process.env) ? process.env : (import.meta as any).env ?? {}
 const BASE = _env.UAPTS_API_BASE ?? 'http://127.0.0.1:8000'
@@ -77,7 +77,7 @@ beforeAll(async () => {
     refreshToken = String(r.body.refresh ?? '').trim()
   } else {
     accessToken = ''
-    if (_env.VITEST_DEBUG) console.warn('login did not return tokens — live tests will fail')
+    if (_env.VITEST_DEBUG) console.warn('login did not return tokens - live tests will fail')
   }
 })
 
@@ -138,7 +138,7 @@ describe('live backend @ ' + BASE + (SKIP ? ' [SKIPPED via env]' : ''), () => {
       method: 'POST',
       body: JSON.stringify({ agency_code: 'NTSA', agency_name: 'X', contact_email: 'x@ntsa.go.ke' }),
     }, accessToken)
-    // Either 201 (no NTSA in the db yet) or 409 (already exists) — both valid.
+    // Either 201 (no NTSA in the db yet) or 409 (already exists) - both valid.
     expect([201, 409]).toContain(r.status)
     if (r.status === 409) {
       expect(r.body.code).toBe('conflict')

@@ -1,6 +1,6 @@
 // app/composables/api/useDashboard.ts
 // ─────────────────────────────────────────────────────────────────────
-// /api/v1/dashboard/* — KPIs across all modules.
+// /api/v1/dashboard/* - KPIs across all modules.
 //
 // Two surfaces:
 //
@@ -91,7 +91,7 @@ export function useDashboard() {
         module: 'M01',
       },
       { id: 'uptime', label: 'Uptime',
-        value: health ? formatUptime(health.uptime_seconds) : '—',
+        value: health ? formatUptime(health.uptime_seconds) : '-',
         color: 'primary', module: 'M01' },
     ]
 

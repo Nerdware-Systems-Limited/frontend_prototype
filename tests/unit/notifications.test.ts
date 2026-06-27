@@ -7,7 +7,7 @@
 //
 // (The full fire_event → Mongo round-trip is exercised by the Django
 // management-command smoke test in the backend. The frontend only
-// needs the rule-shape contract to be consistent — see
+// needs the rule-shape contract to be consistent - see
 // `tests/unit/notifications-shape.test.ts` for that.)
 // ─────────────────────────────────────────────────────────────────────
 

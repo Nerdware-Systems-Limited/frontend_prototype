@@ -1,12 +1,12 @@
 // app/composables/api/useQuery.ts
 // ─────────────────────────────────────────────────────────────────────
-// M15 — Ad-hoc Query Builder.
+// M15 - Ad-hoc Query Builder.
 //
 // Backend: /api/v1/query/datasets/ and /api/v1/query/execute/
 //
 // The query endpoint lets the user pick a dataset, add a few
 // filters, and get a row set back. It's a thin, restricted view
-// over the operational tables — full ClickHouse integration is a
+// over the operational tables - full ClickHouse integration is a
 // separate workstream.
 // ─────────────────────────────────────────────────────────────────────
 

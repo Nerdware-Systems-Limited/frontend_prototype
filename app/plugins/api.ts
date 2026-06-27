@@ -1,5 +1,5 @@
 /**
- * $apiFetch — typed fetch wrapper used everywhere in the app.
+ * $apiFetch - typed fetch wrapper used everywhere in the app.
  *
  * Architecture pattern used by Spotify / Netflix / GitHub:
  *   - Single entry point for all API calls (no raw fetch scattered around)

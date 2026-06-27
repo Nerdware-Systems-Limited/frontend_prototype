@@ -1,6 +1,6 @@
 // app/composables/api/useAccounts.ts
 // ─────────────────────────────────────────────────────────────────────
-// /api/v1/accounts/* — agencies, departments, roles, users.
+// /api/v1/accounts/* - agencies, departments, roles, users.
 //
 // The wireframes include a "User Management" page (uapts-wireframes/pages/
 // user-management.html) and an "SDR" / agency-detail page (kenha.html,

@@ -1,11 +1,11 @@
 /**
- * Global route middleware — auth guard.
+ * Global route middleware - auth guard.
  *
  * Every navigation goes through here (defineNuxtRouteMiddleware is global
  * because the file is placed in middleware/ and named with no `.client`/`.server` suffix).
  *
  * Logic (mirrors what GitHub / Notion / Linear do):
- *   1. Public routes (login) — always let through
+ *   1. Public routes (login) - always let through
  *   2. Has access token in memory → let through
  *   3. No access token but has a stored refresh token → attempt a silent
  *      refresh (this covers the "come back the next day" case).
@@ -37,6 +37,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (newToken) return
   }
 
-  // Nothing worked — go to login, preserving the intended destination
+  // Nothing worked - go to login, preserving the intended destination
   return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
 })

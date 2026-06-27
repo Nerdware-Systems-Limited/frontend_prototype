@@ -1,6 +1,6 @@
 // app/composables/api/useReports.ts
 // ─────────────────────────────────────────────────────────────────────
-// M15 — Reporting & BI (wireframe: report-center.html).
+// M15 - Reporting & BI (wireframe: report-center.html).
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi } from './_client'

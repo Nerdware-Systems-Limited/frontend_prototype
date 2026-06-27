@@ -1,6 +1,6 @@
 // app/composables/api/useAudit.ts
 // ─────────────────────────────────────────────────────────────────────
-// /api/v1/audit/* — audit-trail endpoint, backed by MongoDB.
+// /api/v1/audit/* - audit-trail endpoint, backed by MongoDB.
 //
 // Per the SDD (§4.4.1 shared tables) audit records are stored in
 // MongoDB (immutable, 5-year retention). The audit page wireframe
@@ -43,14 +43,14 @@ export function useAudit() {
   const api = useApi()
 
   return {
-    /** GET /api/v1/audit/ — list audit entries. */
+    /** GET /api/v1/audit/ - list audit entries. */
     list: (q?: AuditQuery) =>
       api<Paged<AuditEntry>>('/api/v1/audit/', { query: cleanQuery(q as Record<string, unknown>) }),
 
-    /** GET /api/v1/audit/{id}/ — single entry. */
+    /** GET /api/v1/audit/{id}/ - single entry. */
     get: (id: string) => api<AuditEntry>(`/api/v1/audit/${id}/`),
 
-    /** GET /api/v1/audit/export/?format=csv|xlsx — bulk export. */
+    /** GET /api/v1/audit/export/?format=csv|xlsx - bulk export. */
     exportUrl: (q?: AuditQuery) => {
       const params = new URLSearchParams()
       if (q) for (const [k, v] of Object.entries(q)) {

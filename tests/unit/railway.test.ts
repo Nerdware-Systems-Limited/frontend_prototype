@@ -19,7 +19,7 @@ function installNuxtApp() {
 
 import { useRailway } from '~/composables/api/useRailway'
 
-describe('useRailway — catalog', () => {
+describe('useRailway - catalog', () => {
   let $api: any
   beforeEach(() => { $api = installNuxtApp() })
 
@@ -71,7 +71,7 @@ describe('useRailway — catalog', () => {
   })
 })
 
-describe('useRailway — summary + actions', () => {
+describe('useRailway - summary + actions', () => {
   let $api: any
   beforeEach(() => { $api = installNuxtApp() })
 
@@ -118,7 +118,7 @@ describe('useRailway — summary + actions', () => {
   })
 })
 
-describe('useRailway — mapData()', () => {
+describe('useRailway - mapData()', () => {
   let $api: any
   beforeEach(() => { $api = installNuxtApp() })
 

@@ -1,6 +1,6 @@
 // app/composables/api/usePublicTransport.ts
 // ─────────────────────────────────────────────────────────────────────
-// M04 — Public Transport Operations (FR-M04-001..014)
+// M04 - Public Transport Operations (FR-M04-001..014)
 //
 // Backend mounted at /api/v1/public-transport/. ViewSets implemented:
 //   saccos, routes, schedules, compliance, demand, brt-stops,

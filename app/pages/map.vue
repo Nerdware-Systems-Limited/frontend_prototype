@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// app/pages/map.vue — Kenya Live Map
+// app/pages/map.vue - Kenya Live Map
 // ─────────────────────────────────────────────────────────────────────
 // Dedicated page that combines:
 //   * Kenya country outline + 8 regions + 12 landmarks (boundary)
@@ -10,7 +10,7 @@
 //
 // All GeoJSON layers come from /api/v1/gis/*. The page is the
 // frontend mirror of the "include the Kenyan map to visualize
-// routes/traffic etc." request — the map shows the entire country
+// routes/traffic etc." request - the map shows the entire country
 // with traffic + transit overlays, just like a GIS dashboard.
 
 import { ref, computed, onMounted } from 'vue'
@@ -30,7 +30,7 @@ const mapArrows = ref<any[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-// Map UI state — layer toggles + map extent.
+// Map UI state - layer toggles + map extent.
 const showBoundary = ref(true)
 const showRoads = ref(true)
 const showRoutes = ref(true)
@@ -107,7 +107,7 @@ async function load() {
         id: `station-${s.id}`,
         lat: s.latitude,
         lon: s.longitude,
-        title: `${s.station_code} — ${s.station_name}`,
+        title: `${s.station_code} - ${s.station_name}`,
         subtitle: `${s.agency_code ?? ''} · ${s.station_type?.toUpperCase?.() ?? ''} · ${s.equipment_status}`,
         color,
         size: 'sm',
@@ -136,7 +136,7 @@ async function load() {
     }
     mapMarkers.value = markers
 
-    // OD arrows — same deterministic zone-coordinate scatter as traffic.vue.
+    // OD arrows - same deterministic zone-coordinate scatter as traffic.vue.
     const odPairs = ((odRes as any).results ?? []).slice(0, 8)
     mapArrows.value = odPairs.map((p: any) => ({
       id: `${p.origin_zone}-${p.destination_zone}`,
@@ -162,7 +162,7 @@ async function load() {
   }
 }
 
-// Stable hash-based scatter — matches the convention used elsewhere.
+// Stable hash-based scatter - matches the convention used elsewhere.
 function zoneCoord(zone: string): [number, number] {
   let hash = 0
   for (let i = 0; i < zone.length; i++) {

@@ -1,6 +1,6 @@
 // app/composables/api/useTraffic.ts
 // ─────────────────────────────────────────────────────────────────────
-// M02 — Road Traffic Management (FR-M02-001..014)
+// M02 - Road Traffic Management (FR-M02-001..014)
 //
 // Backend mounted at /api/v1/traffic/. ViewSets implemented:
 //   counting-stations, counts, classifications, speed-observations,
@@ -227,7 +227,7 @@ export function useTraffic() {
       ),
 
     // Map data: map domain entities into marker/line shapes the UAPTSMap
-    // component understands. These are convenience selectors — the
+    // component understands. These are convenience selectors - the
     // component itself is decoupled from the API.
     mapData: async () => {
       const [stations, events] = await Promise.all([
@@ -246,8 +246,8 @@ export function useTraffic() {
           id: `station-${s.id}`,
           lat: s.latitude,
           lon: s.longitude,
-          title: `${s.station_code} — ${s.station_name}`,
-          subtitle: `${s.agency_code ?? ''} · ${s.station_type.toUpperCase()} · ${s.speed_limit_kmh ?? '—'} km/h · ${s.equipment_status}`,
+          title: `${s.station_code} - ${s.station_name}`,
+          subtitle: `${s.agency_code ?? ''} · ${s.station_type.toUpperCase()} · ${s.speed_limit_kmh ?? '-'} km/h · ${s.equipment_status}`,
           color: colour,
           size: 'sm',
         })

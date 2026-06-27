@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// pages/rail.vue — M08 Railway Management
+// pages/rail.vue - M08 Railway Management
 // FR-M08-001..015: real-time train ops, live tracking, schedule adherence,
 // freight manifests, rolling stock, safety incidents, ridership & revenue,
 // ticketing integration, intermodal (port ↔ rail) coordination.
 //
-// Backend: /api/v1/railway/ — lines, stations, trains, schedules,
+// Backend: /api/v1/railway/ - lines, stations, trains, schedules,
 // operations, freight, incidents, tickets. Plus /summary/ for the
 // one-shot dashboard, /operations/live/, /freight/by-corridor/, etc.
 //
@@ -64,7 +64,7 @@ async function load() {
     error.value = err?.status === 401
       ? 'Sign in to view railway data.'
       : err?.status === 404
-        ? 'Railway endpoints not yet mounted — restart the backend.'
+        ? 'Railway endpoints not yet mounted - restart the backend.'
         : err?.message ?? 'Failed to load railway data.'
   } finally {
     loading.value = false
@@ -76,24 +76,24 @@ watch([networkFilter, days], () => load())
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function fmtKsh(v: string | number | null | undefined): string {
-  if (v == null) return '—'
+  if (v == null) return '-'
   const n = typeof v === 'string' ? parseFloat(v) : v
-  if (Number.isNaN(n)) return '—'
+  if (Number.isNaN(n)) return '-'
   if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
   return n.toLocaleString()
 }
 function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null) return '—'
+  if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
 function fmtPct(v: number | null | undefined): string {
-  if (v == null) return '—'
+  if (v == null) return '-'
   return `${v.toFixed(1)}%`
 }
 function fmtTime(iso?: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleString('en-KE', {
       hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short',
@@ -101,7 +101,7 @@ function fmtTime(iso?: string | null): string {
   } catch { return iso }
 }
 function fmtDate(iso?: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try { return new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' }) }
   catch { return iso }
 }
@@ -331,7 +331,7 @@ function statusBadge(s: string): string {
             </div>
             <div class="adherence-item">
               <div class="text-label text-fg-dim">Avg Delay</div>
-              <div class="adherence-value">{{ summary?.on_time_30d.avg_delay_min.toFixed(1) ?? '—' }}<span class="text-fg-dim text-sm"> min</span></div>
+              <div class="adherence-value">{{ summary?.on_time_30d.avg_delay_min.toFixed(1) ?? '-' }}<span class="text-fg-dim text-sm"> min</span></div>
             </div>
             <div class="adherence-item">
               <div class="text-label text-fg-dim">Cancellations</div>
@@ -349,7 +349,7 @@ function statusBadge(s: string): string {
             />
           </div>
           <div class="text-xs text-fg-muted mt-1">
-            Target: 85% on-time. {{ (summary?.on_time_30d.on_time_pct ?? 0) >= 85 ? '✓ Above target.' : '✗ Below target — review KRC timetables.' }}
+            Target: 85% on-time. {{ (summary?.on_time_30d.on_time_pct ?? 0) >= 85 ? '✓ Above target.' : '✗ Below target - review KRC timetables.' }}
           </div>
         </div>
       </div>
@@ -470,7 +470,7 @@ function statusBadge(s: string): string {
                   <span class="sev-dot" :style="{ background: sevColor(inc.severity) }"></span>
                   {{ inc.severity }}
                 </td>
-                <td class="text-xs">{{ inc.station_code || '—' }}</td>
+                <td class="text-xs">{{ inc.station_code || '-' }}</td>
                 <td class="text-xs text-fg-muted">{{ fmtTime(inc.occurred_at) }}</td>
               </tr>
               <tr v-if="incidents.length === 0">
@@ -506,7 +506,7 @@ function statusBadge(s: string): string {
                 </td>
                 <td class="text-xs">{{ ln.gauge }}</td>
                 <td class="text-xs">{{ ln.status }}</td>
-                <td class="text-xs">{{ ln.length_km ? `${ln.length_km.toFixed(1)} km` : '—' }}</td>
+                <td class="text-xs">{{ ln.length_km ? `${ln.length_km.toFixed(1)} km` : '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -574,7 +574,7 @@ function statusBadge(s: string): string {
     </div>
 
     <div class="text-xs text-fg-dim" style="text-align: right">
-      Last refreshed: {{ summary?.generated_at ? new Date(summary.generated_at).toLocaleString('en-KE') : '—' }}
+      Last refreshed: {{ summary?.generated_at ? new Date(summary.generated_at).toLocaleString('en-KE') : '-' }}
     </div>
   </div>
 </template>

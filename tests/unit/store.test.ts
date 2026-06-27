@@ -1,6 +1,6 @@
 // tests/unit/store.test.ts
 // ─────────────────────────────────────────────────────────────────────
-// Pinia auth store unit tests. These don't hit the network — they
+// Pinia auth store unit tests. These don't hit the network - they
 // stub `$fetch` so we can verify the store's contract:
 //
 //   - login() persists tokens & user

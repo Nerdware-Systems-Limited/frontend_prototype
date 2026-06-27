@@ -1,6 +1,6 @@
 // app/composables/api/useAviationMaritime.ts
 // ─────────────────────────────────────────────────────────────────────
-// M07 — Aviation & Maritime Data Module.
+// M07 - Aviation & Maritime Data Module.
 //
 // Two top-level surfaces mounted at:
 //

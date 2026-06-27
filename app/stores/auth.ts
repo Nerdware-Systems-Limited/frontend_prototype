@@ -1,9 +1,9 @@
 // app/stores/auth.ts
 // ─────────────────────────────────────────────────────────────────────
-// Auth Store — Pinia
+// Auth Store - Pinia
 //
 // Holds ALL authentication state for the app.
-// Pattern: same as Stripe / Notion / Linear — a single store owns tokens,
+// Pattern: same as Stripe / Notion / Linear - a single store owns tokens,
 // user profile, and all auth mutations. Nothing else touches localStorage directly.
 //
 // Token storage strategy (matching what banks and gov platforms do):
@@ -45,7 +45,7 @@ function preferLocal(): 'local' | 'session' {
 /**
  * Normalise a user record returned by the backend into the shape the UI
  * expects. The backend's `UserSerializer` doesn't currently emit `full_name`
- * — we synthesise it from the email local-part until the backend grows the
+ * - we synthesise it from the email local-part until the backend grows the
  * proper name fields, so the existing dashboard / avatar code keeps working.
  */
 function normaliseUser(raw: Partial<User> & { email?: string }): AuthUser {
@@ -123,7 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
           headers: { Authorization: `Bearer ${accessToken.value}` },
           body: { refresh: refreshToken.value },
         })
-      } catch { /* ignore — we clear locally regardless */ }
+      } catch { /* ignore - we clear locally regardless */ }
     }
     _clearTokens()
   }
@@ -160,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Backend exposes the profile at /api/v1/auth/user/ (dj-rest-auth).
       // Some deployments also mount it at /api/v1/users/me/ via a custom
-      // endpoint — keep a fallback to whichever responds first.
+      // endpoint - keep a fallback to whichever responds first.
       let me: User | null = null
       try {
         me = await $fetch<User>('/api/v1/auth/user/', {

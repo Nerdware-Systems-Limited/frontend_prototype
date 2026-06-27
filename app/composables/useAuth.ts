@@ -1,5 +1,5 @@
 /**
- * useAuth — composable for components.
+ * useAuth - composable for components.
  *
  * Thin wrapper that re-exports everything from the auth store so
  * components don't need to import Pinia directly. This is the same

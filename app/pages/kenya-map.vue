@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// pages/kenya-map.vue — Full-screen interactive Kenyan transport map.
+// pages/kenya-map.vue - Full-screen interactive Kenyan transport map.
 //
 // Renders the full UAPTS transport network on top of an OpenStreetMap
 // base layer: Kenya outline, OSM road segments, counting stations,
@@ -7,7 +7,7 @@
 // live congestion events, weather radar cells, and OD trip-flow arcs.
 //
 // All data is fetched as GeoJSON from /api/v1/geojson/* + /api/v1/gis/*
-// — the backend serves real PostGIS geometries wrapped in the GeoJSON
+// - the backend serves real PostGIS geometries wrapped in the GeoJSON
 // spec, so Leaflet can render them directly with L.geoJSON().
 
 definePageMeta({ title: 'Kenya Map' })
@@ -116,12 +116,12 @@ function fmtKES(n: number) {
       </div>
       <div class="kpi-card card card-hover">
         <div class="text-label text-fg-dim">24h Revenue</div>
-        <div class="kpi-value">{{ ptSummary ? fmtKES(ptSummary.kpis.revenue_24h_kes) : '—' }}</div>
+        <div class="kpi-value">{{ ptSummary ? fmtKES(ptSummary.kpis.revenue_24h_kes) : '-' }}</div>
         <div class="text-xs text-fg-muted mt-1">All payment channels</div>
       </div>
       <div class="kpi-card card card-hover">
         <div class="text-label text-fg-dim">On-Time</div>
-        <div class="kpi-value">{{ ptSummary ? ptSummary.on_time_pct.toFixed(1) + '%' : '—' }}</div>
+        <div class="kpi-value">{{ ptSummary ? ptSummary.on_time_pct.toFixed(1) + '%' : '-' }}</div>
         <div class="text-xs text-fg-muted mt-1">FR-M04-004 · 7d window</div>
       </div>
     </div>

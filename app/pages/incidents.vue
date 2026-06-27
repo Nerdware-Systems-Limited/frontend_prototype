@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// pages/incidents.vue — M05 Safety & Incident Management
+// pages/incidents.vue - M05 Safety & Incident Management
 // Backend: /api/v1/safety/incidents/ + /accidents/ + /black-spots/
 //          + /emergency-dispatches/ + /predictive-hotspots/ + /summary/
 definePageMeta({ title: 'Incidents' })
@@ -45,7 +45,7 @@ async function load() {
     hotspots.value = (hs as any).results ?? []
   } catch (err: any) {
     error.value = err?.status === 401
-      ? 'Not authenticated — please log in.'
+      ? 'Not authenticated - please log in.'
       : err?.message ?? 'Failed to load incidents.'
   } finally {
     loading.value = false
@@ -78,7 +78,7 @@ function tierBadge(t: string) {
   return t === 'critical' ? 'danger' : t === 'high' ? 'warning' : 'info'
 }
 function fmtDate(s: string | null) {
-  if (!s) return '—'
+  if (!s) return '-'
   return new Date(s).toLocaleString('en-KE', { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>
@@ -225,7 +225,7 @@ function fmtDate(s: string | null) {
             <td><span class="badge" :class="`badge-${statusBadge(i.status)}`">{{ i.status.replace('_', ' ') }}</span></td>
             <td class="text-xs">{{ i.incident_type.replace('_', ' ') }}</td>
             <td class="text-sm">{{ i.title }}</td>
-            <td class="font-mono text-xs">{{ i.segment_code ?? '—' }}</td>
+            <td class="font-mono text-xs">{{ i.segment_code ?? '-' }}</td>
             <td class="font-mono text-xs">
               <span v-if="i.casualties > 0" class="text-danger">{{ i.casualties }}</span>
               <span v-else class="text-fg-dim">0</span>
@@ -252,8 +252,8 @@ function fmtDate(s: string | null) {
               <td class="font-mono text-xs">{{ d.incident_ref }}</td>
               <td class="text-xs">{{ d.service_type.replace('_', ' ') }}</td>
               <td><span class="badge" :class="`badge-${dispatchBadge(d.status)}`">{{ d.status.replace('_', ' ') }}</span></td>
-              <td class="font-mono text-xs">{{ d.recommended_eta_minutes ?? '—' }} min</td>
-              <td class="font-mono text-xs">{{ d.recommended_units ?? '—' }}</td>
+              <td class="font-mono text-xs">{{ d.recommended_eta_minutes ?? '-' }} min</td>
+              <td class="font-mono text-xs">{{ d.recommended_units ?? '-' }}</td>
             </tr>
           </tbody>
         </table>
@@ -268,8 +268,8 @@ function fmtDate(s: string | null) {
           <tbody>
             <tr v-for="b in blackspots.slice(0, 12)" :key="b.id">
               <td>
-                <div class="text-sm font-medium">{{ b.segment_road_name ?? '—' }}</div>
-                <div class="text-xs text-fg-muted font-mono">{{ b.segment_road_code ?? '—' }}</div>
+                <div class="text-sm font-medium">{{ b.segment_road_name ?? '-' }}</div>
+                <div class="text-xs text-fg-muted font-mono">{{ b.segment_road_code ?? '-' }}</div>
               </td>
               <td><span class="badge" :class="`badge-${tierBadge(b.ranking_tier)}`">{{ b.ranking_tier }}</span></td>
               <td class="font-mono text-xs">{{ b.accident_count_rolling }}</td>

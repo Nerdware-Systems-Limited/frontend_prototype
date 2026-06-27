@@ -1,5 +1,14 @@
 import type { Config } from 'tailwindcss'
 
+/**
+ * UAPTS Wireframe Palette (light theme - Kenya government green + gold)
+ *
+ * Wireframes (theme.css) use raw CSS variables on :root; this Tailwind config
+ * mirrors them so we can use utility classes while keeping the same tokens.
+ *
+ * The full wireframe styling still lives in app/assets/css/theme.css (loaded
+ * via nuxt.config.ts) - Tailwind here is supplementary for utility-class use.
+ */
 export default {
   content: [
     './app/**/*.{vue,js,ts,jsx,tsx}',
@@ -8,62 +17,76 @@ export default {
     './pages/**/*.vue',
     './plugins/**/*.{js,ts}',
   ],
-  darkMode: 'class',
+  // Light theme only - wireframes are not dark mode.
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
       },
       colors: {
+        // Page background = wireframe --bg
         bg: {
-          DEFAULT: '#0a0f1a',
-          2: '#0f1623',
-          3: '#141d2e',
+          DEFAULT: '#f3f4f6',
+          2: '#e5e7eb',
+          3: '#d1d5db',
         },
+        // Wireframe --card
         card: {
-          DEFAULT: '#121b2b',
-          hover: '#18243a',
-          border: '#1e2d42',
+          DEFAULT: '#ffffff',
+          hover: '#fafbfc',
+          border: '#d1d5db',
         },
+        // Wireframe --primary (Kenya green)
         primary: {
-          DEFAULT: '#3b82f6',
-          light: '#60a5fa',
-          dark: '#2563eb',
+          DEFAULT: '#006838',
+          lt: '#0b8a4c',
+          dk: '#004d28',
+          dkr: '#003a1e',
           fg: '#ffffff',
         },
+        // Wireframe --accent (gold)
         accent: {
-          cyan: '#22d3ee',
-          green: '#10b981',
-          amber: '#f59e0b',
-          red: '#ef4444',
-          purple: '#a855f7',
+          DEFAULT: '#FDB913',
+          dk: '#d99a0f',
+          fg: '#1a1a2e',
         },
+        // Wireframe --success / --warning / --destructive / --info
+        success: '#22c55e',
+        warning: '#f59e0b',
+        danger:  '#ef4444',
+        info:    '#1f5fb4',
+        // Wireframe --fg / --fg2 / --fg3
         fg: {
-          DEFAULT: '#e2eaf5',
-          muted: '#8fa3b8',
-          dim: '#4d6172',
+          DEFAULT: '#1a1a2e',
+          muted:   '#4b5563',
+          dim:     '#9ca3af',
         },
+        // Wireframe secondary accents
+        'accent-purple': '#8b5cf6',
+        'accent-cyan':   '#06b6d4',
       },
       borderRadius: {
-        sm: '6px',
-        DEFAULT: '10px',
-        lg: '14px',
-        xl: '18px',
+        sm: '4px',
+        DEFAULT: '6px',
+        md: '6px',
+        lg: '8px',
       },
       boxShadow: {
-        card: '0 2px 16px rgba(0,0,0,0.4)',
-        glow: '0 0 20px rgba(59,130,246,0.2)',
-        'glow-sm': '0 0 8px rgba(59,130,246,0.15)',
+        sm: '0 1px 2px rgba(15,23,42,.06)',
+        DEFAULT: '0 4px 10px rgba(15,23,42,.08)',
+        md: '0 4px 10px rgba(15,23,42,.08)',
+        lg: '0 10px 24px rgba(15,23,42,.10)',
+        card: '0 1px 2px rgba(15,23,42,.06)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'fade-in': 'fadeIn 0.3s ease-out',
+        'fade-in': 'fadeIn 0.25s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         slideUp: {

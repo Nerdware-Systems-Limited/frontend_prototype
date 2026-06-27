@@ -1,8 +1,8 @@
 // app/composables/api/useIntegrations.ts
 // ─────────────────────────────────────────────────────────────────────
-// Integration Hub — the SDD §4.2 Data Sources Registry.
+// Integration Hub - the SDD §4.2 Data Sources Registry.
 //
-// Wireframe: integration-hub.html — a list of upstream source systems
+// Wireframe: integration-hub.html - a list of upstream source systems
 // (iTIMS, IRSMS, PCS, Discoverer, BMS, RMS, e-ProMIS, etc.) with
 // health/last-sync/run-state per integration.
 // ─────────────────────────────────────────────────────────────────────

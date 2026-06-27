@@ -1,257 +1,239 @@
-<script setup lang="ts">
-// pages/integrations.vue — M12 Integration Hub.
-//
-// Wires to:
-//   • /api/v1/integrations/                   — list of upstream feeds
-//   • /api/v1/integrations/<id>/trigger/      — re-run ingestion
-//   • /api/v1/integrations/<id>/pause/        — pause scheduled pull
-//   • /api/v1/integrations/<id>/resume/       — resume
-import { RefreshCw, Link2, Play, Pause, RotateCw, ChevronRight } from 'lucide-vue-next'
-import { useIntegrations } from '~/composables/api'
-
-definePageMeta({ layout: 'default', title: 'Integrations' })
-
-const api = useIntegrations()
-const items = ref<any[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
-
-const filterStatus = ref<string>('')
-const filterMode = ref<string>('')
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    const d = await api.list({ page_size: 100 })
-    items.value = d.results ?? []
-  } catch (err: any) {
-    error.value = err?.status === 404
-      ? 'Integration endpoints not yet wired up on the backend.'
-      : err?.message ?? 'Failed to load integrations.'
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
-
-const filtered = computed(() => items.value.filter((i) => {
-  if (filterStatus.value && i.status !== filterStatus.value) return false
-  if (filterMode.value && i.mode !== filterMode.value) return false
-  return true
-}))
-
-const counts = computed(() => {
-  const c: Record<string, number> = { connected: 0, degraded: 0, disconnected: 0, pending: 0 }
-  for (const i of items.value) c[i.status] = (c[i.status] ?? 0) + 1
-  return c
-})
-
-async function trigger(id: string) {
-  try { await api.trigger(id) }
-  catch { /* ignore for now */ }
-}
-async function pause(id: string) {
-  try { await api.pause(id) }
-  catch { /* ignore */ }
-}
-async function resume(id: string) {
-  try { await api.resume(id) }
-  catch { /* ignore */ }
-}
-
-function fmtSync(iso?: string | null) {
-  if (!iso) return '—'
-  const dt = new Date(iso)
-  const ms = Date.now() - dt.getTime()
-  const min = Math.round(ms / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const h = Math.round(min / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.round(h / 24)}d ago`
-}
-</script>
-
 <template>
-  <div class="integrations-page">
-    <div class="page-header">
-      <div>
-        <div class="text-label text-fg-dim mb-1">M12 · Data Integration Hub</div>
-        <h1 class="text-display">Integrations</h1>
-        <p class="text-sm text-fg-muted mt-1">
-          Upstream feeds from the {{ items.length }} agencies that power UAPTS.
-        </p>
-      </div>
-      <button class="btn btn-secondary" @click="load">
-        <RefreshCw :size="13" /> Refresh
-      </button>
-    </div>
+  <PageHeader
+    eyebrow="M15 - Data Integration Hub"
+    title="Integrations"
+    subtitle="All 15 UAPTS agency feeds - NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA"
+  >
+    <template #actions>
+      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+    </template>
+  </PageHeader>
 
-    <!-- Status strip -->
-    <div v-if="items.length" class="status-strip card">
-      <div class="status-item">
-        <span class="dot dot-live" /> <span class="text-xs">Connected</span>
-        <span class="badge badge-success ml-1">{{ counts.connected }}</span>
-      </div>
-      <div class="status-item">
-        <span class="dot dot-warn" /> <span class="text-xs">Degraded</span>
-        <span class="badge badge-warning ml-1">{{ counts.degraded }}</span>
-      </div>
-      <div class="status-item">
-        <span class="dot dot-dead" /> <span class="text-xs">Disconnected</span>
-        <span class="badge badge-danger ml-1">{{ counts.disconnected }}</span>
-      </div>
-      <div class="status-item">
-        <span class="dot dot-pending" /> <span class="text-xs">Pending</span>
-        <span class="badge badge-neutral ml-1">{{ counts.pending }}</span>
-      </div>
-    </div>
+  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-    <!-- Filters -->
-    <div v-if="items.length" class="filters card">
-      <select v-model="filterStatus" class="input filter-select">
-        <option value="">All statuses</option>
-        <option value="connected">Connected</option>
-        <option value="degraded">Degraded</option>
-        <option value="disconnected">Disconnected</option>
-        <option value="pending">Pending</option>
-      </select>
-      <select v-model="filterMode" class="input filter-select">
-        <option value="">All modes</option>
-        <option value="api">API</option>
-        <option value="csv">CSV</option>
-        <option value="manual">Manual</option>
-      </select>
-      <span class="text-xs text-fg-dim ml-auto">
-        Showing {{ filtered.length }} / {{ items.length }}
-      </span>
-    </div>
+  <!-- Summary KPIs -->
+  <div class="kpi-grid">
+    <KpiCard
+      label="Total Feeds"
+      :value="String(integrations.length)"
+      sub="Registered integrations"
+      source="live" source-title="UAPTS"
+    />
+    <KpiCard
+      label="Connected"
+      :value="String(byStatus('connected'))"
+      sub="Actively syncing"
+      trend-direction="up"
+      source="live" source-title="UAPTS"
+    />
+    <KpiCard
+      label="Degraded"
+      :value="String(byStatus('degraded'))"
+      sub="Partial / error"
+      :trend-direction="byStatus('degraded') === 0 ? 'up' : 'down'"
+      source="live" source-title="UAPTS"
+    />
+    <KpiCard
+      label="Disconnected"
+      :value="String(byStatus('disconnected'))"
+      sub="Not syncing"
+      :trend-direction="byStatus('disconnected') === 0 ? 'up' : 'down'"
+      source="live" source-title="UAPTS"
+    />
+    <KpiCard
+      label="Records Today"
+      :value="fmtNum(totalRecordsToday)"
+      sub="Across all feeds"
+      source="live" source-title="UAPTS"
+    />
+  </div>
 
-    <!-- Table -->
-    <div class="card">
-      <div v-if="error" class="card-body text-fg-muted">{{ error }}</div>
-      <div v-else-if="loading && !items.length" class="card-body text-fg-muted">
-        Loading integrations…
-      </div>
-      <div v-else-if="!filtered.length" class="card-body text-fg-muted">
-        No integrations match the current filters.
-      </div>
-      <table v-else class="data-table">
+  <!-- Filters -->
+  <div class="filter-bar">
+    <select v-model="statusFilter" class="select-sm">
+      <option value="">All statuses</option>
+      <option value="connected">Connected</option>
+      <option value="degraded">Degraded</option>
+      <option value="disconnected">Disconnected</option>
+      <option value="paused">Paused</option>
+    </select>
+    <select v-model="modeFilter" class="select-sm">
+      <option value="">All modes</option>
+      <option value="push">Push</option>
+      <option value="pull">Pull</option>
+      <option value="webhook">Webhook</option>
+    </select>
+    <input v-model="agencySearch" class="select-sm" placeholder="Agency code…" style="min-width:130px" />
+    <button class="btn" @click="statusFilter=''; modeFilter=''; agencySearch=''">Reset</button>
+    <span style="flex:1" />
+    <span style="font-size:12px;color:#64748b">{{ filteredIntegrations.length }} feeds</span>
+  </div>
+
+  <!-- Feed table -->
+  <div class="card">
+    <div class="card-body">
+      <table>
         <thead>
           <tr>
-            <th>Source</th>
             <th>Agency</th>
-            <th>System</th>
+            <th>Source System</th>
             <th>Mode</th>
             <th>Status</th>
             <th>Last Sync</th>
+            <th>Records Today</th>
             <th>Endpoint</th>
-            <th></th>
+            <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="i in filtered" :key="i.source_id">
-            <td>
-              <div class="flex items-center gap-2">
-                <Link2 :size="13" class="text-primary" />
-                <span class="font-medium">{{ i.source_id }}</span>
-              </div>
-              <div v-if="i.last_error" class="text-xs text-warning mt-0.5">
-                {{ i.last_error }}
-              </div>
-            </td>
-            <td>
-              <span class="font-mono text-xs">{{ i.agency_code }}</span>
-              <div class="text-xs text-fg-muted">{{ i.agency_name }}</div>
-            </td>
-            <td>{{ i.source_system }}</td>
-            <td><span class="badge badge-neutral">{{ i.mode.toUpperCase() }}</span></td>
-            <td>
-              <span
-                class="badge"
-                :class="{
-                  'badge-success': i.status === 'connected',
-                  'badge-warning': i.status === 'degraded',
-                  'badge-danger':  i.status === 'disconnected',
-                  'badge-neutral': i.status === 'pending',
-                }"
-              >
-                <span class="dot dot-inline" :class="`dot-${i.status === 'connected' ? 'live' : i.status === 'degraded' ? 'warn' : i.status === 'disconnected' ? 'dead' : 'pending'}`" />
-                {{ i.status }}
-              </span>
-            </td>
-            <td class="font-mono text-xs">{{ fmtSync(i.last_sync_at) }}</td>
-            <td class="text-xs text-fg-muted font-mono truncate-cell">
-              {{ i.endpoint_url ?? '—' }}
-            </td>
-            <td class="actions-cell">
-              <button class="btn btn-ghost btn-icon" title="Trigger sync" @click="trigger(i.source_id)">
-                <Play :size="12" />
-              </button>
-              <button class="btn btn-ghost btn-icon" title="Pause" @click="pause(i.source_id)">
-                <Pause :size="12" />
-              </button>
-              <button class="btn btn-ghost btn-icon" title="Resume" @click="resume(i.source_id)">
-                <RotateCw :size="12" />
-              </button>
-            </td>
-          </tr>
+        <tbody v-if="filteredIntegrations.length">
+          <template v-for="i in filteredIntegrations" :key="i.id">
+            <tr @click="expanded = expanded === i.id ? null : i.id" class="feed-row">
+              <td><BadgePill variant="neutral">{{ i.agency_code }}</BadgePill></td>
+              <td style="font-weight:600">{{ i.name }}</td>
+              <td><BadgePill variant="info">{{ i.mode }}</BadgePill></td>
+              <td><BadgePill :variant="statusBadge(i.status)">{{ i.status }}</BadgePill></td>
+              <td style="font-size:12px;white-space:nowrap">{{ i.last_sync_at ? fmtTime(i.last_sync_at) : 'Never' }}</td>
+              <td style="font-weight:600;text-align:right">{{ fmtNum(i.records_today ?? 0) }}</td>
+              <td style="font-size:11px;font-family:monospace;color:#64748b;max-width:160px;overflow:hidden;text-overflow:ellipsis">
+                {{ i.endpoint_url }}
+              </td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  <button
+                    class="btn" style="font-size:12px"
+                    :disabled="actionId === i.id"
+                    @click.stop="trigger(i.id)"
+                  >⚡ Sync</button>
+                  <button
+                    v-if="i.status !== 'paused'"
+                    class="btn" style="font-size:12px;color:#ca8a04"
+                    :disabled="actionId === i.id"
+                    @click.stop="pause(i.id)"
+                  >⏸ Pause</button>
+                  <button
+                    v-else
+                    class="btn" style="font-size:12px;color:#16a34a"
+                    :disabled="actionId === i.id"
+                    @click.stop="resume(i.id)"
+                  >▶ Resume</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="expanded === i.id" :key="`${i.id}-detail`">
+              <td colspan="8" class="error-row">
+                <div class="error-detail">
+                  <div style="font-size:12px;font-weight:600;margin-bottom:4px">
+                    <span :style="{ color: i.status === 'degraded' || i.status === 'disconnected' ? '#dc2626' : '#15803d' }">
+                      {{ i.status === 'degraded' || i.status === 'disconnected' ? '⚠ Last Error' : '✓ No Errors' }}
+                    </span>
+                  </div>
+                  <div style="font-size:12px;font-family:monospace;color:#475569;white-space:pre-wrap">
+                    {{ i.last_error ?? 'No errors recorded.' }}
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:4px">
+                    Endpoint: {{ i.endpoint_url }}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+        <tbody v-else>
+          <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px">{{ loading ? 'Loading integrations…' : 'No feeds match the current filters.' }}</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </template>
 
+<script setup lang="ts">
+definePageMeta({ layout: 'default' })
+useNavSubtitle('Integrations')
+
+import { useIntegrations } from '~/composables/api'
+import type { Integration } from '~/composables/api'
+
+const integrations = ref<Integration[]>([])
+const loading      = ref(true)
+const error        = ref<string | null>(null)
+const lastRefreshed = ref('-')
+const expanded     = ref<string | null>(null)
+const actionId     = ref<string | null>(null)
+
+const statusFilter = ref('')
+const modeFilter   = ref('')
+const agencySearch = ref('')
+
+async function load() {
+  loading.value = true
+  error.value = null
+  const [res] = await Promise.allSettled([useIntegrations().list({ page_size: 100 })])
+  if (res.status === 'fulfilled') integrations.value = (res.value as any).results ?? []
+  else error.value = 'Unable to reach the UAPTS Integrations API.'
+  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+  loading.value = false
+}
+
+onMounted(load)
+let t: ReturnType<typeof setInterval> | null = null
+onMounted(() => { t = setInterval(load, 120_000) })
+onUnmounted(() => { if (t) clearInterval(t) })
+
+const filteredIntegrations = computed(() =>
+  integrations.value.filter(i => {
+    if (statusFilter.value && i.status !== statusFilter.value) return false
+    if (modeFilter.value   && i.mode !== modeFilter.value)     return false
+    if (agencySearch.value && !i.agency_code.toLowerCase().includes(agencySearch.value.toLowerCase())) return false
+    return true
+  }),
+)
+
+const totalRecordsToday = computed(() =>
+  integrations.value.reduce((s, i) => s + (i.records_today ?? 0), 0),
+)
+function byStatus(s: string) { return integrations.value.filter(i => i.status === s).length }
+
+async function trigger(id: string) {
+  actionId.value = id
+  try { await useIntegrations().trigger(id); await load() } catch {} finally { actionId.value = null }
+}
+async function pause(id: string) {
+  actionId.value = id
+  try {
+    await useIntegrations().pause(id)
+    const idx = integrations.value.findIndex(i => i.id === id)
+    if (idx !== -1) integrations.value[idx] = { ...integrations.value[idx], status: 'paused' }
+  } catch {} finally { actionId.value = null }
+}
+async function resume(id: string) {
+  actionId.value = id
+  try {
+    await useIntegrations().resume(id)
+    const idx = integrations.value.findIndex(i => i.id === id)
+    if (idx !== -1) integrations.value[idx] = { ...integrations.value[idx], status: 'connected' }
+  } catch {} finally { actionId.value = null }
+}
+
+function statusBadge(s: string) {
+  const m: Record<string,string> = { connected:'success', degraded:'warning', disconnected:'danger', paused:'neutral' }
+  return m[s] ?? 'neutral'
+}
+function fmtNum(v: number) { return v.toLocaleString() }
+function fmtTime(iso: string) {
+  try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
+  catch { return iso }
+}
+</script>
+
 <style scoped>
-.integrations-page { display: flex; flex-direction: column; gap: 16px; }
-.card-body { padding: 18px; }
-
-.status-strip { display: flex; align-items: center; gap: 20px; padding: 10px 18px; flex-wrap: wrap; }
-.status-item { display: flex; align-items: center; gap: 6px; }
-
-.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.dot-live    { background: var(--success, #10b981); }
-.dot-warn    { background: var(--warning, #f59e0b); }
-.dot-dead    { background: var(--danger,  #ef4444); }
-.dot-pending { background: var(--fg-dim,  #475569); }
-.dot-inline { display: inline-block; margin-right: 4px; vertical-align: middle; }
-
-.badge { padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; display: inline-flex; align-items: center; gap: 4px; }
-.badge-success { background: rgba(16,185,129,0.15); color: #10b981; }
-.badge-warning { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.badge-danger  { background: rgba(239,68,68,0.15);  color: #ef4444; }
-.badge-neutral { background: rgba(148,163,184,0.15); color: #94a3b8; }
-
-.filters {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px;
-}
-.filter-select { width: 180px; }
-.input {
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 6px 10px; color: var(--fg); font-size: 0.8rem;
-}
-
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 10px 18px; text-align: left; }
-.data-table thead th {
-  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--fg-muted); border-bottom: 1px solid var(--border);
-}
-.data-table tbody tr { border-bottom: 1px solid var(--border); }
-.data-table tbody tr:last-child { border-bottom: none; }
-.data-table tbody tr:hover { background: rgba(255,255,255,0.025); }
-
-.truncate-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.actions-cell { display: flex; gap: 2px; }
-.btn-icon { padding: 5px 7px; }
-.btn-ghost { background: none; border: 1px solid transparent; cursor: pointer; }
-.btn-ghost:hover { background: rgba(255,255,255,0.06); border-color: var(--border); }
-.btn-secondary {
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 6px 12px; cursor: pointer; color: var(--fg);
-  display: inline-flex; align-items: center; gap: 6px;
-}
+.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
+.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+.filter-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
+.feed-row { cursor:pointer; }
+.feed-row:hover { background:#f8fafc; }
+.error-row { background:#fef2f2; }
+.error-detail { padding:8px 12px; }
 </style>

@@ -6,7 +6,7 @@
 //
 // We intentionally do not pre-resolve here. UaptsMap.vue re-resolves
 // the plugin payload itself because Vite's CJS↔ESM interop can wrap
-// the real export under `.default` at any depth — handing back a
+// the real export under `.default` at any depth - handing back a
 // pre-resolved value means UaptsMap.vue would have to trust that
 // shape, which has been a recurring source of `Lc.map is not a
 // function` errors. Letting the consumer walk the namespace keeps

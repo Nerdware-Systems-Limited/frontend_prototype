@@ -4,7 +4,7 @@
 //
 // These mirror the OpenAPI schemas in `uapts_backend/core/openapi.py`
 // and the serializers in `apps/accounts/serializers/`. Keep them in
-// sync with the backend — the tests under `tests/api.test.ts` will
+// sync with the backend - the tests under `tests/api.test.ts` will
 // fail loudly if a field the backend emits is missing here.
 // ─────────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ export interface User {
 /** Profile returned from /api/v1/auth/user/ (also embedded in login response). */
 export interface AuthUser extends User {
   // Backend doesn't currently emit first_name / last_name, but a future
-  // name split is likely — declare them as optional so the UI can light up
+  // name split is likely - declare them as optional so the UI can light up
   // without further changes when the backend grows them.
   first_name?: string
   last_name?: string
@@ -60,7 +60,7 @@ export interface AuthUser extends User {
   avatar?: string | null
 }
 
-/** Login response — `{access, refresh, user}`. */
+/** Login response - `{access, refresh, user}`. */
 export interface LoginResponse {
   access: string
   refresh: string

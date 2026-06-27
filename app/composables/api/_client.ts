@@ -17,7 +17,7 @@ import type { FetchOptions } from 'ofetch'
 
 export interface ApiOptions extends Omit<FetchOptions<'json'>, 'body'> {
   body?: unknown
-  /** Query-string params (typed loosely — domain composables re-narrow). */
+  /** Query-string params (typed loosely - domain composables re-narrow). */
   query?: Record<string, string | number | boolean | undefined | null>
 }
 

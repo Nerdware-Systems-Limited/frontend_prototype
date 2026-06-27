@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // Type-shape regression tests for `~/types/uapts.ts`.
 //
-// These tests don't make HTTP calls — they verify the TypeScript types
+// These tests don't make HTTP calls - they verify the TypeScript types
 // in uapts.ts match the *structure* of the data the backend emits,
 // by parsing fixtures of the actual OpenAPI examples in
 // `core/openapi.py` and asserting required fields are present.

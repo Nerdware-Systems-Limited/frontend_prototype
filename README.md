@@ -1,4 +1,4 @@
-# UAPTS Frontend — Nuxt 4 + Vue 3
+# UAPTS Frontend - Nuxt 4 + Vue 3
 
 The Unified Analytics and Predictive Transport System dashboard SPA.
 
@@ -22,7 +22,7 @@ app/composables/api/
 ├── useAuth.ts          # /api/v1/auth/* (login, logout, refresh, register, password)
 ├── useAccounts.ts      # /api/v1/accounts/{agencies,departments,roles,users}
 ├── useSystem.ts        # /api/, /api/v1/health/, /api/schema/
-├── useDashboard.ts     # M01 — aggregates accounts + health into KPIs
+├── useDashboard.ts     # M01 - aggregates accounts + health into KPIs
 ├── useAudit.ts         # /api/v1/audit/* + /ws/audit/ WS
 ├── useNotifications.ts # /api/v1/notifications/*
 ├── useTraffic.ts       # M02
@@ -40,7 +40,7 @@ The composables resolve the base URL from `NUXT_PUBLIC_API_BASE` (defaults to
 
 | Route        | Module | Wireframe                          | Status   |
 |--------------|--------|------------------------------------|----------|
-| `/login`     | —      | (login.vue)                        | Live     |
+| `/login`     | -      | (login.vue)                        | Live     |
 | `/dashboard` | M01    | dashboard                          | Live API |
 | `/traffic`   | M02    | m02-traffic-map.html               | Live     |
 | `/fleet`     | M03    | m03-fleet-tracking.html            | Live     |
@@ -53,12 +53,12 @@ The composables resolve the base URL from `NUXT_PUBLIC_API_BASE` (defaults to
 | `/analytics` | M01/M14 | analytics-workbench.html         | Live API |
 | `/query-builder` | M15 | query-builder.html               | Stub     |
 | `/reports`   | M15    | report-center.html                 | Live     |
-| `/notifications` | — | notifications.html                 | Live     |
-| `/integrations` | —   | integration-hub.html               | Live     |
-| `/users`     | —      | user-management.html               | Live     |
-| `/audit`     | —      | audit-trail.html                   | Live     |
-| `/settings`  | —      | settings.html                      | Local    |
-| `/profile`   | —      | (profile.vue)                      | Live API |
+| `/notifications` | - | notifications.html                 | Live     |
+| `/integrations` | -   | integration-hub.html               | Live     |
+| `/users`     | -      | user-management.html               | Live     |
+| `/audit`     | -      | audit-trail.html                   | Live     |
+| `/settings`  | -      | settings.html                      | Local    |
+| `/profile`   | -      | (profile.vue)                      | Live API |
 
 "Live" means the page reads from the backend (real or graceful 404); "Stub"
 shows a "module pending" message that lights up automatically when the
@@ -89,14 +89,14 @@ npm run test:ui      # vitest --ui
 
 The suite has three layers:
 
-- **`tests/unit/types.test.ts`** — fixture-driven shape checks for every
+- **`tests/unit/types.test.ts`** - fixture-driven shape checks for every
   API response type. Catches drift between the backend serializers and
   the TypeScript types in `app/types/uapts.ts`.
-- **`tests/unit/store.test.ts`** — Pinia store contract: login,
+- **`tests/unit/store.test.ts`** - Pinia store contract: login,
   refresh, hydrate, forceLogout, fetchMe.
-- **`tests/unit/api.test.ts`** — every domain composable hits the right
+- **`tests/unit/api.test.ts`** - every domain composable hits the right
   URL with the right method/body/query.
-- **`tests/integration/live.test.ts`** — live HTTP probes against
+- **`tests/integration/live.test.ts`** - live HTTP probes against
   `http://127.0.0.1:8000`. Skips automatically if the backend is
   unreachable or `UAPTS_SKIP_LIVE=1`.
 

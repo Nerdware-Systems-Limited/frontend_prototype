@@ -1,6 +1,6 @@
 // app/composables/api/useAuth.ts
 // ─────────────────────────────────────────────────────────────────────
-// /api/v1/auth/* — login / logout / refresh / register / password flows.
+// /api/v1/auth/* - login / logout / refresh / register / password flows.
 //
 // These wrap the standard dj-rest-auth + simplejwt endpoints. The store
 // (stores/auth.ts) owns the token state; this composable just exposes
@@ -37,7 +37,7 @@ export function useAuthApi() {
     login: (body: LoginPayload) =>
       api<LoginResponse>('/api/v1/auth/login/', { method: 'POST', body }),
 
-    /** POST /api/v1/auth/logout/ — blacklists the refresh token. */
+    /** POST /api/v1/auth/logout/ - blacklists the refresh token. */
     logout: (refresh: string, access: string) =>
       api<void>('/api/v1/auth/logout/', {
         method: 'POST',

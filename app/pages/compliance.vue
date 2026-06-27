@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// pages/compliance.vue — M12 Regulatory Compliance Tracker.
+// pages/compliance.vue - M12 Regulatory Compliance Tracker.
 //
 // Wires to:
-//   • /api/v1/public-transport/psv-licenses/   — operator licensing (NTSA)
-//   • /api/v1/public-transport/compliance/     — route compliance checks (NTSA + NaMATA)
-//   • /api/v1/safety/kpis/                     — safety KPIs cross-cut
+//   • /api/v1/public-transport/psv-licenses/   - operator licensing (NTSA)
+//   • /api/v1/public-transport/compliance/     - route compliance checks (NTSA + NaMATA)
+//   • /api/v1/safety/kpis/                     - safety KPIs cross-cut
 //
 // The page groups PSV licenses by status (active / suspended / expired),
 // shows route compliance checks, and surfaces aggregate KPIs that
@@ -70,7 +70,7 @@ const expiringSoon = computed(() => {
 })
 
 function fmtDate(d?: string) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
@@ -148,8 +148,8 @@ function daysUntil(d?: string): number | null {
         <tbody>
           <tr v-for="l in licenses.slice(0, 30)" :key="l.id">
             <td class="font-mono text-xs">{{ l.license_number }}</td>
-            <td>{{ l.sacco_name ?? '—' }}</td>
-            <td>{{ l.route_name ?? '—' }}</td>
+            <td>{{ l.sacco_name ?? '-' }}</td>
+            <td>{{ l.route_name ?? '-' }}</td>
             <td>
               <span
                 class="badge"
@@ -164,9 +164,9 @@ function daysUntil(d?: string): number | null {
               <span v-if="l.gps_compliance_pct != null" class="font-mono text-xs">
                 {{ Number(l.gps_compliance_pct).toFixed(1) }}%
               </span>
-              <span v-else class="text-fg-dim text-xs">—</span>
+              <span v-else class="text-fg-dim text-xs">-</span>
             </td>
-            <td>{{ l.vehicle_count ?? '—' }}</td>
+            <td>{{ l.vehicle_count ?? '-' }}</td>
             <td class="font-mono text-xs">
               {{ fmtDate(l.expiry_date) }}
               <span v-if="(daysUntil(l.expiry_date) ?? 999) < 30" class="text-amber-400 ml-1">
@@ -200,8 +200,8 @@ function daysUntil(d?: string): number | null {
         </thead>
         <tbody>
           <tr v-for="c in checks.slice(0, 30)" :key="c.id">
-            <td>{{ c.route_name ?? '—' }}</td>
-            <td>{{ c.check_type ?? '—' }}</td>
+            <td>{{ c.route_name ?? '-' }}</td>
+            <td>{{ c.check_type ?? '-' }}</td>
             <td>
               <span
                 class="badge"
@@ -212,7 +212,7 @@ function daysUntil(d?: string): number | null {
                 }"
               >{{ c.status }}</span>
             </td>
-            <td class="text-xs">{{ c.notes ?? '—' }}</td>
+            <td class="text-xs">{{ c.notes ?? '-' }}</td>
             <td class="font-mono text-xs">{{ fmtDate(c.checked_at) }}</td>
           </tr>
         </tbody>
@@ -229,8 +229,8 @@ function daysUntil(d?: string): number | null {
       </div>
       <div class="kpi-list">
         <div v-for="k in kpis" :key="k.id" class="kpi-row">
-          <div class="text-sm font-medium">{{ k.label ?? k.name ?? k.metric ?? '—' }}</div>
-          <div class="kpi-row-value">{{ k.value ?? '—' }}</div>
+          <div class="text-sm font-medium">{{ k.label ?? k.name ?? k.metric ?? '-' }}</div>
+          <div class="kpi-row-value">{{ k.value ?? '-' }}</div>
         </div>
       </div>
     </div>
