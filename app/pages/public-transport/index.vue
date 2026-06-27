@@ -5,9 +5,7 @@
     subtitle="NaMATA · NTSA · NCTTCA - BRT operations, PSV oversight, schedule adherence, fare analytics, NCTTCA corridor ridership, and operator ranking"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <NuxtLink to="/public-transport/compliance" class="btn-primary">Compliance →</NuxtLink>
     </template>

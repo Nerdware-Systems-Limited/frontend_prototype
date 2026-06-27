@@ -5,9 +5,7 @@
     subtitle="KPA · KMA · KenTrade · NCTTCA - Berth occupancy, container throughput, KenTrade clearance data, NCTTCA corridor dwell analysis, and 60-day trends"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <select v-model="portFilter" class="select-sm" @change="load">
         <option value="">All ports</option>
         <option v-for="p in opsData?.ports ?? []" :key="p.port_unlocode" :value="p.port_unlocode">

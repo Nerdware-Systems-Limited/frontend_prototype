@@ -6,10 +6,9 @@
 
 <style scoped>
 .auth-shell {
-  min-height: 100vh;
-  background: var(--bg);
+  width: 100%;
+  height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
 }
 </style>

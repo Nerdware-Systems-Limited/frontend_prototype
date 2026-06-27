@@ -5,9 +5,7 @@
     subtitle="NTSA · KeNHA · KMD - KDE accident cluster analysis, KeNHA road geometry context, KMD weather correlation, and predictive hotspot overlays"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>

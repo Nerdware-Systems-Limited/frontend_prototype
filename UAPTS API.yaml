@@ -11902,7 +11902,7 @@ paths:
   /api/v1/fleet/gps-tracks/:
     get:
       operationId: v1_fleet_gps_tracks_list
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       parameters:
       - name: ordering
         required: false
@@ -11943,7 +11943,7 @@ paths:
           description: ''
     post:
       operationId: v1_fleet_gps_tracks_create
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       tags:
       - v1
       requestBody:
@@ -11972,7 +11972,7 @@ paths:
   /api/v1/fleet/gps-tracks/{id}/:
     patch:
       operationId: v1_fleet_gps_tracks_partial_update
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       parameters:
       - in: path
         name: id
@@ -12007,7 +12007,7 @@ paths:
           description: ''
     get:
       operationId: v1_fleet_gps_tracks_retrieve
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       parameters:
       - in: path
         name: id
@@ -12031,7 +12031,7 @@ paths:
           description: ''
     delete:
       operationId: v1_fleet_gps_tracks_destroy
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       parameters:
       - in: path
         name: id
@@ -12051,7 +12051,7 @@ paths:
           description: No response body
     put:
       operationId: v1_fleet_gps_tracks_update
-      description: Live GPS stream (FR-M03-001). Write endpoint is for IVMS ingestion.
+      description: Live GPS stream (FR-M03-001). Write endpoint is for iTIMS ingestion.
       parameters:
       - in: path
         name: id
@@ -12812,7 +12812,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       parameters:
       - name: ordering
         required: false
@@ -12857,7 +12857,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       tags:
       - v1
       requestBody:
@@ -12907,7 +12907,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       parameters:
       - in: path
         name: id
@@ -12946,7 +12946,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       parameters:
       - in: path
         name: id
@@ -12974,7 +12974,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       parameters:
       - in: path
         name: id
@@ -12998,7 +12998,7 @@ paths:
         Configurable alert zone (FR-M03-002).
 
         The map overlays active geofences; the breach-event stream is
-        written by the IVMS correlator via this endpoint.
+        written by the iTIMS correlator via this endpoint.
       parameters:
       - in: path
         name: id
@@ -13238,7 +13238,7 @@ paths:
   /api/v1/fleet/driver-behavior-events/:
     get:
       operationId: v1_fleet_driver_behavior_events_list
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       parameters:
       - name: ordering
         required: false
@@ -13279,7 +13279,7 @@ paths:
           description: ''
     post:
       operationId: v1_fleet_driver_behavior_events_create
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       tags:
       - v1
       requestBody:
@@ -13344,7 +13344,7 @@ paths:
   /api/v1/fleet/driver-behavior-events/{id}/:
     patch:
       operationId: v1_fleet_driver_behavior_events_partial_update
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       parameters:
       - in: path
         name: id
@@ -13379,7 +13379,7 @@ paths:
           description: ''
     get:
       operationId: v1_fleet_driver_behavior_events_retrieve
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       parameters:
       - in: path
         name: id
@@ -13403,7 +13403,7 @@ paths:
           description: ''
     delete:
       operationId: v1_fleet_driver_behavior_events_destroy
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       parameters:
       - in: path
         name: id
@@ -13423,7 +13423,7 @@ paths:
           description: No response body
     put:
       operationId: v1_fleet_driver_behavior_events_update
-      description: IVMS-derived behavioural events (FR-M03-004).
+      description: iTIMS-derived behavioural events (FR-M03-004).
       parameters:
       - in: path
         name: id
@@ -20915,7 +20915,7 @@ components:
         * `ensemble` - Ensemble
     DriverBehaviorEvent:
       type: object
-      description: IVMS-derived behavioural event (FR-M03-004).
+      description: iTIMS-derived behavioural event (FR-M03-004).
       properties:
         id:
           type: string
@@ -20983,7 +20983,7 @@ components:
         * `sharp_turn` - Sharp Turn
     DriverBehaviorEventRequest:
       type: object
-      description: IVMS-derived behavioural event (FR-M03-004).
+      description: iTIMS-derived behavioural event (FR-M03-004).
       properties:
         vehicle:
           type: string
@@ -23377,7 +23377,7 @@ components:
         gps_compliance_pct:
           type: number
           format: double
-          description: Share of days the operator's IVMS was reporting.
+          description: Share of days the operator's iTIMS was reporting.
         vehicle_count:
           type: integer
           maximum: 2147483647
@@ -26166,7 +26166,7 @@ components:
           maxLength: 20
     PatchedDriverBehaviorEventRequest:
       type: object
-      description: IVMS-derived behavioural event (FR-M03-004).
+      description: iTIMS-derived behavioural event (FR-M03-004).
       properties:
         vehicle:
           type: string

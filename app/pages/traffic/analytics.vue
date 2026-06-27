@@ -5,9 +5,7 @@
     subtitle="KeNHA · KURA · KMD - Volume trends, speed compliance, vehicle class breakdown, O-D matrix, and AI forecasts"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <div class="day-filter">
         <button
           v-for="d in [1, 7, 30]"

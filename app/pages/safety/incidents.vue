@@ -5,9 +5,7 @@
     subtitle="NTSA · NPS · KMD - Real-time active incidents, NPS emergency dispatch coordination, KMD weather context, and investigation workflows"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>

@@ -5,9 +5,7 @@
     subtitle="KRC · NCTTCA - Real-time SGR &amp; MGR train positions, delays, rolling stock status, and NCTTCA corridor transit performance - refreshes every 30 seconds"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <BadgePill variant="danger">{{ delayedOps.length }} delayed</BadgePill>
       <BadgePill variant="success">{{ onTimeOps.length }} on-time</BadgePill>
       <select v-model="networkFilter" class="select-sm">

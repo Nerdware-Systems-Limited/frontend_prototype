@@ -5,9 +5,6 @@
     subtitle="KRC · NCTTCA - SGR &amp; MGR timetables, OTP, NCTTCA corridor punctuality benchmarks, and recent operation adherence"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
       <div class="day-filter">
         <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': otpDays === d }" @click="otpDays = d; loadOtp()">{{ d }}d OTP</button>
       </div>

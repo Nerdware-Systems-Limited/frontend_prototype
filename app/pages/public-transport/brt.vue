@@ -5,9 +5,7 @@
     subtitle="NaMATA · NTSA - BRT stop facilities, boarding counts, NTSA vehicle compliance, headway compliance, and schedule adherence"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>

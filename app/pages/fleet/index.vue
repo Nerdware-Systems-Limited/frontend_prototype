@@ -5,9 +5,7 @@
     subtitle="NTSA · KMD - Fleet utilization, speed governor compliance, KMD weather-correlated driver behaviour events, and operator leaderboard"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <NuxtLink to="/fleet/live" class="btn-primary">Live Map →</NuxtLink>
     </template>
@@ -16,7 +14,7 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- KPI ribbon -->
-  <SectionTitle :pill="summary ? 'NTSA iTIMS / IVMS · ' + freshnessLabel(summary.generated_at) : ''">
+  <SectionTitle :pill="summary ? 'NTSA iTIMS / iTIMS · ' + freshnessLabel(summary.generated_at) : ''">
     Fleet KPIs
   </SectionTitle>
 
@@ -32,34 +30,34 @@
       :value="summary ? fmtNum(summary.kpis.live_vehicles) : '-'"
       sub="Active PSVs with signal"
       trend-direction="up"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Trips (7d)"
       :value="summary ? fmtNum(summary.kpis.trips_7d) : '-'"
       sub="PSV trips recorded this week"
       trend-direction="up"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Distance (7d)"
       :value="summary ? `${fmtNum(summary.kpis.distance_7d_km)} km` : '-'"
       sub="Total network kilometres"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Critical Events (24h)"
       :value="summary ? fmtNum(summary.behaviour_critical_24h) : '-'"
       sub="Speeding · harsh brake · deviation"
       trend-direction="down"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Governor Compliance"
       :value="summary ? fmtPct(summary.governor_compliance.online_pct) : '-'"
       :sub="`Tamper rate: ${summary ? fmtPct(summary.governor_compliance.tamper_rate_pct) : '-'}`"
       :trend-direction="summary && summary.governor_compliance.tamper_rate_pct < 5 ? 'up' : 'down'"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
   </div>
 
@@ -132,7 +130,7 @@
   </div>
 
   <!-- Recent critical behaviour events -->
-  <SectionTitle pill="NTSA IVMS · Live">Critical Driver Behaviour Events (24h)</SectionTitle>
+  <SectionTitle pill="NTSA iTIMS · Live">Critical Driver Behaviour Events (24h)</SectionTitle>
 
   <div class="card">
     <div class="card-body">
@@ -173,7 +171,7 @@
   </div>
 
   <!-- Utilization leaderboard -->
-  <SectionTitle pill="NTSA IVMS · Batch">Fleet Utilization Leaderboard</SectionTitle>
+  <SectionTitle pill="NTSA iTIMS · Batch">Fleet Utilization Leaderboard</SectionTitle>
 
   <div class="card">
     <div class="card-body">

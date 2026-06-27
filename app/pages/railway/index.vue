@@ -5,9 +5,7 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - SGR &amp; MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <BadgePill v-if="summary" variant="info">
         {{ fmtNum(summary.kpis.trains_in_service) }} trains live
       </BadgePill>

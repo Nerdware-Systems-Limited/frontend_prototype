@@ -5,9 +5,7 @@
     subtitle="NTSA · KeNHA · KMD - National road safety KPIs, active incidents, KMD weather correlation, KeNHA road intervention effectiveness, and predictive hotspot analysis"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <NuxtLink to="/safety/incidents" class="btn-primary">Incident Command →</NuxtLink>
     </template>

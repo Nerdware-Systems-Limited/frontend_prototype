@@ -5,9 +5,7 @@
     subtitle="Configure zones (depots, ports, restricted areas) and monitor entry/exit breach events"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>
@@ -20,27 +18,27 @@
       label="Total Zones"
       :value="fmtNum(geofences.length)"
       sub="Configured geofence zones"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Active Zones"
       :value="fmtNum(activeCount)"
       sub="Currently monitoring"
       trend-direction="up"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Breaches (24h)"
       :value="fmtNum(breaches.length)"
       sub="All entry / exit / dwell events"
       trend-direction="down"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Critical Zones"
       :value="fmtNum(criticalCount)"
       sub="Severity = critical"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
   </div>
 

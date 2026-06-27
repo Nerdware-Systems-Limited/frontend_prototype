@@ -5,9 +5,7 @@
     subtitle="KPA · KMA · KenTrade · NCTTCA - Real-time AIS vessel traffic, port performance, KenTrade cargo single-window, and NCTTCA corridor transit KPIs"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <div class="day-filter">
         <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
       </div>

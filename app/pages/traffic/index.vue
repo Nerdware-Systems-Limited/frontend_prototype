@@ -5,9 +5,7 @@
     subtitle="KeNHA · KURA · KMD - Real-time flow, congestion events, speed compliance, KMD weather impact, and NCTTCA corridor alerts"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <NuxtLink to="/traffic/alerts" class="btn-primary">Alerts →</NuxtLink>
     </template>

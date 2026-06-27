@@ -166,7 +166,7 @@ function fmtKES(n: number) {
             <span class="legend-swatch" style="background: #10b981"></span>
             <div>
               <div class="legend-label">Counting Stations</div>
-              <div class="legend-desc">ATC + WIM + IVMS · 7,000+ real stations from shapefiles</div>
+              <div class="legend-desc">ATC + WIM + iTIMS · 7,000+ real stations from shapefiles</div>
             </div>
           </div>
           <div class="legend-item">

@@ -5,9 +5,7 @@
     subtitle="KeNHA · KURA · KMD · NCTTCA - Active traffic alerts, congestion events, KMD weather warnings, and NCTTCA corridor risk forecasts"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <BadgePill variant="danger">{{ activeAlerts.length }} Active</BadgePill>
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>

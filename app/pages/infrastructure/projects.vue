@@ -5,9 +5,7 @@
     subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Project portfolio, physical &amp; financial progress, disbursement, delays, and county breakdown"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>

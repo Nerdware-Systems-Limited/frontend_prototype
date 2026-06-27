@@ -5,9 +5,7 @@
     subtitle="NaMATA · NTSA · NCTTCA - SACCO ranking, service quality scores, NCTTCA corridor operator benchmarks, fleet utilization, and passenger feedback"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>
@@ -40,7 +38,7 @@
       label="Avg Fleet Utilization"
       :value="avgUtil ? `${avgUtil.toFixed(0)}%` : '-'"
       sub="Across all ranked SACCOs"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Open Complaints"

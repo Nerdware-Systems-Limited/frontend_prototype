@@ -57,7 +57,7 @@
       <div class="kpi-trend up">
         {{ fleet ? `${fmtNum(fleet.kpis.total_vehicles)} total registered` : 'Loading…' }}
       </div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS / IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
 
     <!-- Rail On-Time -->
@@ -211,31 +211,31 @@
       <div class="kpi-label">Live GPS-tracked</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.live_vehicles) : '-' }}</div>
       <div class="kpi-sub">PSVs &amp; govt fleet with active track</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card good">
       <div class="kpi-label">Trips completed (7d)</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.trips_7d) : '-' }}</div>
       <div class="kpi-sub">PSV trips recorded this week</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card good">
       <div class="kpi-label">Distance covered (7d)</div>
       <div class="kpi-val">{{ fleet ? `${fmtNum(fleet.kpis.distance_7d_km)} km` : '-' }}</div>
       <div class="kpi-sub">Total network kilometres</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card" :class="fleet && fleet.governor_compliance.tamper_rate_pct < 5 ? 'good' : 'warn'">
       <div class="kpi-label">Speed governor compliance</div>
       <div class="kpi-val">{{ fleet ? fmtPct(fleet.governor_compliance.online_pct) : '-' }}</div>
       <div class="kpi-sub">Tamper rate: {{ fleet ? fmtPct(fleet.governor_compliance.tamper_rate_pct) : '-' }}</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card warn">
       <div class="kpi-label">Critical behaviour events (24h)</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.behaviour_critical_24h) : '-' }}</div>
       <div class="kpi-sub">Speeding · harsh brake · deviation</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA IVMS</div>
+      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
   </div>
 
@@ -592,7 +592,7 @@
     <div class="agency-card">
       <div class="agency-card-head">
         <div class="agency-card-title">NTSA - Safety &amp; enforcement</div>
-        <span class="agency-tag">Live IVMS</span>
+        <span class="agency-tag">Live iTIMS</span>
       </div>
       <template v-if="safety && fleet">
         <div class="agency-row">
@@ -952,7 +952,7 @@ const activeAlerts = computed((): AlertEntry[] => {
   }
 
   if (fleet.value && fleet.value.governor_compliance.tamper_rate_pct > 5)
-    list.push({ severity: 'warning', title: `Speed governor tamper rate: ${fmtPct(fleet.value.governor_compliance.tamper_rate_pct)}`, meta: 'NTSA IVMS · Live' })
+    list.push({ severity: 'warning', title: `Speed governor tamper rate: ${fmtPct(fleet.value.governor_compliance.tamper_rate_pct)}`, meta: 'NTSA iTIMS · Live' })
 
   if (infra.value && infra.value.bridges.critical_count > 0)
     list.push({ severity: 'warning', title: `${fmtNum(infra.value.bridges.critical_count)} bridges at critical condition`, meta: 'BMS · Batch survey' })

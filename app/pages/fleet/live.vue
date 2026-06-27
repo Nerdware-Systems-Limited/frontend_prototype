@@ -5,9 +5,7 @@
     subtitle="Real-time GPS positions for all active PSVs and government fleet - refreshes every 30 seconds"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <BadgePill variant="success">{{ liveVehicles.length }} Live</BadgePill>
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>

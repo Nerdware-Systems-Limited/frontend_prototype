@@ -5,9 +5,7 @@
     subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and SACCO registration"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>
@@ -47,7 +45,7 @@
       :value="avgGpsCompliance ? `${avgGpsCompliance.toFixed(1)}%` : '-'"
       sub="Across all active licences"
       :trend-direction="avgGpsCompliance && avgGpsCompliance >= 90 ? 'up' : 'down'"
-      source="live" source-title="NTSA IVMS"
+      source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Active SACCOs"

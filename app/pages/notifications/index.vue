@@ -6,7 +6,6 @@
   >
     <template #actions>
       <span class="unread-badge" v-if="liveUnread > 0">{{ liveUnread }} unread</span>
-      <span class="freshness-badge" v-else>All caught up</span>
       <button class="btn" :disabled="markingAll" @click="markAll">
         {{ markingAll ? 'Marking…' : '✓ Mark all read' }}
       </button>

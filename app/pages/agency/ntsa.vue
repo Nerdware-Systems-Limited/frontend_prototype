@@ -13,7 +13,7 @@
 <div class="persona-ribbon"><strong>RBAC:</strong> Operator persona · live fleet command & enforcement tools<span class="pr-chip">Tenant: NTSA</span></div>
 
 <div class="kpi-grid">
- <div class="kpi-card"><span class="src-chip live kpi-source">Live API</span><div class="kpi-label">Tracked Fleet (IVMS)</div><div class="kpi-value">45,210</div><div class="kpi-sub">PSV + freight reporting GPS</div></div>
+ <div class="kpi-card"><span class="src-chip live kpi-source">Live API</span><div class="kpi-label">Tracked Fleet (iTIMS)</div><div class="kpi-value">45,210</div><div class="kpi-sub">PSV + freight reporting GPS</div></div>
  <div class="kpi-card"><span class="src-chip live kpi-source">Live API</span><div class="kpi-label">Vehicles with Expired Reg</div><div class="kpi-value">214</div><div class="kpi-trend down"> Action required</div></div>
  <div class="kpi-card"><span class="src-chip live kpi-source">Live API</span><div class="kpi-label">Active Black Spots</div><div class="kpi-value">37</div><div class="kpi-sub">≥3 fatalities last 12mo</div></div>
  <div class="kpi-card"><span class="src-chip live kpi-source">Live API</span><div class="kpi-label">7-day Fatalities</div><div class="kpi-value">112</div><div class="kpi-trend down"> 9 vs prior week</div></div>
@@ -21,7 +21,7 @@
 
 <div class="charts-row">
  <div class="chart-card">
-  <h3>Live Fleet Tracking <span>IVMS × Registry cross-reference</span></h3>
+  <h3>Live Fleet Tracking <span>iTIMS × Registry cross-reference</span></h3>
   <div class="map-wrap"><div class="map-canvas" style="height:340px">
      <div id="map"></div>
    <div class="map-legend">

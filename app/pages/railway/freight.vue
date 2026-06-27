@@ -5,9 +5,7 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - Freight manifests, corridor analysis, KenTrade single-window clearances, NCTTCA transit tracking, and KPA port-rail reconciliation"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <div class="day-filter">
         <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
       </div>

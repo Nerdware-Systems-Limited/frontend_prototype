@@ -5,9 +5,7 @@
     subtitle="KeNHA · KRB · LAPSSET - Bridge inventory, condition scores, KRB-funded inspection schedules, critical structure alerts, and spatial mapping"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>

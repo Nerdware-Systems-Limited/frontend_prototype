@@ -5,9 +5,7 @@
     subtitle="NTSA · KeNHA · KURA · KeRRA - National crash rates, injury severity, county breakdowns by road authority, and traffic violation trends"
   >
     <template #actions>
-      <span class="freshness-badge" :class="{ loading }">
-        {{ loading ? 'Refreshing…' : `Updated ${lastRefreshed}` }}
-      </span>
+      
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
     </template>
   </PageHeader>
