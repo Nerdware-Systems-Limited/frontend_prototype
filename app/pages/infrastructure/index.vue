@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M06 - Infrastructure & Network Health"
+    eyebrow="Infrastructure & Network Health"
     title="Asset Condition Map"
     subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Pavement quality (IRI), bridge health, KURA signal faults, KMD weather impact, and deterioration forecasts"
   >
