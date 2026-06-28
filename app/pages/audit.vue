@@ -11,6 +11,11 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
+  <!-- WebSocket status -->
+  <div v-if="streamError" class="ws-banner">⚡ Live feed unavailable - {{ streamError }}</div>
+  <div v-else-if="streamConnected && isDefaultView" class="ws-connected">⚡ Live - connected</div>
+  <div v-else-if="streamConnected" class="ws-paused">⏸ Live - connected, but paused while filtered/paginated</div>
+
   <!-- Filter bar -->
   <div class="filter-bar">
     <input v-model="filters.search" class="select-sm" placeholder="Search…" style="min-width:200px" @change="reload" />
@@ -24,6 +29,7 @@
       <option value="logout">Logout</option>
       <option value="export">Export</option>
       <option value="generate">Generate</option>
+      <option value="view">View</option>
     </select>
     <input v-model="filters.resource" class="select-sm" placeholder="Resource type…" @change="reload" />
     <input type="date" v-model="filters.date_from" class="select-sm" @change="reload" />
@@ -42,37 +48,50 @@
             <th>Timestamp</th>
             <th>User</th>
             <th>Action</th>
-            <th>Resource Type</th>
-            <th>Resource ID</th>
+            <th>Resource / Path</th>
+            <th>Method · Status</th>
             <th>IP Address</th>
             <th>Changes</th>
           </tr>
         </thead>
         <tbody v-if="entries.length">
-          <tr v-for="e in entries" :key="e.id" @click="expanded = expanded === e.id ? null : e.id" class="audit-row">
-            <td style="font-size:12px;white-space:nowrap;font-family:monospace">{{ fmtTime(e.timestamp) }}</td>
-            <td style="font-size:12px">{{ e.user_email }}</td>
+          <tr v-for="e in entries" :key="e.id" @click="toggleExpand(e)" class="audit-row">
+            <!-- Timestamp: API field is created_at -->
+            <td style="font-size:12px;white-space:nowrap;font-family:monospace">{{ fmtTime(entryField(e, 'created_at') ?? e.timestamp) }}</td>
+            <!-- User: username (nullable) → user_id → 'System' -->
+            <td style="font-size:12px">{{ entryUser(e) }}</td>
             <td><BadgePill :variant="actionBadge(e.action)">{{ e.action }}</BadgePill></td>
-            <td style="font-family:monospace;font-size:12px">{{ e.resource_type }}</td>
-            <td style="font-family:monospace;font-size:11px;color:#64748b;max-width:120px;overflow:hidden;text-overflow:ellipsis">{{ e.resource_id ?? '-' }}</td>
-            <td style="font-size:12px;font-family:monospace;color:#64748b">{{ (e as any).ip_address ?? '-' }}</td>
+            <!-- Resource type + id; fall back to request_path when both are blank -->
+            <td style="font-family:monospace;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                :title="entryResource(e)">{{ entryResource(e) }}</td>
+            <!-- request_method + status_code -->
+            <td style="font-size:12px;font-family:monospace;white-space:nowrap">
+              <span v-if="entryField(e,'request_method')" :style="{ color: methodColor(entryField(e,'request_method')) }">
+                {{ entryField(e, 'request_method') }}
+              </span>
+              <span v-if="entryField(e,'status_code')" :style="{ color: statusColor(entryField(e,'status_code')) }"
+                    style="margin-left:4px">{{ entryField(e, 'status_code') }}</span>
+              <span v-if="!entryField(e,'request_method') && !entryField(e,'status_code')" style="color:#94a3b8">-</span>
+            </td>
+            <td style="font-size:12px;font-family:monospace;color:#64748b">{{ entryField(e, 'ip_address') ?? '-' }}</td>
+            <!-- Changes: built from old_values / new_values diff -->
             <td style="font-size:12px">
-              <template v-if="(e as any).changes && Object.keys((e as any).changes).length">
-                <span style="color:#3b82f6;cursor:pointer">{{ expanded === e.id ? '▾' : '▸' }} {{ Object.keys((e as any).changes).length }} fields</span>
+              <template v-if="entryDiffKeys(e).length">
+                <span style="color:#3b82f6;cursor:pointer">{{ expanded === e.id ? '▾' : '▸' }} {{ entryDiffKeys(e).length }} fields</span>
               </template>
               <span v-else style="color:#94a3b8">-</span>
             </td>
           </tr>
           <template v-for="e in entries" :key="`${e.id}-expanded`">
-            <tr v-if="expanded === e.id && (e as any).changes">
+            <tr v-if="expanded === e.id && entryDiffKeys(e).length">
               <td colspan="7" class="change-detail">
                 <table class="diff-table">
                   <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
                   <tbody>
-                    <tr v-for="(change, field) in (e as any).changes" :key="field">
+                    <tr v-for="field in entryDiffKeys(e)" :key="field">
                       <td style="font-family:monospace;font-size:11px">{{ field }}</td>
-                      <td style="font-size:11px;color:#dc2626">{{ JSON.stringify(change.before ?? change.from ?? null) }}</td>
-                      <td style="font-size:11px;color:#16a34a">{{ JSON.stringify(change.after ?? change.to ?? null) }}</td>
+                      <td style="font-size:11px;color:#dc2626">{{ JSON.stringify(entryField(e,'old_values')?.[field] ?? null) }}</td>
+                      <td style="font-size:11px;color:#16a34a">{{ JSON.stringify(entryField(e,'new_values')?.[field] ?? null) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -85,11 +104,12 @@
         </tbody>
       </table>
 
-      <!-- Pagination -->
-      <div v-if="total > pageSize" class="pagination">
-        <button class="btn" :disabled="page <= 1 || loading" @click="page--; reload()">← Prev</button>
-        <span style="font-size:13px;color:#64748b">Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
-        <button class="btn" :disabled="page >= Math.ceil(total / pageSize) || loading" @click="page++; reload()">Next →</button>
+      <!-- Pagination — driven by next/previous URLs returned by the API.
+           No client-side page_size math: the server controls page size. -->
+      <div v-if="prevUrl || nextUrl" class="pagination">
+        <button class="btn" :disabled="!prevUrl || loading" @click="loadUrl(prevUrl!)">← Prev</button>
+        <span style="font-size:13px;color:#64748b">Page {{ page }} · {{ fmtNum(total) }} total</span>
+        <button class="btn" :disabled="!nextUrl || loading" @click="loadUrl(nextUrl!)">Next →</button>
       </div>
     </div>
   </div>
@@ -100,15 +120,22 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Audit Trail')
 
 import { useAudit } from '~/composables/api'
-import type { AuditEntry } from '~/composables/api'
+import type { AuditEntry, AuditQuery } from '~/composables/api'
+import { useAuditSocket } from '~/composables/useAuditSocket'
+import type { AuditLog } from '~/composables/useAuditSocket'
 
 const entries  = ref<AuditEntry[]>([])
 const total    = ref(0)
 const loading  = ref(true)
 const error    = ref<string | null>(null)
-const page     = ref(1)
-const pageSize = 50
 const expanded = ref<string | null>(null)
+
+// ── Pagination state ───────────────────────────────────────────────────────
+// The API returns `next` / `previous` as absolute URLs (or null).
+// We track page number locally only for display; navigation is URL-driven.
+const page    = ref(1)
+const nextUrl = ref<string | null>(null)
+const prevUrl = ref<string | null>(null)
 
 const filters = ref({
   search:    '',
@@ -119,15 +146,21 @@ const filters = ref({
   date_to:   '',
 })
 
-async function load(resetPage = false) {
-  if (resetPage) page.value = 1
-  loading.value = true
-  error.value = null
+/** Apply a page response envelope to local state. */
+function applyPage(data: { count: number; next: string | null; previous: string | null; results: AuditEntry[] }) {
+  entries.value = data.results ?? []
+  total.value   = data.count ?? entries.value.length
+  nextUrl.value = data.next ?? null
+  prevUrl.value = data.previous ?? null
+}
 
-  const q: Record<string, unknown> = {
-    page_size: pageSize,
-    page: page.value,
-  }
+/** Load page 1 with current filters (resets pagination). */
+async function load() {
+  page.value  = 1
+  loading.value = true
+  error.value   = null
+
+  const q: AuditQuery = {}
   if (filters.value.search)    q.search    = filters.value.search
   if (filters.value.user)      q.user      = filters.value.user
   if (filters.value.action)    q.action    = filters.value.action
@@ -135,18 +168,32 @@ async function load(resetPage = false) {
   if (filters.value.date_from) q.date_from = filters.value.date_from
   if (filters.value.date_to)   q.date_to   = filters.value.date_to
 
-  const [res] = await Promise.allSettled([useAudit().list(q as any)])
-  if (res.status === 'fulfilled') {
-    entries.value = (res.value as any).results ?? []
-    total.value   = (res.value as any).count ?? entries.value.length
-  } else {
+  try {
+    applyPage(await useAudit().list(q))
+  } catch {
     error.value = 'Unable to reach the UAPTS Audit API.'
+  } finally {
+    loading.value = false
   }
-
-  loading.value = false
 }
 
-function reload() { load(true) }
+/** Navigate to an absolute next/previous URL from the API response. */
+async function loadUrl(absoluteUrl: string) {
+  loading.value = true
+  error.value   = null
+  // Determine direction before awaiting so we can update page number
+  const goingForward = absoluteUrl === nextUrl.value
+  try {
+    applyPage(await useAudit().listFromUrl(absoluteUrl))
+    page.value += goingForward ? 1 : -1
+  } catch {
+    error.value = 'Unable to load the requested page.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function reload() { load() }
 
 function resetFilters() {
   filters.value = { search: '', user: '', action: '', resource: '', date_from: '', date_to: '' }
@@ -158,6 +205,55 @@ let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(() => load(), 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
+// ── Live feed ───────────────────────────────────────────────────────────
+// Used directly here (not via a shared store) since this is the only page
+// that needs it right now. If a system-health page later needs `metrics`
+// from the same socket, wrap this in a Pinia setup store the same way
+// notifications.ts wraps useNotificationSocket — see the note in
+// useAuditSocket.ts for why a bare onUnmounted(disconnect) only stays safe
+// as long as it's used directly like this, in exactly one component.
+const { logs: liveLogs, isConnected: streamConnected, error: streamError, connect, disconnect }
+  = useAuditSocket()
+
+onMounted(connect)
+onUnmounted(disconnect)
+
+// Only the unfiltered first page is "the live tip of the log" — splicing a
+// brand-new row into a filtered view or page 2+ could show an entry that
+// doesn't belong there until the next reload.
+const isDefaultView = computed(() =>
+  page.value === 1 &&
+  !filters.value.search && !filters.value.user && !filters.value.action &&
+  !filters.value.resource && !filters.value.date_from && !filters.value.date_to,
+)
+
+watch(
+  () => liveLogs.value[0],
+  (latest) => {
+    if (!latest || !isDefaultView.value) return
+    if (entries.value.some((e) => e.id === latest.id)) return
+
+    // Reconcile the WS AuditLog shape with the REST AuditEntry shape.
+    // The API uses created_at (not timestamp) and username/user_id (not user_email).
+    // The changes diff is not available on live rows — it appears on the next REST reload.
+    entries.value.unshift({
+      ...latest,
+      id:         String(latest.id),
+      created_at: latest.created_at ?? latest.timestamp,
+      username:   latest.username,
+      user_id:    latest.user_id,
+      // Keep user_email as fallback for any REST-side AuditEntry code paths
+      user_email: latest.username ?? (latest.user_id && latest.user_id !== 'None' ? latest.user_id : null) ?? 'System',
+    } as unknown as AuditEntry)
+
+    total.value += 1
+    // Cap live-list at the current page size (entries already loaded from REST).
+    // We don't know the server page size ahead of time, so cap at current length + 1
+    // to avoid the list growing unboundedly between REST reloads.
+    if (entries.value.length > (total.value || 100)) entries.value.pop()
+  },
+)
+
 const exportHref = computed(() => {
   const q: Record<string, string> = {}
   if (filters.value.search)    q.search    = filters.value.search
@@ -168,6 +264,62 @@ const exportHref = computed(() => {
   if (filters.value.date_to)   q.date_to   = filters.value.date_to
   return useAudit().exportUrl(q as any)
 })
+
+// ── Field-access helpers (bridge REST AuditEntry ↔ raw API shape) ────────
+// The REST serializer uses snake_case field names that may not be typed on
+// AuditEntry yet. Cast to `any` in one place so the template stays clean.
+function entryField(e: AuditEntry, key: string): any {
+  return (e as any)[key] ?? null
+}
+
+// Resolve the display name for a row: username → user_id (skip "None") → 'System'
+function entryUser(e: AuditEntry): string {
+  const u = entryField(e, 'username')
+  if (u && u !== 'None' && u !== 'null') return u
+  // fall back to user_email for REST rows reconciled before this fix
+  if (e.user_email && e.user_email !== 'System') return e.user_email
+  const uid = entryField(e, 'user_id')
+  if (uid && uid !== 'None' && uid !== 'null') return uid
+  return 'System'
+}
+
+// Build a human-readable resource label.
+// Falls back to request_path when resource_type/resource_id are both blank.
+function entryResource(e: AuditEntry): string {
+  const rt = entryField(e, 'resource_type') as string
+  const ri = entryField(e, 'resource_id')   as string
+  if (rt) return ri ? `${rt} · ${ri}` : rt
+  // No structured resource — show the path so system/integration rows are readable
+  const path = entryField(e, 'request_path') as string
+  return path ?? entryField(e, 'description') ?? '-'
+}
+
+// Compute the union of keys changed between old_values and new_values.
+function entryDiffKeys(e: AuditEntry): string[] {
+  const oldV = entryField(e, 'old_values') as Record<string, unknown> | null
+  const newV = entryField(e, 'new_values') as Record<string, unknown> | null
+  // Also support the legacy `changes` shape that live WS rows may carry
+  const legacy = entryField(e, 'changes') as Record<string, unknown> | null
+  if (legacy && Object.keys(legacy).length) return Object.keys(legacy)
+  const keys = new Set([...Object.keys(oldV ?? {}), ...Object.keys(newV ?? {})])
+  return [...keys]
+}
+
+function toggleExpand(e: AuditEntry) {
+  expanded.value = expanded.value === e.id ? null : e.id
+}
+
+function methodColor(method: string): string {
+  const m: Record<string,string> = { GET:'#0284c7', POST:'#16a34a', PUT:'#d97706', PATCH:'#9333ea', DELETE:'#dc2626' }
+  return m[method?.toUpperCase()] ?? '#64748b'
+}
+function statusColor(code: number | string): string {
+  const n = Number(code)
+  if (n >= 500) return '#dc2626'
+  if (n >= 400) return '#d97706'
+  if (n >= 300) return '#0284c7'
+  return '#16a34a'
+}
 
 function actionBadge(a: string) {
   const m: Record<string,string> = { create:'success', update:'info', delete:'danger', login:'fair', logout:'neutral', export:'fair', generate:'fair' }
@@ -187,6 +339,9 @@ function fmtNum(v: number) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.ws-banner { margin-bottom:8px; padding:6px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; font-size:12px; color:#dc2626; }
+.ws-connected { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f0fdf4; border:1px solid #bbf7d0; font-size:11px; color:#15803d; }
+.ws-paused { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; font-size:11px; color:#64748b; }
 .audit-row { cursor:pointer; }
 .audit-row:hover { background:#f8fafc; }
 .change-detail { background:#f8fafc; padding:12px !important; }

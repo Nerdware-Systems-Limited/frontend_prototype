@@ -86,6 +86,7 @@ useNavSubtitle('Notifications')
 
 import { useNotifications, useNotificationSocket } from '~/composables/api'
 import type { Notification } from '~/composables/api'
+import { useNotificationStore } from '~/stores/notifications'
 
 const notifications  = ref<Notification[]>([])
 const loading        = ref(true)

@@ -1,19 +1,24 @@
 import { ref, onUnmounted } from 'vue'
 
 export type AuditLog = {
-  id: string  // MongoDB _id hex string
-  timestamp: string
-  user_display: string
-  user_initials: string
+  _id: string
+  id: number                    // integer from API
+  user_id: string | null        // "None" as string or null
+  username: string | null
   action: string
   resource_type: string
   resource_id: string
-  ip_address: string
-  status_code: number
-  response_time: number
-  request_method: string
-  request_path: string
   description: string
+  old_values: Record<string, unknown>
+  new_values: Record<string, unknown>
+  metadata: Record<string, unknown>
+  ip_address: string
+  user_agent: string
+  request_path: string
+  request_method: string
+  status_code: number
+  response_time: number | null  // null is valid
+  created_at: string            // ISO string with tz offset
 }
 
 export type Metrics = {

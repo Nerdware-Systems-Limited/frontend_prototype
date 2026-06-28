@@ -40,6 +40,10 @@
  * AppTopNav - fixed top navigation matching wireframe pattern.
  * Subtitle comes from useState('navSubtitle') so each page can update it.
  */
+import { useNotificationStore } from '~/stores/notifications'
+
+const notificationStore = useNotificationStore()
+
 const locale = ref<'EN' | 'SW'>('EN')
 function setLocale(l: 'EN' | 'SW') { locale.value = l }
 
@@ -61,7 +65,7 @@ const userInitials = computed(() => {
     || 'JM'
 })
 
-const alertCount = ref(3) // wireframe shows 3 in the bell badge
+const alertCount = computed(() => notificationStore.unreadCount)
 
 // Live clock - updates every second
 const clock = ref('--:--:--')
@@ -76,6 +80,14 @@ onMounted(() => {
   timer = setInterval(tick, 1000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
+
+// Live-notifications socket. AppTopNav is rendered by every page on the
+// default layout and unmounts/remounts together with it, so this is the
+// connection's whole lifetime — connect once here, disconnect once here.
+// (See the cleanup note in useNotificationSocket.ts for why this can't live
+// inside the store itself.)
+onMounted(() => { notificationStore.connect() })
+onUnmounted(() => { notificationStore.disconnect() })
 
 const router = useRouter()
 function goNotifications() { router.push('/notifications') }
