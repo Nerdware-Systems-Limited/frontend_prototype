@@ -46,9 +46,9 @@
     </div>
 
     <!-- Live Fleet -->
-    <div class="kpi-card good">
+    <div class="kpi-card">
       <div class="kpi-label">
-        <span class="badge good">GOOD</span>
+        <span class="badge" :class="safetyBadge">CRITICAL BLACKOUT</span>
         Active Fleet
       </div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.live_vehicles) : '-' }}</div>
