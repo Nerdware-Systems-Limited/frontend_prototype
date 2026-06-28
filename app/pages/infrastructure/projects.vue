@@ -4,10 +4,10 @@
     title="Construction Projects"
     subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Project portfolio, physical &amp; financial progress, disbursement, delays, and county breakdown"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

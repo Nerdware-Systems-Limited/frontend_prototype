@@ -8,7 +8,7 @@
       <span class="freshness-badge" :class="{ loading }">
         {{ loading ? 'Loading…' : `${fmtNum(trips.length)} trips loaded` }}
       </span>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
 

@@ -4,10 +4,10 @@
     title="Bridge Asset Registry"
     subtitle="KeNHA · KRB · LAPSSET - Bridge inventory, condition scores, KRB-funded inspection schedules, critical structure alerts, and spatial mapping"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

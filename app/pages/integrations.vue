@@ -4,9 +4,6 @@
     title="Integrations"
     subtitle="All UAPTS agency feeds - NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA"
   >
-    <template #actions>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

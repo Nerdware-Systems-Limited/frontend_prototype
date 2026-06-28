@@ -6,7 +6,7 @@
   >
     <template #actions>
       
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
       <NuxtLink to="/public-transport/compliance" class="btn-primary">Compliance →</NuxtLink>
     </template>
   </PageHeader>

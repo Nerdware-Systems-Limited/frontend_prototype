@@ -4,11 +4,11 @@
     title="Live Vehicle Positions"
     subtitle="Real-time GPS positions for all active PSVs and government fleet - refreshes every 30 seconds"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <BadgePill variant="success">{{ liveVehicles.length }} Live</BadgePill>
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

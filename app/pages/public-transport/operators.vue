@@ -4,10 +4,10 @@
     title="Operator Performance"
     subtitle="NaMATA · NTSA · NCTTCA - SACCO ranking, service quality scores, NCTTCA corridor operator benchmarks, fleet utilization, and passenger feedback"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

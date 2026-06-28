@@ -6,7 +6,7 @@
   >
     <template #actions>
       
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
       <NuxtLink to="/safety/incidents" class="btn-primary">Incident Command →</NuxtLink>
     </template>
   </PageHeader>

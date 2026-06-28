@@ -4,10 +4,10 @@
     title="PSV Compliance & Licensing"
     subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and SACCO registration"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

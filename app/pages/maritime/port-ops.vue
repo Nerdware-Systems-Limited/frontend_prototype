@@ -12,7 +12,7 @@
           {{ p.port_name }}
         </option>
       </select>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
 

@@ -5,7 +5,6 @@
     subtitle="RBAC role assignments, user status management, and organisational departments across UAPTS agencies"
   >
     <template #actions>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <NuxtLink to="/users" class="btn-primary">Users →</NuxtLink>
     </template>
   </PageHeader>

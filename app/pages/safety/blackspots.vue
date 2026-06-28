@@ -4,10 +4,10 @@
     title="Blackspot Analysis"
     subtitle="NTSA · KeNHA · KMD - KDE accident cluster analysis, KeNHA road geometry context, KMD weather correlation, and predictive hotspot overlays"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

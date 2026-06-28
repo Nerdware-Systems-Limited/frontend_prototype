@@ -15,7 +15,7 @@
           @click="days = d; load()"
         >{{ d }}d</button>
       </div>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
 

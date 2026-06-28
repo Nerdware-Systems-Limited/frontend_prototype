@@ -4,7 +4,7 @@
 //
 // Pagination: the API returns a Django REST Framework PageNumberPagination
 // response with `count`, `next`, `previous`, and `results`. There is no
-// client-controlled page_size — the server page size is fixed.
+// client-controlled page_size - the server page size is fixed.
 // Navigate by following the `next`/`previous` URLs returned in the response.
 // ─────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ export interface AuditEntry {
   // timing
   created_at: string                  // ISO 8601 with tz offset
 
-  // legacy / compat — kept so old template refs don't hard-error
+  // legacy / compat - kept so old template refs don't hard-error
   /** @deprecated use created_at */       timestamp?: string
   /** @deprecated use username/user_id */ user_email?: string
   /** @deprecated use resource_type */    resource?: string
@@ -61,7 +61,7 @@ export interface AuditQuery {
   search?: string
 }
 
-// The API page envelope — next/previous are absolute URLs or null.
+// The API page envelope - next/previous are absolute URLs or null.
 export interface AuditPage {
   count: number
   next: string | null

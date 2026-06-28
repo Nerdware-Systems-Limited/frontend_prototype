@@ -4,10 +4,10 @@
     title="Incident Command"
     subtitle="NTSA · NPS · KMD - Real-time active incidents, NPS emergency dispatch coordination, KMD weather context, and investigation workflows"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

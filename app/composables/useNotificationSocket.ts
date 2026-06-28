@@ -43,7 +43,7 @@ export type NotificationDoc = {
   expires_at: string | null
 }
 
-const KEEPALIVE_INTERVAL = 30_000   // ms — mirrors KEEPALIVE_INTERVAL in consumers.py
+const KEEPALIVE_INTERVAL = 30_000   // ms - mirrors KEEPALIVE_INTERVAL in consumers.py
 const RECONNECT_DELAY    = 3_000    // ms
 const MAX_NOTIFICATIONS  = 200      // cap in-memory list
 
@@ -85,7 +85,7 @@ export function useNotificationSocket(wsBaseUrl?: string) {
 
   // ── connect ─────────────────────────────────────────────────────
   async function connect() {
-    // Never attempt this on the server — `WebSocket` doesn't exist there,
+    // Never attempt this on the server - `WebSocket` doesn't exist there,
     // and this composable/store can be touched during SSR (e.g. a layout's
     // setup()) before any onMounted() guard kicks in.
     if (typeof window === 'undefined') return
@@ -137,7 +137,7 @@ export function useNotificationSocket(wsBaseUrl?: string) {
       try {
         msg = JSON.parse(event.data as string)
       } catch {
-        return   // malformed frame — ignore
+        return   // malformed frame - ignore
       }
 
       switch (msg.type) {
@@ -170,13 +170,13 @@ export function useNotificationSocket(wsBaseUrl?: string) {
           unreadCount.value = (msg.unread_count as number) ?? 0
           break
 
-        // ── ping: server keepalive ping — we don't need to pong back ─
-        // (the server sends these; we don't send pongs — the server's
+        // ── ping: server keepalive ping - we don't need to pong back ─
+        // (the server sends these; we don't send pongs - the server's
         // _keepalive just fires to keep proxies happy)
         case 'ping':
           break
 
-        // ── pong: response to our client ping — nothing to do ──────
+        // ── pong: response to our client ping - nothing to do ──────
         case 'pong':
           break
 
@@ -196,13 +196,13 @@ export function useNotificationSocket(wsBaseUrl?: string) {
       clearPing()
 
       if (event.code === 4001) {
-        // Auth rejected by the consumer — don't reconnect, surface the error.
+        // Auth rejected by the consumer - don't reconnect, surface the error.
         error.value = 'WebSocket authentication failed (4001). Please log in again.'
         return
       }
 
       if (!intentionalClose && event.code !== 1000) {
-        // Unexpected close — auto-reconnect after a short delay.
+        // Unexpected close - auto-reconnect after a short delay.
         setTimeout(connect, RECONNECT_DELAY)
       }
     }
@@ -240,14 +240,14 @@ export function useNotificationSocket(wsBaseUrl?: string) {
   //
   // This composable is wrapped by the `notifications` Pinia *setup* store
   // (stores/notifications.ts), which is meant to live for the whole app
-  // session — not for the lifetime of a single component. Pinia setup
+  // session - not for the lifetime of a single component. Pinia setup
   // stores run their setup() the first time any component calls
   // useNotificationStore(), and Vue's onUnmounted() attaches to whatever
   // component instance happens to be active at that moment. In practice
   // that meant: whichever page (or the header) first touched the store
   // got the socket torn down the moment *it* unmounted, even though every
   // other page/the header still needed the connection. Connect/disconnect
-  // are called explicitly instead from a long-lived place — see the
+  // are called explicitly instead from a long-lived place - see the
   // onMounted/onUnmounted pair in layouts/default.vue.
   return {
     // state

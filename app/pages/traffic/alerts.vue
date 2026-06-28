@@ -7,7 +7,7 @@
     <template #actions>
       
       <BadgePill variant="danger">{{ activeAlerts.length }} Active</BadgePill>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
 

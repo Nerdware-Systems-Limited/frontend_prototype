@@ -4,7 +4,8 @@
     Mapped to 13 UAPTS core modules, derived from confirmed API paths in UAPTS_API v1.0.0.
     Uses native <details> for groups (theme.css styles them as collapsible).
   -->
-  <aside class="sidebar" id="app-sidebar">
+  <div class="sidebar-backdrop" :class="{ active: sidebarOpen }" @click="sidebarOpen = false" />
+  <aside class="sidebar" :class="{ 'mobile-open': sidebarOpen }" id="app-sidebar">
     <div class="sidebar-section">
 
       <!-- M01 · Dashboard & Visualization - /api/v1/dashboard/summary/ -->
@@ -166,6 +167,13 @@
 
 <script setup lang="ts">
 const route = useRoute()
+const sidebarOpen = useState('sidebarOpen', () => false)
+
+// Close drawer on navigation (mobile)
+watch(() => route.path, () => {
+  if (typeof window !== 'undefined' && window.innerWidth <= 900)
+    sidebarOpen.value = false
+})
 
 function isActive(path: string, exact = true) {
   if (exact) return route.path === path

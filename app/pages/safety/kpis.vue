@@ -4,10 +4,10 @@
     title="Safety KPIs"
     subtitle="NTSA · KeNHA · KURA · KeRRA - National crash rates, injury severity, county breakdowns by road authority, and traffic violation trends"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

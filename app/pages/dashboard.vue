@@ -11,7 +11,6 @@
     subtitle="Unified oversight across all transport agencies and modes"
   >
     <template #actions>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
       <button class="btn-primary">Schedule Cabinet Report</button>
     </template>
   </PageHeader>
@@ -518,7 +517,7 @@
        8. AGENCY FEED HEALTH (from useIntegrations)
   ════════════════════════════════════════════════════════════════ -->
   <div class="section-label">Agency Data Integration Status
-    <span class="section-pill">15 agencies · NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA</span>
+    <!-- <span class="section-pill">15 agencies · NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA</span> -->
   </div>
 
   <div class="table-card">
@@ -1833,4 +1832,35 @@ const mapMarkers = computed((): MarkerSpec[] => {
   display: inline-block;
 }
 .agency-link:hover { text-decoration: underline; }
+
+/* ── Mobile: collapse the 6-col KPI ribbon + 2-col dual blocks ───────── */
+@media (max-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dual-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kpi-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .kpi-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .kpi-card {
+    padding: 10px 12px;
+  }
+}
 </style>

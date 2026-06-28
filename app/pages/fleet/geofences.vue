@@ -4,10 +4,10 @@
     title="Geofence Zones"
     subtitle="Configure zones (depots, ports, restricted areas) and monitor entry/exit breach events"
   >
-    <template #actions>
+    <!-- <template #actions>
       
       <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template>
+    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>

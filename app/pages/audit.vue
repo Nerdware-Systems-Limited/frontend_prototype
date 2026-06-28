@@ -104,7 +104,7 @@
         </tbody>
       </table>
 
-      <!-- Pagination — driven by next/previous URLs returned by the API.
+      <!-- Pagination - driven by next/previous URLs returned by the API.
            No client-side page_size math: the server controls page size. -->
       <div v-if="prevUrl || nextUrl" class="pagination">
         <button class="btn" :disabled="!prevUrl || loading" @click="loadUrl(prevUrl!)">← Prev</button>
@@ -209,7 +209,7 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // Used directly here (not via a shared store) since this is the only page
 // that needs it right now. If a system-health page later needs `metrics`
 // from the same socket, wrap this in a Pinia setup store the same way
-// notifications.ts wraps useNotificationSocket — see the note in
+// notifications.ts wraps useNotificationSocket - see the note in
 // useAuditSocket.ts for why a bare onUnmounted(disconnect) only stays safe
 // as long as it's used directly like this, in exactly one component.
 const { logs: liveLogs, isConnected: streamConnected, error: streamError, connect, disconnect }
@@ -218,7 +218,7 @@ const { logs: liveLogs, isConnected: streamConnected, error: streamError, connec
 onMounted(connect)
 onUnmounted(disconnect)
 
-// Only the unfiltered first page is "the live tip of the log" — splicing a
+// Only the unfiltered first page is "the live tip of the log" - splicing a
 // brand-new row into a filtered view or page 2+ could show an entry that
 // doesn't belong there until the next reload.
 const isDefaultView = computed(() =>
@@ -235,7 +235,7 @@ watch(
 
     // Reconcile the WS AuditLog shape with the REST AuditEntry shape.
     // The API uses created_at (not timestamp) and username/user_id (not user_email).
-    // The changes diff is not available on live rows — it appears on the next REST reload.
+    // The changes diff is not available on live rows - it appears on the next REST reload.
     entries.value.unshift({
       ...latest,
       id:         String(latest.id),
@@ -289,7 +289,7 @@ function entryResource(e: AuditEntry): string {
   const rt = entryField(e, 'resource_type') as string
   const ri = entryField(e, 'resource_id')   as string
   if (rt) return ri ? `${rt} · ${ri}` : rt
-  // No structured resource — show the path so system/integration rows are readable
+  // No structured resource - show the path so system/integration rows are readable
   const path = entryField(e, 'request_path') as string
   return path ?? entryField(e, 'description') ?? '-'
 }

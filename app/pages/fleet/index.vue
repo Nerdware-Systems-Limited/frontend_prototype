@@ -6,7 +6,7 @@
   >
     <template #actions>
       
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
       <NuxtLink to="/fleet/live" class="btn-primary">Live Map →</NuxtLink>
     </template>
   </PageHeader>

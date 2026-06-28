@@ -6,7 +6,7 @@
   >
     <template #actions>
       
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
       <NuxtLink to="/traffic/alerts" class="btn-primary">Alerts →</NuxtLink>
     </template>
   </PageHeader>

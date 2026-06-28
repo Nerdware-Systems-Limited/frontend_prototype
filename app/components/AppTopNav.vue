@@ -6,6 +6,7 @@
   -->
   <nav class="top-nav">
     <div class="top-nav-left">
+      <button class="hamburger-btn" aria-label="Toggle navigation" @click="toggleSidebar">☰</button>
       <div class="top-nav-brand">
         <div class="top-nav-logo">
           <NuxtLink to="/"><img src="/uapts-logo.png" alt="UAPTS" /></NuxtLink>
@@ -25,7 +26,7 @@
       <div class="nav-time" id="navClock">{{ clock }}</div>
 
       <button class="bell-btn" aria-label="Notifications" @click="goNotifications">
-        Alerts <span class="badge">{{ alertCount }}</span>
+        <span class="bell-label">Alerts</span> <span class="badge">{{ alertCount }}</span>
       </button>
 
       <NuxtLink to="/profile" class="avatar" :title="user?.full_name ?? 'Profile'">
@@ -43,6 +44,9 @@
 import { useNotificationStore } from '~/stores/notifications'
 
 const notificationStore = useNotificationStore()
+
+const sidebarOpen = useState('sidebarOpen', () => false)
+function toggleSidebar() { sidebarOpen.value = !sidebarOpen.value }
 
 const locale = ref<'EN' | 'SW'>('EN')
 function setLocale(l: 'EN' | 'SW') { locale.value = l }
@@ -83,7 +87,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // Live-notifications socket. AppTopNav is rendered by every page on the
 // default layout and unmounts/remounts together with it, so this is the
-// connection's whole lifetime — connect once here, disconnect once here.
+// connection's whole lifetime - connect once here, disconnect once here.
 // (See the cleanup note in useNotificationSocket.ts for why this can't live
 // inside the store itself.)
 onMounted(() => { notificationStore.connect() })
