@@ -29,16 +29,17 @@
           <label>Event Type *</label>
           <select v-model="form.event_type" class="select-full">
             <option value="">Select event type…</option>
-            <option value="incident_created">Incident Created</option>
-            <option value="incident_updated">Incident Updated</option>
-            <option value="congestion_severe">Severe Congestion</option>
-            <option value="vehicle_maintenance_due">Vehicle Maintenance Due</option>
-            <option value="geofence_breach">Geofence Breach</option>
-            <option value="license_expiring">License Expiring</option>
-            <option value="integration_degraded">Integration Degraded</option>
-            <option value="bridge_critical">Bridge Critical Condition</option>
-            <option value="train_delayed">Train Delayed</option>
-            <option value="vessel_port_arrival">Vessel Port Arrival</option>
+
+            <option value="traffic.violation.created">Traffic Violation Created</option>
+            <option value="safety.incident.created">Safety Incident Created</option>
+            <option value="weather.observation.created">Weather Observation Created</option>
+
+            <option value="vessel.created">Vessel Created</option>
+            <option value="vessel.position_updated">Vessel Position Updated</option>
+            <option value="vessel.seen">Vessel Seen</option>
+            <option value="vessel.movement.recorded">Vessel Movement Recorded</option>
+
+            <option value="flight.status_updated">Flight Status Updated</option>
           </select>
         </div>
         <div class="form-group">
