@@ -131,7 +131,7 @@
               <td class="dim-cell">{{ h.horizon_days }}d</td>
               <td>
                 <div class="factor-chips">
-                  <span v-for="fc in (h.contributing_factors ?? []).slice(0,3)" :key="fc" class="factor-chip">{{ fc.replace(/_/g,' ') }}</span>
+                  <span v-for="fc in toFactors(h.contributing_factors).slice(0, 3)" :key="fc" class="factor-chip">{{ fc.replace(/_/g,' ') }}</span>
                   <span v-if="!(h.contributing_factors?.length)" class="dim-cell">-</span>
                 </div>
               </td>
@@ -305,6 +305,11 @@ function condBadge(c: string) {
 function modelColor(m: string) {
   const c: Record<string,string> = { arima:'#3b82f6', prophet:'#22c55e', lstm:'#a855f7', gradient_boost:'#f59e0b', xgboost:'#ef4444' }
   return c[m] ?? '#64748b'
+}
+function toFactors(v: unknown): string[] {
+  if (Array.isArray(v)) return v as string[]
+  if (typeof v === 'string' && v) return v.split(',').map(s => s.trim())
+  return []
 }
 </script>
 

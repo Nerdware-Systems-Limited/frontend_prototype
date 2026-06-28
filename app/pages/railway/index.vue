@@ -16,7 +16,7 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- Legacy system EOL alerts - always shown -->
-  <div class="eol-banner">
+  <!-- <div class="eol-banner">
     <AlertItem
       severity="warning"
       title="MGR Translogic System - End of Life"
@@ -27,7 +27,7 @@
       title="MGR ATW Ticketing System - End of Life"
       meta="Data-continuity risk: ATW ticketing is EOL. Ticketing reconciliation data should be backed up manually until UAPTS integration is complete."
     />
-  </div>
+  </div> -->
 
   <!-- KPIs -->
   <div class="kpi-grid">

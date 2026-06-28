@@ -175,8 +175,6 @@ function fmtTime(iso: string) {
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .ws-banner { margin-bottom:8px; padding:6px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; font-size:12px; color:#dc2626; }
 .ws-connected { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f0fdf4; border:1px solid #bbf7d0; font-size:11px; color:#15803d; }
-.filter-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .checkbox-label { display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; }
 .notification-list { display:flex; flex-direction:column; gap:6px; }
 .notification-item { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-radius:8px; background:#fff; border:1px solid #f1f5f9; transition:background .15s; }

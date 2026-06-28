@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Infrastructure & Network Health"
     title="Asset Condition Map"
-    subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Pavement quality (IRI), bridge health, KURA signal faults, KMD weather impact, and deterioration forecasts"
+    subtitle="KeNHA · KURA · KeRRA - Pavement quality (IRI), bridge health, KURA signal faults, KMD weather impact, and deterioration forecasts"
   >
     <template #actions>
       
@@ -14,7 +14,7 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- KPI ribbon -->
-  <SectionTitle :pill="summary ? 'KeNHA / KRB · ' + freshnessLabel(summary.generated_at) : ''">
+  <SectionTitle :pill="summary ? 'KeNHA / KURA · ' + freshnessLabel(summary.generated_at) : ''">
     Network KPIs
   </SectionTitle>
 
@@ -23,7 +23,7 @@
       label="Total Road Length"
       :value="summary ? `${fmtNum(summary.network.total_length_km, 0)} km` : '-'"
       :sub="`${summary ? fmtNum(summary.network.total_segments) : '-'} segments monitored`"
-      source="batch" source-title="KeNHA / KRB"
+      source="batch" source-title="KeNHA / KURA"
     />
     <KpiCard
       label="Avg IRI"

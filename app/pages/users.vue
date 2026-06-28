@@ -2,21 +2,21 @@
   <PageHeader
     eyebrow="M16 - User Management"
     title="Users"
-    subtitle="Manage UAPTS platform users - invite, activate, deactivate, and assign roles across agencies"
+    subtitle="Manage UAPTS platform users - create, activate, deactivate, and assign roles across agencies"
   >
     <template #actions>
       <span class="freshness-badge">{{ totalUsers }} users total</span>
-      <button class="btn-primary" @click="showInviteModal = true">+ Invite User</button>
+      <button class="btn-primary" @click="showInviteModal = true">+ Create User</button>
     </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- Invite modal -->
+  <!-- Create user modal -->
   <div v-if="showInviteModal" class="modal-backdrop" @click.self="showInviteModal = false">
     <div class="modal">
       <div class="modal-header">
-        Invite User
+        Create User
         <button class="modal-close" @click="showInviteModal = false">×</button>
       </div>
       <div class="modal-body">
@@ -49,7 +49,7 @@
       <div class="modal-footer">
         <button class="btn" @click="showInviteModal = false">Cancel</button>
         <button class="btn-primary" :disabled="!inviteForm.email || inviting" @click="doInvite">
-          {{ inviting ? 'Inviting…' : 'Send Invite' }}
+          {{ inviting ? 'Creating…' : 'Create User' }}
         </button>
       </div>
     </div>
@@ -226,7 +226,7 @@ async function doInvite() {
     showInviteModal.value = false
     inviteForm.value = { email: '', full_name: '', agency: '', role_type: 'analyst' }
   } catch (e: any) {
-    inviteError.value = e?.message ?? 'Invite failed.'
+    inviteError.value = e?.message ?? 'Create failed.'
   } finally {
     inviting.value = false
   }
@@ -245,8 +245,6 @@ function fmtTime(iso: string) {
 <style scoped>
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.filter-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .select-full { width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .inactive td { color:#94a3b8 !important; }
 .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1000; display:flex; align-items:center; justify-content:center; }

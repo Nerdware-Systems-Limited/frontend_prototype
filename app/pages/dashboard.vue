@@ -205,37 +205,31 @@
       <div class="kpi-label">Total registered vehicles</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.total_vehicles) : '-' }}</div>
       <div class="kpi-sub">National NTSA iTIMS registry</div>
-      <div class="kpi-source"><span class="source-dot batch" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card good">
       <div class="kpi-label">Live GPS-tracked</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.live_vehicles) : '-' }}</div>
       <div class="kpi-sub">PSVs &amp; govt fleet with active track</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card good">
       <div class="kpi-label">Trips completed (7d)</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.kpis.trips_7d) : '-' }}</div>
       <div class="kpi-sub">PSV trips recorded this week</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card good">
       <div class="kpi-label">Distance covered (7d)</div>
       <div class="kpi-val">{{ fleet ? `${fmtNum(fleet.kpis.distance_7d_km)} km` : '-' }}</div>
       <div class="kpi-sub">Total network kilometres</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card" :class="fleet && fleet.governor_compliance.tamper_rate_pct < 5 ? 'good' : 'warn'">
       <div class="kpi-label">Speed governor compliance</div>
       <div class="kpi-val">{{ fleet ? fmtPct(fleet.governor_compliance.online_pct) : '-' }}</div>
       <div class="kpi-sub">Tamper rate: {{ fleet ? fmtPct(fleet.governor_compliance.tamper_rate_pct) : '-' }}</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
     <div class="kpi-card warn">
       <div class="kpi-label">Critical behaviour events (24h)</div>
       <div class="kpi-val">{{ fleet ? fmtNum(fleet.behaviour_critical_24h) : '-' }}</div>
       <div class="kpi-sub">Speeding · harsh brake · deviation</div>
-      <div class="kpi-source"><span class="source-dot live" />NTSA iTIMS</div>
     </div>
   </div>
 

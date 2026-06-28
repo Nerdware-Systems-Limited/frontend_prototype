@@ -8,8 +8,8 @@
     <div class="sidebar-section">
 
       <!-- M01 · Dashboard & Visualization - /api/v1/dashboard/summary/ -->
-      <NuxtLink class="sidebar-link sidebar-link-top" to="/dashboard" :class="{ active: isActive('/dashboard') }">
-        Dashboard
+      <NuxtLink class="sidebar-group-title sidebar-link sidebar-link-top" to="/dashboard" :class="{ active: isActive('/dashboard') }">
+        Executive Dashboard
       </NuxtLink>
 
       <!-- M02 · Traffic Management - /api/v1/traffic/* -->
@@ -138,12 +138,12 @@
       </details>
 
       <!-- M12 · Data Integration Hub - /api/v1/integrations/* -->
-      <NuxtLink class="sidebar-link sidebar-link-top" to="/integrations" :class="{ active: isActive('/integrations') }">
+      <NuxtLink class="sidebar-link sidebar-link-top" to="/integrations" :class="{ active: isActive('/integrations', false) }">
         Integration Hub
       </NuxtLink>
 
       <!-- M13 · GIS & Spatial Analysis - /api/v1/gis/*, /api/v1/geojson/* -->
-      <NuxtLink class="sidebar-link sidebar-link-top" to="/gis" :class="{ active: isActive('/gis') }">
+      <NuxtLink class="sidebar-link sidebar-link-top" to="/gis" :class="{ active: isActive('/gis', false) }">
         GIS & Spatial Analysis
       </NuxtLink>
 
@@ -154,13 +154,14 @@
 <script setup lang="ts">
 const route = useRoute()
 
-function isActive(prefix: string) {
-  return route.path === prefix || route.path.startsWith(prefix + '/')
+function isActive(path: string, exact = true) {
+  if (exact) return route.path === path
+  return route.path === path || route.path.startsWith(path + '/')
 }
 
 function groupIsOpen(prefixes: string | string[]) {
   const list = Array.isArray(prefixes) ? prefixes : [prefixes]
-  return list.some(p => isActive(p))
+  return list.some(p => isActive(p, false))
 }
 
 const auth = useAuth()

@@ -158,7 +158,7 @@
             <span class="hs-rank">#{{ i + 1 }}</span>
             <div class="hs-info">
               <div class="hs-seg">{{ hs.segment_road_code ?? `Grid ${hs.grid_cell_id}` }}</div>
-              <div class="hs-factors">{{ (hs.contributing_factors ?? []).join(' · ') || '-' }}</div>
+              <div class="hs-factors">{{ toFactors(hs.contributing_factors).join(' · ') || '-' }}</div>
             </div>
             <BadgePill :variant="riskBadge(hs.risk_tier)">{{ hs.risk_tier }}</BadgePill>
             <span class="hs-score">{{ hs.predicted_risk_score.toFixed(2) }}</span>
@@ -236,6 +236,12 @@ const filteredSpots = computed(() =>
 
 function tierCount(tier: string) {
   return spots.value.filter(s => s.ranking_tier === tier).length
+}
+
+function toFactors(v: unknown): string[] {
+  if (Array.isArray(v)) return v as string[]
+  if (typeof v === 'string' && v) return v.split(',').map(s => s.trim())
+  return []
 }
 
 const totalAccidents = computed(() =>

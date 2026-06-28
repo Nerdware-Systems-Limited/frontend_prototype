@@ -8,7 +8,7 @@
     <div class="top-nav-left">
       <div class="top-nav-brand">
         <div class="top-nav-logo">
-          <NuxtLink to="/executive"><img src="/uapts-logo.png" alt="UAPTS" /></NuxtLink>
+          <NuxtLink to="/"><img src="/uapts-logo.png" alt="UAPTS" /></NuxtLink>
         </div>
         <div class="top-nav-text">
           <div class="top-nav-title">UAPTS</div>
@@ -18,11 +18,6 @@
     </div>
 
     <div class="top-nav-actions">
-      <div class="lang-toggle">
-        <button :class="{ on: locale === 'EN' }" @click="setLocale('EN')">EN</button>
-        <button :class="{ on: locale === 'SW' }" @click="setLocale('SW')">SW</button>
-      </div>
-
       <div class="sec-badge" title="MFA active · Session secure">
         <span class="sec-dot"></span>Secure
       </div>
