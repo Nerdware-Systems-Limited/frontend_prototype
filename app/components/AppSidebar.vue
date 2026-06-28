@@ -138,14 +138,27 @@
       </details>
 
       <!-- M12 · Data Integration Hub - /api/v1/integrations/* -->
-      <NuxtLink class="sidebar-link sidebar-link-top" to="/integrations" :class="{ active: isActive('/integrations', false) }">
+      <NuxtLink class="sidebar-group-title sidebar-link sidebar-link-top" to="/integrations" :class="{ active: isActive('/integrations', false) }">
         Integration Hub
       </NuxtLink>
 
       <!-- M13 · GIS & Spatial Analysis - /api/v1/gis/*, /api/v1/geojson/* -->
-      <NuxtLink class="sidebar-link sidebar-link-top" to="/gis" :class="{ active: isActive('/gis', false) }">
+      <NuxtLink class="sidebar-group-title sidebar-link sidebar-link-top" to="/gis" :class="{ active: isActive('/gis', false) }">
         GIS & Spatial Analysis
       </NuxtLink>
+
+      <!-- M14 · Training Institutes - /api/v1/training/* -->
+      <details class="sidebar-group" :open="groupIsOpen('/training')">
+        <summary class="sidebar-group-title">
+          Training Institutes<span class="sidebar-caret">▾</span>
+        </summary>
+        <div class="sidebar-group-items">
+          <NuxtLink class="sidebar-link" to="/training" :class="{ active: isActive('/training') }">Overview</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/training/cohorts" :class="{ active: isActive('/training/cohorts') }">Cohorts</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/training/enrollments" :class="{ active: isActive('/training/enrollments') }">Enrollments</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/training/completions" :class="{ active: isActive('/training/completions') }">Certificates</NuxtLink>
+        </div>
+      </details>
 
     </div>
   </aside>

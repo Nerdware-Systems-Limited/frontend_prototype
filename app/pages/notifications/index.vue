@@ -84,12 +84,12 @@
 definePageMeta({ layout: 'default' })
 useNavSubtitle('Notifications')
 
-import { useNotifications, useNotificationStream } from '~/composables/api'
+import { useNotifications, useNotificationSocket } from '~/composables/api'
 import type { Notification } from '~/composables/api'
 
-const notifications = ref<Notification[]>([])
-const loading       = ref(true)
-const error         = ref<string | null>(null)
+const notifications  = ref<Notification[]>([])
+const loading        = ref(true)
+const error          = ref<string | null>(null)
 const severityFilter = ref('')
 const unreadOnly     = ref(false)
 const readingId      = ref<string | null>(null)
@@ -97,10 +97,20 @@ const deletingId     = ref<string | null>(null)
 const markingAll     = ref(false)
 
 // ── WebSocket live feed ───────────────────────────────────────────────────
-const { connected: streamConnected, unreadCount: liveUnread, error: streamError }
-  = useNotificationStream((event) => {
-    if (event?.notification) notifications.value.unshift(event.notification)
-  })
+const socket = useNotificationSocket()
+const streamConnected = socket.isConnected
+const liveUnread      = socket.unreadCount
+const streamError     = socket.error
+
+// Merge new WS pushes into the page list as they arrive.
+// The socket always prepends to index 0; we watch the length so mutations
+// inside the array are detected without a deep scan of every field.
+watch(() => socket.notifications.value.length, () => {
+  const newest = socket.notifications.value[0]
+  if (newest && !notifications.value.some(n => n.id === newest.id)) {
+    notifications.value.unshift(newest)
+  }
+})
 
 async function load() {
   loading.value = true
@@ -116,7 +126,10 @@ async function load() {
   loading.value = false
 }
 
-onMounted(load)
+onMounted(() => {
+  socket.connect()
+  load()
+})
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 60_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
@@ -132,9 +145,13 @@ const filteredNotifications = computed(() =>
 async function markRead(id: string) {
   readingId.value = id
   try {
-    await useNotifications().markRead(id)
+    // Optimistic update on page list immediately
     const idx = notifications.value.findIndex(n => n.id === id)
     if (idx !== -1) notifications.value[idx] = { ...notifications.value[idx], read: true }
+    // WS mark: optimistic update in socket list + sends mark_read frame to server
+    socket.markRead(id)
+    // REST mark for authoritative persistence
+    await useNotifications().markRead(id)
   } catch {} finally { readingId.value = null }
 }
 

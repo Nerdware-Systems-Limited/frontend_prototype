@@ -27,7 +27,7 @@
 
         <form class="auth-form" @submit.prevent="handleLogin" novalidate>
           <div class="field-group">
-            <label class="field-label" for="uapts-email">Email address or Staff ID</label>
+            <label class="field-label" for="uapts-email">Email address</label>
             <div class="field-input-wrap">
               <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>

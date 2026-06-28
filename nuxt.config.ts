@@ -22,8 +22,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'https://uapts.eu.cc',
-      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'wss://uapts.eu.cc/ws/audit/',
-    },
+      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://http://uapts.eu.cc/ws/audit/',
+      notificationsWsUrl:
+        process.env.NUXT_PUBLIC_NOTIFICATIONS_WS_URL ??
+        'wss://uapts.eu.cc/ws/notifications/',
+    }
   },
 
   css: [
