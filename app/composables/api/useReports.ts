@@ -1,6 +1,6 @@
 // app/composables/api/useReports.ts
 // ─────────────────────────────────────────────────────────────────────
-// M15 - Reporting & BI (wireframe: report-center.html).
+// M09 / M15 - Reporting & BI (wireframe: report-center.html).
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi } from './_client'
@@ -19,11 +19,16 @@ export interface ReportTemplate {
 export interface ReportRun {
   id: string
   template_id: string
+  template_name?: string
   status: 'queued' | 'running' | 'completed' | 'failed'
+  format: string
   requested_by?: string
+  requested_by_email?: string
   requested_at: string
+  generated_at?: string
   completed_at?: string
   download_url?: string
+  file_size_bytes?: number
   error?: string
 }
 
@@ -34,16 +39,50 @@ export interface ReportsQuery {
   status?: ReportRun['status']
 }
 
+export interface GeneratePayload {
+  template_id: string
+  format: ReportTemplate['formats'][number]
+  params?: Record<string, unknown>
+}
+
 export function useReports() {
   const api = useApi()
 
   return {
+    /** GET /api/v1/reports/catalog/ — full template catalog */
     catalog: () => api<ReportTemplate[]>('/api/v1/reports/catalog/'),
+
+    /** GET /api/v1/reports/catalog/<id>/ — single template */
     template: (id: string) => api<ReportTemplate>(`/api/v1/reports/catalog/${id}/`),
-    runs:     (q?: ReportsQuery) =>
-      api<{ count: number; results: ReportRun[] }>('/api/v1/reports/runs/', { query: cleanQuery(q as Record<string, unknown>) }),
-    generate: (body: { template_id: string; format: ReportTemplate['formats'][number]; params?: Record<string, unknown> }) =>
+
+    /** GET /api/v1/reports/runs/ — paginated run history */
+    runs: (q?: ReportsQuery) =>
+      api<{ count: number; results: ReportRun[] }>(
+        '/api/v1/reports/runs/',
+        { query: cleanQuery(q as Record<string, unknown>) },
+      ),
+
+    /** POST /api/v1/reports/generate/ — enqueues a run, returns queued ReportRun */
+    generate: (body: GeneratePayload) =>
       api<ReportRun>('/api/v1/reports/generate/', { method: 'POST', body }),
-    downloadUrl: (runId: string) => `/api/v1/reports/${runId}/download/`,
+
+    /** GET /api/v1/reports/<id>/ — fetch current status of a single run */
+    run: (id: string) => api<ReportRun>(`/api/v1/reports/${id}/`),
+
+    /**
+     * Returns the direct download URL for a completed run.
+     * Used as <a :href="downloadUrl(run.id)"> — browser handles the file save.
+     */
+    download: async (runId: string) => {
+      const blob = await api<Blob>(`/api/v1/reports/${runId}/download/`, { responseType: 'blob' } as any)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = ''  // browser uses the Content-Disposition filename from Django
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
   }
 }

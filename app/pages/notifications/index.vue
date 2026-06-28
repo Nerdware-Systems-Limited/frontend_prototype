@@ -1,82 +1,149 @@
 <template>
   <PageHeader
     eyebrow="Platform Notifications"
-    title="Notifications"
-    subtitle="Real-time alerts and platform notifications across all UAPTS modules"
+    title="Notification Center"
+    subtitle="Real-time alerts from all UAPTS modules — traffic, fleet, safety, infrastructure and more"
   >
     <template #actions>
-      <span class="unread-badge" v-if="liveUnread > 0">{{ liveUnread }} unread</span>
+      <div v-if="liveUnread > 0" class="unread-pill">{{ liveUnread }} unread</div>
       <button class="btn" :disabled="markingAll" @click="markAll">
         {{ markingAll ? 'Marking…' : '✓ Mark all read' }}
       </button>
-      <NuxtLink to="/notifications/rules" class="btn">Alert Rules →</NuxtLink>
+      <NuxtLink to="/notifications/rules" class="btn-primary">Alert Rules →</NuxtLink>
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
-
-  <!-- WebSocket status -->
-  <div v-if="streamError" class="ws-banner">⚡ Live feed unavailable - {{ streamError }}</div>
-  <div v-else-if="streamConnected" class="ws-connected">⚡ Live - connected</div>
-
-  <!-- Filters -->
-  <div class="filter-bar">
-    <select v-model="severityFilter" class="select-sm">
-      <option value="">All severities</option>
-      <option value="critical">Critical</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-      <option value="info">Info</option>
-    </select>
-    <label class="checkbox-label">
-      <input type="checkbox" v-model="unreadOnly" />
-      Unread only
-    </label>
-    <span style="flex:1" />
-    <span style="font-size:12px;color:#64748b">{{ filteredNotifications.length }} shown</span>
+  <!-- Live connection status -->
+  <div
+    class="live-status"
+    :class="streamError ? 'live-status--error' : streamConnected ? 'live-status--ok' : 'live-status--idle'"
+  >
+    <span class="live-dot" />
+    <span v-if="streamError">Live feed unavailable — {{ streamError }}</span>
+    <span v-else-if="streamConnected">Live · Connected to notification stream</span>
+    <span v-else>Connecting to live feed…</span>
   </div>
 
-  <!-- Notification list -->
-  <div class="notification-list">
-    <div
-      v-for="n in filteredNotifications.slice(0, 60)"
-      :key="n.id"
-      class="notification-item"
-      :class="{ unread: !n.read }"
-    >
-      <div class="notif-left">
-        <span class="sev-dot" :style="{ background: sevColor(n.severity) }" />
-      </div>
-      <div class="notif-body">
-        <div class="notif-top">
-          <span class="notif-title">{{ n.title }}</span>
-          <BadgePill :variant="sevBadge(n.severity)">{{ n.severity }}</BadgePill>
-          <span class="notif-time">{{ fmtTime(n.created_at) }}</span>
-        </div>
-        <div class="notif-msg">{{ n.body ?? n.message ?? '-' }}</div>
-        <div v-if="n.channels && n.channels.length" class="notif-channels">
-          <span v-for="ch in n.channels" :key="ch" class="channel-chip">{{ ch }}</span>
-        </div>
-      </div>
-      <div class="notif-actions">
-        <button
-          v-if="!n.read"
-          class="btn" style="font-size:11px;padding:2px 8px"
-          :disabled="readingId === n.id"
-          @click.stop="markRead(n.id)"
-        >✓ Read</button>
-        <button
-          class="btn" style="font-size:11px;padding:2px 8px;color:#dc2626"
-          :disabled="deletingId === n.id"
-          @click.stop="deleteNotif(n.id)"
-        >✕</button>
-      </div>
+  <!-- KPI strip -->
+  <div class="nkpi-strip">
+    <button class="nkpi" :class="{ 'nkpi--active': !severityFilter && !unreadOnly }" @click="severityFilter = ''; unreadOnly = false">
+      <span class="nkpi-val">{{ notifications.length }}</span>
+      <span class="nkpi-lbl">Total</span>
+    </button>
+    <button class="nkpi nkpi--unread" :class="{ 'nkpi--active': unreadOnly }" @click="unreadOnly = !unreadOnly; severityFilter = ''">
+      <span class="nkpi-val">{{ unreadCount }}</span>
+      <span class="nkpi-lbl">Unread</span>
+    </button>
+    <button class="nkpi nkpi--critical" :class="{ 'nkpi--active': severityFilter === 'critical' }" @click="toggleSev('critical')">
+      <span class="nkpi-val">{{ bySeverity('critical') }}</span>
+      <span class="nkpi-lbl">Critical</span>
+    </button>
+    <button class="nkpi nkpi--high" :class="{ 'nkpi--active': severityFilter === 'high' }" @click="toggleSev('high')">
+      <span class="nkpi-val">{{ bySeverity('high') }}</span>
+      <span class="nkpi-lbl">High</span>
+    </button>
+    <button class="nkpi nkpi--medium" :class="{ 'nkpi--active': severityFilter === 'medium' }" @click="toggleSev('medium')">
+      <span class="nkpi-val">{{ bySeverity('medium') }}</span>
+      <span class="nkpi-lbl">Medium</span>
+    </button>
+    <button class="nkpi nkpi--low" :class="{ 'nkpi--active': severityFilter === 'low' || severityFilter === 'info' }" @click="toggleSev('low')">
+      <span class="nkpi-val">{{ bySeverity('low') + bySeverity('info') }}</span>
+      <span class="nkpi-lbl">Low / Info</span>
+    </button>
+  </div>
+
+  <!-- Filter row -->
+  <div class="filter-row">
+    <div class="sev-pills">
+      <button class="sev-pill" :class="{ 'sev-pill--active': !severityFilter }" @click="severityFilter = ''">All</button>
+      <button
+        v-for="s in SEVERITIES"
+        :key="s"
+        class="sev-pill"
+        :class="{ 'sev-pill--active': severityFilter === s }"
+        :style="severityFilter === s
+          ? `background:${sevColor(s)};border-color:${sevColor(s)};color:#fff`
+          : `border-color:${sevColor(s)}33;color:${sevColor(s)}`"
+        @click="toggleSev(s)"
+      >{{ s }}</button>
     </div>
 
-    <div v-if="filteredNotifications.length === 0" class="empty-state">
-      {{ loading ? 'Loading notifications…' : 'No notifications match the current filters.' }}
+    <label class="toggle-wrap">
+      <div class="pill-toggle" :class="{ on: unreadOnly }" @click="unreadOnly = !unreadOnly" />
+      <span>Unread only</span>
+    </label>
+
+    <span class="result-count">
+      {{ filteredNotifications.length }} notification{{ filteredNotifications.length !== 1 ? 's' : '' }}
+    </span>
+  </div>
+
+  <!-- Error banner -->
+  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+
+  <!-- Notification feed -->
+  <div v-if="filteredNotifications.length" class="notif-feed">
+    <template v-for="group in grouped" :key="group.label">
+      <div class="group-label">
+        <span class="group-label-text">{{ group.label }}</span>
+        <span class="group-label-count">{{ group.items.length }}</span>
+      </div>
+
+      <div
+        v-for="n in group.items"
+        :key="n.id"
+        class="notif-card"
+        :class="{ 'notif-card--unread': !n.read }"
+      >
+        <div class="notif-bar" :style="{ background: sevColor(n.severity) }" />
+
+        <div class="notif-icon" :style="{ background: sevColor(n.severity) + '18', color: sevColor(n.severity) }">
+          {{ sevIcon(n.severity) }}
+        </div>
+
+        <div class="notif-content">
+          <div class="notif-header">
+            <span class="notif-title" :class="{ 'notif-title--bold': !n.read }">{{ n.title }}</span>
+            <BadgePill :variant="sevBadge(n.severity)">{{ n.severity }}</BadgePill>
+            <span class="notif-time" :title="fmtTime(n.created_at)">{{ relTime(n.created_at) }}</span>
+          </div>
+          <p class="notif-body">{{ n.body ?? n.message ?? '' }}</p>
+          <div v-if="n.channels?.length" class="ch-row">
+            <span v-for="ch in n.channels" :key="ch" class="ch-pill">{{ ch }}</span>
+          </div>
+        </div>
+
+        <div class="notif-actions">
+          <button
+            v-if="!n.read"
+            class="na-btn na-btn--read"
+            :disabled="readingId === n.id"
+            title="Mark as read"
+            @click.stop="markRead(n.id)"
+          >✓</button>
+          <button
+            class="na-btn na-btn--del"
+            :disabled="deletingId === n.id"
+            title="Delete"
+            @click.stop="deleteNotif(n.id)"
+          >✕</button>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Empty state -->
+  <div v-else class="empty-state">
+    <div class="empty-icon">
+      <span>🔔</span>
     </div>
+    <div class="empty-title">{{ loading ? 'Loading notifications…' : 'All clear' }}</div>
+    <div class="empty-sub">
+      {{ loading ? 'Please wait…' : severityFilter || unreadOnly ? 'No notifications match the current filters.' : 'You have no notifications yet.' }}
+    </div>
+    <button v-if="(severityFilter || unreadOnly) && !loading" class="btn" style="margin-top:12px" @click="severityFilter = ''; unreadOnly = false">
+      Clear filters
+    </button>
   </div>
 </template>
 
@@ -86,7 +153,8 @@ useNavSubtitle('Notifications')
 
 import { useNotifications, useNotificationSocket } from '~/composables/api'
 import type { Notification } from '~/composables/api'
-import { useNotificationStore } from '~/stores/notifications'
+
+const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const
 
 const notifications  = ref<Notification[]>([])
 const loading        = ref(true)
@@ -97,43 +165,37 @@ const readingId      = ref<string | null>(null)
 const deletingId     = ref<string | null>(null)
 const markingAll     = ref(false)
 
-// ── WebSocket live feed ───────────────────────────────────────────────────
-const socket = useNotificationSocket()
+// ── WebSocket live feed ──────────────────────────────────────────────────
+const socket          = useNotificationSocket()
 const streamConnected = socket.isConnected
 const liveUnread      = socket.unreadCount
 const streamError     = socket.error
 
-// Merge new WS pushes into the page list as they arrive.
-// The socket always prepends to index 0; we watch the length so mutations
-// inside the array are detected without a deep scan of every field.
 watch(() => socket.notifications.value.length, () => {
   const newest = socket.notifications.value[0]
-  if (newest && !notifications.value.some(n => n.id === newest.id)) {
+  if (newest && !notifications.value.some(n => n.id === newest.id))
     notifications.value.unshift(newest)
-  }
 })
 
 async function load() {
   loading.value = true
-  error.value = null
-
+  error.value   = null
   const [res] = await Promise.allSettled([
     useNotifications().list({ limit: 60 }),
   ])
-
   if (res.status === 'fulfilled') notifications.value = (res.value as any).results ?? res.value ?? []
   else error.value = 'Unable to reach the UAPTS Notifications API.'
-
   loading.value = false
 }
 
-onMounted(() => {
-  socket.connect()
-  load()
-})
+onMounted(() => { socket.connect(); load() })
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 60_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
+
+// ── Computed ─────────────────────────────────────────────────────────────
+const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+function bySeverity(s: string) { return notifications.value.filter(n => n.severity === s).length }
 
 const filteredNotifications = computed(() =>
   notifications.value.filter(n => {
@@ -143,15 +205,38 @@ const filteredNotifications = computed(() =>
   }),
 )
 
+const grouped = computed(() => {
+  const now  = new Date()
+  const tStr = now.toDateString()
+  const yday = new Date(now)
+  yday.setDate(yday.getDate() - 1)
+  const yStr = yday.toDateString()
+
+  const groups = [
+    { label: 'Today',     items: [] as Notification[] },
+    { label: 'Yesterday', items: [] as Notification[] },
+    { label: 'Earlier',   items: [] as Notification[] },
+  ]
+
+  for (const n of filteredNotifications.value.slice(0, 60)) {
+    const d = new Date(n.created_at).toDateString()
+    if (d === tStr)      groups[0].items.push(n)
+    else if (d === yStr) groups[1].items.push(n)
+    else                 groups[2].items.push(n)
+  }
+
+  return groups.filter(g => g.items.length > 0)
+})
+
+// ── Actions ──────────────────────────────────────────────────────────────
+function toggleSev(s: string) { severityFilter.value = severityFilter.value === s ? '' : s }
+
 async function markRead(id: string) {
   readingId.value = id
   try {
-    // Optimistic update on page list immediately
     const idx = notifications.value.findIndex(n => n.id === id)
     if (idx !== -1) notifications.value[idx] = { ...notifications.value[idx], read: true }
-    // WS mark: optimistic update in socket list + sends mark_read frame to server
     socket.markRead(id)
-    // REST mark for authoritative persistence
     await useNotifications().markRead(id)
   } catch {} finally { readingId.value = null }
 }
@@ -172,42 +257,252 @@ async function deleteNotif(id: string) {
   } catch {} finally { deletingId.value = null }
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────
 function sevColor(s: string) {
-  const m: Record<string,string> = { critical:'#dc2626', high:'#ea580c', medium:'#ca8a04', low:'#2563eb', info:'#64748b' }
+  const m: Record<string, string> = {
+    critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#2563eb', info: '#64748b',
+  }
   return m[s] ?? '#94a3b8'
 }
 function sevBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'info', info:'neutral' }
+  const m: Record<string, string> = { critical: 'danger', high: 'warning', medium: 'fair', low: 'info', info: 'neutral' }
   return m[s] ?? 'neutral'
+}
+function sevIcon(s: string) {
+  const m: Record<string, string> = { critical: '⚡', high: '⚠', medium: '◉', low: 'ℹ', info: '○' }
+  return m[s] ?? '·'
 }
 function fmtTime(iso: string) {
   if (!iso) return '-'
-  try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
+  try { return new Date(iso).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
   catch { return iso }
+}
+function relTime(iso: string) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const m    = Math.floor(diff / 60_000)
+  if (m < 1)   return 'just now'
+  if (m < 60)  return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24)  return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 30)  return `${d}d ago`
+  return fmtTime(iso)
 }
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.unread-badge { font-size:12px; font-weight:700; padding:3px 10px; border-radius:12px; background:#dc2626; color:#fff; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.ws-banner { margin-bottom:8px; padding:6px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; font-size:12px; color:#dc2626; }
-.ws-connected { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f0fdf4; border:1px solid #bbf7d0; font-size:11px; color:#15803d; }
-.checkbox-label { display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; }
-.notification-list { display:flex; flex-direction:column; gap:6px; }
-.notification-item { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-radius:8px; background:#fff; border:1px solid #f1f5f9; transition:background .15s; }
-.notification-item.unread { background:#fefce8; border-color:#fde68a; }
-.notification-item:hover { background:#f8fafc; }
-.notification-item.unread:hover { background:#fef9c3; }
-.notif-left { flex-shrink:0; padding-top:4px; }
-.sev-dot { display:block; width:10px; height:10px; border-radius:50%; }
-.notif-body { flex:1; min-width:0; }
-.notif-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:3px; }
-.notif-title { font-weight:600; font-size:14px; }
-.notif-time { font-size:11px; color:#94a3b8; margin-left:auto; white-space:nowrap; }
-.notif-msg { font-size:13px; color:#475569; line-height:1.45; }
-.notif-channels { display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; }
-.channel-chip { font-size:10px; padding:2px 6px; border-radius:4px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
-.notif-actions { display:flex; flex-direction:column; gap:4px; flex-shrink:0; }
-.empty-state { text-align:center; color:#94a3b8; padding:32px; font-size:14px; }
+/* ── Banners ──────────────────────────────────────────────────────── */
+.error-banner {
+  padding: 10px 16px; border-radius: 8px;
+  background: #fef9c3; border: 1px solid #ca8a04;
+  font-size: 13px; margin-bottom: 4px;
+}
+
+/* ── Live status bar ──────────────────────────────────────────────── */
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+}
+.live-status--ok    { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.live-status--error { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+.live-status--idle  { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: currentColor;
+}
+.live-status--ok .live-dot { animation: pulse-dot 2s ease-in-out infinite; }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.8); }
+}
+
+/* ── KPI strip ────────────────────────────────────────────────────── */
+.nkpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) { .nkpi-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 480px) { .nkpi-strip { grid-template-columns: repeat(2, 1fr); } }
+
+.nkpi {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 14px 10px; border-radius: 10px;
+  background: #fff; border: 1px solid #e2e8f0;
+  cursor: pointer; transition: all .15s; gap: 4px; text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.nkpi:hover { border-color: #94a3b8; box-shadow: 0 3px 8px rgba(0,0,0,.08); }
+.nkpi--active { border-color: #006838 !important; box-shadow: 0 0 0 2px rgba(0,104,56,.12) !important; }
+.nkpi-val { font-size: 22px; font-weight: 800; color: #1e293b; line-height: 1; font-variant-numeric: tabular-nums; }
+.nkpi-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+
+.nkpi--unread   { border-top: 3px solid #2563eb; }
+.nkpi--unread .nkpi-val   { color: #2563eb; }
+.nkpi--critical { border-top: 3px solid #dc2626; }
+.nkpi--critical .nkpi-val { color: #dc2626; }
+.nkpi--high     { border-top: 3px solid #ea580c; }
+.nkpi--high .nkpi-val     { color: #ea580c; }
+.nkpi--medium   { border-top: 3px solid #d97706; }
+.nkpi--medium .nkpi-val   { color: #d97706; }
+.nkpi--low      { border-top: 3px solid #2563eb; }
+
+/* ── Filter row ───────────────────────────────────────────────────── */
+.filter-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+}
+.sev-pills { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.sev-pill {
+  padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;
+  background: transparent; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .12s; color: #64748b; white-space: nowrap;
+  text-transform: capitalize;
+}
+.sev-pill:hover { border-color: #94a3b8; }
+.sev-pill--active { background: #1e293b; border-color: #1e293b; color: #fff; }
+
+.toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #374151; cursor: pointer; white-space: nowrap; }
+.pill-toggle {
+  width: 36px; height: 20px; border-radius: 10px; background: #d1d5db;
+  position: relative; cursor: pointer; transition: background .15s; flex-shrink: 0;
+}
+.pill-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.pill-toggle.on { background: #006838; }
+.pill-toggle.on::after { left: 18px; }
+.result-count { font-size: 12px; color: #94a3b8; white-space: nowrap; margin-left: auto; }
+
+/* ── Notification feed ────────────────────────────────────────────── */
+.notif-feed { display: flex; flex-direction: column; gap: 0; }
+
+.group-label {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 2px; margin-top: 8px; margin-bottom: 6px;
+}
+.group-label-text {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: #64748b;
+}
+.group-label-count {
+  font-size: 10px; padding: 1px 6px; border-radius: 10px;
+  background: #f1f5f9; color: #64748b; font-weight: 600;
+}
+
+/* Notification card */
+.notif-card {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 14px 16px 0;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #eaeff5;
+  margin-bottom: 8px;
+  transition: box-shadow .18s, border-color .18s, transform .15s;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(15,23,42,.05);
+}
+.notif-card:hover {
+  border-color: #c8d4e0;
+  box-shadow: 0 6px 20px rgba(15,23,42,.09);
+  transform: translateY(-1px);
+}
+.notif-card--unread {
+  background: #fff;
+  border-color: #dae2ee;
+  box-shadow: 0 2px 8px rgba(15,23,42,.07);
+}
+.notif-card--unread:hover {
+  border-color: #b6c8da;
+  box-shadow: 0 6px 20px rgba(15,23,42,.11);
+}
+
+/* Left colored severity bar */
+.notif-bar {
+  width: 4px; flex-shrink: 0; align-self: stretch; min-height: 52px;
+}
+.notif-card--unread .notif-bar { width: 5px; }
+
+/* Severity icon */
+.notif-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; margin-top: 1px;
+}
+
+/* Content */
+.notif-content { flex: 1; min-width: 0; }
+.notif-header {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 5px;
+}
+.notif-title { font-size: 13.5px; color: #4b5563; line-height: 1.3; }
+.notif-title--bold { font-weight: 700; color: #0f172a; }
+.notif-title--bold::before {
+  content: '';
+  display: inline-block; vertical-align: middle;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #2563eb; margin-right: 7px;
+}
+.notif-time {
+  font-size: 11px; color: #9ca3af; margin-left: auto;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.notif-body { font-size: 13px; color: #4b5563; line-height: 1.55; margin: 0 0 7px; }
+.ch-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.ch-pill {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px;
+  background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;
+  font-weight: 600; letter-spacing: .02em;
+}
+
+/* Action buttons */
+.notif-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  flex-shrink: 0; padding-right: 6px; padding-top: 2px;
+}
+.na-btn {
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e8ecf1;
+  background: #f8fafc; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; transition: all .14s; color: #94a3b8;
+}
+.na-btn:disabled { opacity: .35; cursor: default; pointer-events: none; }
+.na-btn--read:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.na-btn--del:hover  { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+
+/* ── Unread pill in header ─────────────────────────────────────────── */
+.unread-pill {
+  font-size: 12px; font-weight: 700; padding: 3px 10px;
+  border-radius: 12px; background: #dc2626; color: #fff;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 64px 24px; text-align: center;
+  background: #fff; border: 1px solid #f1f5f9; border-radius: 12px;
+}
+.empty-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin-bottom: 16px;
+}
+.empty-title { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+.empty-sub   { font-size: 13px; color: #94a3b8; }
 </style>

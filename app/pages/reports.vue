@@ -105,16 +105,21 @@
           </tr>
         </thead>
         <tbody v-if="runs.length">
-          <tr v-for="r in runs" :key="r.id">
+          <tr v-for="r in runs" :key="r.id" :class="{ 'run-row-active': r.id === pollingRunId }">
             <td class="run-name">{{ (r as any).template_name ?? r.template_id }}</td>
             <td><BadgePill variant="info">{{ r.format.toUpperCase() }}</BadgePill></td>
-            <td><BadgePill :variant="runBadge(r.status)">{{ r.status }}</BadgePill></td>
-            <td class="run-ts">{{ fmtTime((r as any).generated_at ?? (r as any).created_at) }}</td>
+            <td>
+              <BadgePill :variant="runBadge(r.status)">{{ r.status }}</BadgePill>
+              <span v-if="r.id === pollingRunId" class="poll-dot" title="Checking status…" />
+            </td>
+            <td class="run-ts">{{ fmtTime((r as any).generated_at ?? (r as any).completed_at ?? (r as any).requested_at) }}</td>
             <td class="run-by">{{ (r as any).requested_by_email ?? '-' }}</td>
             <td class="run-size">{{ (r as any).file_size_bytes ? fmtBytes((r as any).file_size_bytes) : '-' }}</td>
             <td>
-              <a v-if="r.status === 'completed'" :href="downloadUrl(r.id)" target="_blank" class="btn run-dl">⬇ Download</a>
-              <span v-else-if="r.status === 'running'" class="run-progress">● In progress…</span>
+              <button v-if="r.status === 'completed'" class="btn run-dl" @click="useReports().download(r.id)">⬇ Download</button>
+              <span v-else-if="r.status === 'running'" class="run-progress">● Generating…</span>
+              <span v-else-if="r.status === 'queued'" class="run-queued">⏳ Queued…</span>
+              <span v-else-if="r.status === 'failed'" class="run-failed" :title="(r as any).error">✕ Failed</span>
               <span v-else class="run-na">-</span>
             </td>
           </tr>
@@ -148,6 +153,11 @@ const genForm = ref({
   params: { date_from: '', date_to: '' } as Record<string, string>,
 })
 
+// Fast-poll state: tracks a run that is still queued/running
+const pollingRunId = ref<string | null>(null)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollDeadline: ReturnType<typeof setTimeout> | null = null
+
 async function load() {
   loading.value = true
   error.value = null
@@ -170,7 +180,7 @@ async function load() {
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 60_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
+onUnmounted(() => { if (t) clearInterval(t); stopPolling() })
 
 const selectedTemplate = computed(() =>
   catalog.value.find(tmpl => tmpl.id === genForm.value.template_id) ?? null,
@@ -200,11 +210,39 @@ async function generateReport() {
     runs.value.unshift(run)
     showGenerateModal.value = false
     genForm.value = { template_id: '', format: 'pdf', params: { date_from: '', date_to: '' } }
+
+    // The API enqueues the job and returns queued/running — start fast polling
+    if (run.status === 'queued' || run.status === 'running') {
+      startPolling(run.id)
+    }
   } catch (e: any) {
-    genError.value = e?.message ?? 'Failed to generate report.'
+    genError.value = e?.data?.detail ?? e?.data?.errors?.[0]?.message ?? e?.message ?? 'Failed to generate report.'
   } finally {
     generating.value = false
   }
+}
+
+function startPolling(runId: string) {
+  stopPolling()
+  pollingRunId.value = runId
+
+  pollTimer = setInterval(async () => {
+    try {
+      const updated = await useReports().run(runId)
+      const idx = runs.value.findIndex(r => r.id === runId)
+      if (idx !== -1) runs.value[idx] = updated
+      if (updated.status === 'completed' || updated.status === 'failed') stopPolling()
+    } catch { /* keep trying until deadline */ }
+  }, 3_000)
+
+  // Give up after 3 minutes
+  pollDeadline = setTimeout(stopPolling, 180_000)
+}
+
+function stopPolling() {
+  pollingRunId.value = null
+  if (pollTimer)    { clearInterval(pollTimer);    pollTimer = null }
+  if (pollDeadline) { clearTimeout(pollDeadline);  pollDeadline = null }
 }
 
 function downloadUrl(runId: string) { return useReports().downloadUrl(runId) }
@@ -265,7 +303,16 @@ function fmtBytes(b: number) {
 .run-size { font-size:12px; color:#94a3b8; font-variant-numeric:tabular-nums; }
 .run-dl   { font-size:12px; text-decoration:none; }
 .run-progress { font-size:12px; color:#3b82f6; font-weight:500; }
-.run-na   { font-size:12px; color:#cbd5e1; }
+.run-queued   { font-size:12px; color:#f59e0b; font-weight:500; }
+.run-failed   { font-size:12px; color:#ef4444; font-weight:500; cursor:help; }
+.run-na       { font-size:12px; color:#cbd5e1; }
+.run-row-active td { background:#fffbeb !important; }
+.poll-dot {
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:#3b82f6; margin-left:6px; vertical-align:middle;
+  animation:poll-pulse 1s ease-in-out infinite;
+}
+@keyframes poll-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
 .empty-row { text-align:center; color:#94a3b8; padding:20px; }
 
 /* ── Modal ── */
