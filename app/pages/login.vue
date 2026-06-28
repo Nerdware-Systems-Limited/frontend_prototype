@@ -4,31 +4,45 @@
     <!-- Left panel: form -->
     <div class="form-panel" :class="{ 'high-contrast': highContrast, 'grayscale': grayscale }" :style="{ fontSize: fontSizes[fontSize] }">
 
-      <!-- Logo -->
-      <div class="logo-wrapper">
-        <img src="/logo.png" alt="UAPTS Logo" class="logo-img" />
-      </div>
-
-      <!-- Headline -->
-      <div class="form-heading">
-        <h1 class="heading-main">UAPTS Login</h1>
-        <p class="heading-sub">Kenya State Department for Transport</p>
-      </div>
+      <!-- Brand lockup -->
+      <header class="brand-header">
+        <div class="brand-row">
+          <div class="brand-logo" aria-hidden="true">
+            <img src="/uapts-logo.png" alt="" class="logo-img" />
+          </div>
+          <div class="brand-text">
+            <div class="brand-name">UAPTS</div>
+            <div class="brand-tag">Unified Analytics &amp; Predictive Transport System</div>
+          </div>
+        </div>
+        <div class="brand-rule" aria-hidden="true"></div>
+      </header>
 
       <!-- Login step -->
       <template v-if="step === 'login'">
+        <div class="form-heading">
+          <h1 class="heading-main">Sign in to UAPTS</h1>
+          <p class="heading-sub">Use your work email or staff identification number.</p>
+        </div>
+
         <form class="auth-form" @submit.prevent="handleLogin" novalidate>
           <div class="field-group">
             <label class="field-label" for="uapts-email">Email address or Staff ID</label>
-            <input
-              id="uapts-email"
-              v-model="email"
-              type="text"
-              class="field-input"
-              placeholder="officer@transport.go.ke"
-              autocomplete="username"
-              required
-            />
+            <div class="field-input-wrap">
+              <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input
+                id="uapts-email"
+                v-model="email"
+                type="text"
+                class="field-input has-icon"
+                placeholder="officer@transport.go.ke"
+                autocomplete="username"
+                required
+              />
+            </div>
           </div>
 
           <div class="field-group">
@@ -37,55 +51,84 @@
               <a href="#" class="forgot-link">Forgot Password</a>
             </div>
             <div class="field-input-wrap">
+              <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
               <input
                 id="uapts-pwd"
                 v-model="password"
                 :type="showPwd ? 'text' : 'password'"
-                class="field-input field-input-icon-right"
+                class="field-input has-icon has-trailing"
                 placeholder="Enter your password"
                 autocomplete="current-password"
                 required
               />
-              <button type="button" class="toggle-pwd-btn" @click="showPwd = !showPwd">
-                <span class="toggle-pwd-text">{{ showPwd ? 'Hide' : 'Show' }} Password</span>
-                <svg v-if="!showPwd" class="eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <svg v-else class="eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+              <button type="button" class="toggle-pwd-btn" @click="showPwd = !showPwd" :aria-label="showPwd ? 'Hide password' : 'Show password'" :aria-pressed="showPwd">
+                <svg v-if="!showPwd" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
               </button>
             </div>
           </div>
 
-          <div class="remember-row">
-            <label class="remember-label">
-              <input type="checkbox" v-model="rememberMe" class="remember-check"> Remember for 30 days
-            </label>
-          </div>
+          <label class="remember-label">
+            <input type="checkbox" v-model="rememberMe" class="remember-check">
+            <span class="remember-text">Remember for 30 days</span>
+          </label>
 
-          <div v-if="loginError" class="error-bar">
-            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-            {{ loginError }}
+          <div v-if="loginError" class="error-bar" role="alert" aria-live="polite">
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <div class="error-text">
+              <strong>Sign-in failed</strong>
+              <span>{{ loginError }}</span>
+            </div>
           </div>
 
           <button type="submit" class="submit-btn" :disabled="isLoading">
-            <svg v-if="isLoading" class="spinner" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10" stroke-linecap="round"/></svg>
-            <span>{{ isLoading ? 'Signing in…' : 'Sign In' }}</span>
+            <svg v-if="isLoading" class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10" stroke-linecap="round"/>
+            </svg>
+            <span>{{ isLoading ? 'Signing you in…' : 'Sign in' }}</span>
+            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
           </button>
         </form>
       </template>
 
       <!-- MFA step -->
       <template v-else-if="step === 'mfa'">
-        <div class="mfa-header">
-          <button class="back-btn" @click="step = 'login'" title="Back">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="back-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+        <div class="form-heading">
+          <button class="back-link" @click="step = 'login'" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+            <span>Back to sign in</span>
           </button>
-          <h1 class="heading-main">Two-Factor Auth</h1>
+          <p class="eyebrow">Step 2 of 2</p>
+          <h1 class="heading-main">Two-factor verification</h1>
+          <p class="heading-sub">A 6-digit code has been sent to your registered authenticator app.</p>
         </div>
-        <p class="mfa-hint">A 6-digit code has been sent to your registered authenticator app.</p>
+
+        <div class="mfa-icon-ring" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
 
         <form class="auth-form" @submit.prevent="handleMFA" novalidate>
           <div class="field-group">
-            <label class="field-label">Verification Code</label>
-            <div class="otp-row">
+            <label class="field-label field-label-center">Verification Code</label>
+            <div class="otp-row" role="group" aria-label="One-time password, 6 digits">
               <input
                 v-for="(_, i) in 6"
                 :key="i"
@@ -93,36 +136,50 @@
                 v-model="otpDigits[i]"
                 type="text"
                 inputmode="numeric"
+                pattern="[0-9]*"
                 maxlength="1"
                 class="otp-box"
+                :aria-label="`Digit ${i + 1} of 6`"
+                :autocomplete="i === 0 ? 'one-time-code' : 'off'"
                 @input="onOTPInput(i)"
                 @keydown.backspace="onOTPBackspace(i)"
+                @keydown.left="i > 0 && otpRefs[i-1]?.focus()"
+                @keydown.right="i < 5 && otpRefs[i+1]?.focus()"
                 @paste="onOTPPaste"
               />
             </div>
           </div>
 
-          <div v-if="mfaError" class="error-bar">
-            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-            {{ mfaError }}
+          <div v-if="mfaError" class="error-bar" role="alert" aria-live="polite">
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <div class="error-text">
+              <strong>Verification failed</strong>
+              <span>{{ mfaError }}</span>
+            </div>
           </div>
 
           <button type="submit" class="submit-btn" :disabled="isLoading || otpCode.length < 6">
-            <svg v-if="isLoading" class="spinner" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10" stroke-linecap="round"/></svg>
-            <span>{{ isLoading ? 'Verifying…' : 'Verify & Sign In' }}</span>
+            <svg v-if="isLoading" class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10" stroke-linecap="round"/>
+            </svg>
+            <span>{{ isLoading ? 'Verifying…' : 'Verify &amp; Sign In' }}</span>
+            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
           </button>
 
           <div class="skip-block">
             <div class="or-divider"><span></span><em>or</em><span></span></div>
-            <button type="button" class="skip-btn" @click="skipMFA">
-              Skip 2FA for now
-            </button>
+            <button type="button" class="skip-btn" @click="skipMFA">Skip 2FA for now</button>
             <p class="skip-note">Development mode · 2FA enforcement is disabled</p>
           </div>
         </form>
 
-        <div class="form-footer-center">
-          <button class="resend-link" @click="resendCode">Resend code</button>
+        <div class="resend-row">
+          <span class="resend-text">Didn't receive a code?</span>
+          <button type="button" class="resend-link" @click="resendCode">Resend code</button>
         </div>
       </template>
     </div>
@@ -132,8 +189,8 @@
       <div class="hero-overlay"></div>
       <div class="hero-content">
         <div class="hero-badge">Kenya State Department for Transport</div>
-        <h2 class="hero-headline">Unified Transport Analytics</h2>
-        <p class="hero-body">Centralized data intelligence for roads, rail, and air across all 47 counties.</p>
+        <h2 class="hero-headline">Unified Analytics and Predictive Transport System</h2>
+        <p class="hero-body">Centralized data intelligence for roads, rail, and air across all transport agencies.</p>
         <div class="hero-stats">
           <div class="stat-item">
             <span class="stat-num">16K+</span>
@@ -141,8 +198,8 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
-            <span class="stat-num">47</span>
-            <span class="stat-label">Counties Connected</span>
+            <span class="stat-num">15</span>
+            <span class="stat-label">agencies Connected</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
@@ -167,8 +224,6 @@ const rememberMe = ref(false)
 const { login, isLoading } = useAuth()
 const loginError = ref('')
 const mfaError = ref('')
-const langOpen = ref(false)
-const a11yOpen = ref(false)
 const highContrast = ref(false)
 const grayscale = ref(false)
 const fontSize = ref(0)
@@ -233,365 +288,354 @@ function onOTPPaste(e: ClipboardEvent) {
 </script>
 
 <style scoped>
-/* ─── Layout ─────────────────────────────────────────────── */
+/* ============================================================================
+   Login + MFA — editorial style
+   - White form panel, 6px radii (no pill buttons)
+   - Gold accent rule beneath brand lockup
+   - Leading field icons, structured error bar with shake animation
+   - Arrow icon on submit button
+   - Eyebrow / h1 / sub heading hierarchy
+   ============================================================================ */
+
 .login-root {
   min-height: 100vh;
+  height: 100vh;
   width: 100%;
   display: flex;
-  background: #ffffff;
+  background: #fff;
   font-family: 'Lexend', 'Inter', system-ui, sans-serif;
-  position: relative;
 }
-
-/* ─── Top controls ───────────────────────────────────────── */
-
-/* Flag placeholders */
-.flag-ke, .flag-gb {
-  display: inline-block;
-  width: 18px;
-  height: 14px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.flag-ke { background: linear-gradient(to bottom, #006600 33%, #000 33%, #000 66%, #ce1126 66%); }
-.flag-gb { background: linear-gradient(135deg, #012169 50%, #C8102E 50%); }
 
 /* ─── Form Panel ─────────────────────────────────────────── */
 .form-panel {
   width: 100%;
   max-width: 600px;
-  min-height: 100vh;
-  padding: 56px 64px 40px;
+  height: 100vh;
+  padding: 40px 64px;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  justify-content: center;
+  gap: 28px;
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
   transition: filter 0.2s;
 }
-
-@media (max-width: 1023px) {
-  .form-panel { width: 100%; max-width: 100%; padding: 56px 24px 40px; }
-  .hero-panel {
-    display: none !important;
-  }
-}
-
-.form-panel.high-contrast {
-  background: #000;
-  color: #fff;
-}
+.form-panel.high-contrast { background: #000; color: #fff; }
 .form-panel.grayscale { filter: grayscale(1); }
 
-.logo-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 28px;
+@media (max-width: 1023px) {
+  .form-panel { width: 100%; max-width: 100%; padding: 32px; }
+  .hero-panel { display: none !important; }
+}
+@media (max-width: 600px) { .form-panel { padding: 24px 22px; gap: 24px; } }
+@media (max-width: 380px) { .form-panel { padding: 20px 18px; } }
+
+/* ─── Brand lockup ───────────────────────────────────────── */
+.brand-header { margin-bottom: 4px; }
+.brand-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px;
+}
+.brand-logo {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 104, 56, .15);
+}
+.logo-img { width: 40px; height: 40px; object-fit: contain; }
+.brand-text { line-height: 1.2; min-width: 0; }
+.brand-name {
+  font-size: 18px; font-weight: 800; letter-spacing: 0.04em;
+  color: #003a1e; line-height: 1.1;
+}
+.brand-tag {
+  font-size: 10.5px; font-weight: 600; color: #6b7280;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin-top: 3px; line-height: 1.3;
+}
+.brand-rule {
+  height: 3px;
+  background: linear-gradient(90deg, #FDB913 0%, #FDB913 56px, #e5e7eb 56px, #e5e7eb 100%);
+  border-radius: 2px;
 }
 
-.logo-img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
 /* ─── Heading ────────────────────────────────────────────── */
-.form-heading { text-align: center; margin-bottom: 32px; }
+.form-heading { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #006838; margin-bottom: 2px;
+}
 .heading-main {
-  font-size: clamp(1.75rem, 3vw, 2.25rem);
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.025em;
-  line-height: 1.15;
+  font-size: clamp(1.625rem, 2vw, 1.875rem);
+  font-weight: 700; letter-spacing: -0.025em;
+  color: #111827; line-height: 1.2; margin: 2px 0 0 0;
 }
 .heading-sub {
-  margin-top: 6px;
-  font-size: 0.9375rem;
-  color: #6b7280;
-  font-weight: 400;
+  font-size: 0.875rem; line-height: 1.6;
+  color: #6b7280; margin-top: 6px; max-width: 44ch;
 }
 
-/* ─── Form ───────────────────────────────────────────────── */
-.auth-form { display: flex; flex-direction: column; gap: 18px; }
-
+/* ─── Form fields ────────────────────────────────────────── */
+.auth-form { display: flex; flex-direction: column; gap: 18px; margin: 0; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
-
-.field-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #374151;
-  letter-spacing: 0.01em;
-}
-
 .field-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
+.field-label {
+  display: block; font-size: 0.8125rem; font-weight: 600;
+  color: #374151; letter-spacing: 0.005em; line-height: 1.4;
+}
+.field-label-center { text-align: center; }
 
 .forgot-link {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #065f46;
-  text-decoration: none;
+  font-size: 0.8125rem; font-weight: 600; color: #006838;
+  text-decoration: none; letter-spacing: 0.005em;
 }
 .forgot-link:hover { text-decoration: underline; }
+.forgot-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; border-radius: 4px; }
+
+.field-input-wrap { position: relative; display: flex; align-items: center; }
+.field-icon {
+  position: absolute; left: 14px; color: #9ca3af;
+  pointer-events: none; transition: color .15s;
+}
+.field-input-wrap:focus-within .field-icon { color: #006838; }
 
 .field-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.9375rem;
-  font-family: inherit;
-  color: #111827;
-  background: #fff;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.field-input:focus {
-  border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+  width: 100%; padding: 12px 14px;
+  border: 1px solid #d1d5db; border-radius: 6px;
+  font-size: 0.9375rem; line-height: 1.45; font-family: inherit;
+  color: #111827; background: #fff; outline: none;
+  transition: border-color .12s, box-shadow .12s;
+  min-height: 46px;
 }
 .field-input::placeholder { color: #9ca3af; }
-
-.field-input-wrap { position: relative; }
-.field-input-icon-right { padding-right: 110px; }
+.field-input.has-icon { padding-left: 42px; }
+.field-input.has-trailing { padding-right: 50px; }
+.field-input:hover:not(:focus) { border-color: #9ca3af; }
+.field-input:focus,
+.field-input:focus-visible {
+  border-color: #006838;
+  box-shadow: 0 0 0 3px rgba(0, 104, 56, .16);
+  outline: none;
+}
+.field-input:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
 
 .toggle-pwd-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #6b7280;
-  padding: 4px 2px;
-  transition: color 0.15s;
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: 1px solid transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7280; width: 38px; height: 38px; border-radius: 6px;
+  transition: background .12s, color .12s;
 }
-.toggle-pwd-btn:hover { color: #111827; }
-.toggle-pwd-text { font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
-.eye-icon { width: 18px; height: 18px; }
+.toggle-pwd-btn:hover { background: #f3f4f6; color: #111827; }
+.toggle-pwd-btn:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
-.remember-row { display: flex; align-items: center; }
+/* ─── Remember checkbox ──────────────────────────────────── */
 .remember-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.875rem;
-  color: #374151;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; padding: 2px 0; user-select: none;
 }
-.remember-check { accent-color: #065f46; width: 16px; height: 16px; border-radius: 4px; }
+.remember-check {
+  width: 17px; height: 17px; accent-color: #006838;
+  margin: 0; flex-shrink: 0; cursor: pointer;
+}
+.remember-text { font-size: 0.8125rem; color: #6b7280; line-height: 1.4; }
 
+/* ─── Error bar ──────────────────────────────────────────── */
 .error-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  color: #b91c1c;
-  font-size: 0.8125rem;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px;
+  background: rgba(185, 28, 28, .04);
+  border: 1px solid rgba(185, 28, 28, .22);
+  border-left: 3px solid #b91c1c;
+  border-radius: 6px; color: #b91c1c; line-height: 1.5;
+  animation: shake .35s ease both;
 }
-.error-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.error-icon { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+.error-text { display: flex; flex-direction: column; gap: 2px; }
+.error-text strong { font-weight: 700; font-size: 0.8125rem; }
+.error-text span { font-size: 0.8125rem; font-weight: 500; opacity: .95; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0) }
+  20%, 60% { transform: translateX(-4px) }
+  40%, 80% { transform: translateX(4px) }
+}
 
 /* ─── Submit button ──────────────────────────────────────── */
 .submit-btn {
-  width: 100%;
-  padding: 12px 24px;
-  border-radius: 9999px;
-  background: #1a5f3f;
-  color: #fff;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  font-family: inherit;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
-  letter-spacing: 0.01em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 14px 20px; border-radius: 6px;
+  background: #006838; color: #fff;
+  font-size: 0.9375rem; font-weight: 600; font-family: inherit;
+  border: 1px solid #006838; cursor: pointer;
+  transition: background .15s, box-shadow .15s, transform .08s, opacity .15s;
+  letter-spacing: 0.005em; min-height: 48px;
+  box-shadow: 0 1px 2px rgba(0,104,56,.18);
   margin-top: 4px;
 }
-.submit-btn:hover:not(:disabled) { background: #145034; box-shadow: 0 2px 12px rgba(26,95,63,0.25); }
-.submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  animation: spin 0.75s linear infinite;
+.submit-btn:hover:not(:disabled) {
+  background: #004d29; border-color: #004d29;
+  box-shadow: 0 4px 14px rgba(0,104,56,.26);
 }
+.submit-btn:active:not(:disabled) { transform: translateY(1px); }
+.submit-btn:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.spinner { width: 18px; height: 18px; animation: spin 0.75s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-
-/* ─── MFA ────────────────────────────────────────────────── */
-.mfa-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+/* ─── MFA: back link ─────────────────────────────────────── */
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  background: transparent; border: none; padding: 4px 0; color: #6b7280;
+  font-family: inherit; font-size: 0.8125rem; font-weight: 500;
+  cursor: pointer; border-radius: 4px; transition: color .12s; margin-bottom: 4px;
 }
-.back-btn {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 6px;
-  cursor: pointer;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  transition: background 0.1s;
-}
-.back-btn:hover { background: #f3f4f6; }
-.back-icon { width: 16px; height: 16px; }
-.mfa-hint { font-size: 0.875rem; color: #6b7280; margin-bottom: 28px; line-height: 1.5; }
+.back-link:hover { color: #006838; }
+.back-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
+/* ─── MFA: shield icon ring ──────────────────────────────── */
+.mfa-icon-ring {
+  width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%;
+  background: rgba(0, 104, 56, .08); border: 1px solid rgba(0, 104, 56, .25);
+  color: #006838; display: flex; align-items: center; justify-content: center;
+}
+
+/* ─── MFA: OTP row ───────────────────────────────────────── */
 .otp-row {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 10px; margin: 8px 0 4px;
 }
 .otp-box {
-  aspect-ratio: 1;
-  text-align: center;
-  font-size: 1.25rem;
-  font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  border: 1.5px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #111827;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%; aspect-ratio: 0.9; text-align: center;
+  font-size: 1.5rem; font-weight: 600;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid #d1d5db; border-radius: 6px;
+  background: #fff; color: #111827; outline: none;
+  caret-color: #006838;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+  min-height: 56px; padding: 0;
 }
-.otp-box:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12); }
+.otp-box:hover:not(:focus) { border-color: #9ca3af; }
+.otp-box:focus,
+.otp-box:focus-visible {
+  border-color: #006838; background: rgba(0, 104, 56, .03);
+  box-shadow: 0 0 0 3px rgba(0, 104, 56, .18); outline: none;
+}
 
+/* ─── MFA: skip block ────────────────────────────────────── */
 .skip-block { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .or-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #9ca3af;
-  font-size: 0.75rem;
-  font-style: normal;
+  display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: 0.75rem;
 }
 .or-divider span { flex: 1; height: 1px; background: #e5e7eb; }
 .or-divider em { font-style: normal; }
 .skip-btn {
-  width: 100%;
-  padding: 10px;
-  border-radius: 9999px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  color: #374151;
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s;
+  width: 100%; padding: 12px; border-radius: 6px;
+  background: #f9fafb; border: 1px solid #e5e7eb; color: #374151;
+  font-size: 0.875rem; font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: background .15s, border-color .15s;
 }
-.skip-btn:hover { background: #f3f4f6; }
+.skip-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+.skip-btn:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 .skip-note { font-size: 0.75rem; color: #9ca3af; text-align: center; }
 
-.form-footer-center {
-  margin-top: 16px;
-  text-align: center;
+/* ─── MFA: resend row ────────────────────────────────────── */
+.resend-row {
+  display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;
 }
+.resend-text { font-size: 0.8125rem; color: #6b7280; }
 .resend-link {
-  background: none;
-  border: none;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #065f46;
-  cursor: pointer;
-  font-family: inherit;
+  background: transparent; border: none; padding: 4px 6px;
+  font-size: 0.8125rem; font-weight: 600; color: #006838;
+  font-family: inherit; cursor: pointer; border-radius: 4px; transition: color .12s;
 }
-.resend-link:hover { text-decoration: underline; }
+.resend-link:hover { color: #004d29; text-decoration: underline; }
+.resend-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
-/* ─── Sign up note ───────────────────────────────────────── */
-.signup-note {
-  margin-top: auto;
-  padding-top: 32px;
-  text-align: center;
-  font-size: 0.875rem;
-  color: #6b7280;
+/* ─── Footer ─────────────────────────────────────────────── */
+.form-footer {
+  margin-top: auto; padding-top: 24px;
+  display: flex; flex-direction: column; gap: 16px; position: relative;
 }
-.signup-link { color: #065f46; font-weight: 600; text-decoration: none; margin-left: 4px; }
-.signup-link:hover { text-decoration: underline; }
+.form-footer::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #e5e7eb 30%, #e5e7eb 70%, transparent 100%);
+}
+.footer-row { display: flex; align-items: flex-start; gap: 8px; }
+.footer-icon { width: 14px; height: 14px; color: #9ca3af; flex-shrink: 0; margin-top: 1px; }
+.footer-text {
+  font-size: 0.6875rem; font-weight: 500; color: #9ca3af;
+  letter-spacing: 0.04em; line-height: 1.6; text-transform: uppercase;
+}
+.footer-meta {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 16px; font-size: 0.8125rem; font-weight: 500; color: #6b7280; line-height: 1.4;
+}
+.footer-meta-copyright {
+  color: #6b7280; font-size: 0.75rem; font-weight: 500;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.005em;
+}
+.footer-meta-links { display: inline-flex; align-items: center; gap: 0; }
+.footer-meta-links a {
+  color: #374151; text-decoration: none; padding: 5px 10px; border-radius: 4px;
+  font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.005em;
+  transition: color .12s, background .12s;
+}
+.footer-meta-links a:hover { color: #006838; background: #f3f4f6; }
+.footer-meta-links a:focus-visible { outline: 2px solid #FDB913; outline-offset: 1px; }
+.footer-meta-sep {
+  display: inline-block; width: 1px; height: 12px;
+  background: #e5e7eb; user-select: none; flex-shrink: 0;
+}
 
 /* ─── Hero panel ─────────────────────────────────────────── */
 .hero-panel {
-  flex: 1;
-  min-height: 100vh;
-  width: 100%;
+  flex: 1; height: 100vh;
   background:
     linear-gradient(160deg, rgba(5, 46, 22, 0.82) 0%, rgba(6, 95, 70, 0.65) 50%, rgba(16, 185, 129, 0.3) 100%),
     url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80') center/cover no-repeat;
-  display: flex;
-  align-items: flex-end;
-  padding: 48px;
-  position: relative;
+  display: flex; align-items: center; justify-content: center; padding: 48px;
+  position: relative; overflow: hidden;
 }
-
 .hero-overlay {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: linear-gradient(to top, rgba(2, 44, 26, 0.6) 0%, transparent 60%);
 }
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-  color: #fff;
-}
-
+.hero-content { position: relative; z-index: 1; color: #fff; }
 .hero-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.25);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 16px;
-  backdrop-filter: blur(4px);
+  display: inline-block; padding: 6px 16px; border-radius: 9999px;
+  background: rgba(0, 104, 56, .6); border: 1px solid rgba(253, 185, 19, .6);
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; margin-bottom: 16px; backdrop-filter: blur(8px);
 }
-
 .hero-headline {
-  font-size: clamp(1.75rem, 2.5vw, 2.5rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.15;
-  margin-bottom: 12px;
-  max-width: 400px;
+  font-size: clamp(1.75rem, 2.5vw, 2.5rem); font-weight: 700;
+  letter-spacing: -0.025em; line-height: 1.1; margin-bottom: 12px; max-width: 400px;
+  text-shadow: 0 2px 12px rgba(0,0,0,.4);
 }
-
 .hero-body {
-  font-size: 0.9375rem;
-  color: rgba(255,255,255,0.8);
-  line-height: 1.6;
-  max-width: 380px;
-  margin-bottom: 32px;
+  font-size: 0.9375rem; color: rgba(255,255,255,.8); line-height: 1.7;
+  max-width: 380px; margin-bottom: 32px; text-shadow: 0 1px 6px rgba(0,0,0,.4);
 }
-
-.hero-stats {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
+.hero-stats { display: flex; align-items: center; gap: 20px; }
 .stat-item { display: flex; flex-direction: column; gap: 2px; }
 .stat-num { font-size: 1.375rem; font-weight: 700; line-height: 1; }
-.stat-label { font-size: 0.6875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.6); }
-.stat-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.2); }
+.stat-label {
+  font-size: 0.6875rem; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.08em; color: rgba(255,255,255,.6);
+}
+.stat-divider { width: 1px; height: 36px; background: rgba(255,255,255,.2); }
+
+/* ─── Reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .error-bar { animation: none !important; }
+  .spinner { animation-duration: 0.001ms !important; }
+  * { transition-duration: 0.001ms !important; }
+}
 </style>

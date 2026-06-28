@@ -40,7 +40,9 @@
     />
   </div>
 
-  <!-- Filter bar -->
+  <!-- Incidents table with filtering -->
+  <SectionTitle>All Incidents</SectionTitle>
+
   <div class="filter-row">
     <select v-model="severityFilter" class="select-sm">
       <option value="">All severities</option>
@@ -60,6 +62,46 @@
     </select>
     <button class="btn" @click="load">Apply</button>
     <button class="btn" @click="severityFilter = ''; statusFilter = ''; load()">Clear</button>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Type</th>
+            <th>Severity</th>
+            <th>Status</th>
+            <th>Casualties</th>
+            <th>Vehicles</th>
+            <th>Channel</th>
+            <th>Reported</th>
+            <th>Dispatches</th>
+          </tr>
+        </thead>
+        <tbody v-if="incidents.length">
+          <tr v-for="inc in incidents" :key="inc.id">
+            <td style="font-family:monospace;font-size:12px">{{ inc.reference_code }}</td>
+            <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
+            <td><BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity }}</BadgePill></td>
+            <td><BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill></td>
+            <td>{{ inc.casualties }}</td>
+            <td>{{ inc.vehicles_involved }}</td>
+            <td style="font-size:12px">{{ inc.reporting_channel.replace(/_/g,' ') }}</td>
+            <td style="white-space:nowrap;font-size:12px">{{ fmtTime(inc.reported_at) }}</td>
+            <td>{{ inc.dispatch_count }}</td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr>
+            <td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">
+              {{ loading ? 'Loading…' : 'No incidents found' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- Map + active list -->
@@ -136,49 +178,6 @@
           Loading incidents…
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Full incident table -->
-  <SectionTitle>All Incidents</SectionTitle>
-
-  <div class="card">
-    <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Reference</th>
-            <th>Type</th>
-            <th>Severity</th>
-            <th>Status</th>
-            <th>Casualties</th>
-            <th>Vehicles</th>
-            <th>Channel</th>
-            <th>Reported</th>
-            <th>Dispatches</th>
-          </tr>
-        </thead>
-        <tbody v-if="incidents.length">
-          <tr v-for="inc in incidents" :key="inc.id">
-            <td style="font-family:monospace;font-size:12px">{{ inc.reference_code }}</td>
-            <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
-            <td><BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity }}</BadgePill></td>
-            <td><BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td>{{ inc.casualties }}</td>
-            <td>{{ inc.vehicles_involved }}</td>
-            <td style="font-size:12px">{{ inc.reporting_channel.replace(/_/g,' ') }}</td>
-            <td style="white-space:nowrap;font-size:12px">{{ fmtTime(inc.reported_at) }}</td>
-            <td>{{ inc.dispatch_count }}</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">
-              {{ loading ? 'Loading…' : 'No incidents found' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 
