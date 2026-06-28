@@ -63,7 +63,9 @@ export type Metrics = {
   active_sessions: number
 }
 
-export function useAuditSocket(url = 'ws://127.0.0.1:8000/ws/audit/') {
+const config    = useRuntimeConfig()
+
+export function useAuditSocket(url = config.public.wsUrl ?? 'ws://127.0.0.1:8000/ws/audit/') {
   const logs = ref<AuditLog[]>([])
   const metrics = ref<Metrics | null>(null)
   const isConnected = ref(false)
