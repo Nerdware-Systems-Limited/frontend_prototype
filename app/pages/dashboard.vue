@@ -556,155 +556,30 @@
   ════════════════════════════════════════════════════════════════ -->
   <div class="section-label">
     Agency Drill-Downs
-    <span class="section-pill">RBAC scoped</span>
+    <span class="section-pill">11 agencies · RBAC scoped</span>
   </div>
 
+  <!-- Row 1: Road infrastructure agencies -->
   <div class="agency-grid">
     <!-- KeNHA -->
     <div class="agency-card">
       <div class="agency-card-head">
         <div class="agency-card-title">KeNHA - Road asset manager</div>
-        <span class="agency-tag">Batch · IRI</span>
-      </div>
-      <template v-if="infra">
-        <div class="agency-row" v-for="c in sortedConditions.slice(0, 4)" :key="c.condition_class">
-          <span class="agency-row-label">{{ c.condition_class }} segments</span>
-          <span class="badge" :class="conditionBadge(c.condition_class)">
-            {{ fmtNum(c.total) }} segs · {{ fmtNum(c.length, 0) }} km
-          </span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Maintenance backlog</span>
-          <span class="badge crit">KES {{ fmtKsh(infra.maintenance.open_value_kes) }}</span>
-        </div>
-      </template>
-      <div v-else class="agency-loading">Loading road data…</div>
-      <NuxtLink to="/agency/kenha" class="agency-link">Open KeNHA workspace →</NuxtLink>
-    </div>
-
-    <!-- NTSA -->
-    <div class="agency-card">
-      <div class="agency-card-head">
-        <div class="agency-card-title">NTSA - Safety &amp; enforcement</div>
-        <span class="agency-tag">Live iTIMS</span>
-      </div>
-      <template v-if="safety && fleet">
-        <div class="agency-row">
-          <span class="agency-row-label">Active incidents</span>
-          <span class="badge crit">{{ fmtNum(safety.kpis.active) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Fatalities (30d)</span>
-          <span class="badge crit">{{ fmtNum(safety.kpis.fatal_30d) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Critical black spots</span>
-          <span class="badge warn">{{ fmtNum(safety.black_spots_by_tier['critical'] ?? 0) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">PSVs live tracked</span>
-          <span class="badge good">{{ fmtNum(fleet.kpis.live_vehicles) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Governor tamper rate</span>
-          <span class="badge" :class="fleet.governor_compliance.tamper_rate_pct < 5 ? 'good' : 'warn'">
-            {{ fmtPct(fleet.governor_compliance.tamper_rate_pct) }}
-          </span>
-        </div>
-      </template>
-      <div v-else class="agency-loading">Loading NTSA data…</div>
-      <NuxtLink to="/agency/ntsa" class="agency-link">Open NTSA workspace →</NuxtLink>
-    </div>
-
-    <!-- KRC Rail -->
-    <div class="agency-card">
-      <div class="agency-card-head">
-        <div class="agency-card-title">KRC - Rail operations</div>
-        <span class="agency-tag">Live</span>
-      </div>
-      <template v-if="rail">
-        <div class="agency-row">
-          <span class="agency-row-label">On-time performance (30d)</span>
-          <span class="badge" :class="rail.on_time_30d.on_time_pct >= 80 ? 'good' : 'warn'">
-            {{ fmtPct(rail.on_time_30d.on_time_pct) }}
-          </span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Ridership (30d)</span>
-          <span class="badge good">{{ fmtNum(rail.ridership_30d.passengers) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Freight (30d)</span>
-          <span class="badge good">{{ fmtNum(rail.freight_30d.total_tons) }} t</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Avg delay</span>
-          <span class="badge" :class="rail.on_time_30d.avg_delay_min < 10 ? 'good' : 'warn'">
-            {{ rail.on_time_30d.avg_delay_min?.toFixed(1) }} min
-          </span>
-        </div>
-      </template>
-      <div v-else class="agency-loading">Loading KRC data…</div>
-      <NuxtLink to="/rail" class="agency-link">Open rail workspace →</NuxtLink>
-    </div>
-  </div>
-
-  <!-- KPA + KAA + SDT -->
-  <div class="agency-grid">
-    <div class="agency-card">
-      <div class="agency-card-head">
-        <div class="agency-card-title">KPA - Port of Mombasa</div>
-        <span class="agency-tag">Batch</span>
-      </div>
-      <template v-if="portList.length">
-        <div class="agency-row" v-for="port in portList.slice(0, 2)" :key="port.port_unlocode">
-          <span class="agency-row-label">{{ port.port_name }} TEUs (30d)</span>
-          <span class="badge good">{{ fmtNum(port.teu_throughput_30d) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Live vessels</span>
-          <span class="badge good">{{ fmtNum(maritime?.kpis.live_vessels ?? 0) }}</span>
-        </div>
-      </template>
-      <div v-else class="agency-loading">Loading KPA data…</div>
-      <NuxtLink to="/maritime" class="agency-link">Open maritime workspace →</NuxtLink>
-    </div>
-
-    <div class="agency-card">
-      <div class="agency-card-head">
-        <div class="agency-card-title">KAA - Airports authority</div>
-        <span class="agency-tag">Live</span>
-      </div>
-      <template v-if="aviation">
-        <div class="agency-row">
-          <span class="agency-row-label">Flights (7d)</span>
-          <span class="badge good">{{ fmtNum(aviation.kpis.flights_total) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">Passenger throughput</span>
-          <span class="badge good">{{ fmtNum(aviation.kpis.pax_total) }}</span>
-        </div>
-        <div class="agency-row">
-          <span class="agency-row-label">OTP</span>
-          <span class="badge" :class="aviation.kpis.otp_pct >= 85 ? 'good' : 'warn'">
-            {{ fmtPct(aviation.kpis.otp_pct) }}
-          </span>
-        </div>
-      </template>
-      <div v-else class="agency-loading">Loading KAA data…</div>
-      <NuxtLink to="/aviation" class="agency-link">Open aviation workspace →</NuxtLink>
-    </div>
-
-    <div class="agency-card">
-      <div class="agency-card-head">
-        <div class="agency-card-title">SDT - Oversight &amp; finance</div>
-        <span class="agency-tag">Manual / batch</span>
+        <span class="agency-tag">REST API · ArcGIS · Hybrid</span>
       </div>
       <template v-if="infra">
         <div class="agency-row">
-          <span class="agency-row-label">Budget absorption (FY)</span>
-          <span class="badge" :class="infra.budget.utilization_pct >= 60 ? 'good' : 'warn'">
-            {{ fmtPct(infra.budget.utilization_pct) }}
+          <span class="agency-row-label">Network in good condition</span>
+          <span class="badge" :class="infraGoodPct >= 60 ? 'good' : 'warn'">{{ fmtPct(infraGoodPct) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Avg IRI score</span>
+          <span class="badge info">{{ infra.network.iri_average?.toFixed(2) ?? '-' }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Bridges critical</span>
+          <span class="badge" :class="infra.bridges.critical_count > 0 ? 'warn' : 'good'">
+            {{ fmtNum(infra.bridges.critical_count) }} / {{ fmtNum(infra.bridges.total) }}
           </span>
         </div>
         <div class="agency-row">
@@ -716,8 +591,363 @@
           <span class="badge warn">{{ fmtNum(infra.predictive.at_risk_segments_12mo) }}</span>
         </div>
       </template>
-      <div v-else class="agency-loading">Loading SDT data…</div>
-      <NuxtLink to="/agency/sdr" class="agency-link">Open SDT workspace →</NuxtLink>
+      <div v-else class="agency-loading">Loading road data…</div>
+      <NuxtLink to="/traffic" class="agency-link">Open KeNHA workspace →</NuxtLink>
+    </div>
+
+    <!-- NTSA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">NTSA - Safety &amp; enforcement</div>
+        <span class="agency-tag">Live · iTIMS · IRSMS</span>
+      </div>
+      <template v-if="safety && fleet">
+        <div class="agency-row">
+          <span class="agency-row-label">Vehicle registry (iTIMS)</span>
+          <span class="badge info">{{ fmtNum(fleet.kpis.total_vehicles) }} records</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Active road incidents</span>
+          <span class="badge" :class="safetyBadge">{{ fmtNum(safety.kpis.active) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Fatalities (30d)</span>
+          <span class="badge crit">{{ fmtNum(safety.kpis.fatal_30d) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Critical black spots</span>
+          <span class="badge warn">{{ fmtNum(safety.black_spots_by_tier['critical'] ?? 0) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Governor tamper rate</span>
+          <span class="badge" :class="fleet.governor_compliance.tamper_rate_pct < 5 ? 'good' : 'warn'">
+            {{ fmtPct(fleet.governor_compliance.tamper_rate_pct) }}
+          </span>
+        </div>
+      </template>
+      <div v-else class="agency-loading">Loading NTSA data…</div>
+      <NuxtLink to="/fleet" class="agency-link">Open NTSA workspace →</NuxtLink>
+    </div>
+
+    <!-- KeRRA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">KeRRA - Rural roads authority</div>
+        <span class="agency-tag">Batch · ERP upgrading</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Rural network managed</span>
+        <span class="badge info">28,150 km</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Paved / Gravel / Earth</span>
+        <span class="badge info">5,163 / 15,440 / 7,546 km</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Regional offices</span>
+        <span class="badge info">47 WAN-connected</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">ERP status</span>
+        <span class="badge warn">Business Central V14 · EOL</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Safety · GIS · Predictive</span>
+      </div>
+      <NuxtLink to="/infrastructure" class="agency-link">Open infrastructure workspace →</NuxtLink>
+    </div>
+  </div>
+
+  <!-- Row 2: Ports, maritime and aviation -->
+  <div class="agency-grid" style="margin-top:8px">
+    <!-- KPA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">KPA - Port of Mombasa</div>
+        <span class="agency-tag">PMIS · VTMIS · REST API</span>
+      </div>
+      <template v-if="portList.length">
+        <div class="agency-row" v-for="port in portList.slice(0, 2)" :key="port.port_unlocode">
+          <span class="agency-row-label">{{ port.port_name }} TEUs (30d)</span>
+          <span class="badge good">{{ fmtNum(port.teu_throughput_30d) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Live vessels in port</span>
+          <span class="badge good">{{ fmtNum(maritime?.kpis.live_vessels ?? 0) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Avg yard dwell time</span>
+          <span class="badge" :class="portDwellOk ? 'good' : 'warn'">{{ portAvgDwellLabel }}</span>
+        </div>
+      </template>
+      <div class="agency-row">
+        <span class="agency-row-label">SAP + KWATOS status</span>
+        <span class="badge warn">End-of-life · active replacement</span>
+      </div>
+      <div v-if="!portList.length" class="agency-loading">Loading KPA data…</div>
+      <NuxtLink to="/maritime" class="agency-link">Open maritime workspace →</NuxtLink>
+    </div>
+
+    <!-- KMA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">KMA - Kenya Maritime Authority</div>
+        <span class="agency-tag">NAV 2018 · Hybrid</span>
+      </div>
+      <template v-if="maritime">
+        <div class="agency-row">
+          <span class="agency-row-label">Maritime incidents (30d)</span>
+          <span class="badge" :class="maritime.kpis.incidents_30d > 5 ? 'warn' : 'good'">
+            {{ fmtNum(maritime.kpis.incidents_30d) }}
+          </span>
+        </div>
+      </template>
+      <div class="agency-row">
+        <span class="agency-row-label">Casualties on record (2025)</span>
+        <span class="badge warn">127</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">PSC inspection records</span>
+        <span class="badge info">Active · vessel compliance</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">ERP status</span>
+        <span class="badge warn">Dynamics NAV 2018 · obsolescence</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Maritime · GIS · Access Control</span>
+      </div>
+      <NuxtLink to="/maritime" class="agency-link">Open maritime workspace →</NuxtLink>
+    </div>
+
+    <!-- KAA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">KAA - Airports authority</div>
+        <span class="agency-tag">Live · KAA / KCAA</span>
+      </div>
+      <template v-if="aviation">
+        <div class="agency-row">
+          <span class="agency-row-label">Flight movements (7d)</span>
+          <span class="badge good">{{ fmtNum(aviation.kpis.flights_total) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Passenger throughput (7d)</span>
+          <span class="badge good">{{ fmtNum(aviation.kpis.pax_total) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">On-time performance</span>
+          <span class="badge" :class="aviation.kpis.otp_pct >= 85 ? 'good' : 'warn'">
+            {{ fmtPct(aviation.kpis.otp_pct) }}
+          </span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Air cargo (7d)</span>
+          <span class="badge info">{{ fmtKsh(aviation.kpis.cargo_kg_total / 1000) }} t</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Avg delay</span>
+          <span class="badge" :class="(aviation.kpis.avg_delay_min ?? 0) < 15 ? 'good' : 'warn'">
+            {{ aviation.kpis.avg_delay_min?.toFixed(0) ?? '-' }} min
+          </span>
+        </div>
+      </template>
+      <div v-else class="agency-loading">Loading KAA data…</div>
+      <NuxtLink to="/aviation" class="agency-link">Open aviation workspace →</NuxtLink>
+    </div>
+  </div>
+
+  <!-- Row 3: Rail, metro transport, northern corridor -->
+  <div class="agency-grid" style="margin-top:8px">
+    <!-- KRC -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">KRC - Railways corporation</div>
+        <span class="agency-tag">SAP S4/HANA · CTC · CSV</span>
+      </div>
+      <template v-if="rail">
+        <div class="agency-row">
+          <span class="agency-row-label">SGR on-time performance (30d)</span>
+          <span class="badge" :class="rail.on_time_30d.on_time_pct >= 80 ? 'good' : 'warn'">
+            {{ fmtPct(rail.on_time_30d.on_time_pct) }}
+          </span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Ridership (30d)</span>
+          <span class="badge good">{{ fmtNum(rail.ridership_30d.passengers) }}</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Freight tonnage (30d)</span>
+          <span class="badge good">{{ fmtNum(rail.freight_30d.total_tons) }} t</span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Avg delay</span>
+          <span class="badge" :class="rail.on_time_30d.avg_delay_min < 10 ? 'good' : 'warn'">
+            {{ rail.on_time_30d.avg_delay_min?.toFixed(1) }} min
+          </span>
+        </div>
+      </template>
+      <div class="agency-row">
+        <span class="agency-row-label">MGR legacy systems (Translogic/ATW)</span>
+        <span class="badge crit">End-of-life · failure risk</span>
+      </div>
+      <div v-if="!rail" class="agency-loading">Loading KRC data…</div>
+      <NuxtLink to="/railway" class="agency-link">Open rail workspace →</NuxtLink>
+    </div>
+
+    <!-- NaMATA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">NaMATA - Metro transport authority</div>
+        <span class="agency-tag">CSV · No AVL deployed</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">BRT corridors active</span>
+        <span class="badge warn">Partial · Route 111 pilot</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Digital matatu routes</span>
+        <span class="badge info">GTFS-compatible (GIS)</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Real-time AVL tracking</span>
+        <span class="badge warn">Not yet deployed</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">AFC / unified ticketing</span>
+        <span class="badge warn">Cash-based · no integration</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Public Transport · Fleet · GIS</span>
+      </div>
+      <NuxtLink to="/public-transport" class="agency-link">Open public transport workspace →</NuxtLink>
+    </div>
+
+    <!-- NCTTCA -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">NCTTCA - Northern Corridor authority</div>
+        <span class="agency-tag">REST API · 6 member states</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Corridor KPIs tracked</span>
+        <span class="badge info">35+ · published monthly</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Border posts monitored</span>
+        <span class="badge info">11 OSBPs</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">RECTS cargo tracking</span>
+        <span class="badge good">Active · GPS + seal tamper</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Reporting lag (current)</span>
+        <span class="badge warn">Monthly · seeking near-RT</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Freight · Data Hub · Dashboard</span>
+      </div>
+      <NuxtLink to="/maritime" class="agency-link">Open corridor workspace →</NuxtLink>
+    </div>
+  </div>
+
+  <!-- Row 4: Oversight, corridor development, mechanical directorate -->
+  <div class="agency-grid" style="margin-top:8px">
+    <!-- SDR – Roads Directorate -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">SDR - National roads oversight</div>
+        <span class="agency-tag">IFMIS · e-ProMIS · Manual</span>
+      </div>
+      <template v-if="infra">
+        <div class="agency-row">
+          <span class="agency-row-label">Budget absorption (FY)</span>
+          <span class="badge" :class="infra.budget.utilization_pct >= 60 ? 'good' : 'warn'">
+            {{ fmtPct(infra.budget.utilization_pct) }}
+          </span>
+        </div>
+        <div class="agency-row">
+          <span class="agency-row-label">Maintenance backlog (all agencies)</span>
+          <span class="badge crit">KES {{ fmtKsh(infra.maintenance.open_value_kes) }}</span>
+        </div>
+      </template>
+      <div class="agency-row">
+        <span class="agency-row-label">National roads register</span>
+        <span class="badge info">165,000 km</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Data integration mode</span>
+        <span class="badge warn">Manual · email / Excel / PDF</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Infrastructure · GIS · Predictive</span>
+      </div>
+      <div v-if="!infra" class="agency-loading">Loading SDR data…</div>
+      <NuxtLink to="/infrastructure" class="agency-link">Open SDR workspace →</NuxtLink>
+    </div>
+
+    <!-- LAPSSET -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">LAPSSET - Corridor Dev. Authority</div>
+        <span class="agency-tag">Manual · Periodic reporting</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Corridor components</span>
+        <span class="badge info">Road · Rail · Pipeline · Port</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Port of Lamu</span>
+        <span class="badge warn">Partial operations</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Enterprise systems</span>
+        <span class="badge warn">None · Excel / Word / PDF</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Integration mode</span>
+        <span class="badge info">Periodic · no real-time feeds</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Revenue · GIS · Predictive · C&amp;C</span>
+      </div>
+      <NuxtLink to="/infrastructure" class="agency-link">Open infrastructure workspace →</NuxtLink>
+    </div>
+
+    <!-- SDR-MTD -->
+    <div class="agency-card">
+      <div class="agency-card-head">
+        <div class="agency-card-title">SDR-MTD - Mechanical &amp; Transport</div>
+        <span class="agency-tag">MECH System · CSV / Manual</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Govt fleet serviceability</span>
+        <span class="badge info">Tracked via MECH system</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Inspection reports (quarterly)</span>
+        <span class="badge info">~10,000 reports</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">Real-time equipment location</span>
+        <span class="badge warn">Not deployed</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">MECH → fleet integration</span>
+        <span class="badge warn">Manual · not linked</span>
+      </div>
+      <div class="agency-row">
+        <span class="agency-row-label">UAPTS modules</span>
+        <span class="badge info">Infrastructure · Fleet · GIS</span>
+      </div>
+      <NuxtLink to="/infrastructure" class="agency-link">Open SDR workspace →</NuxtLink>
     </div>
   </div>
 </template>

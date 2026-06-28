@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M04 - Public Transport Operations"
+    eyebrow="Public Transport Operations"
     title="Public Transport Overview"
     subtitle="NaMATA · NTSA · NCTTCA - BRT operations, PSV oversight, schedule adherence, fare analytics, NCTTCA corridor ridership, and operator ranking"
   >

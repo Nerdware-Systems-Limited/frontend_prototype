@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M15 - Data Integration Hub"
+    eyebrow="Data Integration Hub"
     title="Integrations"
     subtitle="All 15 UAPTS agency feeds - NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA"
   >

@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M16 - Access Control"
+    eyebrow="Access Control"
     title="Roles & Departments"
     subtitle="RBAC role definitions and organisational departments across UAPTS agencies"
   >

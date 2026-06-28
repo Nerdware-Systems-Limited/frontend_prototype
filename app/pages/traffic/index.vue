@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M02 - Road Traffic Management"
+    eyebrow="Road Traffic Management"
     title="Live Traffic Overview"
     subtitle="KeNHA · KURA · KMD - Real-time flow, congestion events, speed compliance, KMD weather impact, and NCTTCA corridor alerts"
   >

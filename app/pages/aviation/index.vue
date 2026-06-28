@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M07 - Aviation & Airport Management"
+    eyebrow="Aviation & Airport Management"
     title="Aviation Operations"
     subtitle="KAA · KCAA · KMD - Real-time ADS-B flight tracking, OTP, passenger volumes, cargo, KMD weather advisories, and KCAA safety oversight"
   >

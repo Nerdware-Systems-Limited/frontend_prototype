@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M15 - Ad-hoc Query Engine"
+    eyebrow="Ad-hoc Query Engine"
     title="Query Builder"
     subtitle="Build and execute ad-hoc queries across UAPTS datasets - incidents, vehicles, congestion, blackspots, GPS tracks, and traffic counts"
   >

@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M08 - Railway Management (KRC)"
+    eyebrow="Railway Management (KRC)"
     title="Railway Operations"
     subtitle="KRC · KPA · KenTrade · NCTTCA - SGR &amp; MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >

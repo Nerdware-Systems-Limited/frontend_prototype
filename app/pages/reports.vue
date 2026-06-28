@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M15 - Report Centre"
+    eyebrow="Report Centre"
     title="Reports"
     subtitle="Generate scheduled and on-demand reports - download PDF or XLSX across all UAPTS modules"
   >

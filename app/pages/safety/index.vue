@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M05 - Safety & Incident Management"
+    eyebrow="Safety & Incident Management"
     title="Safety Overview"
     subtitle="NTSA · KeNHA · KMD - National road safety KPIs, active incidents, KMD weather correlation, KeNHA road intervention effectiveness, and predictive hotspot analysis"
   >

@@ -289,7 +289,7 @@ function onOTPPaste(e: ClipboardEvent) {
 
 <style scoped>
 /* ============================================================================
-   Login + MFA — editorial style
+   Login + MFA - editorial style
    - White form panel, 6px radii (no pill buttons)
    - Gold accent rule beneath brand lockup
    - Leading field icons, structured error bar with shake animation

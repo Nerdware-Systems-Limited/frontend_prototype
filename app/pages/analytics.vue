@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M09 / M14 - Analytics & Predictive Intelligence"
+    eyebrow="Analytics & Predictive Intelligence"
     title="Analytics Workbench"
     subtitle="KeNHA · KURA · KMD · NTSA · NaMATA · KRC · KPA · KAA · KCAA - Multi-domain AI forecasts across traffic, safety risk, infrastructure deterioration, and public transport demand"
   >

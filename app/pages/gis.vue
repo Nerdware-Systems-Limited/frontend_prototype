@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M17 - GIS & Spatial Analysis"
+    eyebrow="GIS & Spatial Analysis"
     title="GIS Explorer"
     subtitle="KeNHA · KURA · KeRRA · KRB · KRC · KPA · KMA · KAA · NCTTCA - National road network, PT routes, rail lines, port infrastructure, and UAPTS spatial layers"
   >

@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M16 - Compliance & Governance"
+    eyebrow="Compliance & Governance"
     title="Audit Trail"
     subtitle="Full platform audit log - every user action, data change, and system event across all modules"
   >

@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M07 - Maritime & Port Operations"
+    eyebrow="Maritime & Port Operations"
     title="Maritime Overview"
     subtitle="KPA · KMA · KenTrade · NCTTCA - Real-time AIS vessel traffic, port performance, KenTrade cargo single-window, and NCTTCA corridor transit KPIs"
   >

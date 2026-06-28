@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M16 - User Management"
+    eyebrow="User Management"
     title="Users"
     subtitle="Manage UAPTS platform users - create, activate, deactivate, and assign roles across agencies"
   >

@@ -1,6 +1,6 @@
 <template>
   <PageHeader
-    eyebrow="M16 - Platform Notifications"
+    eyebrow="Platform Notifications"
     title="Notifications"
     subtitle="Real-time alerts and platform notifications across all UAPTS modules"
   >
