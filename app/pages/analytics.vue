@@ -10,7 +10,7 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Traffic Forecasts"      :value="fmtNum(trafficForecasts.length)"  sub="Predictive segments (24h)"        source="batch" source-title="AI Model · KeNHA" />
+    <KpiCard label="Traffic Forecasts"      :value="fmtNum(trafficForecasts.length)"  sub="Predictive segments (24h)"        source="batch" source-title="AI Model · NTSA" />
     <KpiCard label="Safety Hotspots"        :value="fmtNum(safetyHotspots.length)"    sub="Predicted risk zones"             source="batch" source-title="AI Model · NTSA" />
     <KpiCard label="At-Risk Road Segments"  :value="fmtNum(atRiskSegments.length)"    sub="Deterioration forecast (12mo)"    source="batch" source-title="AI Model · KeNHA" />
     <KpiCard label="PT Demand Forecasts"    :value="fmtNum(demandForecasts.length)"   sub="Route demand predictions"         source="batch" source-title="AI Model · NTSA" />
@@ -327,7 +327,7 @@ const SUGGESTIONS = [
   { label: 'Heavy traffic',         query: 'Show heavy and severe traffic segments' },
 ]
 
-const WELCOME = `Hello! I analyse UAPTS transport predictions from our ML forecast models.\n\nI can summarise and filter:\n• Traffic congestion forecasts (KeNHA)\n• Safety hotspot risk rankings (NTSA)\n• Road deterioration predictions (KeNHA)\n• Public transport demand forecasts (NTSA)\n\nNote: models are in pre-production - predictions will improve as training data accumulates.`
+const WELCOME = `Hello! I analyse UAPTS transport predictions from our ML forecast models.\n\nI can summarise and filter:\n• Traffic congestion forecasts (NTSA)\n• Safety hotspot risk rankings (NTSA)\n• Road deterioration predictions (KeNHA)\n• Public transport demand forecasts (NTSA)\n\nNote: models are in pre-production - predictions will improve as training data accumulates.`
 
 function initChat() {
   messages.value = [{

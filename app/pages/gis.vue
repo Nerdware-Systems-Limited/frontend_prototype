@@ -163,9 +163,8 @@
           <UaptsMap
             :boundary="layers.boundary ? boundary : undefined"
             :roads="layers.roads ? roads : undefined"
-            :lines="layers.routes ? routeLines : undefined"
-            :center="[-0.5, 37.5]"
-            :zoom="6"
+            :routes="layers.routes ? gisRoutes : undefined"
+            :initial-bbox="[-4.677, 33.913, 4.677, 41.859]"
             :height="mapHeight"
           />
           <template #fallback>
@@ -219,7 +218,7 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('GIS Explorer')
 
 import { useGis } from '~/composables/api'
-import type { GeoJSONFeatureCollection, LineSpec } from '~/composables/api'
+import type { GeoJSONFeatureCollection } from '~/composables/api'
 
 const boundary   = ref<GeoJSONFeatureCollection | null>(null)
 const roads      = ref<GeoJSONFeatureCollection | null>(null)
@@ -231,7 +230,7 @@ const simplify          = ref(0.01)
 const highwayFilter     = ref('')
 const serviceTypeFilter = ref('')
 
-const layers = ref({ boundary: true, roads: true, routes: false })
+const layers = ref({ boundary: true, roads: true, routes: true })
 
 const mapHeight = 'calc(100vh - 232px)'
 
@@ -280,21 +279,6 @@ async function toggleLayer(key: 'boundary' | 'roads' | 'routes') {
 
 onMounted(load)
 
-const routeLines = computed<LineSpec[]>(() => {
-  if (!gisRoutes.value) return []
-  return (gisRoutes.value.features ?? []).flatMap((f: any, i: number) => {
-    const coords = f.geometry?.coordinates ?? []
-    if (!coords.length) return []
-    const pts = f.geometry.type === 'MultiLineString' ? coords.flat() : coords
-    return [{
-      id:     f.properties?.id ?? String(i),
-      points: pts.map(([lon, lat]: [number, number]) => ({ lat, lon })),
-      color:  serviceColor(f.properties?.service_type),
-      weight: 2,
-    }]
-  })
-})
-
 const roadCount    = computed(() => roads.value?.features?.length ?? 0)
 const routeCount   = computed(() => gisRoutes.value?.features?.length ?? 0)
 const featureCount = computed(() =>
@@ -309,13 +293,6 @@ const detailLabel = computed(() => {
   if (simplify.value <= 0.030) return 'Medium'
   return 'Fast'
 })
-
-function serviceColor(s: string) {
-  const m: Record<string, string> = {
-    bus: '#3b82f6', brt: '#8b5cf6', matatu: '#f97316', rail: '#ef4444', ferry: '#06b6d4',
-  }
-  return m[s] ?? '#64748b'
-}
 
 function fmtNum(v: number) { return v.toLocaleString() }
 

@@ -265,30 +265,49 @@ function renderBoundary(Lc: any) {
 function renderRoads(Lc: any) {
   if (!props.roads || !mapRef.value) return
   const layer = Lc.geoJSON(props.roads, {
-    style: (p: any) => ({
-      color: p?.road_class === 'A' ? '#ef4444'
-        : p?.road_class === 'B' ? '#f97316'
-        : p?.road_class === 'urban' ? '#eab308' : '#64748b',
-      weight: p?.road_class === 'A' ? 3 : p?.road_class === 'B' ? 2 : 1.5,
-      opacity: 0.7,
-    }),
+    style: (feature: any) => {
+      const p   = feature?.properties ?? {}
+      const hw  = p.highway ?? p.road_class ?? ''
+      const color =
+        hw === 'motorway' || hw === 'trunk' ? '#dc2626'
+        : hw === 'primary'                  ? '#ea580c'
+        : hw === 'secondary'                ? '#ca8a04'
+        : hw === 'tertiary'                 ? '#16a34a'
+        : hw === 'A'                        ? '#ef4444'
+        : hw === 'B'                        ? '#f97316'
+        : hw === 'urban'                    ? '#eab308'
+        : '#64748b'
+      const weight =
+        hw === 'motorway' || hw === 'trunk' ? 3.5
+        : hw === 'primary'                  ? 2.5
+        : hw === 'secondary'                ? 2
+        : 1.5
+      return { color, weight, opacity: 0.8 }
+    },
     onEachFeature: (feature: any, lyr: any) => {
       lyr.bindPopup(buildPopup('roads', feature))
       lyr.on('click', () => emit('feature-click', { layer: 'roads', feature }))
     },
   })
   layer.addTo(mapRef.value)
-  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#64748b', count: props.roads.features?.length ?? 0, visible: true, instance: layer })
+  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#f59e0b', count: props.roads.features?.length ?? 0, visible: true, instance: layer })
 }
 
 function renderRoutes(Lc: any) {
   if (!props.routes || !mapRef.value) return
   const layer = Lc.geoJSON(props.routes, {
-    style: (p: any) => ({
-      color: p?.service_type === 'brt' ? '#ef4444' : '#a855f7',
-      weight: p?.service_type === 'brt' ? 4 : 2,
-      opacity: 0.75,
-    }),
+    style: (feature: any) => {
+      const st = feature?.properties?.service_type ?? ''
+      const color =
+        st === 'brt'    ? '#8b5cf6'
+        : st === 'bus'    ? '#3b82f6'
+        : st === 'matatu' ? '#f97316'
+        : st === 'rail'   ? '#ef4444'
+        : st === 'ferry'  ? '#06b6d4'
+        : '#a855f7'
+      const weight = st === 'brt' ? 4.5 : st === 'rail' ? 3 : 2.5
+      return { color, weight, opacity: 0.85, dashArray: st === 'ferry' ? '6 4' : undefined }
+    },
     onEachFeature: (feature: any, lyr: any) => {
       lyr.bindPopup(buildPopup('routes', feature))
       lyr.on('click', () => emit('feature-click', { layer: 'routes', feature }))
