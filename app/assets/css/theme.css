@@ -1274,6 +1274,7 @@ main svg:not([width]):not([height]){max-width:24px;max-height:24px}
 }
 .sidebar-backdrop.active { display: block; }
 
+
 /* ── 900px: sidebar collapses, content fills full width ─────────────── */
 @media (max-width: 900px) {
   /* Show hamburger */
@@ -1307,6 +1308,10 @@ main svg:not([width]):not([height]){max-width:24px;max-height:24px}
 
   /* Agency / module grids: fewer columns */
   .agency-grid { grid-template-columns: 1fr !important; }
+
+  /* Card body padding */
+  .card-body { padding: 12px 10px; }
+  .card-header { padding: 10px 14px; }
 }
 
 /* ── 768px: tables scroll, filter bars stack ─────────────────────────── */

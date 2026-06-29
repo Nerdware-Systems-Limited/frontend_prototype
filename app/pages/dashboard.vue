@@ -154,7 +154,7 @@
         High: {{ safety ? fmtNum(safety.black_spots_by_tier['high'] ?? 0) : '-' }} ·
         Med: {{ safety ? fmtNum(safety.black_spots_by_tier['medium'] ?? 0) : '-' }}
       </div>
-      <div class="kpi-source"><span class="source-dot batch" />KDE / NTSA</div>
+      <div class="kpi-source"><span class="source-dot batch" />NTSA</div>
     </div>
     <div class="kpi-card info">
       <div class="kpi-label">Active emergency dispatches</div>
@@ -1403,6 +1403,10 @@ const mapMarkers = computed((): MarkerSpec[] => {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .kpi-sub {
   font-size: 10px;
@@ -1833,34 +1837,42 @@ const mapMarkers = computed((): MarkerSpec[] => {
 }
 .agency-link:hover { text-decoration: underline; }
 
-/* ── Mobile: collapse the 6-col KPI ribbon + 2-col dual blocks ───────── */
+/* ── Responsive breakpoints ────────────────────────────────────────── */
+
+/* Large laptop: sidebar (~200px) + content at ~1000-1200px — 6 cols too tight */
+@media (max-width: 1300px) {
+  .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Small laptop / tablet landscape: sidebar still visible */
+@media (max-width: 1024px) {
+  .kpi-grid        { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .map-alerts-row  { grid-template-columns: 1fr; }
+  .agency-grid     { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-val         { font-size: 18px; }
+}
+
+/* Tablet portrait / sidebar-drawer mode */
 @media (max-width: 900px) {
-  .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .dual-col {
-    grid-template-columns: 1fr;
-  }
+  .kpi-grid        { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dual-col        { grid-template-columns: 1fr; }
+  .map-alerts-row  { grid-template-columns: 1fr; }
+  .agency-grid     { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* Large mobile */
 @media (max-width: 600px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .kpi-grid-2 {
-    grid-template-columns: 1fr 1fr;
-  }
+  .kpi-grid        { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-grid-2      { grid-template-columns: 1fr 1fr; }
+  .agency-grid     { grid-template-columns: 1fr; }
+  .kpi-val         { font-size: 17px; }
 }
 
+/* Small mobile */
 @media (max-width: 480px) {
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-  .kpi-grid-2 {
-    grid-template-columns: 1fr;
-  }
-  .kpi-card {
-    padding: 10px 12px;
-  }
+  .kpi-grid        { grid-template-columns: 1fr; }
+  .kpi-grid-2      { grid-template-columns: 1fr; }
+  .kpi-card        { padding: 10px 12px; }
+  .kpi-val         { font-size: 16px; }
 }
 </style>
