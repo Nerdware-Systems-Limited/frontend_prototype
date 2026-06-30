@@ -47,6 +47,23 @@
         </div>
       </div>
 
+      <!-- County detail level (shown when boundary is on) -->
+      <div v-if="layers.boundary" class="panel-section">
+        <div class="panel-section-title">Boundary Detail</div>
+        <div class="admin-level-group">
+          <button
+            v-for="opt in adminLevelOptions" :key="opt.value"
+            class="admin-level-btn"
+            :class="{ active: adminLevel === opt.value }"
+            @click="setAdminLevel(opt.value)"
+          >{{ opt.label }}</button>
+        </div>
+        <div v-if="selectedCounty" class="selected-county">
+          <span class="selected-county-dot" />
+          {{ selectedCounty }}
+        </div>
+      </div>
+
       <!-- Filters (shown contextually) -->
       <div v-if="layers.roads" class="panel-section">
         <div class="panel-section-title">Road Filter</div>
@@ -163,9 +180,11 @@
           <UaptsMap
             :boundary="layers.boundary ? boundary : undefined"
             :roads="layers.roads ? roads : undefined"
-            :routes="layers.routes ? gisRoutes : undefined"
-            :initial-bbox="[-4.677, 33.913, 4.677, 41.859]"
+            :lines="layers.routes ? routeLines : undefined"
+            :center="[-0.5, 37.5]"
+            :zoom="6"
             :height="mapHeight"
+            @feature-click="handleFeatureClick"
           />
           <template #fallback>
             <div class="map-placeholder" :style="{ height: mapHeight }">
@@ -205,6 +224,10 @@
           Routes: {{ serviceTypeFilter || 'All services' }}
         </span>
         <span class="statusbar-spacer" />
+        <span v-if="selectedCounty" class="statusbar-item statusbar-county">
+          <span class="statusbar-dot ready" />{{ selectedCounty }}
+        </span>
+        <span v-if="selectedCounty" class="statusbar-sep" />
         <span class="statusbar-item statusbar-dim">Detail: {{ detailLabel }}</span>
         <span class="statusbar-sep" />
         <span class="statusbar-item statusbar-dim">UAPTS GIS · M17</span>
@@ -218,7 +241,7 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('GIS Explorer')
 
 import { useGis } from '~/composables/api'
-import type { GeoJSONFeatureCollection } from '~/composables/api'
+import type { GeoJSONFeatureCollection, LineSpec } from '~/composables/api'
 
 const boundary   = ref<GeoJSONFeatureCollection | null>(null)
 const roads      = ref<GeoJSONFeatureCollection | null>(null)
@@ -229,8 +252,12 @@ const error      = ref<string | null>(null)
 const simplify          = ref(0.01)
 const highwayFilter     = ref('')
 const serviceTypeFilter = ref('')
+const adminLevel        = ref<0 | 1 | 2>(1)   // 0=country, 1=counties, 2=constituencies
 
-const layers = ref({ boundary: true, roads: true, routes: true })
+// Highlighted county name (set via feature-click emit from UaptsMap)
+const selectedCounty = ref<string | null>(null)
+
+const layers = ref({ boundary: true, roads: true, routes: false })
 
 const mapHeight = 'calc(100vh - 232px)'
 
@@ -240,7 +267,7 @@ async function load() {
   const gis     = useGis()
 
   const calls: Promise<any>[] = [
-    gis.kenyaBoundary(),
+    gis.kenyaBoundary({ admin_level: adminLevel.value }),
     gis.roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined }),
   ]
   if (layers.value.routes)
@@ -256,6 +283,30 @@ async function load() {
     error.value = 'Unable to load GIS layers from the UAPTS API.'
 
   loading.value = false
+}
+
+async function reloadBoundary() {
+  const [res] = await Promise.allSettled([
+    useGis().kenyaBoundary({ admin_level: adminLevel.value }),
+  ])
+  if (res.status === 'fulfilled') {
+    boundary.value = res.value
+    selectedCounty.value = null
+  }
+}
+
+function setAdminLevel(v: number) {
+  adminLevel.value = v as 0 | 1 | 2
+  reloadBoundary()
+}
+
+function handleFeatureClick({ layer, feature }: { layer: string; feature: any }) {
+  if (layer === 'boundary') {
+    const p = feature?.properties ?? {}
+    if (p.kind === 'county' || p.kind === 'constituency') {
+      selectedCounty.value = p.adm1_name || p.adm2_name || p.name || null
+    }
+  }
 }
 
 async function reloadRoads() {
@@ -279,6 +330,24 @@ async function toggleLayer(key: 'boundary' | 'roads' | 'routes') {
 
 onMounted(load)
 
+const routeLines = computed<LineSpec[]>(() => {
+  if (!gisRoutes.value) return []
+  return (gisRoutes.value.features ?? []).flatMap((f: any, i: number) => {
+    const coords = f.geometry?.coordinates ?? []
+    if (!coords.length) return []
+    const pts: [number, number][] = f.geometry.type === 'MultiLineString'
+      ? coords.flat().map(([lon, lat]: [number, number]) => [lat, lon])
+      : coords.map(([lon, lat]: [number, number]) => [lat, lon])
+    if (pts.length < 2) return []
+    return [{
+      id:     f.properties?.id ?? String(i),
+      points: pts,
+      color:  serviceColor(f.properties?.service_type),
+      weight: 2,
+    }]
+  })
+})
+
 const roadCount    = computed(() => roads.value?.features?.length ?? 0)
 const routeCount   = computed(() => gisRoutes.value?.features?.length ?? 0)
 const featureCount = computed(() =>
@@ -293,6 +362,19 @@ const detailLabel = computed(() => {
   if (simplify.value <= 0.030) return 'Medium'
   return 'Fast'
 })
+
+function serviceColor(s: string) {
+  const m: Record<string, string> = {
+    bus: '#3b82f6', brt: '#8b5cf6', matatu: '#f97316', rail: '#ef4444', ferry: '#06b6d4',
+  }
+  return m[s] ?? '#64748b'
+}
+
+const adminLevelOptions = [
+  { value: 0, label: 'Outline' },
+  { value: 1, label: 'Counties' },
+  { value: 2, label: 'Constituencies' },
+]
 
 function fmtNum(v: number) { return v.toLocaleString() }
 
@@ -693,6 +775,52 @@ const routeLegend = [
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.35; }
 }
+
+/* ── Admin level buttons ─────────────────────────────────────────── */
+.admin-level-group {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.admin-level-btn {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+.admin-level-btn:hover { border-color: #6366f1; color: #6366f1; }
+.admin-level-btn.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.selected-county {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+  padding: 4px 0;
+}
+.selected-county-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6366f1;
+  flex-shrink: 0;
+}
+
+.statusbar-county { color: #6366f1; font-weight: 600; }
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .error-banner {

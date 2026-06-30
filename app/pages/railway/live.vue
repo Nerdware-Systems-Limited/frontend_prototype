@@ -1,7 +1,7 @@
 <template>
   <PageHeader
-    eyebrow="Railway - Live Operations"
-    title="Live Train Tracking"
+    eyebrow="Railway - Train Operations"
+    title="Train Operations"
     subtitle="KRC · NCTTCA - Real-time SGR &amp; MGR train positions, delays, rolling stock status, and NCTTCA corridor transit performance - refreshes every 30 seconds"
   >
     <template #actions>
@@ -198,7 +198,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Live Rail')
+useNavSubtitle('Train Operations')
 
 import { useRailway } from '~/composables/api'
 import type { TrainOperation, Train } from '~/composables/api'

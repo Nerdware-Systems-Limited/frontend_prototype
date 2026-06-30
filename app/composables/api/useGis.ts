@@ -41,11 +41,15 @@ export function useGis() {
   const api = useApi()
 
   /**
-   * GET /api/v1/gis/kenya/boundary/
-   * Country outline + 8 historical regions + 12 landmarks.
+   * GET /api/v1/gis/kenya/boundary/?admin_level=
+   * Country outline + counties + constituencies.
+   * admin_level: 0 = country outline only, 1 = +47 counties (default), 2 = +290 constituencies
    */
-  const kenyaBoundary = () =>
-    api<GeoJSONFeatureCollection>('/api/v1/gis/kenya/boundary/')
+  const kenyaBoundary = (params: { admin_level?: 0 | 1 | 2 } = {}) => {
+    const query: Record<string, number> = {}
+    if (params.admin_level != null) query.admin_level = params.admin_level
+    return api<GeoJSONFeatureCollection>('/api/v1/gis/kenya/boundary/', { query })
+  }
 
   /**
    * GET /api/v1/gis/roads/?bbox=&highway=&limit=&simplify=

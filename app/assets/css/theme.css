@@ -333,7 +333,7 @@ main svg:not([width]):not([height]){max-width:24px;max-height:24px}
 
 .tooltip{position:relative}
 
-/* Responsive — extended block is at the bottom of this file */
+/* Responsive - extended block is at the bottom of this file */
 @media (max-width: 900px){
   main,.main-content{margin-left:0;padding:16px}
 }
@@ -1236,12 +1236,12 @@ main svg:not([width]):not([height]){max-width:24px;max-height:24px}
 
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RESPONSIVE SYSTEM — mobile-first overrides
+   RESPONSIVE SYSTEM - mobile-first overrides
    Breakpoints:
-     480px  — small phones
-     600px  — large phones / small tablets
-     768px  — tablets (portrait)
-     900px  — tablets (landscape) / sidebar collapse threshold
+     480px  - small phones
+     600px  - large phones / small tablets
+     768px  - tablets (portrait)
+     900px  - tablets (landscape) / sidebar collapse threshold
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Hamburger toggle (visible on mobile only) ───────────────────────── */

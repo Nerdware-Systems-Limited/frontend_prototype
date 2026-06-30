@@ -953,7 +953,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Executive Command Center')
+useNavSubtitle('Command Centre')
 
 import {
   useSafety, useFleet, useRailway, useAviationMaritime,
@@ -1839,7 +1839,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 
 /* ── Responsive breakpoints ────────────────────────────────────────── */
 
-/* Large laptop: sidebar (~200px) + content at ~1000-1200px — 6 cols too tight */
+/* Large laptop: sidebar (~200px) + content at ~1000-1200px - 6 cols too tight */
 @media (max-width: 1300px) {
   .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

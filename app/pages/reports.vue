@@ -211,7 +211,7 @@ async function generateReport() {
     showGenerateModal.value = false
     genForm.value = { template_id: '', format: 'pdf', params: { date_from: '', date_to: '' } }
 
-    // The API enqueues the job and returns queued/running — start fast polling
+    // The API enqueues the job and returns queued/running - start fast polling
     if (run.status === 'queued' || run.status === 'running') {
       startPolling(run.id)
     }

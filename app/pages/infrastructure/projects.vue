@@ -1,14 +1,9 @@
 <template>
   <PageHeader
-    eyebrow="Infrastructure - Construction Projects"
-    title="Construction Projects"
-    subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Project portfolio, physical &amp; financial progress, disbursement, delays, and county breakdown"
-  >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
-  </PageHeader>
+    eyebrow="Road Infrastructure"
+    title="Road Infrastructure Status"
+    subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Construction project portfolio, maintenance work orders, financial progress, disbursement, and delays"
+  />
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
@@ -168,44 +163,115 @@
       </div>
     </div>
   </div>
+
+  <!-- Maintenance Orders (merged) -->
+  <SectionTitle pill="KeNHA MMS · Live">Maintenance Orders</SectionTitle>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="filter-row">
+        <select v-model="maintStatusFilter" class="select-sm">
+          <option value="">All statuses</option>
+          <option value="planned">Planned</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="on_hold">On Hold</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select v-model="maintPriorityFilter" class="select-sm">
+          <option value="">All priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button class="btn" @click="maintStatusFilter=''; maintPriorityFilter=''">Clear</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Road</th>
+            <th>Work Type</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Contractor</th>
+            <th>Progress</th>
+            <th>Cost (KES)</th>
+            <th>Scheduled</th>
+          </tr>
+        </thead>
+        <tbody v-if="filteredOrders.length">
+          <tr v-for="o in filteredOrders" :key="o.id">
+            <td>
+              <div style="font-weight:600;font-size:13px">{{ o.segment_road_name ?? o.segment_road_code ?? '-' }}</div>
+              <div v-if="o.description" style="font-size:11px;color:#94a3b8">{{ o.description.slice(0,60) }}{{ o.description.length > 60 ? '…' : '' }}</div>
+            </td>
+            <td><BadgePill variant="info">{{ o.work_type.replace(/_/g,' ') }}</BadgePill></td>
+            <td><BadgePill :variant="maintStatusBadge(o.status)">{{ o.status.replace(/_/g,' ') }}</BadgePill></td>
+            <td><BadgePill :variant="priorityBadge(o.priority)">{{ o.priority }}</BadgePill></td>
+            <td style="font-size:12px">{{ o.contractor_name || '-' }}</td>
+            <td>
+              <div v-if="o.status === 'in_progress'" class="prog-wrap">
+                <div class="prog-bar" :style="{ width: `${o.progress_pct ?? 0}%`, background: progColor(o.progress_pct) }" />
+              </div>
+              <span style="font-size:11px">{{ o.progress_pct != null ? `${o.progress_pct.toFixed(0)}%` : '-' }}</span>
+            </td>
+            <td style="font-size:12px;white-space:nowrap">{{ o.cost_kes != null ? `KES ${fmtKES(o.cost_kes)}` : '-' }}</td>
+            <td style="font-size:12px;white-space:nowrap">{{ fmtDate(o.scheduled_at) }}</td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr>
+            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+              {{ loading ? 'Loading maintenance orders…' : 'No orders match the current filters.' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Construction Projects')
+useNavSubtitle('Road Infrastructure Status')
 
 import { useInfrastructure } from '~/composables/api'
-import type { ConstructionProject } from '~/composables/api'
+import type { ConstructionProject, MaintenanceOrder } from '~/composables/api'
 
 const projects      = ref<ConstructionProject[]>([])
 const delayed       = ref<ConstructionProject[]>([])
 const countyRaw     = ref<any[]>([])
+const orders        = ref<MaintenanceOrder[]>([])
 const loading       = ref(true)
 const error         = ref<string | null>(null)
-const lastRefreshed = ref('-')
 const statusFilter  = ref('')
 const countySearch  = ref('')
 const nameSearch    = ref('')
+const maintStatusFilter   = ref('')
+const maintPriorityFilter = ref('')
 
 async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
 
-  const [projRes, delayRes, countyRes] = await Promise.allSettled([
+  const [projRes, delayRes, countyRes, ordRes] = await Promise.allSettled([
     infra.projects({ page_size: 100 }),
     infra.delayedProjects(),
     infra.projectsByCounty(),
+    infra.maintenanceOrders({ page_size: 100 }),
   ])
 
   if (projRes.status   === 'fulfilled') projects.value  = (projRes.value as any).results ?? []
   if (delayRes.status  === 'fulfilled') delayed.value   = (delayRes.value as any).results ?? []
   if (countyRes.status === 'fulfilled') countyRaw.value = Array.isArray(countyRes.value) ? countyRes.value : ((countyRes.value as any).results ?? [])
+  if (ordRes.status    === 'fulfilled') orders.value    = (ordRes.value as any).results ?? []
 
   if ([projRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
 
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
   loading.value = false
 }
 
@@ -220,6 +286,14 @@ const filteredProjects = computed(() =>
     if (statusFilter.value && p.status !== statusFilter.value) return false
     if (countySearch.value && !p.county.toLowerCase().includes(countySearch.value.toLowerCase())) return false
     if (nameSearch.value   && !p.project_name.toLowerCase().includes(nameSearch.value.toLowerCase())) return false
+    return true
+  }),
+)
+
+const filteredOrders = computed(() =>
+  orders.value.filter(o => {
+    if (maintStatusFilter.value   && o.status   !== maintStatusFilter.value)   return false
+    if (maintPriorityFilter.value && o.priority !== maintPriorityFilter.value) return false
     return true
   }),
 )
@@ -263,6 +337,14 @@ function statusBadge(s: string) {
   const m: Record<string,string> = { in_progress:'info', completed:'success', on_hold:'warning', planned:'neutral', cancelled:'danger' }
   return m[s] ?? 'neutral'
 }
+function maintStatusBadge(s: string) {
+  const m: Record<string,string> = { in_progress:'info', completed:'success', scheduled:'fair', planned:'neutral', on_hold:'warning', cancelled:'danger' }
+  return m[s] ?? 'neutral'
+}
+function priorityBadge(s: string) {
+  const m: Record<string,string> = { urgent:'danger', high:'warning', medium:'fair', low:'success' }
+  return m[s] ?? 'neutral'
+}
 function progColor(pct: number | null | undefined) {
   if (pct == null) return '#94a3b8'
   return pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
@@ -270,8 +352,6 @@ function progColor(pct: number | null | undefined) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }

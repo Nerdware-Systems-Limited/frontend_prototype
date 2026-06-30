@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Platform Notifications"
     title="Notification Center"
-    subtitle="Real-time alerts from all UAPTS modules — traffic, fleet, safety, infrastructure and more"
+    subtitle="Real-time alerts from all UAPTS modules - traffic, fleet, safety, infrastructure and more"
   >
     <template #actions>
       <div v-if="liveUnread > 0" class="unread-pill">{{ liveUnread }} unread</div>
@@ -19,7 +19,7 @@
     :class="streamError ? 'live-status--error' : streamConnected ? 'live-status--ok' : 'live-status--idle'"
   >
     <span class="live-dot" />
-    <span v-if="streamError">Live feed unavailable — {{ streamError }}</span>
+    <span v-if="streamError">Live feed unavailable - {{ streamError }}</span>
     <span v-else-if="streamConnected">Live · Connected to notification stream</span>
     <span v-else>Connecting to live feed…</span>
   </div>

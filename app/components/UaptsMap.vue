@@ -170,6 +170,9 @@ const mapRef = ref<any>(null)
 const authStore = useAuthStore()
 const layerStates = ref<Array<{ key: string; label: string; color: string; count: number; visible: boolean; instance: any }>>([])
 
+// County highlight state (data-props boundary mode)
+const selectedCountyLayer = ref<any>(null)
+
 // Catalogue of layers that the LAYER_CATALOG API knows how to fetch.
 const LAYER_CATALOG: Record<string, { label: string; color: string; endpoint: string }> = {
   kenya:       { label: 'Kenya Outline',         color: '#3b82f6', endpoint: '/api/v1/gis/kenya/boundary/' },
@@ -236,16 +239,25 @@ async function renderAllCatalogLayers(Lc: any) {
 }
 
 // ── Rendering: data-props mode ───────────────────────────────────────
+function boundaryStyle(feature: any) {
+  const kind = feature?.properties?.kind
+  if (kind === 'country')      return { color: '#6366f1', weight: 2.5, fillOpacity: 0.03, fillColor: '#6366f1', interactive: false }
+  if (kind === 'county')       return { color: '#94a3b8', weight: 1,   fillOpacity: 0.04, fillColor: '#64748b', dashArray: undefined }
+  if (kind === 'constituency') return { color: '#cbd5e1', weight: 0.5, fillOpacity: 0.02, fillColor: '#94a3b8', dashArray: '3 4' }
+  if (kind === 'river')        return { color: '#38bdf8', weight: 1,   opacity: 0.3,      fillOpacity: 0,       dashArray: '2 5' }
+  return { color: '#94a3b8', weight: 1, fillOpacity: 0.03 }
+}
+
 function renderBoundary(Lc: any) {
   if (!props.boundary || !mapRef.value) return
   const layer = Lc.geoJSON(props.boundary, {
-    style: (p: any) => {
-      if (p?.kind === 'country') return { color: '#3b82f6', weight: 2, fillOpacity: 0.04, fillColor: '#3b82f6' }
-      if (p?.kind === 'region')  return { color: '#94a3b8', weight: 1, fillOpacity: 0.05, fillColor: '#94a3b8', dashArray: '4 3' }
-      return {}
-    },
+    style: (feature: any) => boundaryStyle(feature),
     pointToLayer: (f: any, latlng: any) => {
       const p = f.properties || {}
+      // Landmarks: very faint small dots
+      if (p.kind === 'landmark') {
+        return Lc.circleMarker(latlng, { radius: 3, color: '#94a3b8', weight: 1, fillColor: '#cbd5e1', fillOpacity: 0.5 })
+      }
       const size = p.size === 'lg' ? 12 : p.size === 'sm' ? 6 : 9
       const fill = p.color === 'red' ? '#ef4444'
         : p.color === 'blue' ? '#3b82f6'
@@ -254,60 +266,71 @@ function renderBoundary(Lc: any) {
       return Lc.circleMarker(latlng, { radius: size, color: '#fff', weight: 1.5, fillColor: fill, fillOpacity: 0.9 })
     },
     onEachFeature: (feature: any, lyr: any) => {
+      const kind = feature?.properties?.kind
+      // Rivers and landmarks: no popup, not interactive
+      if (kind === 'river' || kind === 'landmark') return
       lyr.bindPopup(buildPopup('boundary', feature))
-      lyr.on('click', () => emit('feature-click', { layer: 'boundary', feature }))
+      lyr.on('click', () => {
+        emit('feature-click', { layer: 'boundary', feature })
+        // County / constituency highlight
+        if (kind === 'county' || kind === 'constituency') {
+          if (selectedCountyLayer.value) {
+            selectedCountyLayer.value.setStyle(boundaryStyle(selectedCountyLayer.value.feature))
+          }
+          selectedCountyLayer.value = lyr
+          lyr.setStyle({ color: '#6366f1', weight: 2.5, fillColor: '#6366f1', fillOpacity: 0.18 })
+          lyr.bringToFront()
+        }
+      })
     },
   })
   layer.addTo(mapRef.value)
   layerStates.value.push({ key: 'boundary', label: 'Kenya Outline', color: '#3b82f6', count: props.boundary.features?.length ?? 0, visible: true, instance: layer })
 }
 
+// Road style by highway type (matches API properties.highway)
+function roadStyle(feature: any) {
+  const hw = feature?.properties?.highway ?? ''
+  const surface = feature?.properties?.surface ?? ''
+  const paved = surface === 'asphalt' || surface === 'paved' || surface === 'concrete'
+  const unpaved = surface === 'unpaved' || surface === 'gravel' || surface === 'dirt'
+
+  if (hw === 'motorway')     return { color: '#dc2626', weight: 4,   opacity: 0.9,  dashArray: undefined }
+  if (hw === 'trunk')        return { color: '#ea580c', weight: 3.5, opacity: 0.88, dashArray: undefined }
+  if (hw === 'primary')      return { color: '#d97706', weight: 2.5, opacity: 0.85, dashArray: undefined }
+  if (hw === 'secondary')    return { color: '#16a34a', weight: 2,   opacity: 0.80, dashArray: unpaved ? '6 3' : undefined }
+  if (hw === 'tertiary')     return { color: '#0284c7', weight: 1.5, opacity: 0.75, dashArray: unpaved ? '4 4' : undefined }
+  if (hw === 'unclassified') return { color: '#64748b', weight: 1,   opacity: 0.55, dashArray: '3 5' }
+  return                            { color: '#94a3b8', weight: 1,   opacity: 0.45, dashArray: '2 5' }
+}
+
 function renderRoads(Lc: any) {
   if (!props.roads || !mapRef.value) return
   const layer = Lc.geoJSON(props.roads, {
-    style: (feature: any) => {
-      const p   = feature?.properties ?? {}
-      const hw  = p.highway ?? p.road_class ?? ''
-      const color =
-        hw === 'motorway' || hw === 'trunk' ? '#dc2626'
-        : hw === 'primary'                  ? '#ea580c'
-        : hw === 'secondary'                ? '#ca8a04'
-        : hw === 'tertiary'                 ? '#16a34a'
-        : hw === 'A'                        ? '#ef4444'
-        : hw === 'B'                        ? '#f97316'
-        : hw === 'urban'                    ? '#eab308'
-        : '#64748b'
-      const weight =
-        hw === 'motorway' || hw === 'trunk' ? 3.5
-        : hw === 'primary'                  ? 2.5
-        : hw === 'secondary'                ? 2
-        : 1.5
-      return { color, weight, opacity: 0.8 }
-    },
+    style: (feature: any) => roadStyle(feature),
     onEachFeature: (feature: any, lyr: any) => {
       lyr.bindPopup(buildPopup('roads', feature))
-      lyr.on('click', () => emit('feature-click', { layer: 'roads', feature }))
+      lyr.on('mouseover', () => {
+        const base = roadStyle(feature)
+        lyr.setStyle({ ...base, weight: (base.weight as number) + 2, opacity: 1, color: '#f8fafc' })
+        lyr.bringToFront()
+      })
+      lyr.on('mouseout',  () => lyr.setStyle(roadStyle(feature)))
+      lyr.on('click',     () => emit('feature-click', { layer: 'roads', feature }))
     },
   })
   layer.addTo(mapRef.value)
-  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#f59e0b', count: props.roads.features?.length ?? 0, visible: true, instance: layer })
+  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#ea580c', count: props.roads.features?.length ?? 0, visible: true, instance: layer })
 }
 
 function renderRoutes(Lc: any) {
   if (!props.routes || !mapRef.value) return
   const layer = Lc.geoJSON(props.routes, {
-    style: (feature: any) => {
-      const st = feature?.properties?.service_type ?? ''
-      const color =
-        st === 'brt'    ? '#8b5cf6'
-        : st === 'bus'    ? '#3b82f6'
-        : st === 'matatu' ? '#f97316'
-        : st === 'rail'   ? '#ef4444'
-        : st === 'ferry'  ? '#06b6d4'
-        : '#a855f7'
-      const weight = st === 'brt' ? 4.5 : st === 'rail' ? 3 : 2.5
-      return { color, weight, opacity: 0.85, dashArray: st === 'ferry' ? '6 4' : undefined }
-    },
+    style: (p: any) => ({
+      color: p?.service_type === 'brt' ? '#ef4444' : '#a855f7',
+      weight: p?.service_type === 'brt' ? 4 : 2,
+      opacity: 0.75,
+    }),
     onEachFeature: (feature: any, lyr: any) => {
       lyr.bindPopup(buildPopup('routes', feature))
       lyr.on('click', () => emit('feature-click', { layer: 'routes', feature }))
@@ -415,13 +438,19 @@ function buildMarkerPopup(m: MarkerSpec, fill: string): string {
 function buildPopup(layerKey: string, feature: any): string {
   const p = feature.properties || {}
   const title = p.name || p.route_name || p.station_name || p.stop_name ||
-                p.road_name || p.segment_id || p.origin_zone || feature.geometry?.type || layerKey
+                p.road_name || p.adm1 || p.segment_id || p.origin_zone || feature.geometry?.type || layerKey
   const LABEL_MAP: Record<string, string> = {
-    road_class: 'Road class', highway: 'Highway type', length_m: 'Length (m)',
+    // Road fields (from API)
+    highway: 'Highway type', surface: 'Surface', adm1: 'County', adm2: 'Sub-county',
+    // Generic
+    road_class: 'Road class', length_m: 'Length (m)',
     speed_limit_kmh: 'Speed limit', service_type: 'Service type',
     route_name: 'Route', station_name: 'Station', stop_name: 'Stop',
     origin_zone: 'Origin', destination_zone: 'Destination',
     congestion_level: 'Congestion', delay_minutes: 'Delay (min)',
+    // Boundary
+    adm0_name: 'Country', cod_version: 'COD version', area_sqkm: 'Area (km²)',
+    kind: 'Feature type',
   }
   const rows = Object.entries(p)
     .filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== 'name' && k !== 'id')
@@ -438,10 +467,15 @@ function buildPopup(layerKey: string, feature: any): string {
     roads: 'Road Segment', boundary: 'Kenya', routes: 'PT Route',
     markers: 'Marker', lines: 'Line', arrows: 'OD Flow',
   }
+  const LAYER_COLORS: Record<string, string> = {
+    roads: '#ea580c', boundary: '#6366f1', routes: '#a855f7',
+    markers: '#0ea5e9', lines: '#3b82f6', arrows: '#8b5cf6',
+  }
   const layerLabel = LAYER_LABELS[layerKey] ?? layerKey
+  const headBg = LAYER_COLORS[layerKey] ?? '#1e293b'
   const head = `
-    <div style="${POPUP_HEAD_BASE};background:#1e293b">
-      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.55);margin-bottom:3px">${escape(layerLabel)}</div>
+    <div style="${POPUP_HEAD_BASE};background:${headBg}">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.65);margin-bottom:3px">${escape(layerLabel)}</div>
       <div style="font-size:13px;font-weight:600;color:#fff;line-height:1.3">${escape(String(title))}</div>
     </div>`
   const body = rows
@@ -534,6 +568,7 @@ watch(
       if (s.instance) mapRef.value.removeLayer(s.instance)
     }
     layerStates.value = []
+    selectedCountyLayer.value = null
     const Lc = await getLeaflet()
     if (!Lc) return
     await renderAllCatalogLayers(Lc)

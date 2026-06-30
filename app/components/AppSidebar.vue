@@ -8,15 +8,15 @@
   <aside class="sidebar" :class="{ 'mobile-open': sidebarOpen }" id="app-sidebar">
     <div class="sidebar-section">
 
-      <!-- M01 · Dashboard & Visualization - /api/v1/dashboard/summary/ -->
+      <!-- M01 · Command Centre - /api/v1/dashboard/summary/ -->
       <NuxtLink class="sidebar-group-title sidebar-link sidebar-link-top" to="/dashboard" :class="{ active: isActive('/dashboard') }">
-        Executive Dashboard
+        Command Centre
       </NuxtLink>
 
-      <!-- M02 · Traffic Management - /api/v1/traffic/* -->
+      <!-- M02 · Road Traffic Management - /api/v1/traffic/* -->
       <details class="sidebar-group" :open="groupIsOpen('/traffic')">
         <summary class="sidebar-group-title">
-          Traffic Management<span class="sidebar-caret">▾</span>
+          Road Traffic Management<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/traffic" :class="{ active: isActive('/traffic') }">Live Traffic Map</NuxtLink>
@@ -48,6 +48,8 @@
           <NuxtLink class="sidebar-link" to="/public-transport/compliance" :class="{ active: isActive('/public-transport/compliance') }">PSV Compliance</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/brt" :class="{ active: isActive('/public-transport/brt') }">BRT Stops & Headway</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/operators" :class="{ active: isActive('/public-transport/operators') }">Operator Metrics</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/public-transport/vehicle-registration" :class="{ active: isActive('/public-transport/vehicle-registration') }">Vehicle Registration</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/public-transport/driver-licensing" :class="{ active: isActive('/public-transport/driver-licensing') }">Driver Licensing</NuxtLink>
         </div>
       </details>
 
@@ -64,29 +66,39 @@
         </div>
       </details>
 
-      <!-- M06 · Infrastructure Monitoring - /api/v1/infrastructure/* -->
+      <!-- M06 · Road Infrastructure - /api/v1/infrastructure/* -->
       <details class="sidebar-group" :open="groupIsOpen('/infrastructure')">
         <summary class="sidebar-group-title">
-          Infrastructure<span class="sidebar-caret">▾</span>
+          Road Infrastructure<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
-          <NuxtLink class="sidebar-link" to="/infrastructure" :class="{ active: isActive('/infrastructure') }">Asset Condition</NuxtLink>
-          <NuxtLink class="sidebar-link" to="/infrastructure/projects" :class="{ active: isActive('/infrastructure/projects') }">Construction Projects</NuxtLink>
-          <NuxtLink class="sidebar-link" to="/infrastructure/maintenance" :class="{ active: isActive('/infrastructure/maintenance') }">Maintenance Orders</NuxtLink>
-          <NuxtLink class="sidebar-link" to="/infrastructure/bridges" :class="{ active: isActive('/infrastructure/bridges') }">Bridges</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/infrastructure" :class="{ active: isActive('/infrastructure') }">Road Network Inventory</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/infrastructure/projects" :class="{ active: isActive('/infrastructure/projects') }">Road Infrastructure Status</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/infrastructure/funding" :class="{ active: isActive('/infrastructure/funding') }">Funding Allocations</NuxtLink>
         </div>
       </details>
 
-      <!-- M07 · Aviation & Maritime Data - /api/v1/aviation-maritime/* -->
-      <details class="sidebar-group" :open="groupIsOpen(['/aviation', '/maritime'])">
+      <!-- M07a · Aviation - /api/v1/aviation-maritime/aviation/* -->
+      <details class="sidebar-group" :open="groupIsOpen('/aviation')">
         <summary class="sidebar-group-title">
-          Aviation & Maritime<span class="sidebar-caret">▾</span>
+          Aviation<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/aviation" :class="{ active: isActive('/aviation') }">Flight Movements</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/passenger-stats" :class="{ active: isActive('/aviation/passenger-stats') }">Passenger Stats</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/aviation/infrastructure" :class="{ active: isActive('/aviation/infrastructure') }">Aviation Infrastructure</NuxtLink>
+        </div>
+      </details>
+
+      <!-- M07b · Maritime - /api/v1/aviation-maritime/maritime/* -->
+      <details class="sidebar-group" :open="groupIsOpen('/maritime')">
+        <summary class="sidebar-group-title">
+          Maritime<span class="sidebar-caret">▾</span>
+        </summary>
+        <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/maritime" :class="{ active: isActive('/maritime') }">Vessel Movements</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/port-ops" :class="{ active: isActive('/maritime/port-ops') }">Port Operations</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/infrastructure" :class="{ active: isActive('/maritime/infrastructure') }">Maritime Infrastructure</NuxtLink>
         </div>
       </details>
 
@@ -97,9 +109,12 @@
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/railway" :class="{ active: isActive('/railway') }">Railway Overview</NuxtLink>
-          <NuxtLink class="sidebar-link" to="/railway/live" :class="{ active: isActive('/railway/live') }">Live Operations</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/railway/live" :class="{ active: isActive('/railway/live') }">Train Operations</NuxtLink>
           <NuxtLink class="sidebar-link" to="/railway/freight" :class="{ active: isActive('/railway/freight') }">Freight Volumes</NuxtLink>
           <NuxtLink class="sidebar-link" to="/railway/schedules" :class="{ active: isActive('/railway/schedules') }">Schedules</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/railway/infrastructure" :class="{ active: isActive('/railway/infrastructure') }">Rail Infrastructure</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/railway/network-inventory" :class="{ active: isActive('/railway/network-inventory') }">Rail Network Inventory</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/railway/safety" :class="{ active: isActive('/railway/safety') }">Rail Safety</NuxtLink>
         </div>
       </details>
 

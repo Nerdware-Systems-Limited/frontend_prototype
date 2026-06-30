@@ -1,13 +1,13 @@
 <template>
   <PageHeader
-    eyebrow="Infrastructure & Network Health"
-    title="Asset Condition Map"
-    subtitle="KeNHA · KURA · KeRRA - Pavement quality (IRI), bridge health, KURA signal faults, KMD weather impact, and deterioration forecasts"
+    eyebrow="Road Infrastructure"
+    title="Road Network Inventory"
+    subtitle="KeNHA · KURA · KeRRA - Pavement quality (IRI), signal faults, KMD weather impact, and AI deterioration forecasts across the national road network"
   >
     <template #actions>
-      
+
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
-      <NuxtLink to="/infrastructure/projects" class="btn-primary">Projects →</NuxtLink>
+      <NuxtLink to="/infrastructure/projects" class="btn-primary">Infrastructure Status →</NuxtLink>
     </template>
   </PageHeader>
 
@@ -236,7 +236,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Asset Condition Map')
+useNavSubtitle('Road Network Inventory')
 
 import { useInfrastructure, useGis } from '~/composables/api'
 import type { InfrastructureSummary, DeteriorationForecast, TrafficSignal } from '~/composables/api'

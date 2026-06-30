@@ -49,29 +49,29 @@ export function useReports() {
   const api = useApi()
 
   return {
-    /** GET /api/v1/reports/catalog/ — full template catalog */
+    /** GET /api/v1/reports/catalog/ - full template catalog */
     catalog: () => api<ReportTemplate[]>('/api/v1/reports/catalog/'),
 
-    /** GET /api/v1/reports/catalog/<id>/ — single template */
+    /** GET /api/v1/reports/catalog/<id>/ - single template */
     template: (id: string) => api<ReportTemplate>(`/api/v1/reports/catalog/${id}/`),
 
-    /** GET /api/v1/reports/runs/ — paginated run history */
+    /** GET /api/v1/reports/runs/ - paginated run history */
     runs: (q?: ReportsQuery) =>
       api<{ count: number; results: ReportRun[] }>(
         '/api/v1/reports/runs/',
         { query: cleanQuery(q as Record<string, unknown>) },
       ),
 
-    /** POST /api/v1/reports/generate/ — enqueues a run, returns queued ReportRun */
+    /** POST /api/v1/reports/generate/ - enqueues a run, returns queued ReportRun */
     generate: (body: GeneratePayload) =>
       api<ReportRun>('/api/v1/reports/generate/', { method: 'POST', body }),
 
-    /** GET /api/v1/reports/<id>/ — fetch current status of a single run */
+    /** GET /api/v1/reports/<id>/ - fetch current status of a single run */
     run: (id: string) => api<ReportRun>(`/api/v1/reports/${id}/`),
 
     /**
      * Returns the direct download URL for a completed run.
-     * Used as <a :href="downloadUrl(run.id)"> — browser handles the file save.
+     * Used as <a :href="downloadUrl(run.id)"> - browser handles the file save.
      */
     download: async (runId: string) => {
       const blob = await api<Blob>(`/api/v1/reports/${runId}/download/`, { responseType: 'blob' } as any)

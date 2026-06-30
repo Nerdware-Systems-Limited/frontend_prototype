@@ -51,7 +51,7 @@ function toggleSidebar() { sidebarOpen.value = !sidebarOpen.value }
 const locale = ref<'EN' | 'SW'>('EN')
 function setLocale(l: 'EN' | 'SW') { locale.value = l }
 
-const subtitle = useState<string>('navSubtitle', () => 'Executive Command Center')
+const subtitle = useState<string>('navSubtitle', () => 'Command Centre')
 
 const auth = useAuth()
 const user = computed(() => auth.user.value)
