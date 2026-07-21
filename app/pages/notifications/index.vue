@@ -94,17 +94,20 @@
         :key="n.id"
         class="notif-card"
         :class="{ 'notif-card--unread': !n.read }"
+        :style="{ '--sev': sevColor(n.severity) }"
       >
-        <div class="notif-bar" :style="{ background: sevColor(n.severity) }" />
-
-        <div class="notif-icon" :style="{ background: sevColor(n.severity) + '18', color: sevColor(n.severity) }">
-          {{ sevIcon(n.severity) }}
+        <div class="notif-icon" :style="{ background: sevColor(n.severity) + '16', color: sevColor(n.severity) }">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9.5" />
+            <line x1="12" y1="8" x2="12" y2="12.5" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
         </div>
 
         <div class="notif-content">
           <div class="notif-header">
             <span class="notif-title" :class="{ 'notif-title--bold': !n.read }">{{ n.title }}</span>
-            <BadgePill :variant="sevBadge(n.severity)">{{ n.severity }}</BadgePill>
+            <span class="sev-chip" :style="{ background: sevColor(n.severity) + '14', color: sevColor(n.severity), borderColor: sevColor(n.severity) + '40' }">{{ n.severity }}</span>
             <span class="notif-time" :title="fmtTime(n.created_at)">{{ relTime(n.created_at) }}</span>
           </div>
           <p class="notif-body">{{ n.body ?? n.message ?? '' }}</p>
@@ -264,14 +267,6 @@ function sevColor(s: string) {
   }
   return m[s] ?? '#94a3b8'
 }
-function sevBadge(s: string) {
-  const m: Record<string, string> = { critical: 'danger', high: 'warning', medium: 'fair', low: 'info', info: 'neutral' }
-  return m[s] ?? 'neutral'
-}
-function sevIcon(s: string) {
-  const m: Record<string, string> = { critical: '⚡', high: '⚠', medium: '◉', low: 'ℹ', info: '○' }
-  return m[s] ?? '·'
-}
 function fmtTime(iso: string) {
   if (!iso) return '-'
   try { return new Date(iso).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
@@ -406,42 +401,31 @@ function relTime(iso: string) {
 /* Notification card */
 .notif-card {
   display: flex; align-items: flex-start; gap: 14px;
-  padding: 16px 14px 16px 0;
-  border-radius: 12px;
+  padding: 14px 14px 14px 13px;
+  border-radius: 10px;
   background: #fff;
-  border: 1px solid #eaeff5;
+  border: 1px solid #eef1f5;
+  border-left: 3px solid #e2e8f0;
   margin-bottom: 8px;
-  transition: box-shadow .18s, border-color .18s, transform .15s;
-  overflow: hidden;
+  transition: box-shadow .15s, border-color .15s;
   position: relative;
-  box-shadow: 0 1px 4px rgba(15,23,42,.05);
+  box-shadow: 0 1px 2px rgba(15,23,42,.04);
 }
 .notif-card:hover {
-  border-color: #c8d4e0;
-  box-shadow: 0 6px 20px rgba(15,23,42,.09);
-  transform: translateY(-1px);
+  border-color: #d7dee6;
+  box-shadow: 0 3px 10px rgba(15,23,42,.07);
 }
 .notif-card--unread {
-  background: #fff;
-  border-color: #dae2ee;
-  box-shadow: 0 2px 8px rgba(15,23,42,.07);
+  background: #fbfcfe;
+  border-color: #eaeff5;
+  border-left-color: var(--sev, #2563eb);
 }
-.notif-card--unread:hover {
-  border-color: #b6c8da;
-  box-shadow: 0 6px 20px rgba(15,23,42,.11);
-}
-
-/* Left colored severity bar */
-.notif-bar {
-  width: 4px; flex-shrink: 0; align-self: stretch; min-height: 52px;
-}
-.notif-card--unread .notif-bar { width: 5px; }
+.notif-card--unread:hover { border-color: #d7dee6; border-left-color: var(--sev, #2563eb); }
 
 /* Severity icon */
 .notif-icon {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px; margin-top: 1px;
 }
 
 /* Content */
@@ -452,11 +436,9 @@ function relTime(iso: string) {
 }
 .notif-title { font-size: 13.5px; color: #4b5563; line-height: 1.3; }
 .notif-title--bold { font-weight: 700; color: #0f172a; }
-.notif-title--bold::before {
-  content: '';
-  display: inline-block; vertical-align: middle;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #2563eb; margin-right: 7px;
+.sev-chip {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 4px; border: 1px solid; line-height: 1.4;
 }
 .notif-time {
   font-size: 11px; color: #9ca3af; margin-left: auto;

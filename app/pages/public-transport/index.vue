@@ -5,8 +5,8 @@
     subtitle="NaMATA · NTSA · NCTTCA - BRT operations, PSV oversight, schedule adherence, fare analytics, NCTTCA corridor ridership, and operator ranking"
   >
     <template #actions>
-      
-      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
       <NuxtLink to="/public-transport/compliance" class="btn-primary">Compliance →</NuxtLink>
     </template>
   </PageHeader>
@@ -127,17 +127,13 @@
 
   <div class="card">
     <div class="card-body">
-      <div v-if="fareTrend.length" class="rev-chart">
-        <div v-for="(b, i) in fareTrend" :key="i" class="rev-col">
-          <div class="rev-tip">{{ fmtKES(b.total_kes) }}</div>
-          <div
-            class="rev-bar"
-            :style="{ height: `${maxRev > 0 ? (b.total_kes / maxRev) * 100 : 0}%` }"
-          />
-          <div class="rev-label">{{ fmtHour(b.collected_hour) }}</div>
-        </div>
-      </div>
-      <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No revenue data' }}</div>
+      <TrendLineChart
+        :points="fareTrendPoints"
+        color="#22c55e"
+        :height="180"
+        :format-value="v => fmtKES(v)"
+        :empty-text="loading ? 'Loading…' : 'No revenue data'"
+      />
     </div>
   </div>
 
@@ -226,18 +222,13 @@
 
   <div class="card">
     <div class="card-body">
-      <div v-if="demandForecast.length" class="rev-chart">
-        <div v-for="(d, i) in demandForecast" :key="i" class="rev-col">
-          <div class="rev-tip" style="font-size:9px">{{ fmtNum(d.total_predicted) }}</div>
-          <div
-            class="rev-bar"
-            style="background:#8b5cf6"
-            :style="{ height: `${maxDemand > 0 ? (d.total_predicted / maxDemand) * 100 : 0}%` }"
-          />
-          <div class="rev-label">{{ fmtHour(d.target_at) }}</div>
-        </div>
-      </div>
-      <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No forecast data' }}</div>
+      <TrendLineChart
+        :points="demandForecastPoints"
+        color="#8b5cf6"
+        :height="180"
+        :format-value="v => fmtNum(v)"
+        :empty-text="loading ? 'Loading…' : 'No forecast data'"
+      />
     </div>
   </div>
 </template>
@@ -312,10 +303,15 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ─────────────────────────────────────────────────────────────
-const maxRev      = computed(() => Math.max(1, ...fareTrend.value.map(f => f.total_kes ?? 0)))
 const maxFeedback = computed(() => Math.max(1, ...feedbackByCategory.value.map(f => f.total ?? 0)))
 const demandForecast = computed(() => summary.value?.demand_forecast_24h ?? [])
-const maxDemand   = computed(() => Math.max(1, ...demandForecast.value.map(d => d.total_predicted ?? 0)))
+
+const fareTrendPoints = computed(() =>
+  fareTrend.value.map(f => ({ label: fmtHour(f.collected_hour), value: f.total_kes ?? 0 })),
+)
+const demandForecastPoints = computed(() =>
+  demandForecast.value.map(d => ({ label: fmtHour(d.target_at), value: d.total_predicted ?? 0 })),
+)
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -370,11 +366,6 @@ function chanColor(ch: string) {
 .chan-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
 .chan-bar { height:100%; border-radius:4px; transition:width .4s; }
 .chan-val { font-size:11px; text-align:right; }
-.rev-chart { display:flex; align-items:flex-end; gap:3px; height:110px; overflow-x:auto; }
-.rev-col { display:flex; flex-direction:column; align-items:center; min-width:28px; flex:1; }
-.rev-tip { font-size:9px; color:#64748b; margin-bottom:2px; white-space:nowrap; }
-.rev-bar { width:80%; background:#22c55e; border-radius:2px 2px 0 0; min-height:4px; }
-.rev-label { font-size:9px; color:#94a3b8; margin-top:2px; white-space:nowrap; }
 .feedback-grid { display:flex; flex-direction:column; gap:8px; }
 .fb-row { display:grid; grid-template-columns:160px 1fr 100px; align-items:center; gap:8px; }
 .fb-label { font-size:13px; }

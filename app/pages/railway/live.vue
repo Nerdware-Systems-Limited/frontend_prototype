@@ -5,7 +5,6 @@
     subtitle="KRC · NCTTCA - Real-time SGR &amp; MGR train positions, delays, rolling stock status, and NCTTCA corridor transit performance - refreshes every 30 seconds"
   >
     <template #actions>
-      
       <BadgePill variant="danger">{{ delayedOps.length }} delayed</BadgePill>
       <BadgePill variant="success">{{ onTimeOps.length }} on-time</BadgePill>
       <select v-model="networkFilter" class="select-sm">
@@ -13,6 +12,8 @@
         <option value="sgr">SGR</option>
         <option value="mgr">MGR</option>
       </select>
+      <NuxtLink to="/railway/network-inventory" class="btn">Rolling Stock Registry →</NuxtLink>
+      <NuxtLink to="/railway/safety" class="btn">Incidents & Safety →</NuxtLink>
     </template>
   </PageHeader>
 

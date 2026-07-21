@@ -4,10 +4,10 @@
     title="PSV Compliance & Licensing"
     subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and SACCO registration"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
+    <template #actions>
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Vehicle Inspections →</NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
+    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -140,9 +140,11 @@
   </div>
 
   <!-- SACCO compliance status table -->
-  <SectionTitle>SACCO Registration Status</SectionTitle>
-
   <div class="card">
+    <div class="card-header">
+      SACCO Registration Status
+      <NuxtLink to="/public-transport/operators" class="link-sm">Full operator registry →</NuxtLink>
+    </div>
     <div class="card-body">
       <table>
         <thead>
@@ -331,4 +333,5 @@ function saccoStatus(s: string) {
 .chk-ok-bar { background:#22c55e; }
 .chk-flag-bar { background:#f59e0b; }
 .chk-viol-bar { background:#ef4444; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; }
 </style>

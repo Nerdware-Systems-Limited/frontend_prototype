@@ -8,7 +8,7 @@
       <div class="day-filter">
         <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': otpDays === d }" @click="otpDays = d; loadOtp()">{{ d }}d OTP</button>
       </div>
-      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
+      <NuxtLink to="/railway/network-inventory" class="btn">Station / Route Performance →</NuxtLink>
     </template>
   </PageHeader>
 
@@ -155,6 +155,29 @@
     </div>
   </div>
 
+  <!-- Revenue, bookings and no-shows by route -->
+  <SectionTitle :pill="`KRC Ticketing · ${otpDays}d`">Revenue &amp; Bookings by Route</SectionTitle>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Route</th><th>Bookings</th><th>No-Shows</th><th>No-Show Rate</th><th>Revenue (KES)</th></tr></thead>
+          <tbody v-if="revenueByRoute.length">
+            <tr v-for="r in revenueByRoute" :key="`${r.origin}-${r.destination}`">
+              <td style="font-weight:600;font-size:12px">{{ r.origin }} → {{ r.destination }}</td>
+              <td>{{ fmtNum(r.bookings) }}</td>
+              <td>{{ fmtNum(r.noShows) }}</td>
+              <td :style="{ color: r.noShowRate > 10 ? '#ef4444' : '#22c55e' }">{{ r.noShowRate.toFixed(1) }}%</td>
+              <td style="font-size:12px">KES {{ fmtKES(r.revenue) }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No ticketing data in the current view.' }}</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Recent operations with adherence -->
   <SectionTitle pill="KRC OCC · Recent">Recent Operations - Schedule Adherence</SectionTitle>
 
@@ -212,10 +235,11 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Rail Schedules')
 
 import { useRailway } from '~/composables/api'
-import type { TrainSchedule, TrainOperation, OnTimeStats } from '~/composables/api'
+import type { TrainSchedule, TrainOperation, OnTimeStats, RailTicket } from '~/composables/api'
 
 const schedules  = ref<TrainSchedule[]>([])
 const recentOps  = ref<TrainOperation[]>([])
+const tickets    = ref<RailTicket[]>([])
 const otp        = ref<OnTimeStats | null>(null)
 const loading    = ref(true)
 const error      = ref<string | null>(null)
@@ -232,15 +256,17 @@ async function load() {
   error.value = null
   const rail = useRailway()
 
-  const [schRes, opRes, otpRes] = await Promise.allSettled([
+  const [schRes, opRes, otpRes, ticketsRes] = await Promise.allSettled([
     rail.schedules({ page_size: 100 }),
     rail.operations({ page_size: 30 }),
     rail.onTimeStats(otpDays.value),
+    rail.tickets({ page_size: 300, days: otpDays.value }),
   ])
 
   if (schRes.status === 'fulfilled') schedules.value = (schRes.value as any).results ?? []
   if (opRes.status  === 'fulfilled') recentOps.value = (opRes.value as any).results ?? []
   if (otpRes.status === 'fulfilled') otp.value       = otpRes.value
+  if (ticketsRes.status === 'fulfilled') tickets.value = (ticketsRes.value as any).results ?? []
 
   if ([schRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Railway API.'
@@ -280,6 +306,22 @@ const scheduleMap = computed(() => {
 function scheduleDepTime(schedId: string) {
   return scheduleMap.value.get(schedId) ?? '-'
 }
+
+const revenueByRoute = computed(() => {
+  const m = new Map<string, { origin: string; destination: string; bookings: number; noShows: number; revenue: number }>()
+  for (const tk of tickets.value) {
+    const key = `${tk.origin}-${tk.destination}`
+    const ex = m.get(key) ?? { origin: tk.origin, destination: tk.destination, bookings: 0, noShows: 0, revenue: 0 }
+    ex.bookings++
+    if (tk.is_no_show) ex.noShows++
+    ex.revenue += parseFloat(tk.fare_kes || '0')
+    m.set(key, ex)
+  }
+  return [...m.values()]
+    .map(r => ({ ...r, noShowRate: r.bookings > 0 ? (r.noShows / r.bookings) * 100 : 0 }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 15)
+})
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -322,6 +364,7 @@ function opBadge(s: string) {
 .select-sm:focus { outline:none; border-color:#3b82f6; }
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; color:#374151; }
 .checkbox-label input[type="checkbox"] { width:14px; height:14px; accent-color:#3b82f6; cursor:pointer; }
+.table-scroll { overflow-x:auto; }
 
 /* ── OTP visual panel ── */
 .otp-panel {

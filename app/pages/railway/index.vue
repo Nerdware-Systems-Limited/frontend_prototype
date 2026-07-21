@@ -5,10 +5,11 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - SGR &amp; MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >
     <template #actions>
-      
       <BadgePill v-if="summary" variant="info">
         {{ fmtNum(summary.kpis.trains_in_service) }} trains live
       </BadgePill>
+      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory →</NuxtLink>
+      <NuxtLink to="/railway/safety" class="btn">Rail Safety →</NuxtLink>
       <NuxtLink to="/railway/live" class="btn-primary">Live Operations →</NuxtLink>
     </template>
   </PageHeader>
@@ -148,7 +149,10 @@
 
       <!-- Freight summary -->
       <div class="card stack-card">
-        <div class="card-header">Freight Summary (30d)</div>
+        <div class="card-header">
+          Freight Summary (30d)
+          <NuxtLink to="/railway/freight" class="link-sm">Details →</NuxtLink>
+        </div>
         <div class="card-body" v-if="summary">
           <div class="rid-stat-row freight-stats">
             <div><span class="stat-label">Shipments</span><span class="rid-val">{{ fmtNum(summary.freight_30d.shipments) }}</span></div>
@@ -169,7 +173,10 @@
 
       <!-- Safety -->
       <div class="card stack-card">
-        <div class="card-header">Safety Summary (90d)</div>
+        <div class="card-header">
+          Safety Summary (90d)
+          <NuxtLink to="/railway/safety" class="link-sm">Details →</NuxtLink>
+        </div>
         <div class="card-body" v-if="summary">
           <div class="rid-stat-row">
             <div>
@@ -392,4 +399,5 @@ function opBadge(s: string) {
 .occ-bar { height:100%; border-radius:3px; }
 .share-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; }
 .share-bar { height:100%; border-radius:4px; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; }
 </style>

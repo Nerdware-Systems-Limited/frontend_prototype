@@ -173,20 +173,35 @@
   </div>
 
   <!-- Fatality trend sparkline -->
-  <div v-if="safety?.fatality_trend_30d?.length" class="spark-card">
-    <div class="spark-card-head">30-day fatality trend</div>
+  <div v-if="fatalityTrend.length" class="spark-card">
+    <div class="spark-card-head spark-card-head-row">
+      <span>30-day fatality trend</span>
+      <span class="spark-legend">
+        <span class="spark-legend-item"><span class="spark-dot" style="background:#0ca30c" />Low (&le;2)</span>
+        <span class="spark-legend-item"><span class="spark-dot" style="background:#fab219" />Moderate (3-5)</span>
+        <span class="spark-legend-item"><span class="spark-dot" style="background:#d03b3b" />High (&gt;5)</span>
+      </span>
+    </div>
     <div class="spark-card-body">
-      <div class="sparkbar">
+      <div class="sparkbar" @pointerleave="fatalityHover = null">
         <div
-          v-for="d in safety.fatality_trend_30d.slice(-30)"
+          v-for="(d, i) in fatalityTrend"
           :key="d.day"
           class="sparkbar-bar"
+          :class="{ 'is-hovered': fatalityHover === i }"
           :style="{
             height: `${Math.max(4, (d.fatalities / maxFatalities) * 100)}%`,
-            background: d.fatalities > 5 ? '#d03b3b' : d.fatalities > 2 ? '#fab219' : '#0ca30c',
+            background: fatalitySeverityColor(d.fatalities),
           }"
-          :title="`${d.day}: ${d.fatalities} fatalities`"
+          @pointerenter="fatalityHover = i"
         />
+      </div>
+      <div class="sparkbar-range">
+        <span>{{ fmtSparkDate(fatalityTrend[0]?.day) }}</span>
+        <span class="sparkbar-hover-info">
+          {{ fatalityHover !== null ? `${fatalityTrend[fatalityHover].fatalities} fatalities · ${fmtSparkDate(fatalityTrend[fatalityHover].day)}` : '' }}
+        </span>
+        <span>{{ fmtSparkDate(fatalityTrend[fatalityTrend.length - 1]?.day) }}</span>
       </div>
     </div>
   </div>
@@ -1125,11 +1140,18 @@ const portAvgDwellLabel = computed(() =>
 const portDwellOk = computed(() => portAvgDwell.value != null && portAvgDwell.value < 5)
 const portBadge = computed((): 'good' | 'warn' => (portDwellOk.value ? 'good' : 'warn'))
 
-// ── Derived: Fatality sparkline max ───────────────────────────────────
-const maxFatalities = computed(() => {
-  const trend = safety.value?.fatality_trend_30d ?? []
-  return Math.max(1, ...trend.map(d => d.fatalities))
-})
+// ── Derived: Fatality sparkline ────────────────────────────────────────
+const fatalityTrend = computed(() => (safety.value?.fatality_trend_30d ?? []).slice(-30))
+const maxFatalities = computed(() => Math.max(1, ...fatalityTrend.value.map(d => d.fatalities)))
+const fatalityHover = ref<number | null>(null)
+function fatalitySeverityColor(n: number) {
+  return n > 5 ? '#d03b3b' : n > 2 ? '#fab219' : '#0ca30c'
+}
+function fmtSparkDate(iso: string | undefined) {
+  if (!iso) return ''
+  try { return new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' }) }
+  catch { return iso }
+}
 
 // ── Helpers: condition colours + badges ───────────────────────────────
 function conditionColor(cls: string): string {
@@ -1461,6 +1483,32 @@ const mapMarkers = computed((): MarkerSpec[] => {
   font-weight: 500;
   color: var(--text-secondary, #52514e);
 }
+.spark-card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.spark-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.spark-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-secondary, #52514e);
+}
+.spark-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
 .spark-card-body {
   padding: 10px 12px;
 }
@@ -1478,7 +1526,19 @@ const mapMarkers = computed((): MarkerSpec[] => {
   min-height: 3px;
   transition: opacity 0.15s;
 }
-.sparkbar-bar:hover { opacity: 0.75; }
+.sparkbar-bar:hover, .sparkbar-bar.is-hovered { opacity: 0.75; }
+.sparkbar-range {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted, #898781);
+}
+.sparkbar-hover-info {
+  font-weight: 600;
+  color: var(--text-secondary, #52514e);
+}
 
 /* ── Fleet composition tags ─────────────────────────────────────────── */
 .fleet-tags {

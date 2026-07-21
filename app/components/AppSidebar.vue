@@ -47,8 +47,9 @@
           <NuxtLink class="sidebar-link" to="/public-transport" :class="{ active: isActive('/public-transport') }">Operations Overview</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/compliance" :class="{ active: isActive('/public-transport/compliance') }">PSV Compliance</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/brt" :class="{ active: isActive('/public-transport/brt') }">BRT Stops & Headway</NuxtLink>
-          <NuxtLink class="sidebar-link" to="/public-transport/operators" :class="{ active: isActive('/public-transport/operators') }">Operator Metrics</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/public-transport/operators" :class="{ active: isActive('/public-transport/operators') }">Public Operators</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/vehicle-registration" :class="{ active: isActive('/public-transport/vehicle-registration') }">Vehicle Registration</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/public-transport/vehicle-inspections" :class="{ active: isActive('/public-transport/vehicle-inspections') }">Vehicle Inspections</NuxtLink>
           <NuxtLink class="sidebar-link" to="/public-transport/driver-licensing" :class="{ active: isActive('/public-transport/driver-licensing') }">Driver Licensing</NuxtLink>
         </div>
       </details>
@@ -74,6 +75,7 @@
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/infrastructure" :class="{ active: isActive('/infrastructure') }">Road Network Inventory</NuxtLink>
           <NuxtLink class="sidebar-link" to="/infrastructure/projects" :class="{ active: isActive('/infrastructure/projects') }">Road Infrastructure Status</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/infrastructure/bridges" :class="{ active: isActive('/infrastructure/bridges') }">Bridges & Assets</NuxtLink>
           <NuxtLink class="sidebar-link" to="/infrastructure/funding" :class="{ active: isActive('/infrastructure/funding') }">Funding Allocations</NuxtLink>
         </div>
       </details>

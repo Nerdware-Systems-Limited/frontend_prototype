@@ -149,20 +149,13 @@
 
   <div class="card">
     <div class="card-body">
-      <div v-if="summary?.volume_24h?.length" class="vol-chart">
-        <div v-for="(h, i) in summary.volume_24h" :key="i" class="vol-col">
-          <div class="vol-tip">{{ fmtNum(h.volume) }}</div>
-          <div
-            class="vol-bar"
-            :style="{
-              height: `${maxVolume > 0 ? (h.volume / maxVolume) * 100 : 0}%`,
-              background: h.avg_speed != null && h.avg_speed < 20 ? '#ef4444' : h.avg_speed != null && h.avg_speed < 40 ? '#f59e0b' : '#22c55e',
-            }"
-          />
-          <div class="vol-label">{{ fmtHour(h.hour) }}</div>
-        </div>
-      </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading volume…' : 'No 24h volume data' }}</div>
+      <TrendLineChart
+        :points="volumeChartPoints"
+        color="#3b82f6"
+        :height="180"
+        :format-value="v => fmtNum(v)"
+        :empty-text="loading ? 'Loading volume…' : 'No 24h volume data'"
+      />
     </div>
   </div>
 
@@ -320,8 +313,12 @@ onMounted(() => { t = setInterval(load, 60_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const maxVolume = computed(() =>
-  Math.max(1, ...(summary.value?.volume_24h ?? []).map(h => h.volume)),
+const volumeChartPoints = computed(() =>
+  (summary.value?.volume_24h ?? []).map(h => ({
+    label: fmtHour(h.hour),
+    value: h.volume,
+    meta: h.avg_speed != null ? `${h.avg_speed.toFixed(0)} km/h avg speed` : undefined,
+  })),
 )
 
 const nextHourForecasts = computed(() => summary.value?.forecast_next_hour ?? [])
@@ -394,11 +391,6 @@ function impactColor(score: number) {
 .weather-row { display:flex; align-items:center; gap:10px; padding:4px 0; }
 .weather-icon { font-size:20px; line-height:1; }
 .weather-impact { margin-left:auto; font-size:12px; font-weight:600; }
-.vol-chart { display:flex; align-items:flex-end; gap:2px; height:110px; overflow-x:auto; }
-.vol-col { display:flex; flex-direction:column; align-items:center; min-width:24px; flex:1; }
-.vol-tip { font-size:8px; color:#64748b; margin-bottom:2px; }
-.vol-bar { width:80%; border-radius:2px 2px 0 0; min-height:4px; }
-.vol-label { font-size:8px; color:#94a3b8; margin-top:2px; }
 .forecast-list { display:flex; flex-direction:column; gap:8px; }
 .fc-row { display:flex; align-items:center; gap:10px; }
 .fc-detail { display:flex; gap:16px; font-size:12px; color:#64748b; margin-left:auto; }

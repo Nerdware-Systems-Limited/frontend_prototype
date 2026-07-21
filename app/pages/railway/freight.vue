@@ -5,11 +5,10 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - Freight manifests, corridor analysis, KenTrade single-window clearances, NCTTCA transit tracking, and KPA port-rail reconciliation"
   >
     <template #actions>
-      
       <div class="day-filter">
         <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
       </div>
-      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
+      <NuxtLink to="/railway/infrastructure" class="btn">Freight Terminals →</NuxtLink>
     </template>
   </PageHeader>
 
@@ -149,6 +148,31 @@
     </div>
   </div>
 
+  <!-- Intermodal transfer analysis -->
+  <SectionTitle pill="Computed · Rail-Port">Intermodal Transfer Analysis</SectionTitle>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <div class="recon-note">
+        Rail-port intermodal performance, derived from manifests with a declared port of origin. Rail-road intermodal transfer is not yet modelled - no road-leg linkage exists in the freight data today.
+      </div>
+      <div v-if="intermodalByPort.length" class="table-scroll">
+        <table>
+          <thead><tr><th>Port of Origin</th><th>Manifests</th><th>Tonnage</th><th>Avg Transit Time</th><th>Pending Arrival</th></tr></thead>
+          <tbody>
+            <tr v-for="p in intermodalByPort" :key="p.port">
+              <td style="font-weight:600">{{ p.port }}</td>
+              <td>{{ fmtNum(p.count) }}</td>
+              <td>{{ fmtNum(p.tons) }}t</td>
+              <td style="font-size:12px">{{ p.avgTransitHours != null ? `${p.avgTransitHours.toFixed(1)}h` : '-' }}</td>
+              <td :style="{ color: p.pending > 0 ? '#f59e0b' : 'inherit' }">{{ p.pending }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No manifests with a declared port of origin in the current view.' }}</div>
+    </div>
+  </div>
+
   <!-- Full manifest log -->
   <SectionTitle>Freight Manifest Log</SectionTitle>
 
@@ -272,6 +296,25 @@ const byCargoType = computed(() => {
   return Array.from(map.values()).sort((a, b) => b.tons - a.tons)
 })
 
+const intermodalByPort = computed(() => {
+  const m = new Map<string, { port: string; count: number; tons: number; transitHours: number[]; pending: number }>()
+  for (const mf of manifests.value) {
+    if (!mf.port_origin) continue
+    const ex = m.get(mf.port_origin) ?? { port: mf.port_origin, count: 0, tons: 0, transitHours: [], pending: 0 }
+    ex.count++
+    ex.tons += mf.tonnage
+    if (mf.arrived_at) {
+      ex.transitHours.push((new Date(mf.arrived_at).getTime() - new Date(mf.dispatched_at).getTime()) / 3_600_000)
+    } else {
+      ex.pending++
+    }
+    m.set(mf.port_origin, ex)
+  }
+  return [...m.values()]
+    .map(p => ({ port: p.port, count: p.count, tons: p.tons, pending: p.pending, avgTransitHours: p.transitHours.length ? p.transitHours.reduce((a, b) => a + b, 0) / p.transitHours.length : null }))
+    .sort((a, b) => b.count - a.count)
+})
+
 const totalTons    = computed(() => manifests.value.reduce((s, m) => s + m.tonnage, 0))
 const totalRevenue = computed(() => manifests.value.reduce((s, m) => s + parseFloat(m.revenue_kes), 0))
 const avgWagons    = computed(() => manifests.value.length > 0 ? manifests.value.reduce((s, m) => s + m.wagon_count, 0) / manifests.value.length : null)
@@ -341,6 +384,7 @@ function cargoBadge(t: string) {
 
 /* ── Reconciliation note ── */
 .recon-note { font-size:12px; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
+.table-scroll { overflow-x:auto; }
 
 /* ── Filters & table ── */
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }

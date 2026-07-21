@@ -67,23 +67,13 @@
     <div class="card">
       <div class="card-header">Volume Trend (24h)</div>
       <div class="card-body">
-        <div v-if="summary?.volume_24h?.length" class="vol-chart">
-          <div v-for="(h, i) in summary.volume_24h" :key="i" class="vol-col">
-            <div class="vol-tip">{{ fmtNum(h.volume) }}</div>
-            <div
-              class="vol-bar"
-              :style="{
-                height: `${maxVolume > 0 ? (h.volume / maxVolume) * 100 : 0}%`,
-                background: h.avg_speed != null && h.avg_speed < 20 ? '#ef4444'
-                           : h.avg_speed != null && h.avg_speed < 40 ? '#f59e0b'
-                           : '#22c55e',
-              }"
-              :title="`${fmtHour(h.hour)}: ${fmtNum(h.volume)} vol, ${h.avg_speed?.toFixed(0) ?? '-'} km/h`"
-            />
-            <div class="vol-label">{{ fmtHour(h.hour) }}</div>
-          </div>
-        </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No volume data' }}</div>
+        <TrendLineChart
+          :points="volumeChartPoints"
+          color="#3b82f6"
+          :height="180"
+          :format-value="v => fmtNum(v)"
+          :empty-text="loading ? 'Loading…' : 'No volume data'"
+        />
       </div>
     </div>
 
@@ -112,31 +102,12 @@
 
   <div class="card">
     <div class="card-body">
-      <div v-if="forecastsByHour.length">
-        <div class="fc-legend">
-          <span v-for="m in forecastModels" :key="m" class="fc-model">
-            <span class="fc-dot" :style="{ background: modelColor(m) }" />{{ m }}
-          </span>
-        </div>
-        <div class="fc-chart">
-          <div v-for="(slot, i) in forecastsByHour" :key="i" class="fc-col">
-            <div
-              v-for="f in slot"
-              :key="f.id"
-              class="fc-bar"
-              :style="{
-                height: `${maxFcVolume > 0 ? (f.predicted_volume / maxFcVolume) * 100 : 0}%`,
-                background: modelColor(f.model_name),
-              }"
-              :title="`${f.model_name}: ${fmtNum(f.predicted_volume)} vol, ${f.predicted_speed_kmh.toFixed(0)} km/h`"
-            />
-            <div class="fc-hour">{{ fmtHour(slot[0]?.target_at) }}</div>
-          </div>
-        </div>
-      </div>
-      <div v-else style="color:#94a3b8;font-size:13px">
-        {{ loading ? 'Loading forecast…' : 'No forecast data available.' }}
-      </div>
+      <MultiLineChart
+        :series="forecastSeries"
+        :height="200"
+        :format-value="v => fmtNum(v)"
+        :empty-text="loading ? 'Loading forecast…' : 'No forecast data available.'"
+      />
     </div>
   </div>
 
@@ -284,28 +255,25 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const maxVolume   = computed(() =>
-  Math.max(1, ...(summary.value?.volume_24h ?? []).map(h => h.volume)),
-)
-const maxFcVolume = computed(() =>
-  Math.max(1, ...forecasts.value.map(f => f.predicted_volume)),
-)
-const maxTrips    = computed(() => Math.max(1, ...topPairs.value.map(p => p.trips)))
+const maxTrips = computed(() => Math.max(1, ...topPairs.value.map(p => p.trips)))
 
+// ── Volume trend line chart ─────────────────────────────────────────────
+const volumeChartPoints = computed(() =>
+  (summary.value?.volume_24h ?? []).map(h => ({ label: fmtHour(h.hour), value: h.volume })),
+)
+
+// ── Forecast multi-line chart (one line per model) ──────────────────────
 const forecastModels = computed(() =>
   [...new Set(forecasts.value.map(f => f.model_name))],
 )
-
-const forecastsByHour = computed(() => {
-  const buckets = new Map<string, TrafficForecast[]>()
-  forecasts.value.forEach(f => {
-    const key = f.target_at
-    const existing = buckets.get(key)
-    if (existing) existing.push(f)
-    else buckets.set(key, [f])
-  })
-  return Array.from(buckets.values()).slice(0, 24)
-})
+const forecastSeries = computed(() => forecastModels.value.map(m => ({
+  name: m,
+  color: modelColor(m),
+  points: forecasts.value
+    .filter(f => f.model_name === m)
+    .sort((a, b) => a.target_at.localeCompare(b.target_at))
+    .map(f => ({ label: fmtHour(f.target_at), value: f.predicted_volume })),
+})))
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -342,24 +310,12 @@ function compColor(pct: number) {
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .day-filter { display:flex; gap:4px; }
 .btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
-.vol-chart { display:flex; align-items:flex-end; gap:2px; height:110px; overflow-x:auto; }
-.vol-col { display:flex; flex-direction:column; align-items:center; min-width:24px; flex:1; }
-.vol-tip { font-size:8px; color:#64748b; margin-bottom:2px; }
-.vol-bar { width:80%; border-radius:2px 2px 0 0; min-height:4px; }
-.vol-label { font-size:8px; color:#94a3b8; margin-top:2px; }
 .class-list { display:flex; flex-direction:column; gap:8px; }
 .class-row { display:grid; grid-template-columns:110px 1fr 80px; align-items:center; gap:8px; }
 .class-label { font-size:12px; text-transform:capitalize; }
 .class-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
 .class-bar { height:100%; border-radius:4px; transition:width .4s; }
 .class-nums { display:flex; flex-direction:column; align-items:flex-end; }
-.fc-legend { display:flex; gap:16px; margin-bottom:8px; flex-wrap:wrap; }
-.fc-model { display:flex; align-items:center; gap:5px; font-size:12px; }
-.fc-dot { width:10px; height:10px; border-radius:2px; display:inline-block; }
-.fc-chart { display:flex; align-items:flex-end; gap:2px; height:120px; overflow-x:auto; }
-.fc-col { display:flex; flex-direction:column; align-items:center; min-width:28px; flex:1; }
-.fc-bar { width:60%; border-radius:2px 2px 0 0; min-height:4px; }
-.fc-hour { font-size:8px; color:#94a3b8; margin-top:2px; }
 .comp-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
 .comp-bar { height:100%; border-radius:4px; transition:width .4s; }
 </style>

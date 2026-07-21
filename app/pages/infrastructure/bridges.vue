@@ -1,69 +1,114 @@
 <template>
   <PageHeader
-    eyebrow="Infrastructure - Bridges"
-    title="Bridge Asset Registry"
-    subtitle="KeNHA · KRB · LAPSSET - Bridge inventory, condition scores, KRB-funded inspection schedules, critical structure alerts, and spatial mapping"
+    eyebrow="Infrastructure - Bridges & Assets"
+    title="Bridge & Asset Registry"
+    subtitle="KeNHA · KRB · LAPSSET - Bridge inventory, condition scores, inspection schedules, streetlights, signals, WIM stations and closures"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
+    <template #actions>
+      <NuxtLink :to="agencyLink('/infrastructure')" class="btn">Road Network →</NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/projects')" class="btn">Infrastructure Status →</NuxtLink>
+    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+
+  <!-- Agency tabs -->
+  <div class="agency-tabs">
+    <button class="agency-tab" :class="{ active: selectedAgency === '' }" @click="selectAgency('')">
+      All Agencies <span class="agency-tab-count">{{ bridges.length }}</span>
+    </button>
+    <button
+      v-for="a in agencyOptions" :key="a.code"
+      class="agency-tab" :class="{ active: selectedAgency === a.code }"
+      @click="selectAgency(a.code)"
+    >
+      {{ a.code }} <span class="agency-tab-count">{{ a.count }}</span>
+    </button>
+  </div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
     <KpiCard
       label="Total Bridges"
-      :value="fmtNum(bridges.length)"
-      sub="In national registry"
-      source="batch" source-title="KeNHA BMS"
+      :value="fmtNum(scopedBridges.length)"
+      :sub="agencyLabel"
+      source="batch" source-title="Bridge Mgmt System"
     />
     <KpiCard
       label="Good Condition"
       :value="fmtNum(countByClass('good'))"
       sub="Condition score ≥ 80"
       trend-direction="up"
-      source="batch" source-title="KeNHA BMS"
+      source="batch" source-title="Bridge Mgmt System"
     />
     <KpiCard
       label="Fair Condition"
       :value="fmtNum(countByClass('fair'))"
       sub="Score 60–79, monitor closely"
-      source="batch" source-title="KeNHA BMS"
+      source="batch" source-title="Bridge Mgmt System"
     />
     <KpiCard
       label="Poor / Critical"
       :value="fmtNum(countByClass('poor') + countByClass('critical'))"
       sub="Urgent inspection required"
       trend-direction="down"
-      source="batch" source-title="KeNHA BMS"
+      source="batch" source-title="Bridge Mgmt System"
     />
     <KpiCard
       label="Avg Condition Score"
       :value="avgScore ? avgScore.toFixed(1) : '-'"
       sub="Out of 100"
       :trend-direction="avgScore && avgScore >= 70 ? 'up' : 'down'"
-      source="batch" source-title="KeNHA BMS"
+      source="batch" source-title="Bridge Mgmt System"
     />
     <KpiCard
       label="Overdue Inspections"
       :value="fmtNum(overdueCount)"
       sub="Next inspection date passed"
       trend-direction="down"
-      source="batch" source-title="KeNHA BMS"
+      source="batch" source-title="Bridge Mgmt System"
+    />
+  </div>
+
+  <!-- Other network assets -->
+  <SectionTitle pill="Network-wide">Other Assets</SectionTitle>
+  <div class="kpi-grid">
+    <KpiCard
+      label="Streetlights Operational"
+      :value="streetlightPct != null ? `${streetlightPct.toFixed(0)}%` : '-'"
+      sub="Of registered streetlights"
+      source="batch" source-title="Streetlight Registry"
+    />
+    <KpiCard
+      label="Traffic Signal Faults"
+      :value="fmtNum(agencySignalFaults.length)"
+      :sub="agencyLabel"
+      trend-direction="down"
+      source="live" source-title="NaMATA / NCC"
+    />
+    <KpiCard
+      label="WIM Overload Rate"
+      :value="summary?.wim.overload_rate_pct != null ? `${summary.wim.overload_rate_pct.toFixed(1)}%` : '-'"
+      sub="Network-wide · 30d"
+      source="live" source-title="WIM Stations"
+    />
+    <KpiCard
+      label="Closures / Restrictions"
+      :value="fmtNum(closures.length)"
+      sub="Active rural road reports"
+      trend-direction="down"
+      source="batch" source-title="Field Reports"
     />
   </div>
 
   <!-- Critical alerts -->
-  <SectionTitle pill="KeNHA BMS · Priority">Critical Bridges - Immediate Action Required</SectionTitle>
+  <SectionTitle pill="Bridge Mgmt System · Priority">Critical Bridges - Immediate Action Required ({{ agencyLabel }})</SectionTitle>
 
   <div class="card">
     <div class="card-body">
-      <div v-if="critical.length">
+      <div v-if="scopedCritical.length">
         <AlertItem
-          v-for="b in critical"
+          v-for="b in scopedCritical"
           :key="b.id"
           :severity="b.condition_class === 'critical' ? 'critical' : 'warning'"
           :title="`${b.bridge_name} (${b.bridge_code})`"
@@ -119,7 +164,7 @@
   </div>
 
   <!-- Bridge table with filters -->
-  <SectionTitle>Bridge Inventory</SectionTitle>
+  <SectionTitle>Bridge Inventory ({{ agencyLabel }})</SectionTitle>
 
   <div class="card">
     <div class="card-body">
@@ -144,11 +189,13 @@
         <input v-model="nameSearch" class="select-sm" placeholder="Search bridge name…" style="min-width:180px" />
         <button class="btn" @click="condFilter=''; typeFilter=''; nameSearch=''">Clear</button>
       </div>
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
             <th>Bridge Name</th>
             <th>Code</th>
+            <th>Agency</th>
             <th>Type</th>
             <th>Span (m)</th>
             <th>Load Limit (t)</th>
@@ -163,6 +210,7 @@
           <tr v-for="b in filteredBridges" :key="b.id">
             <td style="font-weight:600">{{ b.bridge_name }}</td>
             <td style="font-family:monospace;font-size:12px">{{ b.bridge_code }}</td>
+            <td><BadgePill variant="info">{{ b.agency_code ?? '-' }}</BadgePill></td>
             <td><BadgePill variant="info">{{ b.bridge_type.replace(/_/g,' ') }}</BadgePill></td>
             <td>{{ b.span_length_m != null ? `${b.span_length_m}m` : '-' }}</td>
             <td>{{ b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes}t` : '-' }}</td>
@@ -187,9 +235,28 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading bridges…' : 'No bridges match current filters.' }}
             </td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Closures / restrictions -->
+  <div v-if="closures.length" class="card" style="margin-bottom:16px">
+    <div class="card-header">Closures / Restrictions ({{ agencyLabel }})</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>Road</th><th>Status</th><th>Reason</th><th>Reported</th></tr></thead>
+        <tbody>
+          <tr v-for="c in scopedClosures" :key="c.id">
+            <td style="font-weight:600;font-size:12px">{{ c.segment_road_name ?? c.segment_road_code ?? '-' }}</td>
+            <td><BadgePill variant="warning">{{ c.status }}</BadgePill></td>
+            <td style="font-size:12px">{{ c.closure_reason || '-' }}</td>
+            <td style="font-size:11px">{{ fmtDate(c.reported_at) }}</td>
           </tr>
         </tbody>
       </table>
@@ -202,13 +269,19 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Bridges')
 
 import { useInfrastructure, useGis } from '~/composables/api'
-import type { Bridge } from '~/composables/api'
+import type { Bridge, TrafficSignal, RuralRoadStatus, InfrastructureSummary } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
 
-const bridges  = ref<Bridge[]>([])
-const critical = ref<Bridge[]>([])
+const route  = useRoute()
+const router = useRouter()
+
+const bridges      = ref<Bridge[]>([])
+const critical     = ref<Bridge[]>([])
+const signalFaults = ref<TrafficSignal[]>([])
+const closures     = ref<RuralRoadStatus[]>([])
+const summary      = ref<InfrastructureSummary | null>(null)
 const roadsGeo = ref<GeoJSONFeatureCollection | null>(null)
 const loading  = ref(true)
 const error    = ref<string | null>(null)
@@ -217,21 +290,36 @@ const condFilter = ref('')
 const typeFilter = ref('')
 const nameSearch = ref('')
 
+const selectedAgency = ref(typeof route.query.agency === 'string' ? route.query.agency : '')
+function selectAgency(code: string) {
+  selectedAgency.value = code
+  router.replace({ query: { ...route.query, agency: code || undefined } })
+}
+function agencyLink(path: string) {
+  return selectedAgency.value ? { path, query: { agency: selectedAgency.value } } : path
+}
+
 async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
   const gis   = useGis()
 
-  const [allRes, critRes, roadsRes] = await Promise.allSettled([
+  const [allRes, critRes, roadsRes, sigRes, closureRes, sumRes] = await Promise.allSettled([
     infra.bridges({ page_size: 200 }),
     infra.criticalBridges(),
     gis.roads({ limit: 300, simplify: 0.03 }),
+    infra.signalFaults(),
+    infra.ruralRoadStatus({ page_size: 50 }),
+    infra.summary(),
   ])
 
   if (allRes.status  === 'fulfilled') bridges.value  = (allRes.value as any).results ?? []
   if (critRes.status === 'fulfilled') critical.value = (critRes.value as any).results ?? []
   if (roadsRes.status === 'fulfilled') roadsGeo.value = roadsRes.value
+  if (sigRes.status   === 'fulfilled') signalFaults.value = (sigRes.value as any).results ?? []
+  if (closureRes.status === 'fulfilled') closures.value = (closureRes.value as any).results ?? []
+  if (sumRes.status   === 'fulfilled') summary.value = sumRes.value
 
   if ([allRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -245,9 +333,25 @@ let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
+// ── Agency scoping ───────────────────────────────────────────────────────
+const agencyOptions = computed(() => {
+  const m = new Map<string, number>()
+  for (const b of bridges.value) {
+    if (!b.agency_code) continue
+    m.set(b.agency_code, (m.get(b.agency_code) ?? 0) + 1)
+  }
+  return [...m.entries()].map(([code, count]) => ({ code, count })).sort((a, b) => a.code.localeCompare(b.code))
+})
+const agencyLabel = computed(() => selectedAgency.value || 'All Agencies')
+const scopedBridges = computed(() => selectedAgency.value ? bridges.value.filter(b => b.agency_code === selectedAgency.value) : bridges.value)
+const scopedCritical = computed(() => selectedAgency.value ? critical.value.filter(b => b.agency_code === selectedAgency.value) : critical.value)
+const agencySignalFaults = computed(() => signalFaults.value.filter(s => !selectedAgency.value || s.agency_code === selectedAgency.value))
+const streetlightPct = computed(() => summary.value?.streetlights.operational_pct ?? null)
+const scopedClosures = computed(() => closures.value)
+
 // ── Computed ──────────────────────────────────────────────────────────────
 const filteredBridges = computed(() =>
-  bridges.value.filter(b => {
+  scopedBridges.value.filter(b => {
     if (condFilter.value && b.condition_class !== condFilter.value)               return false
     if (typeFilter.value && b.bridge_type     !== typeFilter.value)               return false
     if (nameSearch.value && !b.bridge_name.toLowerCase().includes(nameSearch.value.toLowerCase())) return false
@@ -255,18 +359,18 @@ const filteredBridges = computed(() =>
   }),
 )
 
-function countByClass(cls: string) { return bridges.value.filter(b => b.condition_class === cls).length }
+function countByClass(cls: string) { return scopedBridges.value.filter(b => b.condition_class === cls).length }
 
 const avgScore = computed(() => {
-  const scored = bridges.value.filter(b => b.condition_score != null)
+  const scored = scopedBridges.value.filter(b => b.condition_score != null)
   if (!scored.length) return null
   return scored.reduce((s, b) => s + b.condition_score!, 0) / scored.length
 })
 
-const overdueCount = computed(() => bridges.value.filter(b => isOverdue(b.next_inspection_at)).length)
+const overdueCount = computed(() => scopedBridges.value.filter(b => isOverdue(b.next_inspection_at)).length)
 
 const bridgeMarkers = computed((): MarkerSpec[] =>
-  bridges.value
+  scopedBridges.value
     .filter(b => b.latitude != null && b.longitude != null)
     .map(b => ({
       id: `br-${b.id}`,
@@ -284,7 +388,7 @@ const bridgeMarkers = computed((): MarkerSpec[] =>
 
 const byType = computed(() => {
   const map = new Map<string, { type: string; count: number; total_score: number; avg_score: number | null }>()
-  bridges.value.forEach(b => {
+  scopedBridges.value.forEach(b => {
     const ex = map.get(b.bridge_type)
     if (ex) { ex.count++; if (b.condition_score != null) ex.total_score += b.condition_score }
     else map.set(b.bridge_type, { type: b.bridge_type, count: 1, total_score: b.condition_score ?? 0, avg_score: null })
@@ -324,6 +428,12 @@ function condBadge(cls: string) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
+.agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
+.agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.agency-tab-count { font-size:11px; opacity:.75; }
+.table-scroll { overflow-x:auto; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col-map { grid-template-columns:1fr; } }
