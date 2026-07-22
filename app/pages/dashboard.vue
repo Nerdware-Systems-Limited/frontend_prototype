@@ -532,7 +532,7 @@
        8. AGENCY FEED HEALTH (from useIntegrations)
   ════════════════════════════════════════════════════════════════ -->
   <div class="section-label">Agency Data Integration Status
-    <!-- <span class="section-pill">15 agencies · NTSA · KeNHA · KURA · KeRRA · KRB · KAA · KCAA · KMD · KenTrade · LAPSSET · NaMATA · KRC · KPA · KMA · NCTTCA</span> -->
+    <NuxtLink to="/integrations" class="section-link">Full feed registry →</NuxtLink>
   </div>
 
   <div class="table-card">
@@ -1896,6 +1896,11 @@ const mapMarkers = computed((): MarkerSpec[] => {
   display: inline-block;
 }
 .agency-link:hover { text-decoration: underline; }
+.section-link {
+  font-size: 10px; font-weight: 600; text-transform: none; letter-spacing: normal;
+  color: #1d5ca6; text-decoration: none; flex-shrink: 0;
+}
+.section-link:hover { text-decoration: underline; }
 
 /* ── Responsive breakpoints ────────────────────────────────────────── */
 

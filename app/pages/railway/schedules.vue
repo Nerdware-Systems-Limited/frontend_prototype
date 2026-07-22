@@ -112,10 +112,12 @@
         </label>
         <input v-model="trainSearch" class="select-sm" placeholder="Train number…" style="min-width:120px" />
         <button class="btn" @click="networkFilter=''; classFilter=''; dayTypeFilter=''; trainSearch=''; activeOnly=true">Reset</button>
+        <ExportButton filename="uapts-train-schedules.csv" :rows="filteredSchedules" :columns="scheduleExportColumns" style="margin-left:auto" />
       </div>
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Train #</th>
             <th>Network</th>
             <th>Class</th>
@@ -130,23 +132,36 @@
           </tr>
         </thead>
         <tbody v-if="filteredSchedules.length">
-          <tr v-for="s in filteredSchedules.slice(0, 50)" :key="s.id">
-            <td style="font-family:monospace;font-weight:700">{{ s.train_number }}</td>
-            <td>
-              <BadgePill :variant="s.network === 'sgr' ? 'info' : 'success'">
-                {{ s.network.toUpperCase() }}
-              </BadgePill>
-            </td>
-            <td><BadgePill :variant="classBadge(s.service_class)">{{ s.service_class }}</BadgePill></td>
-            <td style="font-size:12px;font-weight:600">{{ s.origin_code }} → {{ s.destination_code }}</td>
-            <td style="font-family:monospace;font-weight:700;color:#1e293b">{{ s.departure_time }}</td>
-            <td style="font-family:monospace;color:#64748b">{{ s.arrival_time }}</td>
-            <td style="font-size:12px">{{ formatDuration(s.duration_minutes) }}</td>
-            <td style="font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.days_of_week">{{ s.days_of_week }}</td>
-            <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_economy_kes)) }}</td>
-            <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_first_class_kes)) }}</td>
-            <td><BadgePill :variant="s.is_active ? 'success' : 'neutral'">{{ s.is_active ? 'Active' : 'Inactive' }}</BadgePill></td>
-          </tr>
+          <template v-for="s in filteredSchedules.slice(0, 50)" :key="s.id">
+            <tr class="expand-row" @click="expanded = expanded === s.id ? null : s.id">
+              <td class="expand-cell">{{ expanded === s.id ? '▾' : '▸' }}</td>
+              <td style="font-family:monospace;font-weight:700">{{ s.train_number }}</td>
+              <td>
+                <BadgePill :variant="s.network === 'sgr' ? 'info' : 'success'">
+                  {{ s.network.toUpperCase() }}
+                </BadgePill>
+              </td>
+              <td><BadgePill :variant="classBadge(s.service_class)">{{ s.service_class }}</BadgePill></td>
+              <td style="font-size:12px;font-weight:600">{{ s.origin_code }} → {{ s.destination_code }}</td>
+              <td style="font-family:monospace;font-weight:700;color:#1e293b">{{ s.departure_time }}</td>
+              <td style="font-family:monospace;color:#64748b">{{ s.arrival_time }}</td>
+              <td style="font-size:12px">{{ formatDuration(s.duration_minutes) }}</td>
+              <td style="font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.days_of_week">{{ s.days_of_week }}</td>
+              <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_economy_kes)) }}</td>
+              <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_first_class_kes)) }}</td>
+              <td><BadgePill :variant="s.is_active ? 'success' : 'neutral'">{{ s.is_active ? 'Active' : 'Inactive' }}</BadgePill></td>
+            </tr>
+            <tr v-if="expanded === s.id" class="detail-row">
+              <td :colspan="11">
+                <div class="drilldown">
+                  <div class="dd-item"><span class="dd-label">Days of Week</span><span>{{ s.days_of_week }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Day Type</span><span style="text-transform:capitalize">{{ s.day_type }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Train Unit</span><span style="font-family:monospace">{{ s.train_unit_code ?? '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Freight Fare (per ton)</span><span>KES {{ fmtKES(parseFloat(s.fare_freight_per_ton_kes)) }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
           <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading schedules…' : 'No schedules match filters.' }}</td></tr>
@@ -250,6 +265,7 @@ const classFilter    = ref('')
 const dayTypeFilter  = ref('')
 const activeOnly     = ref(true)
 const trainSearch    = ref('')
+const expanded       = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -296,6 +312,21 @@ const filteredSchedules = computed(() =>
     return true
   }),
 )
+
+const scheduleExportColumns = [
+  { key: 'train_number', label: 'Train #' },
+  { key: 'network', label: 'Network' },
+  { key: 'service_class', label: 'Class' },
+  { key: 'origin_code', label: 'Origin' },
+  { key: 'destination_code', label: 'Destination' },
+  { key: 'departure_time', label: 'Departure' },
+  { key: 'arrival_time', label: 'Arrival' },
+  { key: 'duration_minutes', label: 'Duration (min)' },
+  { key: 'days_of_week', label: 'Days' },
+  { key: 'fare_economy_kes', label: 'Fare Economy (KES)' },
+  { key: 'fare_first_class_kes', label: 'Fare 1st Class (KES)' },
+  { key: 'is_active', label: 'Active' },
+]
 
 // Build a lookup of schedule_id → departure_time for the adherence table
 const scheduleMap = computed(() => {
@@ -365,6 +396,12 @@ function opBadge(s: string) {
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; color:#374151; }
 .checkbox-label input[type="checkbox"] { width:14px; height:14px; accent-color:#3b82f6; cursor:pointer; }
 .table-scroll { overflow-x:auto; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 
 /* ── OTP visual panel ── */
 .otp-panel {

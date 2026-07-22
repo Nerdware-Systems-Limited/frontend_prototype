@@ -204,6 +204,7 @@
           <option value="failed">Failed</option>
         </select>
         <button class="btn" @click="clearTableFilters">Clear</button>
+        <ExportButton filename="uapts-road-inventory.csv" :href="roadInventoryExportHref" style="margin-left:auto" />
       </div>
 
       <div class="table-scroll">
@@ -306,85 +307,50 @@
     </div>
   </div>
 
-  <!-- At-risk deterioration forecasts -->
-  <SectionTitle pill="ML Model · Agency Survey">At-Risk Segments (Next 12 Months)</SectionTitle>
-
-  <div class="card">
-    <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Road Code</th>
-            <th>Model</th>
-            <th>Predicted Condition</th>
-            <th>Failure Probability</th>
-            <th>Predicted PCI</th>
-            <th>Horizon</th>
-            <th>Confidence</th>
-            <th>Generated</th>
-          </tr>
-        </thead>
-        <tbody v-if="atRisk.length">
-          <tr v-for="f in atRisk" :key="f.id">
-            <td style="font-weight:600;font-family:monospace;font-size:12px">{{ f.segment_road_code ?? f.segment }}</td>
-            <td style="font-size:12px"><BadgePill variant="info">{{ f.model_name }}</BadgePill></td>
-            <td><BadgePill :variant="condBadge(f.predicted_condition_class ?? '')">{{ f.predicted_condition_class ?? '-' }}</BadgePill></td>
-            <td>
-              <span :style="{ color: failColor(f.failure_probability), fontWeight:'600' }">
-                {{ f.failure_probability != null ? `${(f.failure_probability * 100).toFixed(1)}%` : '-' }}
-              </span>
-            </td>
-            <td>{{ f.predicted_pci != null ? f.predicted_pci.toFixed(1) : '-' }}</td>
-            <td>{{ f.horizon_months }}mo</td>
-            <td>{{ f.confidence_pct != null ? `${f.confidence_pct.toFixed(0)}%` : '-' }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ fmtDate(f.generated_at) }}</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
-              {{ loading ? 'Loading forecasts…' : 'No at-risk segments found.' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <!-- At-risk + signal faults - top-5 preview, full registry lives in Maintenance -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header">
+        At-Risk Segments (Next 12mo)
+        <NuxtLink :to="agencyLink('/infrastructure/maintenance')" class="link-sm">Full forecast list →</NuxtLink>
+      </div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>Road Code</th><th>Predicted Condition</th><th>Failure Prob.</th></tr></thead>
+          <tbody v-if="topAtRisk.length">
+            <tr v-for="f in topAtRisk" :key="f.id">
+              <td style="font-weight:600;font-family:monospace;font-size:12px">{{ f.segment_road_code ?? f.segment }}</td>
+              <td><BadgePill :variant="condBadge(f.predicted_condition_class ?? '')">{{ f.predicted_condition_class ?? '-' }}</BadgePill></td>
+              <td>
+                <span :style="{ color: failColor(f.failure_probability), fontWeight:'600' }">
+                  {{ f.failure_probability != null ? `${(f.failure_probability * 100).toFixed(1)}%` : '-' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No at-risk segments found.' }}</td></tr></tbody>
+        </table>
+      </div>
     </div>
-  </div>
 
-  <!-- Traffic signal faults -->
-  <SectionTitle pill="NaMATA / NCC · Live">Traffic Signal Faults ({{ agencyLabel }})</SectionTitle>
-
-  <div class="card">
-    <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Intersection</th>
-            <th>Code</th>
-            <th>Status</th>
-            <th>Mode</th>
-            <th>Agency</th>
-            <th>Last Change</th>
-          </tr>
-        </thead>
-        <tbody v-if="agencySignalFaults.length">
-          <tr v-for="sig in agencySignalFaults" :key="sig.id">
-            <td style="font-weight:600">{{ sig.intersection_name }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ sig.intersection_code }}</td>
-            <td><BadgePill :variant="sigBadge(sig.status)">{{ sig.status }}</BadgePill></td>
-            <td style="font-size:12px">{{ sig.mode.replace(/_/g,' ') }}</td>
-            <td style="font-size:12px">{{ sig.agency_code ?? '-' }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ fmtDate(sig.last_status_change_at) }}</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">
-              {{ loading ? 'Loading signals…' : 'No signal faults reported.' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card">
+      <div class="card-header">
+        Traffic Signal Faults ({{ agencyLabel }})
+        <NuxtLink :to="agencyLink('/infrastructure/maintenance')" class="link-sm">Full signal list →</NuxtLink>
+      </div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>Intersection</th><th>Status</th><th>Last Change</th></tr></thead>
+          <tbody v-if="topSignalFaults.length">
+            <tr v-for="sig in topSignalFaults" :key="sig.id">
+              <td style="font-weight:600;font-size:13px">{{ sig.intersection_name }}</td>
+              <td><BadgePill :variant="sigBadge(sig.status)">{{ sig.status }}</BadgePill></td>
+              <td style="font-size:12px;white-space:nowrap">{{ fmtDate(sig.last_status_change_at) }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No signal faults reported.' }}</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
@@ -503,6 +469,12 @@ const agencyOverdueInspections = computed(() =>
 const agencySignalFaults = computed(() =>
   signalFaults.value.filter(s => !selectedAgency.value || s.agency_code === selectedAgency.value),
 )
+const topAtRisk = computed(() =>
+  [...atRisk.value].sort((a, b) => (b.failure_probability ?? 0) - (a.failure_probability ?? 0)).slice(0, 5),
+)
+const topSignalFaults = computed(() =>
+  [...agencySignalFaults.value].sort((a, b) => (a.status === 'faulty' ? -1 : 1) - (b.status === 'faulty' ? -1 : 1)).slice(0, 5),
+)
 const agencyBudget = computed(() => {
   const pool = budgets.value.filter(b => !selectedAgency.value || b.agency_code === selectedAgency.value)
   if (!pool.length) return null
@@ -551,6 +523,17 @@ const tableSegments = computed(() => agencySegments.value.filter(s => {
   if (conditionFilter.value && s.condition_class !== conditionFilter.value) return false
   return true
 }))
+// Real server-side export (honors the same django-filter params as the list
+// endpoint) - more complete than exporting only the currently-loaded page.
+const roadInventoryExportHref = computed(() => {
+  const q = new URLSearchParams({ format: 'csv' })
+  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  if (classFilter.value) q.set('road_class', classFilter.value)
+  if (surfaceFilter.value) q.set('surface', surfaceFilter.value)
+  if (conditionFilter.value) q.set('condition', conditionFilter.value)
+  if (search.value) q.set('search', search.value)
+  return `/api/v1/infrastructure/road-segments/export/?${q.toString()}`
+})
 
 // ── Cross-agency data quality (always computed over the full dataset) ───
 const qualityChecks = computed(() => {
@@ -597,8 +580,9 @@ function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
-function fmtKES(n: number | null | undefined) {
-  if (n == null) return '-'
+function fmtKES(v: number | string | null | undefined) {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (n == null || isNaN(n)) return '-'
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
@@ -666,4 +650,6 @@ function sigBadge(s: string) {
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .scroll-body { max-height:320px; overflow-y:auto; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm:hover { text-decoration:underline; }
 </style>

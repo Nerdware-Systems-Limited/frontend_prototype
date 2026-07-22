@@ -34,6 +34,26 @@
     </div>
   </div>
 
+  <!-- Network map -->
+  <SectionTitle pill="Live · OSM-Sourced Geometry">Network Map</SectionTitle>
+  <div class="card map-card">
+    <div class="card-header">Lines &amp; Stations</div>
+    <ClientOnly>
+      <UaptsMap
+        :markers="stationMarkers"
+        :lines="railLines"
+        :center="[-1.0, 37.5]"
+        :zoom="6"
+        height="440px"
+        show-legend
+      />
+    </ClientOnly>
+    <div class="map-key">
+      <span class="mk"><span class="line-seg" style="background:#3b82f6" /> SGR</span>
+      <span class="mk"><span class="line-seg" style="background:#10b981" /> MGR</span>
+    </div>
+  </div>
+
   <!-- Line inventory -->
   <SectionTitle pill="Live · OSM-Sourced Geometry">Line Inventory</SectionTitle>
   <div class="card">
@@ -246,7 +266,10 @@ useNavSubtitle('Rail Network Inventory')
 import { useRailway } from '~/composables/api'
 import type { RailLine, RailStation, Train, TrainSchedule, TrainOperation, RailTicket, FreightManifest, RailIncident, RailNetwork } from '~/composables/api'
 
+type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+
 const lines      = ref<RailLine[]>([])
+const railLines  = ref<any[]>([])
 const stations   = ref<RailStation[]>([])
 const trains     = ref<Train[]>([])
 const schedules  = ref<TrainSchedule[]>([])
@@ -298,6 +321,7 @@ async function load() {
       m.set(id, { lat: mk.lat, lon: mk.lon })
     }
     stationCoordMap.value = m
+    railLines.value = (mapRes.value as any).lines ?? []
   }
 
   if (linesRes.status === 'rejected')
@@ -316,6 +340,23 @@ function stationCoords(id: string) {
   const c = stationCoordMap.value.get(id)
   return c ? `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}` : '-'
 }
+
+const stationMarkers = computed((): MarkerSpec[] =>
+  stations.value
+    .filter(s => stationCoordMap.value.has(s.id))
+    .map(s => {
+      const c = stationCoordMap.value.get(s.id)!
+      return {
+        id: `station-${s.id}`,
+        lat: c.lat,
+        lon: c.lon,
+        title: s.name,
+        subtitle: `${s.network.toUpperCase()} · ${s.station_type}`,
+        color: s.network === 'sgr' ? 'blue' : 'green',
+        size: s.station_type === 'terminal' || s.station_type === 'interchange' ? 'lg' : 'sm',
+      }
+    }),
+)
 
 // ── Filters ──────────────────────────────────────────────────────────────
 const filteredStations = computed(() => stations.value.filter(s => {
@@ -451,6 +492,10 @@ function trainStatusBadge(s: string) {
 
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.map-card { overflow:hidden; margin-bottom:16px; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; color:#475569; }
+.mk { display:flex; align-items:center; gap:5px; }
+.line-seg { width:20px; height:4px; border-radius:2px; display:inline-block; flex-shrink:0; }
 .compare-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; margin-bottom:16px; }
 .compare-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; }
 .cc-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }

@@ -112,7 +112,7 @@
   </div>
 
   <!-- Speed compliance per station -->
-  <SectionTitle pill="KeNHA ATC · Live">Speed Compliance by Station</SectionTitle>
+  <SectionTitle :pill="sourceLabel('kenha_traffic')">Speed Compliance by Station</SectionTitle>
 
   <div class="card">
     <div class="card-body">
@@ -218,6 +218,8 @@ const loading   = ref(true)
 const error     = ref<string | null>(null)
 const lastRefreshed = ref('-')
 const days = ref(7)
+
+const { sourceLabel } = useDataSources()
 
 async function load() {
   loading.value = true

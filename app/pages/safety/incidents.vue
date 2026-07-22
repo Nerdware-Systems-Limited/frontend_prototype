@@ -44,6 +44,7 @@
   <SectionTitle>All Incidents</SectionTitle>
 
   <div class="filter-row">
+    <input v-model="incidentSearch" class="select-sm" placeholder="Search reference / title…" style="min-width:180px" />
     <select v-model="severityFilter" class="select-sm">
       <option value="">All severities</option>
       <option value="fatal">Fatal</option>
@@ -61,7 +62,8 @@
       <option value="resolved">Resolved</option>
     </select>
     <button class="btn" @click="load">Apply</button>
-    <button class="btn" @click="severityFilter = ''; statusFilter = ''; load()">Clear</button>
+    <button class="btn" @click="incidentSearch = ''; severityFilter = ''; statusFilter = ''; load()">Clear</button>
+    <ExportButton filename="uapts-incidents.csv" :rows="filteredIncidents" :columns="incidentExportColumns" style="margin-left:auto" />
   </div>
 
   <div class="card" style="margin-bottom:16px">
@@ -69,6 +71,7 @@
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Reference</th>
             <th>Type</th>
             <th>Severity</th>
@@ -80,22 +83,36 @@
             <th>Dispatches</th>
           </tr>
         </thead>
-        <tbody v-if="incidents.length">
-          <tr v-for="inc in incidents" :key="inc.id">
-            <td style="font-family:monospace;font-size:12px">{{ inc.reference_code }}</td>
-            <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
-            <td><BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity }}</BadgePill></td>
-            <td><BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td>{{ inc.casualties }}</td>
-            <td>{{ inc.vehicles_involved }}</td>
-            <td style="font-size:12px">{{ inc.reporting_channel.replace(/_/g,' ') }}</td>
-            <td style="white-space:nowrap;font-size:12px">{{ fmtTime(inc.reported_at) }}</td>
-            <td>{{ inc.dispatch_count }}</td>
-          </tr>
+        <tbody v-if="filteredIncidents.length">
+          <template v-for="inc in filteredIncidents" :key="inc.id">
+            <tr class="expand-row" @click="expanded = expanded === inc.id ? null : inc.id">
+              <td class="expand-cell">{{ expanded === inc.id ? '▾' : '▸' }}</td>
+              <td style="font-family:monospace;font-size:12px">{{ inc.reference_code }}</td>
+              <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
+              <td><BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity }}</BadgePill></td>
+              <td><BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill></td>
+              <td>{{ inc.casualties }}</td>
+              <td>{{ inc.vehicles_involved }}</td>
+              <td style="font-size:12px">{{ inc.reporting_channel.replace(/_/g,' ') }}</td>
+              <td style="white-space:nowrap;font-size:12px">{{ fmtTime(inc.reported_at) }}</td>
+              <td>{{ inc.dispatch_count }}</td>
+            </tr>
+            <tr v-if="expanded === inc.id" class="detail-row">
+              <td :colspan="10">
+                <div class="drilldown">
+                  <div class="dd-item" style="grid-column:1/-1"><span class="dd-label">Description</span><span>{{ inc.description || '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Reporting Agency</span><span>{{ inc.reporting_agency_code ?? '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Coordinates</span><span style="font-family:monospace">{{ inc.latitude != null && inc.longitude != null ? `${inc.latitude.toFixed(4)}, ${inc.longitude.toFixed(4)}` : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Triaged</span><span>{{ inc.triaged_at ? fmtTime(inc.triaged_at) : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Resolved</span><span>{{ inc.resolved_at ? fmtTime(inc.resolved_at) : '-' }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No incidents found' }}
             </td>
           </tr>
@@ -242,6 +259,8 @@ const lastRefreshed = ref('-')
 
 const severityFilter = ref('')
 const statusFilter   = ref('')
+const incidentSearch = ref('')
+const expanded       = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -305,6 +324,25 @@ const activeIncidents = computed(() =>
   incidents.value.filter(i => !['resolved','closed','cancelled'].includes(i.status)),
 )
 
+const filteredIncidents = computed(() => incidents.value.filter(i => {
+  if (incidentSearch.value) {
+    const q = incidentSearch.value.toLowerCase()
+    if (!i.reference_code.toLowerCase().includes(q) && !i.title.toLowerCase().includes(q)) return false
+  }
+  return true
+}))
+const incidentExportColumns = [
+  { key: 'reference_code', label: 'Reference' },
+  { key: 'incident_type', label: 'Type' },
+  { key: 'severity', label: 'Severity' },
+  { key: 'status', label: 'Status' },
+  { key: 'casualties', label: 'Casualties' },
+  { key: 'vehicles_involved', label: 'Vehicles' },
+  { key: 'reporting_channel', label: 'Channel' },
+  { key: 'reported_at', label: 'Reported' },
+  { key: 'dispatch_count', label: 'Dispatches' },
+]
+
 const incidentMarkers = computed((): MarkerSpec[] =>
   incidents.value
     .filter(i => i.latitude && i.longitude)
@@ -364,4 +402,10 @@ function dispatchBadge(status: string) {
 .inc-meta { font-size:12px; color:#64748b; margin-bottom:6px; }
 .inc-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 .btn-sm { padding:3px 10px; font-size:12px; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 </style>

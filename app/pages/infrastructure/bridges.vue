@@ -188,11 +188,18 @@
         </select>
         <input v-model="nameSearch" class="select-sm" placeholder="Search bridge name…" style="min-width:180px" />
         <button class="btn" @click="condFilter=''; typeFilter=''; nameSearch=''">Clear</button>
+        <ExportButton
+          filename="uapts-bridges.csv"
+          :rows="filteredBridges"
+          :columns="exportColumns"
+          style="margin-left:auto"
+        />
       </div>
       <div class="table-scroll">
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Bridge Name</th>
             <th>Code</th>
             <th>Agency</th>
@@ -207,31 +214,43 @@
           </tr>
         </thead>
         <tbody v-if="filteredBridges.length">
-          <tr v-for="b in filteredBridges" :key="b.id">
-            <td style="font-weight:600">{{ b.bridge_name }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ b.bridge_code }}</td>
-            <td><BadgePill variant="info">{{ b.agency_code ?? '-' }}</BadgePill></td>
-            <td><BadgePill variant="info">{{ b.bridge_type.replace(/_/g,' ') }}</BadgePill></td>
-            <td>{{ b.span_length_m != null ? `${b.span_length_m}m` : '-' }}</td>
-            <td>{{ b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes}t` : '-' }}</td>
-            <td>
-              <div class="score-bar-wrap">
-                <div
-                  class="score-bar"
-                  :style="{ width: `${b.condition_score ?? 0}%`, background: scoreColor(b.condition_score) }"
-                />
-              </div>
-              <span style="font-size:11px">{{ b.condition_score != null ? b.condition_score.toFixed(1) : '-' }}</span>
-            </td>
-            <td><BadgePill :variant="condBadge(b.condition_class)">{{ b.condition_class }}</BadgePill></td>
-            <td style="font-size:12px">{{ b.year_built ?? '-' }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ fmtDate(b.last_inspection_at) }}</td>
-            <td style="font-size:12px;white-space:nowrap">
-              <span :style="{ color: isOverdue(b.next_inspection_at) ? '#ef4444' : 'inherit' }">
-                {{ fmtDate(b.next_inspection_at) }}
-              </span>
-            </td>
-          </tr>
+          <template v-for="b in filteredBridges" :key="b.id">
+            <tr class="expand-row" @click="expanded = expanded === b.id ? null : b.id">
+              <td class="expand-cell">{{ expanded === b.id ? '▾' : '▸' }}</td>
+              <td style="font-weight:600">{{ b.bridge_name }}</td>
+              <td style="font-family:monospace;font-size:12px">{{ b.bridge_code }}</td>
+              <td><BadgePill variant="info">{{ b.agency_code ?? '-' }}</BadgePill></td>
+              <td><BadgePill variant="info">{{ b.bridge_type.replace(/_/g,' ') }}</BadgePill></td>
+              <td>{{ b.span_length_m != null ? `${b.span_length_m}m` : '-' }}</td>
+              <td>{{ b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes}t` : '-' }}</td>
+              <td>
+                <div class="score-bar-wrap">
+                  <div
+                    class="score-bar"
+                    :style="{ width: `${b.condition_score ?? 0}%`, background: scoreColor(b.condition_score) }"
+                  />
+                </div>
+                <span style="font-size:11px">{{ b.condition_score != null ? b.condition_score.toFixed(1) : '-' }}</span>
+              </td>
+              <td><BadgePill :variant="condBadge(b.condition_class)">{{ b.condition_class }}</BadgePill></td>
+              <td style="font-size:12px">{{ b.year_built ?? '-' }}</td>
+              <td style="font-size:12px;white-space:nowrap">{{ fmtDate(b.last_inspection_at) }}</td>
+              <td style="font-size:12px;white-space:nowrap">
+                <span :style="{ color: isOverdue(b.next_inspection_at) ? '#ef4444' : 'inherit' }">
+                  {{ fmtDate(b.next_inspection_at) }}
+                </span>
+              </td>
+            </tr>
+            <tr v-if="expanded === b.id" class="detail-row">
+              <td :colspan="11">
+                <div class="drilldown">
+                  <div class="dd-item"><span class="dd-label">Coordinates</span><span style="font-family:monospace">{{ b.latitude != null && b.longitude != null ? `${b.latitude.toFixed(4)}, ${b.longitude.toFixed(4)}` : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Notes</span><span>{{ b.notes || '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Last Updated</span><span>{{ fmtDate(b.updated_at) }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
           <tr>
@@ -289,6 +308,7 @@ const lastRefreshed = ref('-')
 const condFilter = ref('')
 const typeFilter = ref('')
 const nameSearch = ref('')
+const expanded = ref<string | null>(null)
 
 const selectedAgency = ref(typeof route.query.agency === 'string' ? route.query.agency : '')
 function selectAgency(code: string) {
@@ -360,6 +380,21 @@ const filteredBridges = computed(() =>
 )
 
 function countByClass(cls: string) { return scopedBridges.value.filter(b => b.condition_class === cls).length }
+
+// ── Export (current filtered view) ──────────────────────────────────────
+const exportColumns = [
+  { key: 'bridge_name', label: 'Bridge Name' },
+  { key: 'bridge_code', label: 'Code' },
+  { key: 'agency_code', label: 'Agency' },
+  { key: 'bridge_type', label: 'Type' },
+  { key: 'span_length_m', label: 'Span (m)' },
+  { key: 'load_capacity_tonnes', label: 'Load Limit (t)' },
+  { key: 'condition_score', label: 'Condition Score' },
+  { key: 'condition_class', label: 'Condition' },
+  { key: 'year_built', label: 'Year Built' },
+  { key: 'last_inspection_at', label: 'Last Inspection' },
+  { key: 'next_inspection_at', label: 'Next Inspection' },
+]
 
 const avgScore = computed(() => {
   const scored = scopedBridges.value.filter(b => b.condition_score != null)
@@ -434,6 +469,12 @@ function condBadge(cls: string) {
 .agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
 .table-scroll { overflow-x:auto; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col-map { grid-template-columns:1fr; } }

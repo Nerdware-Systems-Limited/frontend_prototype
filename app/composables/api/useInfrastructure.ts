@@ -75,8 +75,8 @@ export interface MaintenanceOrder {
   status: MaintenanceStatus
   priority: MaintenancePriority
   description: string
-  cost_kes: number | null
-  budgeted_cost_kes: number | null
+  cost_kes: string | null
+  budgeted_cost_kes: string | null
   scheduled_at: string | null
   started_at: string | null
   completed_at: string | null
@@ -161,8 +161,8 @@ export interface ConstructionProject {
   planned_end: string | null
   actual_start: string | null
   actual_end: string | null
-  contract_sum_kes: number | null
-  disbursed_kes: number | null
+  contract_sum_kes: string | null
+  disbursed_kes: string | null
   physical_progress_pct: number | null
   financial_progress_pct: number | null
   budget_utilization_pct: number
@@ -205,7 +205,7 @@ export interface WIMReading {
   speed_kmh: number | null
   direction: string
   verdict: WIMVerdict
-  fine_kes: number | null
+  fine_kes: string | null
   fine_paid: boolean
   recorded_at: string
 }
@@ -215,9 +215,9 @@ export interface MaintenanceBudget {
   agency: string | null
   agency_code: string | null
   fiscal_year: number
-  allocated_kes: number
-  disbursed_kes: number
-  committed_kes: number
+  allocated_kes: string
+  disbursed_kes: string
+  committed_kes: string
   utilization_pct: number
   notes: string
   created_at: string

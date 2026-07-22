@@ -122,6 +122,12 @@
           <option value="revenue">Revenue</option>
         </select>
         <button class="btn" @click="clearFilters">Clear</button>
+        <ExportButton
+          filename="uapts-operators.csv"
+          :rows="exportRows"
+          :columns="exportColumns"
+          style="margin-left:auto"
+        />
       </div>
 
       <div class="table-scroll">
@@ -434,6 +440,26 @@ const filteredOperators = computed(() => {
     return bv - av
   })
 })
+
+// ── Export (current filtered view) ──────────────────────────────────────
+const exportColumns = [
+  { key: 'sacco_name', label: 'SACCO / Operator' },
+  { key: 'registration_status', label: 'Status' },
+  { key: 'contact_phone', label: 'Contact' },
+  { key: 'route_count', label: 'Routes' },
+  { key: 'fleet_size', label: 'Fleet' },
+  { key: 'service_quality_score', label: 'Service Quality' },
+  { key: 'route_compliance', label: 'Route Compliance %' },
+  { key: 'complaint_count', label: 'Complaints' },
+  { key: 'revenue', label: 'Revenue (KES)' },
+  { key: 'fleet_utilization_pct', label: 'Fleet Util %' },
+  { key: 'payment_channels', label: 'Payment Channels' },
+  { key: 'last_refresh', label: 'Last Refresh' },
+]
+const exportRows = computed(() => filteredOperators.value.map(op => ({
+  ...op,
+  payment_channels: op.payment_channels.join(', '),
+})))
 
 // ── KPIs ─────────────────────────────────────────────────────────────────
 const kpis = computed(() => {

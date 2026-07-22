@@ -92,6 +92,7 @@
   <div class="card">
     <div class="card-body">
       <div class="filter-row">
+        <input v-model="zoneSearch" class="select-sm" placeholder="Search zone name…" style="min-width:180px" />
         <select v-model="typeFilter" class="select-sm">
           <option value="">All zone types</option>
           <option value="depot">Depot</option>
@@ -108,10 +109,13 @@
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <button class="btn" @click="zoneSearch=''; typeFilter=''; severityFilter=''">Clear</button>
+        <ExportButton filename="uapts-geofence-zones.csv" :rows="filteredZones" :columns="zoneExportColumns" style="margin-left:auto" />
       </div>
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Zone Name</th>
             <th>Type</th>
             <th>Severity</th>
@@ -122,23 +126,34 @@
           </tr>
         </thead>
         <tbody v-if="filteredZones.length">
-          <tr v-for="z in filteredZones" :key="z.id">
-            <td style="font-weight:600">{{ z.zone_name }}</td>
-            <td><BadgePill variant="info">{{ z.zone_type }}</BadgePill></td>
-            <td><BadgePill :variant="sevBadge(z.severity)">{{ z.severity }}</BadgePill></td>
-            <td>{{ z.radius_m ?? '-' }}</td>
-            <td>
-              <span :style="{ color: z.is_active ? '#22c55e' : '#94a3b8' }">
-                {{ z.is_active ? '● Active' : '○ Inactive' }}
-              </span>
-            </td>
-            <td style="font-size:12px">{{ z.agency_code ?? '-' }}</td>
-            <td style="font-size:12px">{{ fmtDate(z.created_at) }}</td>
-          </tr>
+          <template v-for="z in filteredZones" :key="z.id">
+            <tr class="expand-row" @click="expanded = expanded === z.id ? null : z.id">
+              <td class="expand-cell">{{ expanded === z.id ? '▾' : '▸' }}</td>
+              <td style="font-weight:600">{{ z.zone_name }}</td>
+              <td><BadgePill variant="info">{{ z.zone_type }}</BadgePill></td>
+              <td><BadgePill :variant="sevBadge(z.severity)">{{ z.severity }}</BadgePill></td>
+              <td>{{ z.radius_m ?? '-' }}</td>
+              <td>
+                <span :style="{ color: z.is_active ? '#22c55e' : '#94a3b8' }">
+                  {{ z.is_active ? '● Active' : '○ Inactive' }}
+                </span>
+              </td>
+              <td style="font-size:12px">{{ z.agency_code ?? '-' }}</td>
+              <td style="font-size:12px">{{ fmtDate(z.created_at) }}</td>
+            </tr>
+            <tr v-if="expanded === z.id" class="detail-row">
+              <td :colspan="8">
+                <div class="drilldown">
+                  <div class="dd-item"><span class="dd-label">Coordinates</span><span style="font-family:monospace">{{ z.latitude != null && z.longitude != null ? `${z.latitude.toFixed(4)}, ${z.longitude.toFixed(4)}` : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Last Updated</span><span>{{ fmtDate(z.updated_at) }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No zones found' }}
             </td>
           </tr>
@@ -166,6 +181,8 @@ const error     = ref<string | null>(null)
 const lastRefreshed = ref('-')
 const typeFilter     = ref('')
 const severityFilter = ref('')
+const zoneSearch     = ref('')
+const expanded       = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -198,11 +215,21 @@ const criticalCount = computed(() => geofences.value.filter(z => z.severity === 
 
 const filteredZones = computed(() =>
   geofences.value.filter(z => {
+    if (zoneSearch.value && !z.zone_name.toLowerCase().includes(zoneSearch.value.toLowerCase())) return false
     if (typeFilter.value     && z.zone_type !== typeFilter.value)     return false
     if (severityFilter.value && z.severity  !== severityFilter.value) return false
     return true
   }),
 )
+const zoneExportColumns = [
+  { key: 'zone_name', label: 'Zone Name' },
+  { key: 'zone_type', label: 'Type' },
+  { key: 'severity', label: 'Severity' },
+  { key: 'radius_m', label: 'Radius (m)' },
+  { key: 'is_active', label: 'Active' },
+  { key: 'agency_code', label: 'Agency' },
+  { key: 'created_at', label: 'Created' },
+]
 
 const zoneMarkers = computed((): MarkerSpec[] =>
   geofences.value
@@ -263,6 +290,12 @@ function eventBadge(e: string) {
 .bi-zone { font-size:13px; font-weight:600; }
 .bi-plate { font-size:12px; color:#64748b; }
 .bi-meta { font-size:11px; color:#94a3b8; }
-.filter-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.filter-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 </style>

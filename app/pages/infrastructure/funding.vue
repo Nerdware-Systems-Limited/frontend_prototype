@@ -43,6 +43,9 @@
   <SectionTitle pill="National Treasury · Batch">Budget Allocations by Fiscal Year ({{ agencyLabel }})</SectionTitle>
   <div class="card">
     <div class="card-body">
+      <div class="filter-row">
+        <ExportButton filename="uapts-funding-allocations.csv" :href="budgetExportHref" style="margin-left:auto" />
+      </div>
       <div v-if="agencyBudgetsScoped.length" class="budget-list">
         <div v-for="b in agencyBudgetsScoped" :key="b.id" class="budget-item">
           <div class="bi-header">
@@ -60,12 +63,12 @@
             </div>
             <div class="bi-bar-row">
               <span>Disbursed</span>
-              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#22c55e" :style="{ width: `${b.allocated_kes > 0 ? (b.disbursed_kes / b.allocated_kes) * 100 : 0}%` }" /></div>
+              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#22c55e" :style="{ width: `${budgetPct(b.disbursed_kes, b.allocated_kes)}%` }" /></div>
               <span class="bi-val">KES {{ fmtKES(b.disbursed_kes) }}</span>
             </div>
             <div class="bi-bar-row">
               <span>Committed</span>
-              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#f59e0b" :style="{ width: `${b.allocated_kes > 0 ? (b.committed_kes / b.allocated_kes) * 100 : 0}%` }" /></div>
+              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#f59e0b" :style="{ width: `${budgetPct(b.committed_kes, b.allocated_kes)}%` }" /></div>
               <span class="bi-val">KES {{ fmtKES(b.committed_kes) }}</span>
             </div>
           </div>
@@ -231,9 +234,9 @@ const latestPerAgency = computed(() => {
 
 const kpi = computed(() => {
   const rows = latestPerAgency.value
-  const allocated = rows.reduce((s, b) => s + b.allocated_kes, 0)
-  const disbursed  = rows.reduce((s, b) => s + b.disbursed_kes, 0)
-  const committed  = rows.reduce((s, b) => s + b.committed_kes, 0)
+  const allocated = rows.reduce((s, b) => s + (parseFloat(b.allocated_kes) || 0), 0)
+  const disbursed  = rows.reduce((s, b) => s + (parseFloat(b.disbursed_kes) || 0), 0)
+  const committed  = rows.reduce((s, b) => s + (parseFloat(b.committed_kes) || 0), 0)
   const balance = allocated - disbursed
   const absorptionPct = allocated > 0 ? (disbursed / allocated) * 100 : null
   const avgUtilization = agencyBudgetsScoped.value.length
@@ -261,7 +264,9 @@ const disbursementVsProgress = computed(() => {
   return latestPerAgency.value.filter(b => b.agency_code).map(b => {
     const projs = projects.value.filter(p => p.agency_code === b.agency_code && p.physical_progress_pct != null)
     const avgPhysical = projs.length ? projs.reduce((s, p) => s + (p.physical_progress_pct as number), 0) / projs.length : null
-    const absorptionPct = b.allocated_kes > 0 ? (b.disbursed_kes / b.allocated_kes) * 100 : 0
+    const allocated = parseFloat(b.allocated_kes) || 0
+    const disbursedAmt = parseFloat(b.disbursed_kes) || 0
+    const absorptionPct = allocated > 0 ? (disbursedAmt / allocated) * 100 : 0
     const flag = avgPhysical != null && absorptionPct - avgPhysical >= 25
     return { agency: b.agency_code as string, absorptionPct, avgPhysical, flag }
   })
@@ -283,8 +288,9 @@ function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
-function fmtKES(n: number | null | undefined) {
-  if (n == null) return '-'
+function fmtKES(v: number | string | null | undefined) {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (n == null || isNaN(n)) return '-'
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
@@ -293,6 +299,19 @@ function fmtKES(n: number | null | undefined) {
 function utilBadge(pct: number) {
   return pct >= 80 ? 'success' : pct >= 50 ? 'fair' : 'warning'
 }
+function budgetPct(part: string, whole: string) {
+  const w = parseFloat(whole) || 0
+  const p = parseFloat(part) || 0
+  return w > 0 ? (p / w) * 100 : 0
+}
+
+// Real server-side export (honors the same django-filter params as the list
+// endpoint) - more complete than exporting only the currently-loaded page.
+const budgetExportHref = computed(() => {
+  const q = new URLSearchParams({ format: 'csv' })
+  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  return `/api/v1/infrastructure/maintenance-budgets/export/?${q.toString()}`
+})
 </script>
 
 <style scoped>
@@ -306,6 +325,7 @@ function utilBadge(pct: number) {
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .scroll-body { max-height:280px; overflow-y:auto; }
+.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .budget-list { display:flex; flex-direction:column; gap:16px; }
 .budget-item { border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; }
 .bi-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }

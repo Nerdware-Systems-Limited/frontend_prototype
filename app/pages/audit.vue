@@ -5,7 +5,12 @@
     subtitle="Full platform audit log - every user action, data change, and system event across all modules"
   >
     <template #actions>
-      <a :href="exportHref" download="uapts-audit.csv" class="btn">⬇ Export CSV</a>
+      <ExportButton
+        filename="uapts-audit.csv"
+        :rows="exportRows"
+        :columns="exportColumns"
+        label="Export CSV (current page)"
+      />
     </template>
   </PageHeader>
 
@@ -34,6 +39,12 @@
     <input v-model="filters.resource" class="select-sm" placeholder="Resource type…" @change="reload" />
     <input type="date" v-model="filters.date_from" class="select-sm" @change="reload" />
     <input type="date" v-model="filters.date_to" class="select-sm" @change="reload" />
+    <select v-model.number="pageSize" class="select-sm" @change="reload">
+      <option :value="25">25 / page</option>
+      <option :value="50">50 / page</option>
+      <option :value="100">100 / page</option>
+      <option :value="200">200 / page</option>
+    </select>
     <button class="btn" @click="resetFilters">Reset</button>
     <span style="flex:1" />
     <span style="font-size:12px;color:#64748b">Showing {{ entries.length }} of {{ fmtNum(total) }}</span>
@@ -145,6 +156,9 @@ const filters = ref({
   date_from: '',
   date_to:   '',
 })
+// Server default page size is small (10-20 rows) unless `limit` is passed
+// explicitly - this is what was making the log feel like it was missing entries.
+const pageSize = ref(100)
 
 /** Apply a page response envelope to local state. */
 function applyPage(data: { count: number; next: string | null; previous: string | null; results: AuditEntry[] }) {
@@ -160,7 +174,7 @@ async function load() {
   loading.value = true
   error.value   = null
 
-  const q: AuditQuery = {}
+  const q: AuditQuery = { limit: pageSize.value }
   if (filters.value.search)    q.search    = filters.value.search
   if (filters.value.user)      q.user      = filters.value.user
   if (filters.value.action)    q.action    = filters.value.action
@@ -247,23 +261,33 @@ watch(
     } as unknown as AuditEntry)
 
     total.value += 1
-    // Cap live-list at the current page size (entries already loaded from REST).
-    // We don't know the server page size ahead of time, so cap at current length + 1
-    // to avoid the list growing unboundedly between REST reloads.
-    if (entries.value.length > (total.value || 100)) entries.value.pop()
+    // Cap the live-list at the page size we actually requested, so it doesn't
+    // grow past one page's worth of rows between REST reloads.
+    if (entries.value.length > pageSize.value) entries.value.pop()
   },
 )
 
-const exportHref = computed(() => {
-  const q: Record<string, string> = {}
-  if (filters.value.search)    q.search    = filters.value.search
-  if (filters.value.user)      q.user      = filters.value.user
-  if (filters.value.action)    q.action    = filters.value.action
-  if (filters.value.resource)  q.resource  = filters.value.resource
-  if (filters.value.date_from) q.date_from = filters.value.date_from
-  if (filters.value.date_to)   q.date_to   = filters.value.date_to
-  return useAudit().exportUrl(q as any)
-})
+// No backend audit-export endpoint exists (verified against the live API),
+// so this exports the currently-loaded, currently-filtered page client-side -
+// hence the "(current page)" label rather than claiming a full export.
+const exportColumns = [
+  { key: 'created_at', label: 'Timestamp' },
+  { key: 'user', label: 'User' },
+  { key: 'action', label: 'Action' },
+  { key: 'resource', label: 'Resource / Path' },
+  { key: 'request_method', label: 'Method' },
+  { key: 'status_code', label: 'Status' },
+  { key: 'ip_address', label: 'IP Address' },
+]
+const exportRows = computed(() => entries.value.map(e => ({
+  created_at: entryField(e, 'created_at') ?? e.timestamp,
+  user: entryUser(e),
+  action: e.action,
+  resource: entryResource(e),
+  request_method: entryField(e, 'request_method'),
+  status_code: entryField(e, 'status_code'),
+  ip_address: entryField(e, 'ip_address'),
+})))
 
 // ── Field-access helpers (bridge REST AuditEntry ↔ raw API shape) ────────
 // The REST serializer uses snake_case field names that may not be typed on

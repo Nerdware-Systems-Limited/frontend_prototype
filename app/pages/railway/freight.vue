@@ -191,10 +191,12 @@
         </select>
         <input v-model="manifestSearch" class="select-sm" placeholder="Search manifest / route…" style="min-width:180px" />
         <button class="btn" @click="cargoFilter=''; manifestSearch=''">Clear</button>
+        <ExportButton filename="uapts-freight-manifests.csv" :rows="filteredManifests" :columns="manifestExportColumns" style="margin-left:auto" />
       </div>
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Manifest Ref</th>
             <th>Cargo Type</th>
             <th>Tonnage</th>
@@ -207,20 +209,32 @@
           </tr>
         </thead>
         <tbody v-if="filteredManifests.length">
-          <tr v-for="m in filteredManifests.slice(0, 50)" :key="m.id">
-            <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
-            <td><BadgePill :variant="cargoBadge(m.cargo_type)">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
-            <td>{{ m.wagon_count }}</td>
-            <td style="font-size:12px">{{ m.origin_station_code }} → {{ m.destination_station_code }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ m.schedule_train_number ?? '-' }}</td>
-            <td style="font-size:12px">{{ fmtKES(parseFloat(m.revenue_kes)) }}</td>
-            <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
-            <td style="font-size:11px;white-space:nowrap;color:#22c55e">{{ m.arrived_at ? fmtTime(m.arrived_at) : '-' }}</td>
-          </tr>
+          <template v-for="m in filteredManifests.slice(0, 50)" :key="m.id">
+            <tr class="expand-row" @click="expanded = expanded === m.id ? null : m.id">
+              <td class="expand-cell">{{ expanded === m.id ? '▾' : '▸' }}</td>
+              <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
+              <td><BadgePill :variant="cargoBadge(m.cargo_type)">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
+              <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
+              <td>{{ m.wagon_count }}</td>
+              <td style="font-size:12px">{{ m.origin_station_code }} → {{ m.destination_station_code }}</td>
+              <td style="font-family:monospace;font-size:12px">{{ m.schedule_train_number ?? '-' }}</td>
+              <td style="font-size:12px">{{ fmtKES(parseFloat(m.revenue_kes)) }}</td>
+              <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
+              <td style="font-size:11px;white-space:nowrap;color:#22c55e">{{ m.arrived_at ? fmtTime(m.arrived_at) : '-' }}</td>
+            </tr>
+            <tr v-if="expanded === m.id" class="detail-row">
+              <td :colspan="10">
+                <div class="drilldown">
+                  <div class="dd-item"><span class="dd-label">Operator</span><span>{{ m.operator_agency_code ?? m.operator ?? '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Port of Origin</span><span style="font-family:monospace">{{ m.port_origin ?? '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Customs Ref (KPA)</span><span style="font-family:monospace">{{ m.customs_clearance_ref ?? '-' }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading manifests…' : 'No manifests match filters.' }}</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading manifests…' : 'No manifests match filters.' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -242,6 +256,7 @@ const lastRefreshed = ref('-')
 const days          = ref(30)
 const cargoFilter   = ref('')
 const manifestSearch = ref('')
+const expanded = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -314,6 +329,19 @@ const intermodalByPort = computed(() => {
     .map(p => ({ port: p.port, count: p.count, tons: p.tons, pending: p.pending, avgTransitHours: p.transitHours.length ? p.transitHours.reduce((a, b) => a + b, 0) / p.transitHours.length : null }))
     .sort((a, b) => b.count - a.count)
 })
+
+const manifestExportColumns = [
+  { key: 'manifest_ref', label: 'Manifest Ref' },
+  { key: 'cargo_type', label: 'Cargo Type' },
+  { key: 'tonnage', label: 'Tonnage' },
+  { key: 'wagon_count', label: 'Wagons' },
+  { key: 'origin_station_code', label: 'Origin' },
+  { key: 'destination_station_code', label: 'Destination' },
+  { key: 'schedule_train_number', label: 'Train' },
+  { key: 'revenue_kes', label: 'Revenue (KES)' },
+  { key: 'dispatched_at', label: 'Dispatched' },
+  { key: 'arrived_at', label: 'Arrived' },
+]
 
 const totalTons    = computed(() => manifests.value.reduce((s, m) => s + m.tonnage, 0))
 const totalRevenue = computed(() => manifests.value.reduce((s, m) => s + parseFloat(m.revenue_kes), 0))
@@ -390,4 +418,10 @@ function cargoBadge(t: string) {
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; color:#374151; }
 .select-sm:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.12); }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 </style>

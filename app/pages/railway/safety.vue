@@ -88,27 +88,26 @@
   </div>
 
   <!-- Level crossing safety -->
-  <SectionTitle pill="KRC Safety · Pending Integration">Level Crossing Safety</SectionTitle>
+  <SectionTitle pill="KRC Level Crossings · Live">Level Crossing Safety</SectionTitle>
   <div class="card">
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Crossing</th><th>Location</th><th>Network</th><th>Risk Rating</th><th>Protection</th><th>Incidents</th><th>Near Misses</th><th>Last Inspection</th><th>Next Inspection</th><th>Recommended Intervention</th></tr></thead>
+          <thead><tr><th>Crossing</th><th>Road</th><th>Line</th><th>Risk Rating</th><th>Protection</th><th>Near Misses</th><th>Daily Road Traffic</th><th>Daily Trains</th><th>Last Incident</th></tr></thead>
           <tbody v-if="levelCrossings.length">
             <tr v-for="c in levelCrossings" :key="c.id">
               <td style="font-family:monospace;font-size:12px">{{ c.crossing_ref }}</td>
-              <td style="font-size:12px">{{ c.location }}</td>
-              <td><BadgePill :variant="c.network === 'sgr' ? 'info' : 'success'">{{ c.network.toUpperCase() }}</BadgePill></td>
+              <td style="font-size:12px">{{ c.road_name }}</td>
+              <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
               <td><BadgePill :variant="riskBadge(c.risk_rating)">{{ c.risk_rating }}</BadgePill></td>
               <td style="font-size:12px">{{ c.protection_type.replace(/_/g,' ') }}</td>
-              <td>{{ c.incident_count }}</td>
-              <td>{{ c.near_miss_count }}</td>
-              <td style="font-size:11px">{{ fmtDate(c.last_inspection) }}</td>
-              <td style="font-size:11px">{{ fmtDate(c.next_inspection) }}</td>
-              <td style="font-size:12px">{{ c.recommended_intervention ?? '-' }}</td>
+              <td>{{ fmtNum(c.near_miss_count) }}</td>
+              <td>{{ c.daily_road_traffic != null ? fmtNum(c.daily_road_traffic) : '-' }}</td>
+              <td>{{ c.daily_train_movements != null ? fmtNum(c.daily_train_movements) : '-' }}</td>
+              <td style="font-size:11px">{{ c.last_incident_at ? fmtDate(c.last_incident_at) : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading crossings…' : 'Level-crossing registry has not been integrated from KRC asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings on file.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -187,7 +186,7 @@
       <div class="card-header">High-Risk Crossings</div>
       <div class="card-body">
         <div v-if="highRiskCrossings.length">
-          <AlertItem v-for="c in highRiskCrossings" :key="c.id" :severity="c.risk_rating === 'critical' ? 'critical' : 'warning'" :title="c.location" :meta="`${c.incident_count} incidents · ${c.near_miss_count} near-misses · ${c.protection_type.replace(/_/g,' ')}`" />
+          <AlertItem v-for="c in highRiskCrossings" :key="c.id" :severity="c.risk_rating === 'critical' ? 'critical' : 'warning'" :title="c.road_name" :meta="`${c.near_miss_count} near-misses · ${c.protection_type.replace(/_/g,' ')}${c.last_incident_at ? ' · last incident ' + fmtDate(c.last_incident_at) : ''}`" />
         </div>
         <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No high-risk crossings on file yet.' }}</div>
       </div>

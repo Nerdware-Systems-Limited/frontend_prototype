@@ -234,6 +234,45 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Tabular feature registry - independent of map rendering ────── -->
+  <!-- Always rendered (not gated on the map/ClientOnly above) so the page
+       stays useful if Leaflet fails to load. -->
+  <div class="two-col" style="margin-top:16px">
+    <div v-if="layers.roads" class="card">
+      <div class="card-header">Road Segments ({{ roadCount }})</div>
+      <div class="card-body table-scroll" style="max-height:360px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Name</th><th>Highway Type</th><th>Feature ID</th></tr></thead>
+          <tbody v-if="roadFeatureRows.length">
+            <tr v-for="r in roadFeatureRows" :key="r.id">
+              <td style="font-weight:600;font-size:12px">{{ r.name }}</td>
+              <td><BadgePill variant="info">{{ r.highway }}</BadgePill></td>
+              <td style="font-size:11px;color:#94a3b8;font-family:monospace">{{ r.id }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No road features loaded.' }}</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="layers.routes" class="card">
+      <div class="card-header">PT Routes ({{ routeCount }})</div>
+      <div class="card-body table-scroll" style="max-height:360px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Name</th><th>Service Type</th><th>Feature ID</th></tr></thead>
+          <tbody v-if="routeFeatureRows.length">
+            <tr v-for="r in routeFeatureRows" :key="r.id">
+              <td style="font-weight:600;font-size:12px">{{ r.name }}</td>
+              <td><BadgePill variant="info">{{ r.serviceType }}</BadgePill></td>
+              <td style="font-size:11px;color:#94a3b8;font-family:monospace">{{ r.id }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No route features loaded.' }}</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -350,6 +389,23 @@ const routeLines = computed<LineSpec[]>(() => {
 
 const roadCount    = computed(() => roads.value?.features?.length ?? 0)
 const routeCount   = computed(() => gisRoutes.value?.features?.length ?? 0)
+
+// ── Tabular registry rows (mirrors what's plotted on the map, so the page
+// stays usable if the map itself fails to render) ──────────────────────
+const roadFeatureRows = computed(() =>
+  (roads.value?.features ?? []).map((f: any, i: number) => ({
+    id: f.id ?? f.properties?.id ?? String(i),
+    name: f.properties?.name ?? f.properties?.ref ?? '(unnamed)',
+    highway: (f.properties?.highway ?? 'unclassified').replace(/_/g, ' '),
+  })),
+)
+const routeFeatureRows = computed(() =>
+  (gisRoutes.value?.features ?? []).map((f: any, i: number) => ({
+    id: f.properties?.id ?? f.id ?? String(i),
+    name: f.properties?.name ?? f.properties?.route_name ?? '(unnamed)',
+    serviceType: f.properties?.service_type ?? 'unknown',
+  })),
+)
 const featureCount = computed(() =>
   (layers.value.boundary && boundary.value ? 1 : 0) +
   (layers.value.roads ? roadCount.value : 0) +
@@ -821,6 +877,11 @@ const routeLegend = [
 }
 
 .statusbar-county { color: #6366f1; font-weight: 600; }
+
+/* ── Feature registry tables ─────────────────────────────────────── */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:900px) { .two-col { grid-template-columns:1fr; } }
+.table-scroll { overflow-x:auto; }
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .error-banner {

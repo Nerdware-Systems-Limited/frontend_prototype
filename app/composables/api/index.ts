@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // Re-exports for every domain API composable. Use as:
 //
-//   import { useIncidents, useAuthApi } from '~/composables/api'
+//   import { useSafety, useDashboard } from '~/composables/api'
 //
 // instead of long relative paths.
 // ─────────────────────────────────────────────────────────────────────
@@ -10,7 +10,6 @@
 export { useApi, cleanQuery, type ApiOptions } from './_client'
 export { useGis } from './useGis'
 
-export { useAuthApi, type LoginPayload, type RegisterPayload, type PasswordChangePayload, type PasswordResetPayload, type PasswordResetConfirmPayload } from './useAuth'
 export { useSystemApi, useServiceHealth } from './useSystem'
 export { useAgencies, useDepartments, useRoles, useUsers, type ListOpts } from './useAccounts'
 
@@ -62,14 +61,22 @@ export {
   type AssetInventorySnapshot,
   type InfrastructureQuery,
 } from './useInfrastructure'
-export { useIncidents, type Incident, type IncidentQuery, type IncidentReportPayload, type IncidentMode, type IncidentSeverity } from './useIncidents'
 export { useReports, type ReportTemplate, type ReportRun, type ReportsQuery } from './useReports'
 export { useIntegrations, type DataSource, type IngestedRecord, type Integration, type IntegrationQuery, type RecordsQuery } from './useIntegrations'
 export { usePublicTransport, type PTSummary, type Sacco, type Route, type BRTStop, type Schedule, type ScheduleAdherence, type FareCollection, type DemandForecast, type ServiceQualityScore, type OperatorMetric, type PaymentTransaction, type FleetDeployment, type PTFeed, type PassengerFeedback, type PSVLicense, type PTQuery } from './usePublicTransport'
 export { useVehicleInspections, type VehicleInspection, type InspectionResult, type InspectionQuery } from './useVehicleInspections'
 export { useDriverLicensing, type Driver, type DriverLicence, type LicenceClass, type LicenceStatus, type DriverQuery, type DriverLicenceQuery } from './useDriverLicensing'
 export { useRailway, type RailwaySummary, type RailwayKpis, type LiveOperation, type OnTimeStats, type FreightSummary, type IncidentSummary, type RidershipSummary, type RailLine, type RailStation, type Train, type TrainSchedule, type TrainOperation, type FreightManifest, type RailIncident, type RailTicket, type RailQuery, type RailNetwork, type RailGauge, type RailStatus, type StationType, type ServiceType, type TrainType, type TrainStatus, type ServiceClass, type DayType, type OpStatus, type DelayReason, type CargoType, type IncidentType, type IncidentSeverity, type TicketClass, type Channel } from './useRailway'
-export { useRailInfrastructure, type TrackSection, type RailFacility, type LevelCrossing, type CapitalWork, type RailInfraSummary, type TrackConditionClass, type FacilityType, type FacilityStatus, type CrossingProtectionType, type CrossingRiskRating, type CapitalWorkStatus, type RailInfraQuery } from './useRailInfrastructure'
+export {
+  useRailInfrastructure,
+  type TrackSection, type LevelCrossing, type RailCapitalWork, type RailCulvert, type RailSignal,
+  type RailType, type SleeperType, type TrackCondition,
+  type CrossingProtectionType, type CrossingRiskRating,
+  type CapitalWorkProjectType, type CapitalWorkStatus,
+  type CulvertType, type CulvertCondition,
+  type SignalType, type RailSignalStatus,
+  type RailInfraQuery,
+} from './useRailInfrastructure'
 export { useRailSafety, type CorrectiveAction, type RailRiskIndicator, type InvestigationStatus, type RailRiskType, type RailSafetyQuery } from './useRailSafety'
 export { useNotifications, type Notification, type AlertRule, type Condition, type LeafCondition, type CompositeCondition, type ConditionOp, type Severity, type Channel as NotificationChannel, type NotificationQuery, type RuleQuery, type NotificationListResponse, type UnreadCountResponse, type MarkReadResponse, type MarkAllReadResponse, type AlertRuleListResponse, type NotifyRequest, type CreateRuleRequest, type HealthResponse } from './useNotifications'
 export { useNotificationSocket } from './useNotificationSocket'

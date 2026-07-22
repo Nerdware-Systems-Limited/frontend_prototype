@@ -143,11 +143,13 @@
         <input v-model="countySearch" class="select-sm" placeholder="Filter by county…" style="min-width:150px" />
         <input v-model="nameSearch" class="select-sm" placeholder="Project name…" style="min-width:200px" />
         <button class="btn" @click="statusFilter=''; countySearch=''; nameSearch=''">Clear</button>
+        <ExportButton filename="uapts-project-portfolio.csv" :href="projectExportHref" style="margin-left:auto" />
       </div>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
+              <th></th>
               <th>Project</th>
               <th>County / Corridor</th>
               <th>Agency</th>
@@ -161,30 +163,46 @@
             </tr>
           </thead>
           <tbody v-if="filteredProjects.length">
-            <tr v-for="p in filteredProjects" :key="p.id" :class="{ 'row-delayed': isDelayed(p.id) }">
-              <td>
-                <div style="font-weight:600;font-size:13px">{{ p.project_name }}</div>
-                <div style="font-size:11px;color:#94a3b8;font-family:monospace">{{ p.project_code }}</div>
-              </td>
-              <td style="font-size:12px">{{ p.county }}{{ p.corridor ? ` · ${p.corridor}` : '' }}</td>
-              <td><BadgePill variant="info">{{ p.agency_code ?? '-' }}</BadgePill></td>
-              <td><BadgePill :variant="statusBadge(p.status)">{{ p.status.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-size:12px">{{ p.contractor || '-' }}</td>
-              <td>
-                <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.physical_progress_pct ?? 0}%`, background: progColor(p.physical_progress_pct) }" /></div>
-                <span style="font-size:11px">{{ p.physical_progress_pct != null ? `${p.physical_progress_pct.toFixed(0)}%` : '-' }}</span>
-              </td>
-              <td>
-                <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.financial_progress_pct ?? 0}%`, background: '#3b82f6' }" /></div>
-                <span style="font-size:11px">{{ p.financial_progress_pct != null ? `${p.financial_progress_pct.toFixed(0)}%` : '-' }}</span>
-              </td>
-              <td style="font-size:12px;white-space:nowrap">{{ p.contract_sum_kes != null ? `KES ${fmtKES(p.contract_sum_kes)}` : '-' }}</td>
-              <td style="font-size:12px;white-space:nowrap">{{ p.disbursed_kes != null ? `KES ${fmtKES(p.disbursed_kes)}` : '-' }}</td>
-              <td style="font-size:12px;white-space:nowrap">{{ fmtDate(p.planned_end) }}</td>
-            </tr>
+            <template v-for="p in filteredProjects" :key="p.id">
+              <tr class="expand-row" :class="{ 'row-delayed': isDelayed(p.id) }" @click="expandedProject = expandedProject === p.id ? null : p.id">
+                <td class="expand-cell">{{ expandedProject === p.id ? '▾' : '▸' }}</td>
+                <td>
+                  <div style="font-weight:600;font-size:13px">{{ p.project_name }}</div>
+                  <div style="font-size:11px;color:#94a3b8;font-family:monospace">{{ p.project_code }}</div>
+                </td>
+                <td style="font-size:12px">{{ p.county }}{{ p.corridor ? ` · ${p.corridor}` : '' }}</td>
+                <td><BadgePill variant="info">{{ p.agency_code ?? '-' }}</BadgePill></td>
+                <td><BadgePill :variant="statusBadge(p.status)">{{ p.status.replace(/_/g,' ') }}</BadgePill></td>
+                <td style="font-size:12px">{{ p.contractor || '-' }}</td>
+                <td>
+                  <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.physical_progress_pct ?? 0}%`, background: progColor(p.physical_progress_pct) }" /></div>
+                  <span style="font-size:11px">{{ p.physical_progress_pct != null ? `${p.physical_progress_pct.toFixed(0)}%` : '-' }}</span>
+                </td>
+                <td>
+                  <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.financial_progress_pct ?? 0}%`, background: '#3b82f6' }" /></div>
+                  <span style="font-size:11px">{{ p.financial_progress_pct != null ? `${p.financial_progress_pct.toFixed(0)}%` : '-' }}</span>
+                </td>
+                <td style="font-size:12px;white-space:nowrap">{{ p.contract_sum_kes != null ? `KES ${fmtKES(p.contract_sum_kes)}` : '-' }}</td>
+                <td style="font-size:12px;white-space:nowrap">{{ p.disbursed_kes != null ? `KES ${fmtKES(p.disbursed_kes)}` : '-' }}</td>
+                <td style="font-size:12px;white-space:nowrap">{{ fmtDate(p.planned_end) }}</td>
+              </tr>
+              <tr v-if="expandedProject === p.id" class="detail-row">
+                <td :colspan="11">
+                  <div class="drilldown">
+                    <div class="dd-item"><span class="dd-label">Project Type</span><span>{{ p.project_type.replace(/_/g,' ') }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Length</span><span>{{ p.length_km != null ? `${p.length_km} km` : '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Planned Start</span><span>{{ fmtDate(p.planned_start) }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Actual Start</span><span>{{ fmtDate(p.actual_start) }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Actual End</span><span>{{ fmtDate(p.actual_end) }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Budget Utilization</span><span>{{ p.budget_utilization_pct.toFixed(0) }}%</span></div>
+                    <div class="dd-item" style="grid-column:1/-1"><span class="dd-label">Description</span><span>{{ p.description || '-' }}</span></div>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading projects…' : 'No projects match the current filters.' }}</td></tr>
+            <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading projects…' : 'No projects match the current filters.' }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -229,6 +247,7 @@
           <option value="low">Low</option>
         </select>
         <button class="btn" @click="maintStatusFilter=''; maintPriorityFilter=''">Clear</button>
+        <ExportButton filename="uapts-maintenance-orders.csv" :href="ordersExportHref" style="margin-left:auto" />
       </div>
       <div class="table-scroll">
         <table>
@@ -300,6 +319,7 @@ const countySearch  = ref('')
 const nameSearch    = ref('')
 const maintStatusFilter   = ref('')
 const maintPriorityFilter = ref('')
+const expandedProject     = ref<string | null>(null)
 
 const selectedAgency = ref(typeof route.query.agency === 'string' ? route.query.agency : '')
 
@@ -423,8 +443,26 @@ const filteredOrders = computed(() =>
   }),
 )
 
-const totalContract  = computed(() => agencyProjects.value.reduce((s, p) => s + (p.contract_sum_kes ?? 0), 0))
-const totalDisbursed = computed(() => agencyProjects.value.reduce((s, p) => s + (p.disbursed_kes ?? 0), 0))
+// Real server-side exports (honor the same django-filter params as their
+// list endpoints) - more complete than exporting only the currently-loaded page.
+const projectExportHref = computed(() => {
+  const q = new URLSearchParams({ format: 'csv' })
+  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  if (statusFilter.value) q.set('status', statusFilter.value)
+  if (countySearch.value) q.set('county', countySearch.value)
+  if (nameSearch.value) q.set('search', nameSearch.value)
+  return `/api/v1/infrastructure/construction-projects/export/?${q.toString()}`
+})
+const ordersExportHref = computed(() => {
+  const q = new URLSearchParams({ format: 'csv' })
+  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  if (maintStatusFilter.value) q.set('status', maintStatusFilter.value)
+  if (maintPriorityFilter.value) q.set('priority', maintPriorityFilter.value)
+  return `/api/v1/infrastructure/maintenance-orders/export/?${q.toString()}`
+})
+
+const totalContract  = computed(() => agencyProjects.value.reduce((s, p) => s + (parseFloat(p.contract_sum_kes ?? '') || 0), 0))
+const totalDisbursed = computed(() => agencyProjects.value.reduce((s, p) => s + (parseFloat(p.disbursed_kes ?? '') || 0), 0))
 
 function countByStatus(s: string) { return agencyProjects.value.filter(p => p.status === s).length }
 
@@ -446,8 +484,9 @@ function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
-function fmtKES(n: number | null | undefined) {
-  if (n == null) return '-'
+function fmtKES(v: number | string | null | undefined) {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (n == null || isNaN(n)) return '-'
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
@@ -493,6 +532,12 @@ function progColor(pct: number | null | undefined) {
 .prog-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
 .prog-bar { height:100%; border-radius:4px; transition:width .4s; }
 .row-delayed td:first-child { border-left:3px solid #f59e0b; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 .county-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
 .county-card { border:1px solid #f1f5f9; border-radius:6px; padding:10px 12px; }
 .cc-name { font-size:13px; font-weight:600; margin-bottom:2px; }

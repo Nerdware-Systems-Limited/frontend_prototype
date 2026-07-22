@@ -2,10 +2,11 @@
 // ─────────────────────────────────────────────────────────────────────
 // /api/v1/audit/* - audit-trail endpoint, backed by MongoDB.
 //
-// Pagination: the API returns a Django REST Framework PageNumberPagination
-// response with `count`, `next`, `previous`, and `results`. There is no
-// client-controlled page_size - the server page size is fixed.
-// Navigate by following the `next`/`previous` URLs returned in the response.
+// Pagination: limit/offset style - the API accepts a `limit` query param
+// (verified against the live schema) and returns `count`, `next`,
+// `previous`, `results`. The `next`/`previous` URLs already carry the
+// limit forward, so only the *first* request needs to set it - navigate
+// subsequent pages by following those URLs (see listFromUrl).
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi, cleanQuery } from './_client'
@@ -53,6 +54,8 @@ export interface AuditEntry {
 
 export interface AuditQuery {
   page?: number
+  /** Results per page (limit/offset pagination) - server defaults to a small value if omitted. */
+  limit?: number
   user?: string
   action?: string
   resource?: string
@@ -76,8 +79,9 @@ export function useAudit() {
 
   return {
     /**
-     * GET /api/v1/audit/logs/?page=N&...
+     * GET /api/v1/audit/logs/?limit=N&page=N&...
      * Returns the full page envelope so the caller can read next/previous.
+     * Pass `limit` explicitly - the server default is small (10-20 rows).
      */
     list: (q?: AuditQuery): Promise<AuditPage> =>
       api<AuditPage>('/api/v1/audit/logs/', { query: cleanQuery(q as Record<string, unknown>) }),
@@ -91,19 +95,14 @@ export function useAudit() {
       return api<AuditPage>(path)
     },
 
-    /** GET /api/v1/audit/{id}/ - single entry. */
-    get: (id: string) => api<AuditEntry>(`/api/v1/audit/${id}/`),
+    /** GET /api/v1/audit/logs/{id}/ - single entry. */
+    get: (id: string) => api<AuditEntry>(`/api/v1/audit/logs/${id}/`),
 
-    /** Build an export URL from current filters (CSV download). */
-    exportUrl: (q?: AuditQuery): string => {
-      const params = new URLSearchParams()
-      if (q) {
-        for (const [k, v] of Object.entries(q)) {
-          if (v !== null && v !== undefined && v !== '') params.set(k, String(v))
-        }
-      }
-      const qs = params.toString()
-      return `/api/v1/audit/export/${qs ? `?${qs}` : ''}`
-    },
+    /** GET /api/v1/audit/my-logs/ - actions performed by the current user. */
+    myLogs: (q?: AuditQuery): Promise<AuditPage> =>
+      api<AuditPage>('/api/v1/audit/my-logs/', { query: cleanQuery(q as Record<string, unknown>) }),
+
+    /** GET /api/v1/audit/actions/ - distinct action types available to filter by. */
+    actions: () => api<string[] | { results: string[] }>('/api/v1/audit/actions/'),
   }
 }

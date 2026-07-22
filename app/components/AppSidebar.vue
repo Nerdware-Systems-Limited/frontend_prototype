@@ -32,6 +32,7 @@
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/fleet" :class="{ active: isActive('/fleet') }">Fleet Overview</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/fleet/behaviour" :class="{ active: isActive('/fleet/behaviour') }">Driver Behaviour</NuxtLink>
           <NuxtLink class="sidebar-link" to="/fleet/live" :class="{ active: isActive('/fleet/live') }">Live Positions</NuxtLink>
           <NuxtLink class="sidebar-link" to="/fleet/geofences" :class="{ active: isActive('/fleet/geofences') }">Geofences</NuxtLink>
           <NuxtLink class="sidebar-link" to="/fleet/trip-playbacks" :class="{ active: isActive('/fleet/trip-playbacks') }">Trip Playback</NuxtLink>
@@ -87,6 +88,7 @@
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/aviation" :class="{ active: isActive('/aviation') }">Flight Movements</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/aviation/flights" :class="{ active: isActive('/aviation/flights') }">Flight Log</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/passenger-stats" :class="{ active: isActive('/aviation/passenger-stats') }">Passenger Stats</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/infrastructure" :class="{ active: isActive('/aviation/infrastructure') }">Aviation Infrastructure</NuxtLink>
         </div>
@@ -99,6 +101,7 @@
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink class="sidebar-link" to="/maritime" :class="{ active: isActive('/maritime') }">Vessel Movements</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/vessels" :class="{ active: isActive('/maritime/vessels') }">Vessel Registry</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/port-ops" :class="{ active: isActive('/maritime/port-ops') }">Port Operations</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/infrastructure" :class="{ active: isActive('/maritime/infrastructure') }">Maritime Infrastructure</NuxtLink>
         </div>

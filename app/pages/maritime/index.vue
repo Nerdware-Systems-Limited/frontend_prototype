@@ -125,69 +125,51 @@
     </div>
   </div>
 
-  <!-- Live vessel movements table -->
+  <!-- Live vessel movements preview -->
   <SectionTitle pill="KMA AIS · Live">Vessel Movements - In Port</SectionTitle>
 
   <div class="card">
+    <div class="card-header">
+      Recent Movements
+      <NuxtLink to="/maritime/vessels" class="link-sm">Full movement log →</NuxtLink>
+    </div>
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="portFilter" class="select-sm" @change="load">
-          <option value="">All ports</option>
-          <option v-for="p in ports" :key="p.unlocode" :value="p.unlocode">{{ p.name }} ({{ p.unlocode }})</option>
-        </select>
-        <select v-model="vesselTypeFilter" class="select-sm">
-          <option value="">All vessel types</option>
-          <option value="container">Container</option>
-          <option value="bulk_carrier">Bulk Carrier</option>
-          <option value="tanker">Tanker</option>
-          <option value="general_cargo">General Cargo</option>
-          <option value="vehicle">Vehicle Carrier</option>
-        </select>
-        <button class="btn" @click="portFilter=''; vesselTypeFilter=''">Clear</button>
-      </div>
       <table>
         <thead>
           <tr>
             <th>Vessel</th>
-            <th>IMO</th>
-            <th>Type</th>
             <th>Port</th>
-            <th>Berth</th>
             <th>Movement</th>
             <th>Status</th>
             <th>ETA / ETD</th>
-            <th>Cargo</th>
-            <th>TEU</th>
           </tr>
         </thead>
         <tbody v-if="filteredMovements.length">
-          <tr v-for="m in filteredMovements.slice(0, 30)" :key="m.id">
+          <tr v-for="m in filteredMovements.slice(0, 8)" :key="m.id">
             <td style="font-weight:600">{{ m.vessel_name }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ m.vessel_imo }}</td>
-            <td><BadgePill variant="info">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
             <td style="font-family:monospace;font-size:12px">{{ m.port_unlocode }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ m.berth_code || '-' }}</td>
             <td><BadgePill variant="neutral">{{ m.movement_type.replace(/_/g,' ') }}</BadgePill></td>
             <td><BadgePill :variant="mvmtBadge(m.status)">{{ m.status.replace(/_/g,' ') }}</BadgePill></td>
             <td style="font-size:11px;white-space:nowrap">
               <div v-if="m.eta">ETA: {{ fmtDate(m.eta) }}</div>
               <div v-if="m.etd">ETD: {{ fmtDate(m.etd) }}</div>
             </td>
-            <td style="font-size:12px">{{ m.cargo_type }}</td>
-            <td style="font-size:12px">{{ m.teu_count > 0 ? fmtNum(m.teu_count) : '-' }}</td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements.' }}</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements.' }}</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Vessel registry + berth availability -->
+  <!-- Vessel registry preview + berth availability -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header">Vessel Registry (KMA)</div>
+      <div class="card-header">
+        Vessel Registry (KMA)
+        <NuxtLink to="/maritime/vessels" class="link-sm">Full registry →</NuxtLink>
+      </div>
       <div class="card-body">
         <table>
           <thead>
@@ -201,7 +183,7 @@
             </tr>
           </thead>
           <tbody v-if="vessels.length">
-            <tr v-for="v in vessels.slice(0, 15)" :key="v.id">
+            <tr v-for="v in vessels.slice(0, 8)" :key="v.id">
               <td style="font-weight:600;font-size:13px">{{ v.vessel_name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ v.imo_number }}</td>
               <td><BadgePill variant="info">{{ v.vessel_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -364,6 +346,8 @@ function certBadge(s: string) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .day-filter { display:flex; gap:4px; }
 .btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }

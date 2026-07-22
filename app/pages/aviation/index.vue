@@ -184,59 +184,38 @@
     </div>
   </div>
 
-  <!-- Flight log -->
+  <!-- Flight log preview -->
   <SectionTitle pill="KAA ATC · Live">Recent Flights</SectionTitle>
 
   <div class="card">
+    <div class="card-header">
+      Latest Movements
+      <NuxtLink to="/aviation/flights" class="link-sm">Full flight log →</NuxtLink>
+    </div>
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="airlineFilter" class="select-sm" @change="load">
-          <option value="">All airlines</option>
-          <option v-for="al in airlines.slice(0,20)" :key="al.iata_code" :value="al.iata_code">{{ al.name }}</option>
-        </select>
-        <select v-model="statusFilter" class="select-sm" @change="load">
-          <option value="">All statuses</option>
-          <option value="in_flight">In Flight</option>
-          <option value="delayed">Delayed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="landed">Landed</option>
-          <option value="scheduled">Scheduled</option>
-        </select>
-        <button class="btn" @click="airlineFilter=''; statusFilter=''; load()">Clear</button>
-      </div>
       <table>
         <thead>
           <tr>
             <th>Flight</th>
-            <th>Airline</th>
             <th>Route</th>
             <th>Status</th>
             <th>Dep Delay</th>
-            <th>Arr Delay</th>
             <th>Passengers</th>
-            <th>Cargo (kg)</th>
-            <th>Gate</th>
           </tr>
         </thead>
         <tbody v-if="flights.length">
-          <tr v-for="f in flights" :key="f.id">
+          <tr v-for="f in flights.slice(0, 8)" :key="f.id">
             <td style="font-family:monospace;font-weight:700">{{ f.schedule_flight_number }}</td>
-            <td style="font-size:12px">{{ f.airline_iata }}</td>
             <td style="font-size:12px">{{ f.origin_code }} → {{ f.destination_code }}</td>
             <td><BadgePill :variant="flightBadge(f.status)">{{ f.status.replace(/_/g,' ') }}</BadgePill></td>
             <td :style="{ color: f.delay_departure_min > 30 ? '#ef4444' : f.delay_departure_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
               {{ f.delay_departure_min > 0 ? `+${f.delay_departure_min} min` : 'On time' }}
             </td>
-            <td :style="{ color: f.delay_arrival_min > 30 ? '#ef4444' : f.delay_arrival_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
-              {{ f.delay_arrival_min > 0 ? `+${f.delay_arrival_min} min` : '-' }}
-            </td>
             <td>{{ f.passengers_actual != null ? fmtNum(f.passengers_actual) : fmtNum(f.passengers_booked) }}</td>
-            <td>{{ fmtNum(f.cargo_kg) }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ f.gate || '-' }}</td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading flights…' : 'No flights match current filters.' }}</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading flights…' : 'No flights match current filters.' }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -288,8 +267,6 @@ const loading    = ref(true)
 const error      = ref<string | null>(null)
 const lastRefreshed  = ref('-')
 const days           = ref(7)
-const airlineFilter  = ref('')
-const statusFilter   = ref('')
 
 async function load() {
   loading.value = true
@@ -301,7 +278,7 @@ async function load() {
     avm.flightsOTP(days.value),
     avm.airports(),
     avm.airlines(),
-    avm.flights({ days: days.value, airline: airlineFilter.value || undefined, status: statusFilter.value || undefined, page_size: 30 }),
+    avm.flights({ days: days.value, page_size: 8 }),
     avm.cargoByCommodity(days.value),
     avm.passengersByAirport({ days: days.value }),
     avm.flightsByStatus({ days: days.value }),
@@ -379,6 +356,8 @@ function statusColor(s: string) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .day-filter { display:flex; gap:4px; }
 .btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }

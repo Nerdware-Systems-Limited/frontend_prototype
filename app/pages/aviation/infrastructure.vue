@@ -62,6 +62,20 @@
     </div>
   </div>
 
+  <!-- Airport map -->
+  <SectionTitle pill="Live Registry">Airport Map</SectionTitle>
+  <div class="card map-card">
+    <div class="card-header">Registered Airports</div>
+    <ClientOnly>
+      <UaptsMap
+        :markers="airportMarkers"
+        :center="[0.0, 37.9]"
+        :zoom="6"
+        height="380px"
+      />
+    </ClientOnly>
+  </div>
+
   <!-- Airport registry -->
   <SectionTitle pill="Live Registry">Airport Registry</SectionTitle>
   <div class="card">
@@ -202,6 +216,8 @@ useNavSubtitle('Aviation Infrastructure')
 import { useAviationMaritime, useAviationInfrastructure } from '~/composables/api'
 import type { Airport, PassengerByAirport, Runway, Navaid, AviationFacility, AviationCapitalWork, AviationInfraSummary } from '~/composables/api'
 
+type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+
 const airports     = ref<Airport[]>([])
 const pax          = ref<PassengerByAirport[]>([])
 const runways      = ref<Runway[]>([])
@@ -273,6 +289,20 @@ const capacityUtilisation = computed(() => pax.value.map(p => {
 
 const overCapacityAirports = computed(() => capacityUtilisation.value.filter(c => (c.utilizationPct ?? 0) > 100))
 
+const airportMarkers = computed((): MarkerSpec[] =>
+  airports.value
+    .filter(a => a.latitude != null && a.longitude != null)
+    .map(a => ({
+      id: `ap-${a.id}`,
+      lat: a.latitude!,
+      lon: a.longitude!,
+      title: a.name,
+      subtitle: `${a.iata_code} / ${a.icao_code} · ${a.runway_count} runway(s) · ${a.active ? 'active' : 'inactive'}`,
+      color: a.airport_type === 'international' ? 'red' : a.airport_type === 'regional' ? 'blue' : 'green',
+      size: a.airport_type === 'international' ? 'lg' : 'md',
+    })),
+)
+
 // ── Registry filters ─────────────────────────────────────────────────────
 const filteredAirports = computed(() => airports.value.filter(a => {
   if (search.value) {
@@ -313,6 +343,7 @@ function facilityStatusBadge(s: string) {
 
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }

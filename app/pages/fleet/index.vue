@@ -133,6 +133,10 @@
   <SectionTitle pill="NTSA iTIMS · Live">Critical Driver Behaviour Events (24h)</SectionTitle>
 
   <div class="card">
+    <div class="card-header">
+      Latest Events
+      <NuxtLink to="/fleet/behaviour" class="link-sm">Full event log →</NuxtLink>
+    </div>
     <div class="card-body">
       <table>
         <thead>
@@ -141,27 +145,21 @@
             <th>Event Type</th>
             <th>Severity</th>
             <th>Speed (km/h)</th>
-            <th>Limit (km/h)</th>
-            <th>Deceleration</th>
-            <th>Duration (s)</th>
             <th>Detected</th>
           </tr>
         </thead>
         <tbody v-if="criticalEvents.length">
-          <tr v-for="ev in criticalEvents" :key="ev.id">
+          <tr v-for="ev in criticalEvents.slice(0, 8)" :key="ev.id">
             <td style="font-weight:600">{{ ev.plate_number }}</td>
             <td><BadgePill variant="warning">{{ ev.event_type.replace(/_/g,' ') }}</BadgePill></td>
             <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
             <td>{{ ev.speed_kmh ?? '-' }}</td>
-            <td>{{ ev.speed_limit_kmh ?? '-' }}</td>
-            <td>{{ ev.deceleration_mps2 != null ? `${ev.deceleration_mps2.toFixed(2)} m/s²` : '-' }}</td>
-            <td>{{ ev.duration_seconds ?? '-' }}</td>
             <td style="white-space:nowrap;font-size:12px">{{ fmtTime(ev.detected_at) }}</td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No critical behaviour events in the last 24h' }}
             </td>
           </tr>
@@ -174,6 +172,10 @@
   <SectionTitle pill="NTSA iTIMS · Batch">Fleet Utilization Leaderboard</SectionTitle>
 
   <div class="card">
+    <div class="card-header">
+      Top Vehicles
+      <NuxtLink to="/fleet/behaviour" class="link-sm">Full leaderboard →</NuxtLink>
+    </div>
     <div class="card-body">
       <table>
         <thead>
@@ -183,13 +185,10 @@
             <th>Operator</th>
             <th>Utilization %</th>
             <th>Trips</th>
-            <th>Distance (km)</th>
-            <th>Active Hours</th>
-            <th>Date</th>
           </tr>
         </thead>
         <tbody v-if="utilization.length">
-          <tr v-for="(u, i) in utilization" :key="u.id">
+          <tr v-for="(u, i) in utilization.slice(0, 8)" :key="u.id">
             <td style="font-weight:700;color:#94a3b8">#{{ i + 1 }}</td>
             <td style="font-weight:600">{{ u.plate_number }}</td>
             <td>{{ u.operator_name ?? '-' }}</td>
@@ -200,14 +199,11 @@
               <span style="font-size:12px">{{ u.utilization_pct != null ? fmtPct(u.utilization_pct) : '-' }}</span>
             </td>
             <td>{{ fmtNum(u.trips_count) }}</td>
-            <td>{{ u.distance_km != null ? fmtNum(u.distance_km, 1) : '-' }}</td>
-            <td>{{ u.active_hours != null ? u.active_hours.toFixed(1) : '-' }}</td>
-            <td style="font-size:12px">{{ u.date }}</td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No utilization data available' }}
             </td>
           </tr>
@@ -302,6 +298,8 @@ function utilColor(pct: number | null | undefined) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:900px){ .two-col { grid-template-columns:1fr; } }

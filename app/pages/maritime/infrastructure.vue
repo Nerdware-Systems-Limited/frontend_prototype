@@ -60,6 +60,20 @@
     </div>
   </div>
 
+  <!-- Port map -->
+  <SectionTitle pill="Live Registry">Port Map</SectionTitle>
+  <div class="card map-card">
+    <div class="card-header">Registered Ports</div>
+    <ClientOnly>
+      <UaptsMap
+        :markers="portMarkers"
+        :center="[-3.0, 39.9]"
+        :zoom="6"
+        height="380px"
+      />
+    </ClientOnly>
+  </div>
+
   <!-- Port registry -->
   <SectionTitle pill="Live Registry">Port Registry</SectionTitle>
   <div class="card">
@@ -264,6 +278,10 @@ useNavSubtitle('Maritime Infrastructure')
 import { useAviationMaritime, useMaritimeInfrastructure } from '~/composables/api'
 import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary } from '~/composables/api'
 
+type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+// Kenya's two KPA-operated ports - same fixed lookup used across the maritime module's maps.
+const PORT_COORDS: Record<string, [number, number]> = { KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92] }
+
 const ports        = ref<Port[]>([])
 const berths        = ref<Berth[]>([])
 const containers    = ref<ContainerByPort[]>([])
@@ -342,6 +360,21 @@ const capacityUtilisation = computed(() => containers.value.map(c => {
   return { unlocode: c.port__unlocode, name: c.port__name, designThroughput, annualisedActual, utilizationPct }
 }).sort((a, b) => (b.utilizationPct ?? 0) - (a.utilizationPct ?? 0)))
 
+const portMarkers = computed((): MarkerSpec[] =>
+  ports.value.map((p, i) => {
+    const coords = PORT_COORDS[p.unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
+    const portBerths = berths.value.filter(b => b.port_unlocode === p.unlocode)
+    return {
+      id: `port-${p.unlocode}`,
+      lat: coords[0], lon: coords[1],
+      title: p.name,
+      subtitle: `${p.port_type.replace(/_/g, ' ')} · ${portBerths.length} berths · ${p.active ? 'active' : 'inactive'}`,
+      color: p.active ? 'blue' : 'gray',
+      size: 'lg',
+    }
+  }),
+)
+
 // ── Filters ──────────────────────────────────────────────────────────────
 const filteredBerths = computed(() => berths.value.filter(b => {
   if (portFilter.value && b.port_unlocode !== portFilter.value) return false
@@ -387,6 +420,7 @@ function inspectionBadge(s: string | undefined) {
 
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }

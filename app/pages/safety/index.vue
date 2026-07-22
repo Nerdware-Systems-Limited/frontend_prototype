@@ -150,7 +150,10 @@
     </div>
 
     <div class="card">
-      <div class="card-header">Black Spot Tier Distribution</div>
+      <div class="card-header">
+        Black Spot Tier Distribution
+        <NuxtLink to="/safety/blackspots" class="link-sm">Black Spot Inventory →</NuxtLink>
+      </div>
       <div class="card-body">
         <div v-for="tier in tierOrder" :key="tier" class="tier-row">
           <div class="tier-label">
@@ -416,6 +419,8 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }

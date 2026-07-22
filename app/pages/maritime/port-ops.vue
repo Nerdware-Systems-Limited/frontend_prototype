@@ -135,6 +135,19 @@
   </div>
 
   <!-- Berth occupancy table -->
+  <SectionTitle pill="KPA · Berth Registry">Port &amp; Berth Map</SectionTitle>
+  <div class="card map-card">
+    <div class="card-header">Ports with Berth Counts</div>
+    <ClientOnly>
+      <UaptsMap
+        :markers="portMarkers"
+        :center="[-3.0, 39.9]"
+        :zoom="6"
+        height="380px"
+      />
+    </ClientOnly>
+  </div>
+
   <SectionTitle pill="KPA · Berth Registry">Berth Directory & Status</SectionTitle>
 
   <div class="card">
@@ -228,6 +241,10 @@ useNavSubtitle('Port Operations')
 import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Berth } from '~/composables/api'
 
+type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+// Kenya's two KPA-operated ports - same fixed lookup used on the maritime overview map.
+const PORT_COORDS: Record<string, [number, number]> = { KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92] }
+
 const opsData        = ref<MaritimeOps | null>(null)
 const berths         = ref<Berth[]>([])
 const containerTrend = ref<any[]>([])
@@ -279,6 +296,21 @@ const filteredBerths = computed(() =>
   berths.value.filter(b => !berthTypeFilter.value || b.berth_type === berthTypeFilter.value),
 )
 
+const portMarkers = computed((): MarkerSpec[] =>
+  (opsData.value?.ports ?? []).map((p, i) => {
+    const coords = PORT_COORDS[p.port_unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
+    const portBerths = berths.value.filter(b => b.port_unlocode === p.port_unlocode)
+    return {
+      id: `port-${p.port_unlocode}`,
+      lat: coords[0], lon: coords[1],
+      title: p.port_name,
+      subtitle: `${portBerths.filter(b => b.active).length}/${portBerths.length} berths active · ${p.currently_in_port} vessels in port`,
+      color: 'blue',
+      size: 'lg',
+    }
+  }),
+)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -303,6 +335,7 @@ function dirBadge(d: string) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .port-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin-bottom:16px; }

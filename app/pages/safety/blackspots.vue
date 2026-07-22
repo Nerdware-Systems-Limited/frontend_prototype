@@ -82,6 +82,7 @@
   <div class="card">
     <div class="card-body">
       <div class="filter-row">
+        <input v-model="spotSearch" class="select-sm" placeholder="Search road name / code…" style="min-width:180px" />
         <select v-model="tierFilter" class="select-sm">
           <option value="">All tiers</option>
           <option value="critical">Critical</option>
@@ -89,10 +90,13 @@
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <button class="btn" @click="spotSearch=''; tierFilter=''">Clear</button>
+        <ExportButton filename="uapts-blackspot-inventory.csv" :rows="filteredSpots" :columns="spotExportColumns" style="margin-left:auto" />
       </div>
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Road Code / Name</th>
             <th>Tier</th>
             <th>Accidents (rolling)</th>
@@ -104,20 +108,31 @@
           </tr>
         </thead>
         <tbody v-if="filteredSpots.length">
-          <tr v-for="bs in filteredSpots" :key="bs.id">
-            <td>{{ bs.segment_road_name ?? bs.segment_road_code ?? '-' }}</td>
-            <td><BadgePill :variant="tierBadge(bs.ranking_tier)">{{ bs.ranking_tier }}</BadgePill></td>
-            <td>{{ fmtNum(bs.accident_count_rolling) }}</td>
-            <td>{{ fmtNum(bs.fatality_count_rolling) }}</td>
-            <td>{{ bs.kde_intensity != null ? bs.kde_intensity.toFixed(4) : '-' }}</td>
-            <td>{{ bs.radius_m ?? '-' }}</td>
-            <td>{{ bs.window_days }}</td>
-            <td style="font-size:12px">{{ fmtDate(bs.last_computed_at) }}</td>
-          </tr>
+          <template v-for="bs in filteredSpots" :key="bs.id">
+            <tr class="expand-row" @click="expanded = expanded === bs.id ? null : bs.id">
+              <td class="expand-cell">{{ expanded === bs.id ? '▾' : '▸' }}</td>
+              <td>{{ bs.segment_road_name ?? bs.segment_road_code ?? '-' }}</td>
+              <td><BadgePill :variant="tierBadge(bs.ranking_tier)">{{ bs.ranking_tier }}</BadgePill></td>
+              <td>{{ fmtNum(bs.accident_count_rolling) }}</td>
+              <td>{{ fmtNum(bs.fatality_count_rolling) }}</td>
+              <td>{{ bs.kde_intensity != null ? bs.kde_intensity.toFixed(4) : '-' }}</td>
+              <td>{{ bs.radius_m ?? '-' }}</td>
+              <td>{{ bs.window_days }}</td>
+              <td style="font-size:12px">{{ fmtDate(bs.last_computed_at) }}</td>
+            </tr>
+            <tr v-if="expanded === bs.id" class="detail-row">
+              <td :colspan="9">
+                <div class="drilldown">
+                  <div class="dd-item"><span class="dd-label">Coordinates</span><span style="font-family:monospace">{{ bs.centroid_latitude != null && bs.centroid_longitude != null ? `${bs.centroid_latitude.toFixed(4)}, ${bs.centroid_longitude.toFixed(4)}` : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Created</span><span>{{ fmtDate(bs.created_at) }}</span></div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No black spots found' }}
             </td>
           </tr>
@@ -188,6 +203,8 @@ const loading   = ref(true)
 const error     = ref<string | null>(null)
 const lastRefreshed = ref('-')
 const tierFilter = ref('')
+const spotSearch = ref('')
+const expanded   = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -231,8 +248,25 @@ onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ────────────────────────────────────────────────────────────
 const filteredSpots = computed(() =>
-  tierFilter.value ? spots.value.filter(s => s.ranking_tier === tierFilter.value) : spots.value,
+  spots.value.filter(s => {
+    if (tierFilter.value && s.ranking_tier !== tierFilter.value) return false
+    if (spotSearch.value) {
+      const q = spotSearch.value.toLowerCase()
+      if (!(s.segment_road_name ?? '').toLowerCase().includes(q) && !(s.segment_road_code ?? '').toLowerCase().includes(q)) return false
+    }
+    return true
+  }),
 )
+const spotExportColumns = [
+  { key: 'segment_road_name', label: 'Road' },
+  { key: 'ranking_tier', label: 'Tier' },
+  { key: 'accident_count_rolling', label: 'Accidents' },
+  { key: 'fatality_count_rolling', label: 'Fatalities' },
+  { key: 'kde_intensity', label: 'KDE Intensity' },
+  { key: 'radius_m', label: 'Radius (m)' },
+  { key: 'window_days', label: 'Window (days)' },
+  { key: 'last_computed_at', label: 'Last Computed' },
+]
 
 function tierCount(tier: string) {
   return spots.value.filter(s => s.ranking_tier === tier).length
@@ -315,8 +349,14 @@ function riskBadge(t: string) {
 .map-key { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; padding:8px 16px; border-top:1px solid #f1f5f9; }
 .mk-item { display:flex; align-items:center; gap:4px; }
 .mk-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
-.filter-row { display:flex; gap:8px; margin-bottom:12px; }
+.filter-row { display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
+.expand-row { cursor:pointer; }
+.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
+.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
