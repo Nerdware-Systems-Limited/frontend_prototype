@@ -12,6 +12,8 @@
           {{ p.port_name }}
         </option>
       </select>
+      <NuxtLink to="/maritime/cargo" class="btn">Cargo →</NuxtLink>
+      <NuxtLink to="/maritime/performance" class="btn">Performance & Ranking →</NuxtLink>
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>

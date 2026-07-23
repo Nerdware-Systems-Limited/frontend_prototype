@@ -42,6 +42,14 @@ export interface InspectionQuery {
   search?: string
 }
 
+/** Confirmed live shape of GET /fleet/vehicle-inspections/summary/ - see MissingApis.md §2.3. */
+export interface VehicleInspectionSummary {
+  total: number
+  by_result: Record<InspectionResult, number>
+  pass_rate_pct: number
+  days: number
+}
+
 export function useVehicleInspections() {
   const api = useApi()
   const V = '/api/v1/fleet/vehicle-inspections'
@@ -52,9 +60,8 @@ export function useVehicleInspections() {
 
     get: (id: string) => api<VehicleInspection>(`${V}/${id}/`),
 
-    // Pass/fail breakdown over a window - shape is server-defined, not
-    // part of the documented schema, so callers should treat this loosely.
-    summary: () => api<any>(`${V}/summary/`),
+    // Pass/fail breakdown over a window.
+    summary: () => api<VehicleInspectionSummary>(`${V}/summary/`),
 
     reinspections: (id: string) =>
       api<Paged<VehicleInspection> | VehicleInspection[]>(`${V}/${id}/reinspections/`),

@@ -38,6 +38,8 @@ export type Channel = 'in_app' | 'websocket' | 'email' | 'sms'
 export interface Notification {
   id: string
   user_id: string
+  /** Array form of user_id for multi-recipient rule fan-out (e.g. rules targeting a role). */
+  user_id_any?: string[]
   event_type: string
   rule_id?: string | null
   severity: Severity

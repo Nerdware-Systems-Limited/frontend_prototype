@@ -22,6 +22,8 @@ export interface GeoJSONFeatureCollection {
   count?: number
   bbox?: [number, number, number, number]
   filters?: Record<string, any>
+  /** Collection-level metadata (e.g. admin-0 boundary attributes) - only present on some endpoints (confirmed on /gis/kenya/boundary/). */
+  properties?: Record<string, any>
   [k: string]: any
 }
 

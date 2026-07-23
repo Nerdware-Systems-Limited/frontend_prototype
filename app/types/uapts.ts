@@ -109,6 +109,7 @@ export interface RootBanner {
   environment: string
   description: string
   documentation_url: string
+  policy_docs_url?: string
   timestamp: string
   endpoints: Record<string, string>
 }

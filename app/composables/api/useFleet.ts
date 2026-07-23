@@ -40,7 +40,9 @@ export interface Vehicle {
   plate_number: string
   chassis_no: string
   engine_no: string
+  engine_capacity_cc: number | null
   vehicle_type: VehicleType
+  body_type: string | null
   make: string
   model_name: string
   year_of_manufacture: number | null
@@ -49,10 +51,21 @@ export interface Vehicle {
   load_capacity_kg: number | null
   axle_configuration: string
   fuel_type: string
+  county: string | null
   speed_limit_kmh: number
   has_speed_governor: boolean
   insurance_expiry: string | null
   inspection_expiry: string | null
+  logbook_status: string | null
+  /**
+   * Owner identity fields - confirmed live but blank ("") on every sampled
+   * vehicle in this environment. Could be unseeded data, or redaction like
+   * Driver.national_id (see useDriverLicensing.revealDriverId) - confirm
+   * with backend before building UI that assumes these are populated.
+   */
+  owner_name: string | null
+  owner_id_number: string | null
+  owner_phone: string | null
   status: VehicleStatus
   last_seen_at: string | null
   last_latitude: number | null
@@ -166,6 +179,9 @@ export interface TripPlayback {
   stop_count: number
   boardings: number | null
   alightings: number | null
+  /** GPS breadcrumb polyline for this trip, as [lon, lat] pairs (GeoJSON coordinate order). */
+  path?: [number, number][]
+  stops_served?: string[]
   status: TripStatus
   created_at: string
   updated_at: string

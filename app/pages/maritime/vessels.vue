@@ -7,6 +7,7 @@
     <template #actions>
       <NuxtLink to="/maritime" class="btn">Live Map →</NuxtLink>
       <NuxtLink to="/maritime/port-ops" class="btn">Port Operations →</NuxtLink>
+      <NuxtLink to="/maritime/accidents" class="btn">Accidents & Safety →</NuxtLink>
     </template>
   </PageHeader>
 

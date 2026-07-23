@@ -19,6 +19,8 @@ export interface Sacco {
   sacco_name: string
   registration_status: 'active' | 'suspended' | 'revoked'
   contact_phone?: string
+  agency?: string | null
+  agency_code?: string | null
   route_count: number
   fleet_size: number
   service_quality_score: number
@@ -41,6 +43,8 @@ export interface Route {
   stop_count: number
   agency_id?: string
   is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface BRTStop {
@@ -58,6 +62,8 @@ export interface BRTStop {
   avg_dwell_seconds: number
   avg_boarding_count: number
   is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Schedule {
@@ -70,6 +76,8 @@ export interface Schedule {
   arrival_time: string
   frequency_min: number
   is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 export interface ScheduleAdherence {
@@ -95,6 +103,8 @@ export interface FareCollection {
   total_kes: string
   avg_fare_kes: string
   collected_hour: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface DemandForecast {
@@ -123,6 +133,7 @@ export interface ServiceQualityScore {
   vehicle_age_score: number
   occupancy_score: number
   composite_score: number
+  calculated_at?: string
 }
 
 export interface OperatorMetric {
@@ -137,6 +148,7 @@ export interface OperatorMetric {
   revenue_kes: string
   fleet_utilization_pct: number
   rank_position: number
+  calculated_at?: string
 }
 
 export interface PaymentTransaction {
@@ -178,6 +190,8 @@ export interface PTFeed {
   download_url?: string
   generated_at: string
   published_at?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface PassengerFeedback {
@@ -189,6 +203,8 @@ export interface PassengerFeedback {
   category: 'cleanliness' | 'safety' | 'punctuality' | 'fare' | 'driver_behaviour' | 'vehicle_condition' | 'other'
   rating: number
   text: string
+  /** Anonymised hash of the submitter's contact - empty string when none given. */
+  contact_hash?: string
   status: 'open' | 'investigating' | 'resolved' | 'closed'
   submitted_at: string
   resolved_at?: string | null
@@ -206,7 +222,18 @@ export interface PSVLicense {
   status: 'active' | 'expired' | 'suspended' | 'revoked'
   gps_compliance_pct: number
   vehicle_count: number
+  created_at?: string
+  updated_at?: string
 }
+
+/** Confirmed live shape of GET /public-transport/compliance/summary/ - see MissingApis.md §2.3. */
+export type ComplianceCheckType = 'fare' | 'licensing' | 'capacity'
+export type ComplianceSummary = Record<ComplianceCheckType, {
+  compliant: number
+  flagged: number
+  violation: number
+  total: number
+}>
 
 export interface PTSummary {
   kpis: {
@@ -264,14 +291,13 @@ export function usePublicTransport() {
     schedules: (q?: PTQuery) =>
       api<Paged<Schedule>>('/api/v1/public-transport/schedules/', { query: cleanQuery(q as Record<string, unknown>) }),
     compliance: (q?: PTQuery) =>
-      api<Paged<{ id: string; route: string; route_name?: string; check_type: string; status: string; notes: string; checked_at: string }>>(
+      api<Paged<{ id: string; route: string; route_name?: string; check_type: string; status: string; notes: string; checked_at: string; created_at?: string; updated_at?: string }>>(
         '/api/v1/public-transport/compliance/', { query: cleanQuery(q as Record<string, unknown>) }),
+    // Confirmed live shape: Record<'fare'|'licensing'|'capacity', {...}> - see MissingApis.md §2.3.
     complianceSummary: () =>
-      api<Record<string, { compliant: number; flagged: number; violation: number; total: number }>>(
-        '/api/v1/public-transport/compliance/summary/',
-      ),
+      api<ComplianceSummary>('/api/v1/public-transport/compliance/summary/'),
     demand: (q?: PTQuery) =>
-      api<Paged<{ id: string; route: string; origin_zone: string; destination_zone: string; passenger_count: number; surveyed_at: string }>>(
+      api<Paged<{ id: string; route: string; route_name?: string; origin_zone: string; destination_zone: string; passenger_count: number; surveyed_at: string; created_at?: string; updated_at?: string }>>(
         '/api/v1/public-transport/demand/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     brtStops: (q?: PTQuery) =>

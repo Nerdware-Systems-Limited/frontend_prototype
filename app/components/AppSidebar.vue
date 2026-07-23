@@ -103,7 +103,13 @@
           <NuxtLink class="sidebar-link" to="/maritime" :class="{ active: isActive('/maritime') }">Vessel Movements</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/vessels" :class="{ active: isActive('/maritime/vessels') }">Vessel Registry</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/port-ops" :class="{ active: isActive('/maritime/port-ops') }">Port Operations</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/services" :class="{ active: isActive('/maritime/services') }">Port Services</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/cargo" :class="{ active: isActive('/maritime/cargo') }">Cargo Tracking</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/waterways" :class="{ active: isActive('/maritime/waterways') }">Waterways</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/infrastructure" :class="{ active: isActive('/maritime/infrastructure') }">Maritime Infrastructure</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/accidents" :class="{ active: isActive('/maritime/accidents') }">Accidents & Safety</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/green-transport" :class="{ active: isActive('/maritime/green-transport') }">Green Transport</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/performance" :class="{ active: isActive('/maritime/performance') }">Performance & Ranking</NuxtLink>
         </div>
       </details>
 

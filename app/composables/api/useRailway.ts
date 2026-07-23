@@ -63,6 +63,8 @@ export interface RailLine {
   stations_count: number
   admin1_name?: string
   admin2_name?: string
+  latitude?: number | null
+  longitude?: number | null
   created_at?: string
   updated_at?: string
 }
@@ -82,6 +84,8 @@ export interface RailStation {
   city?: string
   admin1_name?: string
   elevation_m?: number | null
+  latitude?: number | null
+  longitude?: number | null
   created_at?: string
   updated_at?: string
 }
@@ -201,8 +205,11 @@ export interface RailTicket {
   id: string
   pnr: string
   schedule: string
+  schedule_train_number?: string | null
   origin: string
+  origin_code?: string | null
   destination: string
+  destination_code?: string | null
   ticket_class: TicketClass
   channel: Channel
   passenger_name_hash: string
@@ -212,6 +219,7 @@ export interface RailTicket {
   travel_date: string
   is_no_show: boolean
   operator_agency?: string | null
+  operator_agency_code?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -267,12 +275,28 @@ export interface FreightSummary {
   }>
 }
 
+/** Shape nested at RailwaySummary.incidents_90d (from the /railway/summary/ envelope). */
 export interface IncidentSummary {
   total: number
   casualties: number
   loss_kes: number
   fatal: number
   level_crossing: number
+}
+
+/**
+ * Shape returned by the standalone GET /railway/incidents/stats/?days=N
+ * endpoint - confirmed live to use different (prefixed) field names than
+ * the same-concept object nested in RailwaySummary.incidents_90d above.
+ * See MissingApis.md §2.1.
+ */
+export interface RailIncidentStats {
+  days: number
+  total_incidents: number
+  total_casualties: number
+  total_loss_kes: number
+  fatal_incidents: number
+  level_crossing_incidents: number
 }
 
 export interface RidershipSummary {
@@ -358,7 +382,7 @@ export function useRailway() {
         `/api/v1/railway/freight/by-corridor/?days=${days}`,
       ),
     incidentStats: (days = 90) =>
-      api<IncidentSummary>(`/api/v1/railway/incidents/stats/?days=${days}`),
+      api<RailIncidentStats>(`/api/v1/railway/incidents/stats/?days=${days}`),
     revenueByRoute: (days = 30) =>
       api<{ count: number; results: any[] }>(
         `/api/v1/railway/tickets/by-route/?days=${days}`,

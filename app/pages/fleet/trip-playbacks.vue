@@ -51,6 +51,7 @@
       <div class="ts-item"><span>Avg Speed</span><strong>{{ selectedTrip.avg_speed_kmh != null ? `${selectedTrip.avg_speed_kmh.toFixed(0)} km/h` : '-' }}</strong></div>
       <div class="ts-item"><span>Max Speed</span><strong>{{ selectedTrip.max_speed_kmh != null ? `${selectedTrip.max_speed_kmh.toFixed(0)} km/h` : '-' }}</strong></div>
       <div class="ts-item"><span>Stops</span><strong>{{ selectedTrip.stop_count }}</strong></div>
+      <div v-if="selectedTrip.stops_served?.length" class="ts-item"><span>Stops Served</span><strong>{{ selectedTrip.stops_served.join(', ') }}</strong></div>
       <div class="ts-item"><span>Boardings</span><strong>{{ selectedTrip.boardings ?? '-' }}</strong></div>
       <div class="ts-item"><span>Alightings</span><strong>{{ selectedTrip.alightings ?? '-' }}</strong></div>
       <div class="ts-item">
@@ -161,8 +162,20 @@ async function load() {
 async function replayTrip(trip: TripPlayback) {
   selectedTrip.value = trip
   tripPath.value = []
-  loadingPath.value = trip.id
 
+  // The trip record itself already carries a GPS breadcrumb polyline as
+  // [lon, lat] pairs (GeoJSON order) - use it immediately (no network
+  // round-trip) and swap to the [lat, lon] order this page's map layer
+  // expects. Only fall back to the dedicated /path/ endpoint if the trip
+  // has none (e.g. GPS tracking gap).
+  if (trip.path?.length) {
+    tripPath.value = trip.path.map(([lon, lat]) => [lat, lon])
+    await nextTick()
+    document.querySelector('.map-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+
+  loadingPath.value = trip.id
   try {
     const path = await useFleet().tripPath(trip.id) as any
     // API may return { points: [[lat,lon]] } or { results: [...] } or array

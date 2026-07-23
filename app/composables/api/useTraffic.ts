@@ -137,6 +137,8 @@ export interface WeatherObservation {
   condition: 'clear' | 'cloudy' | 'rain' | 'heavy_rain' | 'fog' | 'storm'
   traffic_impact_score: number
   observed_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface TrafficAlert {

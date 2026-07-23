@@ -47,6 +47,7 @@ export interface RoadSegment {
   road_name: string
   road_code: string
   road_class: RoadClass
+  county: string | null
   chainage_start: number | null
   chainage_end: number | null
   length_km: number
