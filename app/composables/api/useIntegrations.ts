@@ -55,7 +55,7 @@ export interface IntegrationQuery {
 }
 
 export interface RecordsQuery {
-  source?: string         // filter by source_id
+  source_id?: string      // filter by source_id (backend query param is `source_id`, not `source`)
   page?: number
   page_size?: number
   search?: string

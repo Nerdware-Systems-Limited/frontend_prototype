@@ -480,7 +480,12 @@ async function load() {
 async function loadAgencySegments(code: string) {
   const infra = useInfrastructure()
   try {
-    const res = await infra.segments({ agency_code: code, page_size: 300 }) as any
+    // RoadSegmentFilter only exposes `agency` (the Agency UUID, via
+    // agency_id equality) - there is no `agency_code` filter param on the
+    // backend, so it must be resolved to the UUID via agencyCodeToId first.
+    const agencyId = agencyCodeToId.value[code]
+    if (!agencyId) { segments.value = []; segmentsTotal.value = 0; return }
+    const res = await infra.segments({ agency: agencyId, page_size: 300 }) as any
     segments.value = res.results ?? []
     segmentsTotal.value = res.count ?? segments.value.length
   } catch {
@@ -537,6 +542,17 @@ const agencyOptions = computed(() => {
 })
 const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
 
+// RoadSegmentFilter's `agency` param matches on the Agency UUID, not its
+// code - build the mapping from the unfiltered baseline sample (each row
+// carries both `agency` (uuid) and `agency_code`).
+const agencyCodeToId = computed(() => {
+  const m: Record<string, string> = {}
+  for (const s of allAgencySample.value) {
+    if (s.agency_code && s.agency) m[s.agency_code] = s.agency
+  }
+  return m
+})
+
 // ── Agency-scoped datasets ───────────────────────────────────────────────
 // `segments` is already agency-scoped (server-side `agency=` filter) once a
 // tab is selected - see loadAgencySegments() - so no client-side filter step
@@ -554,7 +570,7 @@ const topAtRisk = computed(() =>
   [...atRisk.value].sort((a, b) => (b.failure_probability ?? 0) - (a.failure_probability ?? 0)).slice(0, 5),
 )
 const topSignalFaults = computed(() =>
-  [...agencySignalFaults.value].sort((a, b) => (a.status === 'faulty' ? -1 : 1) - (b.status === 'faulty' ? -1 : 1)).slice(0, 5),
+  [...agencySignalFaults.value].sort((a, b) => (a.status === 'fault' ? -1 : 1) - (b.status === 'fault' ? -1 : 1)).slice(0, 5),
 )
 const agencyBudget = computed(() => {
   const pool = budgets.value.filter(b => !selectedAgency.value || b.agency_code === selectedAgency.value)
@@ -637,7 +653,7 @@ async function loadTablePage() {
   const infra = useInfrastructure()
   try {
     const res = await infra.segments({
-      agency_code: selectedAgency.value || undefined,
+      agency: selectedAgency.value ? agencyCodeToId.value[selectedAgency.value] : undefined,
       page: tablePage.value,
       page_size: tablePageSize.value,
       search: search.value || undefined,
@@ -673,7 +689,12 @@ onMounted(loadTablePage)
 // endpoint) - more complete than exporting only the currently-loaded page.
 const roadInventoryExportHref = computed(() => {
   const q = new URLSearchParams({ format: 'csv' })
-  if (selectedAgency.value) q.set('agency_code', selectedAgency.value)
+  // RoadSegmentFilter's `agency` param expects the Agency UUID, not its code
+  // (passing a non-UUID code 500s server-side) - resolve via agencyCodeToId.
+  if (selectedAgency.value) {
+    const agencyId = agencyCodeToId.value[selectedAgency.value]
+    if (agencyId) q.set('agency', agencyId)
+  }
   if (classFilter.value) q.set('road_class', classFilter.value)
   if (surfaceFilter.value) q.set('surface', surfaceFilter.value)
   if (conditionFilter.value) q.set('condition', conditionFilter.value)
@@ -767,7 +788,7 @@ function failColor(p: number | null | undefined) {
   return p >= 0.7 ? '#ef4444' : p >= 0.4 ? '#f59e0b' : '#22c55e'
 }
 function sigBadge(s: string) {
-  const m: Record<string,string> = { operational:'success', faulty:'danger', maintenance:'warning', offline:'neutral' }
+  const m: Record<string,string> = { operational:'success', fault:'danger', degraded:'warning', maintenance:'warning', offline:'neutral' }
   return m[s] ?? 'neutral'
 }
 </script>

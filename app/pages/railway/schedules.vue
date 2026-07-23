@@ -341,8 +341,10 @@ function scheduleDepTime(schedId: string) {
 const revenueByRoute = computed(() => {
   const m = new Map<string, { origin: string; destination: string; bookings: number; noShows: number; revenue: number }>()
   for (const tk of tickets.value) {
-    const key = `${tk.origin}-${tk.destination}`
-    const ex = m.get(key) ?? { origin: tk.origin, destination: tk.destination, bookings: 0, noShows: 0, revenue: 0 }
+    const originLabel = tk.origin_code ?? tk.origin
+    const destinationLabel = tk.destination_code ?? tk.destination
+    const key = `${originLabel}-${destinationLabel}`
+    const ex = m.get(key) ?? { origin: originLabel, destination: destinationLabel, bookings: 0, noShows: 0, revenue: 0 }
     ex.bookings++
     if (tk.is_no_show) ex.noShows++
     ex.revenue += parseFloat(tk.fare_kes || '0')

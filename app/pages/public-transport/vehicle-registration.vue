@@ -330,7 +330,7 @@ async function toggleExpand(v: Vehicle) {
   const fleet = useFleet()
   const vi = useVehicleInspections()
   const [insRes, adhRes, behRes] = await Promise.allSettled([
-    vi.forVehicle(v.plate_number),
+    vi.forVehicle(v.id),
     fleet.routeAdherence({ vehicle: v.id, page_size: 10 }),
     fleet.behaviourEvents({ vehicle: v.id, page_size: 10 }),
   ])

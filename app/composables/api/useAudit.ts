@@ -1,6 +1,9 @@
 // app/composables/api/useAudit.ts
 // ─────────────────────────────────────────────────────────────────────
-// /api/v1/audit/* - audit-trail endpoint, backed by MongoDB.
+// /api/v1/audit/* - audit-trail endpoint. Plain PostgreSQL underneath
+// (apps/audit/models.py) - the `.log()`/`.find()` API on the Django
+// model is only *shaped* to look like the old MongoDB interface; there
+// is no Mongo involved here (that's apps/notifications, not audit).
 //
 // Pagination: page-number style - the API accepts `limit` (page size) and
 // `page` query params and returns `count`, `next`, `previous`, `results`,
@@ -35,11 +38,11 @@ export interface AuditEntry {
   metadata: Record<string, unknown>
 
   // request context
-  ip_address: string
+  ip_address: string | null       // GenericIPAddressField(null=True) - can be null
   user_agent: string
   request_path: string
   request_method: string
-  status_code: number
+  status_code: number | null      // PositiveSmallIntegerField(null=True) - can be null
   response_time: number | null
 
   // timing
@@ -52,16 +55,25 @@ export interface AuditEntry {
   /** @deprecated use ip_address */       ip?: string
 }
 
+// Query params actually accepted by _build_queryset() in apps/audit/views.py
+// (confirmed live). There is no `user`/`resource`/`date_from`/`date_to`/
+// `search` param on this backend - those were guessed names that the API
+// silently ignores (the filter is a no-op, not an error), so callers using
+// them would appear to work while actually returning the unfiltered set.
 export interface AuditQuery {
   page?: number
   /** Results per page (limit/offset pagination) - server defaults to a small value if omitted. */
   limit?: number
-  user?: string
+  /** Exact match on AuditLog.user_id (a user UUID, not an email). */
+  user_id?: string
   action?: string
-  resource?: string
-  date_from?: string
-  date_to?: string
-  search?: string
+  /** Exact match on AuditLog.resource_type, e.g. "accounts.User". */
+  resource_type?: string
+  resource_id?: string
+  /** ISO-8601 (or plain YYYY-MM-DD) lower bound, inclusive - created_at__gte. */
+  since?: string
+  /** ISO-8601 (or plain YYYY-MM-DD) upper bound, inclusive - created_at__lte. */
+  until?: string
 }
 
 // The API page envelope - next/previous are absolute URLs or null.

@@ -122,7 +122,7 @@ async function load() {
 
   const [alRes, flRes] = await Promise.allSettled([
     avm.airlines(),
-    avm.flights({ days: days.value, airline: airlineFilter.value || undefined, status: statusFilter.value || undefined, page_size: 150 } as any),
+    avm.flights({ days: days.value, airline: airlineFilter.value || undefined, status: statusFilter.value || undefined, page_size: 150 }),
   ])
 
   if (alRes.status === 'fulfilled') airlines.value = (alRes.value as any).results ?? []

@@ -249,7 +249,7 @@ async function loadRecords() {
       page_size: 50,
       ordering: '-event_at',
       search: recSearch.value || undefined,
-      source: recSource.value || undefined,
+      source_id: recSource.value || undefined,
     })
     records.value = (res as any).results ?? []
   } catch { /* leave existing records */ } finally {

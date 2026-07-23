@@ -178,7 +178,10 @@ async function load() {
   error.value = null
   const vi = useVehicleInspections()
 
-  const res = await vi.list({ page_size: 100, search: search.value || undefined }).catch(() => null)
+  // Note: the backend endpoint has no full-text search param (search=
+  // is a silent no-op there - see useVehicleInspections.ts), so the
+  // search box below filters the loaded page client-side instead.
+  const res = await vi.list({ page_size: 100 }).catch(() => null)
   if (res) {
     inspections.value = (res as any).results ?? []
   } else {
@@ -212,6 +215,11 @@ async function toggleExpand(i: VehicleInspection) {
 const filteredInspections = computed(() => inspections.value.filter(i => {
   if (resultFilter.value && i.result !== resultFilter.value) return false
   if (reinspectionOnly.value && !i.is_reinspection) return false
+  if (search.value) {
+    const q = search.value.toLowerCase()
+    const hay = `${i.plate_number} ${i.inspection_centre} ${i.inspector_name ?? ''}`.toLowerCase()
+    if (!hay.includes(q)) return false
+  }
   return true
 }))
 

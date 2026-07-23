@@ -23,15 +23,14 @@
 
   <!-- Filter bar -->
   <div class="filter-bar">
-    <input v-model="filters.search" class="select-sm" placeholder="Search…" style="min-width:200px" @change="reload" />
-    <input v-model="filters.user" class="select-sm" placeholder="User email…" style="min-width:160px" @change="reload" />
+    <input v-model="filters.user_id" class="select-sm" placeholder="User ID (UUID)…" style="min-width:200px" @change="reload" />
     <select v-model="filters.action" class="select-sm" @change="reload">
       <option value="">All actions</option>
       <option v-for="a in actionOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
     </select>
-    <input v-model="filters.resource" class="select-sm" placeholder="Resource type…" @change="reload" />
-    <input type="date" v-model="filters.date_from" class="select-sm" @change="reload" />
-    <input type="date" v-model="filters.date_to" class="select-sm" @change="reload" />
+    <input v-model="filters.resource_type" class="select-sm" placeholder="Resource type…" @change="reload" />
+    <input type="date" v-model="filters.since" class="select-sm" @change="reload" />
+    <input type="date" v-model="filters.until" class="select-sm" @change="reload" />
     <select v-model.number="pageSize" class="select-sm" @change="reload">
       <option :value="25">25 / page</option>
       <option :value="50">50 / page</option>
@@ -141,13 +140,15 @@ const page    = ref(1)
 const nextUrl = ref<string | null>(null)
 const prevUrl = ref<string | null>(null)
 
+// Names match apps/audit/views.py `_build_queryset()` exactly - there is
+// no `search` param on this backend (nor `user`/`resource`/`date_from`/
+// `date_to` - those were guessed and silently ignored by the API).
 const filters = ref({
-  search:    '',
-  user:      '',
-  action:    '',
-  resource:  '',
-  date_from: '',
-  date_to:   '',
+  user_id:       '',
+  action:        '',
+  resource_type: '',
+  since:         '',
+  until:         '',
 })
 // Server default page size is small (10-20 rows) unless `limit` is passed
 // explicitly - this is what was making the log feel like it was missing entries.
@@ -168,12 +169,11 @@ async function load() {
   error.value   = null
 
   const q: AuditQuery = { limit: pageSize.value }
-  if (filters.value.search)    q.search    = filters.value.search
-  if (filters.value.user)      q.user      = filters.value.user
-  if (filters.value.action)    q.action    = filters.value.action
-  if (filters.value.resource)  q.resource  = filters.value.resource
-  if (filters.value.date_from) q.date_from = filters.value.date_from
-  if (filters.value.date_to)   q.date_to   = filters.value.date_to
+  if (filters.value.user_id)       q.user_id       = filters.value.user_id
+  if (filters.value.action)        q.action        = filters.value.action
+  if (filters.value.resource_type) q.resource_type = filters.value.resource_type
+  if (filters.value.since)         q.since         = filters.value.since
+  if (filters.value.until)         q.until         = filters.value.until
 
   try {
     applyPage(await useAudit().list(q))
@@ -203,7 +203,7 @@ async function loadUrl(absoluteUrl: string) {
 function reload() { load() }
 
 function resetFilters() {
-  filters.value = { search: '', user: '', action: '', resource: '', date_from: '', date_to: '' }
+  filters.value = { user_id: '', action: '', resource_type: '', since: '', until: '' }
   reload()
 }
 
@@ -238,8 +238,8 @@ onUnmounted(disconnect)
 // doesn't belong there until the next reload.
 const isDefaultView = computed(() =>
   page.value === 1 &&
-  !filters.value.search && !filters.value.user && !filters.value.action &&
-  !filters.value.resource && !filters.value.date_from && !filters.value.date_to,
+  !filters.value.user_id && !filters.value.action &&
+  !filters.value.resource_type && !filters.value.since && !filters.value.until,
 )
 
 watch(

@@ -47,8 +47,7 @@
           <select v-model="form.severity" class="select-full">
             <option value="">Any</option>
             <option value="info">Info</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
+            <option value="warning">Warning</option>
             <option value="high">High</option>
             <option value="critical">Critical</option>
           </select>
@@ -77,7 +76,7 @@
         </div>
         <div class="form-group">
           <label>Message Template</label>
-          <textarea v-model="form.message_template" class="select-full" rows="3" placeholder="Use {event_type}, {severity}, {resource_id} placeholders…" />
+          <textarea v-model="form.message_template" class="select-full" rows="3" placeholder="Use {field} placeholders matching the event's context payload, e.g. {plate_number}, {violation_type}, {station}, {weight_kg}…" />
         </div>
         <div v-if="saveError" style="font-size:12px;color:#ef4444">⚠ {{ saveError }}</div>
       </div>
@@ -166,7 +165,7 @@ const saveError = ref<string | null>(null)
 const togglingId = ref<string | null>(null)
 const deletingId = ref<string | null>(null)
 
-const CHANNELS = ['in_app', 'email', 'sms', 'webhook']
+const CHANNELS = ['in_app', 'websocket', 'email', 'sms']
 const ROLES    = ['admin', 'analyst', 'operator']
 
 const emptyForm = () => ({
@@ -183,7 +182,12 @@ const form = ref(emptyForm())
 async function load() {
   loading.value = true
   error.value = null
-  const [res] = await Promise.allSettled([useNotifications().rules.list()])
+  // The table has its own Enabled/Off toggle column, so it needs both
+  // active and inactive rules. The backend defaults `rules.list()` (no
+  // `active` param) to active-only - pass `active: false` explicitly,
+  // which the composable translates to `?active=false`, telling the
+  // backend to skip the active-only filter and return everything.
+  const [res] = await Promise.allSettled([useNotifications().rules.list({ active: false })])
   if (res.status === 'fulfilled') rules.value = (res.value as any).results ?? res.value ?? []
   else error.value = 'Unable to reach the UAPTS Notifications API.'
   loading.value = false
@@ -259,7 +263,7 @@ async function deleteRule(id: string) {
 }
 
 function sevBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'info', info:'neutral' }
+  const m: Record<string,string> = { critical:'danger', high:'warning', warning:'fair', info:'neutral' }
   return m[s] ?? 'neutral'
 }
 function fmtTime(iso: string) {

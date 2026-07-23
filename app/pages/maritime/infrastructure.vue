@@ -12,7 +12,7 @@
   </PageHeader>
 
   <div v-if="error" class="error-banner">
-    ⚠ {{ error }} Channel depth, navaid status, dry-dock/ICD facility health, and capital-works integration with KPA asset management is not yet live - port/berth registry and capacity figures below are computed from the live catalogue.
+    ⚠ {{ error }}
   </div>
 
   <!-- Real registry KPIs -->
@@ -23,14 +23,14 @@
     <KpiCard label="Avg Cranes / Berth" :value="avgCranes != null ? avgCranes.toFixed(1) : '-'" sub="Container-handling capacity proxy" source="live" source-title="KPA Registry" />
   </div>
 
-  <!-- TBD infra KPIs -->
+  <!-- Infra KPIs (computed from the live channel/navaid/dry-dock/capital-works catalogues) -->
   <div class="kpi-grid">
-    <KpiCard label="Channel Depth Compliance" :value="infra ? pct(infra.kpis.channel_depth_compliance_pct) : '-'" sub="Current vs design depth" :trend-direction="(infra?.kpis.channel_depth_compliance_pct ?? 0) >= 90 ? 'up' : 'down'" source="batch" source-title="KPA Hydrographic" />
-    <KpiCard label="Navaid Availability" :value="infra ? pct(infra.kpis.navaid_operational_pct) : '-'" sub="Buoys / lighthouses / VTS radar" source="batch" source-title="KMA" />
-    <KpiCard label="Dry Docks Available" :value="infra ? fmtNum(infra.kpis.dry_docks_available) : '-'" sub="Ready for ship repair" source="batch" source-title="KPA" />
-    <KpiCard label="Avg ICD Utilisation" :value="infra ? pct(infra.kpis.icd_avg_utilization_pct) : '-'" sub="Inland container depots" source="batch" source-title="KPA" />
-    <KpiCard label="Open Work Orders" :value="infra ? fmtNum(infra.kpis.open_work_orders) : fmtNum(openCapitalWorks.length)" sub="Infrastructure maintenance" source="batch" source-title="KPA AMS" />
-    <KpiCard label="Capital Works Value" :value="capitalWorksValue ? `KES ${fmtKES(capitalWorksValue)}` : (infra ? `KES ${fmtKES(infra.kpis.capital_works_value_kes)}` : '-')" sub="Active investment pipeline incl. LAPSSET" source="batch" source-title="KPA / National Treasury" />
+    <KpiCard label="Channel Depth Compliance" :value="pct(channelDepthCompliancePct)" sub="Dredged vs target depth" :trend-direction="(channelDepthCompliancePct ?? 0) >= 90 ? 'up' : 'down'" source="live" source-title="KMA Hydrographic" />
+    <KpiCard label="Navaid Availability" :value="pct(navaidOperationalPct)" sub="Buoys / lighthouses / radar / VHF" source="live" source-title="KMA" />
+    <KpiCard label="Dry Docks Operational" :value="fmtNum(dryDocksOperational)" :sub="`of ${fmtNum(dryDocks.length)} registered`" source="live" source-title="KPA" />
+    <KpiCard label="Registered ICDs" :value="fmtNum(icds.length)" sub="Inland container depots" source="live" source-title="KPA Registry" />
+    <KpiCard label="Active Capital Works" :value="fmtNum(activeCapitalWorks.length)" :sub="`of ${fmtNum(capitalWorks.length)} projects`" source="live" source-title="KPA / National Treasury" />
+    <KpiCard label="Active Capital Works Value" :value="activeCapitalWorksValue ? `KES ${fmtKES(activeCapitalWorksValue)}` : '-'" sub="In-progress projects" source="live" source-title="KPA / National Treasury" />
   </div>
 
   <!-- Capacity utilisation -->
@@ -39,7 +39,7 @@
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Port</th><th>UNLOCODE</th><th>Design Throughput/yr (TEU)</th><th>Annualised Actual (est.)</th><th>Utilisation</th></tr></thead>
+          <thead><tr><th>Port</th><th>UNLOCODE</th><th>Design Throughput/yr (TEU)</th><th>Annualised Actual (est.)</th><th>Utilisation</th><th>Berth Availability</th></tr></thead>
           <tbody v-if="capacityUtilisation.length">
             <tr v-for="c in capacityUtilisation" :key="c.unlocode">
               <td style="font-weight:600">{{ c.name }}</td>
@@ -52,12 +52,13 @@
                 </div>
                 <span style="font-size:11px">{{ c.utilizationPct != null ? `${c.utilizationPct.toFixed(0)}%` : '-' }}</span>
               </td>
+              <td style="font-size:12px">{{ berthAvailabilityByPort[c.unlocode] != null ? `${berthAvailabilityByPort[c.unlocode]!.toFixed(0)}%` : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No container-throughput data available to estimate utilisation.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No container-throughput data available to estimate utilisation.' }}</td></tr></tbody>
         </table>
       </div>
-      <div class="source-note">Annualised actual is estimated by scaling the {{ throughputDays }}-day container throughput to a full year - directional only, not a reported annual figure.</div>
+      <div class="source-note">Annualised actual is estimated by scaling the {{ throughputDays }}-day container throughput to a full year - directional only, not a reported annual figure. Berth availability is from <code>infrastructure/summary/</code>.</div>
     </div>
   </div>
 
@@ -143,47 +144,52 @@
   </div>
 
   <!-- Channel depth & dredging -->
-  <SectionTitle pill="KPA Hydrographic · Pending Integration">Channel Depth &amp; Dredging</SectionTitle>
+  <SectionTitle pill="KMA Hydrographic · Live">Channel Depth &amp; Dredging</SectionTitle>
   <div class="card">
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Port</th><th>Channel</th><th>Current Depth (m)</th><th>Design Depth (m)</th><th>Status</th><th>Last Dredged</th><th>Next Dredging Due</th></tr></thead>
+          <thead><tr><th>Port</th><th>Channel</th><th>Waterway</th><th>Dredged Depth (m)</th><th>Target Depth (m)</th><th>vs Target</th><th>Last Dredged</th></tr></thead>
           <tbody v-if="channels.length">
             <tr v-for="c in channels" :key="c.id">
-              <td style="font-family:monospace;font-weight:600">{{ c.port_unlocode }}</td>
-              <td style="font-size:12px">{{ c.channel_name }}</td>
-              <td>{{ c.current_depth_m }}</td>
-              <td>{{ c.design_depth_m }}</td>
-              <td><BadgePill :variant="channelBadge(c.status)">{{ c.status.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-size:11px">{{ fmtDate(c.last_dredged) }}</td>
-              <td style="font-size:11px">{{ fmtDate(c.next_dredging_due) }}</td>
+              <td style="font-family:monospace;font-weight:600">{{ c.port_unlocode ?? '-' }}</td>
+              <td style="font-size:12px">{{ c.name }}</td>
+              <td style="font-size:12px">{{ c.waterway_name ?? '-' }}</td>
+              <td>{{ c.dredged_depth_m }}</td>
+              <td>{{ c.target_depth_m ?? '-' }}</td>
+              <td>
+                <BadgePill v-if="c.target_depth_m != null" :variant="c.dredged_depth_m >= c.target_depth_m ? 'success' : 'danger'">
+                  {{ c.dredged_depth_m >= c.target_depth_m ? 'meets target' : 'below target' }}
+                </BadgePill>
+                <span v-else>-</span>
+              </td>
+              <td style="font-size:11px">{{ fmtDate(c.last_dredged_date) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Channel depth/dredging survey data has not been integrated from KPA hydrographic services yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No channels registered.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
   </div>
 
   <!-- Navaids -->
-  <SectionTitle pill="KMA · Pending Integration">Navigational Aids</SectionTitle>
+  <SectionTitle pill="KMA · Live">Navigational Aids</SectionTitle>
   <div class="card">
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Port</th><th>Type</th><th>Location</th><th>Status</th><th>Last Inspection</th><th>Next Inspection</th></tr></thead>
+          <thead><tr><th>Port</th><th>Name</th><th>Type</th><th>Waterway</th><th>Status</th><th>Uptime</th></tr></thead>
           <tbody v-if="navaids.length">
             <tr v-for="n in navaids" :key="n.id">
-              <td style="font-family:monospace;font-weight:600">{{ n.port_unlocode }}</td>
-              <td><BadgePill variant="info">{{ n.navaid_type.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-size:12px">{{ n.location }}</td>
-              <td><BadgePill :variant="facilityStatusBadge(n.status)">{{ n.status.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-size:11px">{{ fmtDate(n.last_inspection) }}</td>
-              <td style="font-size:11px">{{ fmtDate(n.next_inspection) }}</td>
+              <td style="font-family:monospace;font-weight:600">{{ n.port_unlocode ?? '-' }}</td>
+              <td style="font-size:12px">{{ n.name }}</td>
+              <td><BadgePill variant="info">{{ n.aid_type.replace(/_/g,' ') }}</BadgePill></td>
+              <td style="font-size:12px">{{ n.waterway_name ?? '-' }}</td>
+              <td><BadgePill :variant="facilityStatusBadge(n.operational_status)">{{ n.operational_status.replace(/_/g,' ') }}</BadgePill></td>
+              <td style="font-size:12px">{{ n.uptime_pct != null ? `${n.uptime_pct.toFixed(1)}%` : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Navaid status has not been integrated from KMA asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No navigation aids registered.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -195,17 +201,18 @@
       <div class="card-header">Dry Docks &amp; Ship Repair</div>
       <div class="card-body">
         <table>
-          <thead><tr><th>Facility</th><th>Port</th><th>Capacity (DWT)</th><th>Status</th><th>Current Vessel</th></tr></thead>
+          <thead><tr><th>Facility</th><th>Port</th><th>Type</th><th>Capacity (DWT)</th><th>Operator</th><th>Status</th></tr></thead>
           <tbody v-if="dryDocks.length">
             <tr v-for="d in dryDocks" :key="d.id">
               <td style="font-weight:600;font-size:12px">{{ d.name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ d.port_unlocode }}</td>
+              <td style="font-size:12px">{{ d.dock_type.replace(/_/g,' ') }}</td>
               <td>{{ fmtNum(d.capacity_dwt) }}</td>
-              <td><BadgePill :variant="dryDockBadge(d.status)">{{ d.status.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-size:12px">{{ d.current_vessel ?? '-' }}</td>
+              <td style="font-size:12px">{{ d.operator || '-' }}</td>
+              <td><BadgePill :variant="dryDockBadge(d.operational_status)">{{ d.operational_status.replace(/_/g,' ') }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'Dry-dock facility data not yet integrated.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No dry docks registered.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -213,17 +220,17 @@
       <div class="card-header">Inland Container Depots</div>
       <div class="card-body">
         <table>
-          <thead><tr><th>ICD</th><th>Location</th><th>Capacity (TEU)</th><th>Utilisation</th><th>Status</th></tr></thead>
+          <thead><tr><th>ICD</th><th>UNLOCODE</th><th>Operator</th><th>Design Throughput (TEU/yr)</th><th>Status</th></tr></thead>
           <tbody v-if="icds.length">
             <tr v-for="i in icds" :key="i.id">
               <td style="font-weight:600;font-size:12px">{{ i.name }}</td>
-              <td style="font-size:12px">{{ i.location }}</td>
-              <td>{{ fmtNum(i.capacity_teu) }}</td>
-              <td>{{ i.current_utilization_pct != null ? `${i.current_utilization_pct.toFixed(0)}%` : '-' }}</td>
-              <td><BadgePill :variant="facilityStatusBadge(i.status)">{{ i.status.replace(/_/g,' ') }}</BadgePill></td>
+              <td style="font-family:monospace;font-size:12px">{{ i.unlocode }}</td>
+              <td style="font-size:12px">{{ i.operator || '-' }}</td>
+              <td>{{ fmtNum(i.design_throughput_teu) }}</td>
+              <td><BadgePill :variant="i.active ? 'success' : 'neutral'">{{ i.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'ICD registry not yet integrated.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No ports currently classified as ICDs (port_type=inland_dry).' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -250,24 +257,28 @@
   </div>
 
   <!-- Capital works -->
-  <SectionTitle pill="KPA / National Treasury · Pending Integration">Capital Works Pipeline</SectionTitle>
+  <SectionTitle pill="KPA / National Treasury · Live">Capital Works Pipeline</SectionTitle>
   <div class="card">
     <div class="card-body">
+      <div class="table-scroll">
       <table>
-        <thead><tr><th>Project</th><th>Port</th><th>Contractor</th><th>Scope</th><th>Physical</th><th>Financial</th><th>Capacity Impact</th></tr></thead>
+        <thead><tr><th>Ref</th><th>Project</th><th>Port</th><th>Type</th><th>Contractor</th><th>Funding</th><th>Budget (KES)</th><th>Financial Progress</th><th>Status</th></tr></thead>
         <tbody v-if="capitalWorks.length">
           <tr v-for="c in capitalWorks" :key="c.id">
+            <td style="font-family:monospace;font-size:11px">{{ c.project_ref }}</td>
             <td style="font-weight:600;font-size:12px">{{ c.project_name }}</td>
-            <td style="font-family:monospace">{{ c.port_unlocode }}</td>
-            <td style="font-size:12px">{{ c.contractor ?? '-' }}</td>
-            <td style="font-size:12px">{{ c.scope }}</td>
-            <td style="font-size:12px">{{ c.physical_progress_pct != null ? `${c.physical_progress_pct.toFixed(0)}%` : '-' }}</td>
-            <td style="font-size:12px">{{ c.financial_progress_pct != null ? `${c.financial_progress_pct.toFixed(0)}%` : '-' }}</td>
-            <td style="font-size:12px">{{ c.expected_capacity_impact ?? '-' }}</td>
+            <td style="font-family:monospace">{{ c.port_unlocode ?? '-' }}</td>
+            <td style="font-size:12px">{{ c.project_type.replace(/_/g,' ') }}</td>
+            <td style="font-size:12px">{{ c.contractor || '-' }}</td>
+            <td style="font-size:12px">{{ c.funding_source || '-' }}</td>
+            <td style="font-size:12px">{{ fmtKES(parseFloat(c.budget_kes)) }}</td>
+            <td style="font-size:12px">{{ financialProgressPct(c) != null ? `${financialProgressPct(c)!.toFixed(0)}%` : '-' }}</td>
+            <td><BadgePill :variant="capitalWorkBadge(c.status)">{{ c.status.replace(/_/g,' ') }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Capital-works pipeline (incl. LAPSSET/Lamu Port) has not been integrated from KPA/National Treasury yet.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No capital works projects registered.' }}</td></tr></tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>
@@ -277,7 +288,7 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Maritime Infrastructure')
 
 import { useAviationMaritime, useMaritimeInfrastructure } from '~/composables/api'
-import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary } from '~/composables/api'
+import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary, CapitalWorkStatus } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
 // Kenya's two KPA-operated ports - same fixed lookup used across the maritime module's maps.
@@ -347,8 +358,34 @@ const activeBerths = computed(() => berths.value.filter(b => b.active))
 const totalDesignThroughput = computed(() => ports.value.reduce((s, p) => s + (p.design_throughput_teu ?? 0), 0))
 const avgCranes = computed(() => berths.value.length ? berths.value.reduce((s, b) => s + (b.crane_count ?? 0), 0) / berths.value.length : null)
 
-const openCapitalWorks  = computed(() => capitalWorks.value.filter(c => c.physical_progress_pct != null && c.physical_progress_pct < 100))
-const capitalWorksValue = computed(() => capitalWorks.value.reduce((s, c) => s + (c.value_kes ?? 0), 0) || null)
+// ── Infra KPIs (computed from the live channel/navaid/dry-dock/capital-works catalogues) ─
+const channelDepthCompliancePct = computed(() => {
+  const withTarget = channels.value.filter(c => c.target_depth_m != null)
+  if (!withTarget.length) return null
+  const compliant = withTarget.filter(c => c.dredged_depth_m >= (c.target_depth_m as number)).length
+  return (compliant / withTarget.length) * 100
+})
+const navaidOperationalPct = computed(() => {
+  if (!navaids.value.length) return null
+  const operational = navaids.value.filter(n => n.operational_status === 'operational').length
+  return (operational / navaids.value.length) * 100
+})
+const dryDocksOperational = computed(() => dryDocks.value.filter(d => d.operational_status === 'operational').length)
+const activeCapitalWorks  = computed(() => capitalWorks.value.filter(c => c.status === 'in_progress'))
+const activeCapitalWorksValue = computed(() =>
+  activeCapitalWorks.value.reduce((s, c) => s + parseFloat(c.budget_kes || '0'), 0) || null,
+)
+function financialProgressPct(c: MaritimeCapitalWork): number | null {
+  const budget = parseFloat(c.budget_kes || '0')
+  if (!budget) return null
+  return (parseFloat(c.spent_kes || '0') / budget) * 100
+}
+
+const berthAvailabilityByPort = computed<Record<string, number | null>>(() => {
+  const out: Record<string, number | null> = {}
+  for (const p of infra.value?.ports ?? []) out[p.port_unlocode] = p.berth_availability_pct
+  return out
+})
 
 // ── Capacity utilisation (real cross-reference) ─────────────────────────
 const capacityUtilisation = computed(() => containers.value.map(c => {
@@ -401,16 +438,16 @@ function fmtDate(s: string | null | undefined) {
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
   catch { return s }
 }
-function channelBadge(s: string) {
-  const m: Record<string,string> = { compliant:'success', restricted:'warning', non_compliant:'danger' }
-  return m[s] ?? 'neutral'
-}
 function facilityStatusBadge(s: string) {
-  const m: Record<string,string> = { operational:'success', degraded:'warning', out_of_service:'danger', at_capacity:'warning' }
+  const m: Record<string,string> = { operational:'success', maintenance:'warning', non_operational:'danger' }
   return m[s] ?? 'neutral'
 }
 function dryDockBadge(s: string) {
-  const m: Record<string,string> = { available:'success', occupied:'info', under_repair:'warning', out_of_service:'danger' }
+  const m: Record<string,string> = { operational:'success', under_maintenance:'warning', decommissioned:'danger' }
+  return m[s] ?? 'neutral'
+}
+function capitalWorkBadge(s: CapitalWorkStatus) {
+  const m: Record<CapitalWorkStatus,string> = { planned:'neutral', in_progress:'info', completed:'success', suspended:'danger' }
   return m[s] ?? 'neutral'
 }
 function inspectionBadge(s: string | undefined) {

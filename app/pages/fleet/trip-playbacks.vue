@@ -148,8 +148,10 @@ async function load() {
 
   const q: Record<string, any> = { page_size: 50 }
   if (plateFilter.value)  q.search     = plateFilter.value
-  if (dateFrom.value)     q.date_from  = dateFrom.value
-  if (dateTo.value)       q.date_to    = dateTo.value
+  // Backend only supports a lower bound (`from`, filters started_at__gte) -
+  // there is no upper-bound ("to") filter on /trip-playbacks/, so dateTo
+  // can't be wired up without a backend change (see report).
+  if (dateFrom.value)     q.from       = dateFrom.value
   if (statusFilter.value) q.status     = statusFilter.value
 
   const [res] = await Promise.allSettled([fleet.tripPlaybacks(q)])
@@ -177,14 +179,12 @@ async function replayTrip(trip: TripPlayback) {
 
   loadingPath.value = trip.id
   try {
-    const path = await useFleet().tripPath(trip.id) as any
-    // API may return { points: [[lat,lon]] } or { results: [...] } or array
-    if (Array.isArray(path)) {
-      tripPath.value = path
-    } else if (Array.isArray(path?.points)) {
-      tripPath.value = path.points
-    } else if (Array.isArray(path?.results)) {
-      tripPath.value = path.results.map((p: any) => [p.latitude ?? p.lat, p.longitude ?? p.lon] as [number, number])
+    // GET /trip-playbacks/{id}/path/ returns an object with a `path` key —
+    // [lon, lat] pairs (GeoJSON order), same as TripPlayback.path — not a
+    // bare array, `.points`, or a paginated `.results`.
+    const res = await useFleet().tripPath(trip.id)
+    if (Array.isArray(res?.path)) {
+      tripPath.value = res.path.map(([lon, lat]) => [lat, lon])
     }
   } catch {
     // If path fetch fails, keep selectedTrip for stats but show empty map

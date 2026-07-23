@@ -5,46 +5,100 @@
     subtitle="KeNHA · KURA · KeRRA · KRB · KRC · KPA · KMA · KAA · NCTTCA - National road network, PT routes, rail lines, port infrastructure, and UAPTS spatial layers"
   >
     <template #actions>
+      <button class="btn btn-ghost" type="button" @click="copyShareLink">
+        {{ copyLinkStatus === 'copied' ? '✓ Link copied' : copyLinkStatus === 'error' ? 'Copy failed' : '⚲ Copy link' }}
+      </button>
       <button class="btn" :disabled="loading" @click="load">↻ Reload Layers</button>
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner">
+    <span>⚠ {{ error }}</span>
+    <button type="button" class="error-dismiss" aria-label="Dismiss" @click="error = null">×</button>
+  </div>
 
   <div class="gis-workspace">
 
     <!-- ── Left control panel ─────────────────────────────────────── -->
     <aside class="gis-panel">
 
+      <!-- Search -->
+      <div v-if="layers.boundary && adminLevel !== 0" class="panel-section panel-search">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="M21 21l-4.3-4.3"/>
+          </svg>
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="search-input"
+            placeholder="Jump to a county or constituency…"
+            role="combobox"
+            aria-controls="gis-search-listbox"
+            :aria-expanded="searchOpen && searchResults.length > 0"
+            @focus="searchOpen = true"
+            @blur="onSearchBlur"
+            @keydown="onSearchKeydown"
+          />
+          <button v-if="searchQuery" type="button" class="search-clear" aria-label="Clear search" @mousedown.prevent="searchQuery = ''">×</button>
+        </div>
+        <ul v-if="searchOpen && searchResults.length" id="gis-search-listbox" role="listbox" class="search-results">
+          <li
+            v-for="(r, i) in searchResults" :key="r.id"
+            role="option" :aria-selected="i === searchActiveIndex"
+            class="search-result-row" :class="{ active: i === searchActiveIndex }"
+            @mousedown.prevent="selectSearchResult(r)"
+          >
+            <span class="search-result-kind">{{ r.kind }}</span>
+            <span class="search-result-name">{{ r.name }}</span>
+          </li>
+        </ul>
+        <div v-else-if="searchOpen && searchQuery && !searchResults.length" class="search-empty">
+          No matches in the loaded boundary layer.
+        </div>
+      </div>
+
       <!-- Layers -->
       <div class="panel-section">
         <div class="panel-section-title">Map Layers</div>
 
-        <div class="layer-row" @click="toggleLayer('boundary')">
-          <span class="layer-swatch" :style="{ background: layers.boundary ? '#818cf8' : '#334155' }" />
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.boundary" @click="toggleLayer('boundary')">
+          <span class="layer-swatch" :style="{ background: layers.boundary ? '#818cf8' : '#334155' }" aria-hidden="true" />
           <span class="layer-name" :class="{ 'layer-dim': !layers.boundary }">Kenya Boundary</span>
-          <div class="layer-switch" :class="{ on: layers.boundary }">
-            <span class="layer-thumb" />
-          </div>
-        </div>
+          <div class="layer-switch" :class="{ on: layers.boundary }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
 
-        <div class="layer-row" @click="toggleLayer('roads')">
-          <span class="layer-swatch" :style="{ background: layers.roads ? '#f59e0b' : '#334155' }" />
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.roads" @click="toggleLayer('roads')">
+          <span class="layer-swatch" :style="{ background: layers.roads ? '#f59e0b' : '#334155' }" aria-hidden="true" />
           <span class="layer-name" :class="{ 'layer-dim': !layers.roads }">Road Network</span>
           <span v-if="roadCount" class="layer-badge">{{ fmtNum(roadCount) }}</span>
-          <div class="layer-switch" :class="{ on: layers.roads }">
-            <span class="layer-thumb" />
-          </div>
-        </div>
+          <div class="layer-switch" :class="{ on: layers.roads }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
+        <div v-if="layerErrors.boundary" class="layer-error">⚠ {{ layerErrors.boundary }}</div>
 
-        <div class="layer-row" @click="toggleLayer('routes')">
-          <span class="layer-swatch" :style="{ background: layers.routes ? '#34d399' : '#334155' }" />
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.routes" @click="toggleLayer('routes')">
+          <span class="layer-swatch" :style="{ background: layers.routes ? '#34d399' : '#334155' }" aria-hidden="true" />
           <span class="layer-name" :class="{ 'layer-dim': !layers.routes }">PT Routes</span>
           <span v-if="routeCount" class="layer-badge">{{ fmtNum(routeCount) }}</span>
-          <div class="layer-switch" :class="{ on: layers.routes }">
-            <span class="layer-thumb" />
-          </div>
-        </div>
+          <div class="layer-switch" :class="{ on: layers.routes }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
+        <div v-if="layerErrors.routes" class="layer-error">⚠ {{ layerErrors.routes }}</div>
+      </div>
+
+      <!-- Additional spatial layers (GeoJSON catalog - fetched/rendered by UaptsMap itself) -->
+      <div class="panel-section">
+        <div class="panel-section-title">Additional Spatial Layers</div>
+        <button
+          v-for="c in CATALOG_LAYER_LIST" :key="c.key"
+          type="button" class="layer-row" role="switch" :aria-checked="catalogLayers[c.key]"
+          @click="toggleCatalogLayer(c.key)"
+        >
+          <span class="layer-swatch" :style="{ background: catalogLayers[c.key] ? c.color : '#334155' }" aria-hidden="true" />
+          <span class="layer-name" :class="{ 'layer-dim': !catalogLayers[c.key] }">{{ c.label }}</span>
+          <div class="layer-switch" :class="{ on: catalogLayers[c.key] }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
+        <div class="source-note">Counts for these layers show in the map's own legend overlay.</div>
       </div>
 
       <!-- County detail level (shown when boundary is on) -->
@@ -151,6 +205,11 @@
           <span class="stat-label">PT routes</span>
           <span class="stat-val" :class="{ 'stat-ok': !!routeCount }">{{ fmtNum(routeCount) }}</span>
         </div>
+        <div class="stat-row">
+          <span class="stat-dot" :style="{ background: activeCatalogKeys.length ? '#3b82f6' : '#334155' }" />
+          <span class="stat-label">Additional layers</span>
+          <span class="stat-val" :class="{ 'stat-ok': activeCatalogKeys.length > 0 }">{{ activeCatalogKeys.length }} on</span>
+        </div>
         <div class="stat-total">
           {{ fmtNum(featureCount) }} total features
         </div>
@@ -178,9 +237,12 @@
       <div class="gis-map-wrap">
         <ClientOnly>
           <UaptsMap
+            ref="mapComponentRef"
             :boundary="layers.boundary ? boundary : undefined"
             :roads="layers.roads ? roads : undefined"
             :lines="layers.routes ? routeLines : undefined"
+            :layers="activeCatalogKeys"
+            :show-legend="activeCatalogKeys.length > 0"
             :center="[-0.5, 37.5]"
             :zoom="6"
             :height="mapHeight"
@@ -280,13 +342,33 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('GIS Explorer')
 
 import { useGis } from '~/composables/api'
-import type { GeoJSONFeatureCollection, LineSpec } from '~/composables/api'
+import type { GeoJSONFeatureCollection } from '~/composables/api'
+import type { LineSpec } from '~/components/UaptsMap.vue'
+
+type CatalogLayerKey = 'rail-lines' | 'rail-stations' | 'stations' | 'brt-stops' | 'congestion' | 'weather' | 'od-flow' | 'segments'
+
+// Matches UaptsMap.vue's own LAYER_CATALOG - kept here only for the
+// toggle-row label/color, the actual fetch+render is entirely inside
+// UaptsMap (catalog mode via the `:layers` prop).
+const CATALOG_LAYER_LIST: { key: CatalogLayerKey; label: string; color: string }[] = [
+  { key: 'rail-lines',    label: 'Rail Lines (SGR/MGR)', color: '#3b82f6' },
+  { key: 'rail-stations', label: 'Rail Stations',        color: '#ef4444' },
+  { key: 'stations',      label: 'Counting Stations',    color: '#10b981' },
+  { key: 'brt-stops',     label: 'BRT Stops',            color: '#3b82f6' },
+  { key: 'congestion',    label: 'Active Congestion',    color: '#ef4444' },
+  { key: 'weather',       label: 'Weather (KMD)',        color: '#06b6d4' },
+  { key: 'od-flow',       label: 'OD Trip Flows',        color: '#f59e0b' },
+  { key: 'segments',      label: 'Road Segments (Infra)', color: '#64748b' },
+]
 
 const boundary   = ref<GeoJSONFeatureCollection | null>(null)
 const roads      = ref<GeoJSONFeatureCollection | null>(null)
 const gisRoutes  = ref<GeoJSONFeatureCollection | null>(null)
 const loading    = ref(true)
 const error      = ref<string | null>(null)
+// Per-layer soft errors (e.g. routes failed but boundary loaded fine) -
+// shown inline next to the relevant control instead of blocking the page.
+const layerErrors = ref<Record<string, string>>({})
 
 const simplify          = ref(0.01)
 const highwayFilter     = ref('')
@@ -297,40 +379,141 @@ const adminLevel        = ref<0 | 1 | 2>(1)   // 0=country, 1=counties, 2=consti
 const selectedCounty = ref<string | null>(null)
 
 const layers = ref({ boundary: true, roads: true, routes: false })
+const catalogLayers = ref<Record<CatalogLayerKey, boolean>>({
+  'rail-lines': false, 'rail-stations': false, stations: false, 'brt-stops': false,
+  congestion: false, weather: false, 'od-flow': false, segments: false,
+})
+const activeCatalogKeys = computed(() =>
+  (Object.keys(catalogLayers.value) as CatalogLayerKey[]).filter(k => catalogLayers.value[k]),
+)
 
 const mapHeight = 'calc(100vh - 232px)'
+const mapComponentRef = ref<{ flyTo: (lat: number, lon: number, zoom?: number) => void } | null>(null)
+
+// ── URL state sync: makes the current view bookmarkable / shareable ───
+const route  = useRoute()
+const router = useRouter()
+
+function hydrateFromQuery() {
+  const q = route.query
+  if (typeof q.layers === 'string') {
+    const active = q.layers.split(',')
+    layers.value.boundary = active.includes('boundary')
+    layers.value.roads    = active.includes('roads')
+    layers.value.routes   = active.includes('routes')
+    for (const k of Object.keys(catalogLayers.value) as CatalogLayerKey[])
+      catalogLayers.value[k] = active.includes(k)
+  }
+  if (q.admin === '0' || q.admin === '1' || q.admin === '2') adminLevel.value = Number(q.admin) as 0 | 1 | 2
+  if (typeof q.hwy === 'string') highwayFilter.value = q.hwy
+  if (typeof q.svc === 'string') serviceTypeFilter.value = q.svc
+  const simplifyNum = Number(q.simplify)
+  if (typeof q.simplify === 'string' && Number.isFinite(simplifyNum)) simplify.value = simplifyNum
+}
+hydrateFromQuery()
+
+let urlSyncTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleUrlSync() {
+  if (urlSyncTimer) clearTimeout(urlSyncTimer)
+  urlSyncTimer = setTimeout(syncStateToUrl, 400)
+}
+function syncStateToUrl() {
+  const active = [
+    ...(layers.value.boundary ? ['boundary'] : []),
+    ...(layers.value.roads ? ['roads'] : []),
+    ...(layers.value.routes ? ['routes'] : []),
+    ...activeCatalogKeys.value,
+  ]
+  const query: Record<string, string> = { layers: active.join(','), admin: String(adminLevel.value) }
+  if (highwayFilter.value) query.hwy = highwayFilter.value
+  if (serviceTypeFilter.value) query.svc = serviceTypeFilter.value
+  query.simplify = String(simplify.value)
+  router.replace({ query }).catch(() => {})
+}
+watch(
+  () => [layers.value.boundary, layers.value.roads, layers.value.routes, activeCatalogKeys.value.join(','),
+         adminLevel.value, highwayFilter.value, serviceTypeFilter.value, simplify.value],
+  scheduleUrlSync,
+)
+
+const copyLinkStatus = ref<'idle' | 'copied' | 'error'>('idle')
+async function copyShareLink() {
+  try {
+    await navigator.clipboard.writeText(window.location.href)
+    copyLinkStatus.value = 'copied'
+  } catch {
+    copyLinkStatus.value = 'error'
+  }
+  setTimeout(() => { copyLinkStatus.value = 'idle' }, 1800)
+}
+
+// ── Data loading ────────────────────────────────────────────────────
+// requestToken guards every async load path below against out-of-order
+// responses (e.g. hitting "Reload" twice quickly) - whichever call
+// started most recently "wins"; older ones drop their result on arrival.
+let requestToken = 0
+
+function describeError(reason: unknown): string {
+  if (reason instanceof Error) return reason.message
+  if (typeof reason === 'string') return reason
+  return 'Request failed.'
+}
+function setLayerError(key: string, message: string) {
+  layerErrors.value = { ...layerErrors.value, [key]: message }
+}
+function clearLayerError(key: string) {
+  if (!(key in layerErrors.value)) return
+  const next = { ...layerErrors.value }
+  delete next[key]
+  layerErrors.value = next
+}
 
 async function load() {
   loading.value = true
   error.value   = null
+  const myToken = ++requestToken
   const gis     = useGis()
 
-  const calls: Promise<any>[] = [
-    gis.kenyaBoundary({ admin_level: adminLevel.value }),
-    gis.roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined }),
-  ]
+  const tasks: Record<string, Promise<any>> = {
+    boundary: gis.kenyaBoundary({ admin_level: adminLevel.value }),
+    roads: gis.roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined }),
+  }
   if (layers.value.routes)
-    calls.push(gis.routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined }))
+    tasks.routes = gis.routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined })
 
-  const results = await Promise.allSettled(calls)
+  const keys = Object.keys(tasks)
+  const settled = await Promise.allSettled(keys.map(k => tasks[k]))
+  if (myToken !== requestToken) return // superseded by a newer load
 
-  if (results[0].status === 'fulfilled') boundary.value   = results[0].value
-  if (results[1].status === 'fulfilled') roads.value      = results[1].value
-  if (results[2]?.status === 'fulfilled') gisRoutes.value = results[2].value
+  settled.forEach((result, i) => {
+    const key = keys[i]
+    if (result.status === 'fulfilled') {
+      clearLayerError(key)
+      if (key === 'boundary') boundary.value = result.value
+      else if (key === 'roads') roads.value = result.value
+      else if (key === 'routes') gisRoutes.value = result.value
+    } else {
+      setLayerError(key, describeError(result.reason))
+    }
+  })
 
-  if (results.slice(0, 2).every(r => r.status === 'rejected'))
+  if (settled.every(r => r.status === 'rejected'))
     error.value = 'Unable to load GIS layers from the UAPTS API.'
 
   loading.value = false
 }
 
 async function reloadBoundary() {
-  const [res] = await Promise.allSettled([
-    useGis().kenyaBoundary({ admin_level: adminLevel.value }),
-  ])
-  if (res.status === 'fulfilled') {
-    boundary.value = res.value
+  const myToken = ++requestToken
+  try {
+    const res = await useGis().kenyaBoundary({ admin_level: adminLevel.value })
+    if (myToken !== requestToken) return
+    boundary.value = res
     selectedCounty.value = null
+    clearLayerError('boundary')
+  } catch (err) {
+    if (myToken !== requestToken) return
+    setLayerError('boundary', describeError(err))
   }
 }
 
@@ -349,22 +532,37 @@ function handleFeatureClick({ layer, feature }: { layer: string; feature: any })
 }
 
 async function reloadRoads() {
-  const [res] = await Promise.allSettled([
-    useGis().roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined }),
-  ])
-  if (res.status === 'fulfilled') roads.value = res.value
+  const myToken = ++requestToken
+  try {
+    const res = await useGis().roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined })
+    if (myToken !== requestToken) return
+    roads.value = res
+    clearLayerError('roads')
+  } catch (err) {
+    if (myToken !== requestToken) return
+    setLayerError('roads', describeError(err))
+  }
 }
 
 async function reloadRoutes() {
-  const [res] = await Promise.allSettled([
-    useGis().routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined }),
-  ])
-  if (res.status === 'fulfilled') gisRoutes.value = res.value
+  const myToken = ++requestToken
+  try {
+    const res = await useGis().routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined })
+    if (myToken !== requestToken) return
+    gisRoutes.value = res
+    clearLayerError('routes')
+  } catch (err) {
+    if (myToken !== requestToken) return
+    setLayerError('routes', describeError(err))
+  }
 }
 
 async function toggleLayer(key: 'boundary' | 'roads' | 'routes') {
   layers.value[key] = !layers.value[key]
   if (key === 'routes' && layers.value.routes && !gisRoutes.value) await reloadRoutes()
+}
+function toggleCatalogLayer(key: CatalogLayerKey) {
+  catalogLayers.value[key] = !catalogLayers.value[key]
 }
 
 onMounted(load)
@@ -449,6 +647,57 @@ const routeLegend = [
   { label: 'Rail',   color: '#ef4444' },
   { label: 'Ferry',  color: '#06b6d4' },
 ]
+
+// ── County/constituency search (client-side, over the loaded boundary
+// layer - `center_lat`/`center_lon` are provided per-feature by the
+// backend, so "jump to" is a direct flyTo, no bbox math needed) ───────
+interface SearchResult { id: string; kind: string; name: string; lat: number; lon: number }
+const searchQuery = ref('')
+const searchOpen = ref(false)
+const searchActiveIndex = ref(-1)
+
+const searchResults = computed<SearchResult[]>(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q || !boundary.value) return []
+  const out: SearchResult[] = []
+  for (const f of boundary.value.features ?? []) {
+    const p = f.properties ?? {}
+    if (p.kind !== 'county' && p.kind !== 'constituency') continue
+    const name = p.kind === 'county' ? p.adm1_name : p.adm2_name
+    if (!name || !String(name).toLowerCase().includes(q)) continue
+    if (p.center_lat == null || p.center_lon == null) continue
+    out.push({ id: p.adm2_pcode || p.adm1_pcode || name, kind: p.kind, name, lat: p.center_lat, lon: p.center_lon })
+    if (out.length >= 8) break
+  }
+  return out
+})
+
+function selectSearchResult(r: SearchResult) {
+  searchQuery.value = r.name
+  searchOpen.value = false
+  searchActiveIndex.value = -1
+  selectedCounty.value = r.name
+  mapComponentRef.value?.flyTo(r.lat, r.lon, r.kind === 'county' ? 9 : 11)
+}
+function onSearchBlur() {
+  // Delay so a click on a result (which fires @mousedown before blur) still registers.
+  setTimeout(() => { searchOpen.value = false }, 150)
+}
+function onSearchKeydown(e: KeyboardEvent) {
+  if (!searchResults.value.length) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    searchActiveIndex.value = (searchActiveIndex.value + 1) % searchResults.value.length
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    searchActiveIndex.value = searchActiveIndex.value <= 0 ? searchResults.value.length - 1 : searchActiveIndex.value - 1
+  } else if (e.key === 'Enter' && searchActiveIndex.value >= 0) {
+    e.preventDefault()
+    selectSearchResult(searchResults.value[searchActiveIndex.value])
+  } else if (e.key === 'Escape') {
+    searchOpen.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -494,6 +743,85 @@ const routeLegend = [
   justify-content: space-between;
 }
 
+/* ── Search ──────────────────────────────────────────────────────── */
+.panel-search { position: relative; }
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #fff;
+}
+.search-icon { width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0; }
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: #1e293b;
+  background: transparent;
+  min-width: 0;
+}
+.search-clear {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.search-clear:hover { color: #475569; }
+.search-results {
+  position: absolute;
+  left: 16px; right: 16px; top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.1);
+  list-style: none;
+  padding: 4px;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.search-result-row:hover, .search-result-row.active { background: #eff6ff; }
+.search-result-kind {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.search-result-name { color: #1e293b; font-weight: 500; }
+.search-empty {
+  position: absolute;
+  left: 16px; right: 16px; top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  color: #94a3b8;
+  z-index: 20;
+}
+
 /* ── Layer rows ──────────────────────────────────────────────────── */
 .layer-row {
   display: flex;
@@ -505,6 +833,11 @@ const routeLegend = [
   transition: background 0.12s;
   margin-bottom: 2px;
   user-select: none;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
 }
 .layer-row:hover { background: #f1f5f9; }
 
@@ -534,6 +867,14 @@ const routeLegend = [
   color: #64748b;
   font-variant-numeric: tabular-nums;
 }
+
+.layer-error {
+  font-size: 11px;
+  color: #b45309;
+  padding: 2px 8px 6px;
+}
+
+.source-note { margin-top: 6px; font-size: 10px; color: #94a3b8; }
 
 /* Custom toggle switch */
 .layer-switch {
@@ -891,5 +1232,19 @@ const routeLegend = [
   background: #fef9c3;
   border: 1px solid #ca8a04;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.error-dismiss {
+  border: none;
+  background: none;
+  color: #92400e;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.error-dismiss:hover { color: #713f12; }
 </style>

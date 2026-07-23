@@ -50,9 +50,9 @@
       <span>Incident Trend</span>
       <div class="filter-row-inline">
         <select v-model="trendMetric" class="select-sm">
-          <option value="total_incidents">Total Incidents</option>
-          <option value="fatal_count">Fatalities</option>
-          <option value="serious_count">Serious Injuries</option>
+          <option value="incidents">Total Incidents</option>
+          <option value="fatalities">Fatalities</option>
+          <option value="injuries">Injuries</option>
         </select>
       </div>
     </div>
@@ -69,7 +69,7 @@
               class="bar-fill"
               :style="{
                 height: `${maxTrendVal > 0 ? (getMetric(d) / maxTrendVal) * 100 : 0}%`,
-                background: trendMetric === 'fatal_count' ? '#ef4444' : '#3b82f6',
+                background: trendMetric === 'fatalities' ? '#ef4444' : '#3b82f6',
               }"
               :title="`${d.date}: ${getMetric(d)}`"
             />
@@ -168,7 +168,7 @@ const violationData = ref<any[]>([])
 const loading      = ref(true)
 const error        = ref<string | null>(null)
 const lastRefreshed = ref('-')
-const trendMetric  = ref<'total_incidents' | 'fatal_count' | 'serious_count'>('total_incidents')
+const trendMetric  = ref<'incidents' | 'fatalities' | 'injuries'>('incidents')
 
 async function load() {
   loading.value = true
@@ -189,7 +189,20 @@ async function load() {
   }
   if (countyRes.status === 'fulfilled') {
     const raw = countyRes.value as any
-    countyRaw.value = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
+    const rows: any[] = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
+    // /kpis/by-county/ returns {county, incidents, fatalities, serious} — remap onto the
+    // SafetyKPI-shaped field names the table below reads. minor_count / avg_response_minutes /
+    // interventions_evaluated / intervention_effectiveness_pct aren't produced by this rollup.
+    countyRaw.value = rows.map(r => ({
+      county: r.county,
+      total_incidents: r.incidents ?? 0,
+      fatal_count: r.fatalities ?? 0,
+      serious_count: r.serious ?? 0,
+      minor_count: null,
+      avg_response_minutes: null,
+      interventions_evaluated: null,
+      intervention_effectiveness_pct: null,
+    }))
   }
   if (violRes.status   === 'fulfilled') {
     const raw = violRes.value as any

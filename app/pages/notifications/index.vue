@@ -42,13 +42,13 @@
       <span class="nkpi-val">{{ bySeverity('high') }}</span>
       <span class="nkpi-lbl">High</span>
     </button>
-    <button class="nkpi nkpi--medium" :class="{ 'nkpi--active': severityFilter === 'medium' }" @click="toggleSev('medium')">
-      <span class="nkpi-val">{{ bySeverity('medium') }}</span>
-      <span class="nkpi-lbl">Medium</span>
+    <button class="nkpi nkpi--warning" :class="{ 'nkpi--active': severityFilter === 'warning' }" @click="toggleSev('warning')">
+      <span class="nkpi-val">{{ bySeverity('warning') }}</span>
+      <span class="nkpi-lbl">Warning</span>
     </button>
-    <button class="nkpi nkpi--low" :class="{ 'nkpi--active': severityFilter === 'low' || severityFilter === 'info' }" @click="toggleSev('low')">
-      <span class="nkpi-val">{{ bySeverity('low') + bySeverity('info') }}</span>
-      <span class="nkpi-lbl">Low / Info</span>
+    <button class="nkpi nkpi--info" :class="{ 'nkpi--active': severityFilter === 'info' }" @click="toggleSev('info')">
+      <span class="nkpi-val">{{ bySeverity('info') }}</span>
+      <span class="nkpi-lbl">Info</span>
     </button>
   </div>
 
@@ -159,7 +159,7 @@ import { useNotifications } from '~/composables/api'
 import type { Notification } from '~/composables/api'
 import { useNotificationStore } from '~/stores/notifications'
 
-const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const
+const SEVERITIES = ['critical', 'high', 'warning', 'info'] as const
 
 const notifications  = ref<Notification[]>([])
 const loading        = ref(true)
@@ -268,7 +268,7 @@ async function deleteNotif(id: string) {
 // ── Helpers ──────────────────────────────────────────────────────────────
 function sevColor(s: string) {
   const m: Record<string, string> = {
-    critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#2563eb', info: '#64748b',
+    critical: '#dc2626', high: '#ea580c', warning: '#d97706', info: '#64748b',
   }
   return m[s] ?? '#94a3b8'
 }
@@ -352,9 +352,9 @@ function relTime(iso: string) {
 .nkpi--critical .nkpi-val { color: #dc2626; }
 .nkpi--high     { border-top: 3px solid #ea580c; }
 .nkpi--high .nkpi-val     { color: #ea580c; }
-.nkpi--medium   { border-top: 3px solid #d97706; }
-.nkpi--medium .nkpi-val   { color: #d97706; }
-.nkpi--low      { border-top: 3px solid #2563eb; }
+.nkpi--warning  { border-top: 3px solid #d97706; }
+.nkpi--warning .nkpi-val  { color: #d97706; }
+.nkpi--info     { border-top: 3px solid #2563eb; }
 
 /* ── Filter row ───────────────────────────────────────────────────── */
 .filter-row {

@@ -239,6 +239,31 @@ export interface GovernmentFleet {
   updated_at: string
 }
 
+// ── Behaviour summary / trip path payloads ────────────────────────────
+// Real shape of GET /driver-behavior-events/summary/ — a pivot of
+// event_type -> {severity: count, total}, plus a worst-offenders list.
+// (NOT a paginated `{results}` envelope.)
+export interface DriverBehaviourSummary {
+  by_type: Record<string, Record<string, number>>
+  worst_offenders: Array<{ vehicle_id: string; vehicle__plate_number: string; events: number }>
+  days: number
+  since: string
+}
+
+// Real shape of GET /trip-playbacks/{id}/path/ — a single object keyed
+// by `path` (NOT a bare array, `.points`, or a paginated `.results`).
+export interface TripPath {
+  id: string
+  plate_number: string
+  started_at: string
+  ended_at: string | null
+  /** [lon, lat] pairs (GeoJSON coordinate order), same as TripPlayback.path. */
+  path: [number, number][]
+  stops_served: string[]
+  origin_label: string
+  destination_label: string
+}
+
 // ── Summary analytics payload ───────────────────────────────────────
 
 export interface FleetSummary {
@@ -311,7 +336,7 @@ export function useFleet() {
       api<Paged<DriverBehaviorEvent>>(`${F}/driver-behavior-events/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    behaviourSummary: () => api<{ results: any[] }>(`${F}/driver-behavior-events/summary/`),
+    behaviourSummary: () => api<DriverBehaviourSummary>(`${F}/driver-behavior-events/summary/`),
     behaviourCritical: () => api<Paged<DriverBehaviorEvent>>(`${F}/driver-behavior-events/critical/`),
 
     // ── Route adherence ────────────────────────────────────────────
@@ -333,7 +358,7 @@ export function useFleet() {
       api<Paged<TripPlayback>>(`${F}/trip-playbacks/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    tripPath: (tripId: string) => api<unknown>(`${F}/trip-playbacks/${tripId}/path/`),
+    tripPath: (tripId: string) => api<TripPath>(`${F}/trip-playbacks/${tripId}/path/`),
     utilization: (q?: FleetQuery) =>
       api<Paged<FleetUtilization>>(`${F}/utilization/`, {
         query: cleanQuery(q as Record<string, unknown>),

@@ -209,7 +209,12 @@ async function authedFetch(url: string): Promise<any> {
 }
 
 // ── Rendering: layer-catalog mode ───────────────────────────────────
-async function renderCatalogLayer(Lc: any, key: string) {
+// `token` guards against overlapping render cycles (e.g. the data-props
+// watcher firing again while a previous cycle's catalog fetch is still
+// in flight) - without it, both cycles' fetches can each pass the
+// "already rendered" check before either has pushed to `layerStates`,
+// producing duplicate layers/legend rows for the same key.
+async function renderCatalogLayer(Lc: any, key: string, token: number) {
   const meta = LAYER_CATALOG[key]
   if (!meta) return
   if (layerStates.value.find(s => s.key === key)) return  // already rendered
@@ -221,6 +226,7 @@ async function renderCatalogLayer(Lc: any, key: string) {
     console.warn(`[UaptsMap] catalog layer ${key} failed:`, err?.message)
     return
   }
+  if (token !== renderToken) return  // superseded by a newer render cycle
   const features = data?.features ?? []
   const layer = Lc.geoJSON(data, {
     pointToLayer: (_f: any, latlng: any) =>
@@ -234,8 +240,11 @@ async function renderCatalogLayer(Lc: any, key: string) {
   layerStates.value.push({ key, label: meta.label, color: meta.color, count: features.length, visible: true, instance: layer })
 }
 
-async function renderAllCatalogLayers(Lc: any) {
-  for (const key of props.layers) await renderCatalogLayer(Lc, key)
+async function renderAllCatalogLayers(Lc: any, token: number) {
+  for (const key of props.layers) {
+    if (token !== renderToken) return
+    await renderCatalogLayer(Lc, key, token)
+  }
 }
 
 // ── Rendering: data-props mode ───────────────────────────────────────
@@ -507,6 +516,36 @@ function toggleLayer(key: string) {
   else mapRef.value.removeLayer(s.instance)
 }
 
+// ── Programmatic control (for parent-driven "jump to" actions, e.g. a
+// county/constituency search box) ────────────────────────────────────
+function flyTo(lat: number, lon: number, zoom?: number) {
+  if (!mapRef.value) return
+  mapRef.value.flyTo([lat, lon], zoom ?? mapRef.value.getZoom())
+}
+defineExpose({ flyTo })
+
+// Tears down every current layer instance and rebuilds from scratch -
+// shared by the initial mount and the data-props watcher below so there
+// is exactly one code path that can populate `layerStates`, guarded by
+// `renderToken` against overlapping cycles (see renderCatalogLayer).
+let renderToken = 0
+async function rerenderAll(Lc: any) {
+  const myToken = ++renderToken
+  for (const s of layerStates.value) {
+    if (s.instance && mapRef.value) mapRef.value.removeLayer(s.instance)
+  }
+  layerStates.value = []
+  selectedCountyLayer.value = null
+  await renderAllCatalogLayers(Lc, myToken)
+  if (myToken !== renderToken) return  // superseded while catalog layers were fetching
+  renderBoundary(Lc)
+  renderRoads(Lc)
+  renderRoutes(Lc)
+  renderLines(Lc)
+  renderMarkers(Lc)
+  renderArrows(Lc)
+}
+
 // ── Lifecycle ───────────────────────────────────────────────────────
 onMounted(async () => {
   if (!mapEl.value) return
@@ -535,13 +574,7 @@ onMounted(async () => {
   }
 
   // Render - both modes are independent and can be combined.
-  await renderAllCatalogLayers(Lc)
-  renderBoundary(Lc)
-  renderRoads(Lc)
-  renderRoutes(Lc)
-  renderLines(Lc)
-  renderMarkers(Lc)
-  renderArrows(Lc)
+  await rerenderAll(Lc)
 })
 
 onBeforeUnmount(() => {
@@ -563,21 +596,9 @@ watch(
   ],
   async () => {
     if (!mapRef.value) return
-    // Tear down existing layer instances.
-    for (const s of layerStates.value) {
-      if (s.instance) mapRef.value.removeLayer(s.instance)
-    }
-    layerStates.value = []
-    selectedCountyLayer.value = null
     const Lc = await getLeaflet()
     if (!Lc) return
-    await renderAllCatalogLayers(Lc)
-    renderBoundary(Lc)
-    renderRoads(Lc)
-    renderRoutes(Lc)
-    renderLines(Lc)
-    renderMarkers(Lc)
-    renderArrows(Lc)
+    await rerenderAll(Lc)
   },
   { deep: true },
 )

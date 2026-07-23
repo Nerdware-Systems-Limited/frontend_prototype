@@ -146,7 +146,7 @@
             <td class="num-cell">{{ f.predicted_speed_kmh.toFixed(0) }} km/h</td>
             <td><BadgePill :variant="congBadge(f.predicted_congestion)">{{ f.predicted_congestion.replace(/_/g,' ') }}</BadgePill></td>
             <td class="dim-cell">{{ f.horizon_hours }}h</td>
-            <td class="dim-cell">{{ fmtTime(f.computed_at) }}</td>
+            <td class="dim-cell">{{ fmtTime(f.generated_at) }}</td>
           </tr>
         </tbody>
         <tbody v-else>
@@ -171,15 +171,15 @@
               <td><BadgePill :variant="riskBadge(h.risk_tier)">{{ h.risk_tier }}</BadgePill></td>
               <td>
                 <div class="score-bar-wrap">
-                  <div class="score-bar" :style="{ width: `${(h.predicted_risk_score ?? 0) * 100}%`, background: riskColor(h.risk_tier) }" />
+                  <div class="score-bar" :style="{ width: `${h.predicted_risk_score ?? 0}%`, background: riskColor(h.risk_tier) }" />
                 </div>
-                <span class="score-label">{{ ((h.predicted_risk_score ?? 0) * 100).toFixed(0) }}%</span>
+                <span class="score-label">{{ (h.predicted_risk_score ?? 0).toFixed(0) }}%</span>
               </td>
               <td class="dim-cell">{{ h.horizon_days }}d</td>
               <td>
                 <div class="factor-chips">
                   <span v-for="fc in toFactors(h.contributing_factors).slice(0, 3)" :key="fc" class="factor-chip">{{ fc.replace(/_/g,' ') }}</span>
-                  <span v-if="!h.contributing_factors?.length" class="dim-cell">-</span>
+                  <span v-if="!toFactors(h.contributing_factors).length" class="dim-cell">-</span>
                 </div>
               </td>
             </tr>
@@ -198,7 +198,7 @@
           </thead>
           <tbody v-if="atRiskSegments.length">
             <tr v-for="s in atRiskSegments.slice(0, 10)" :key="s.id">
-              <td class="mono-cell">{{ s.road_code ?? s.segment_road_code }}</td>
+              <td class="mono-cell">{{ s.segment_road_code }}</td>
               <td><BadgePill :variant="condBadge(s.predicted_condition_class)">{{ (s.predicted_condition_class ?? '-').replace(/_/g,' ') }}</BadgePill></td>
               <td>
                 <div class="score-bar-wrap">
@@ -232,7 +232,7 @@
             <td class="pax-big">{{ fmtNum(f.predicted_passengers) }}</td>
             <td class="conf-range">{{ fmtNum(f.lower_passengers) }} – {{ fmtNum(f.upper_passengers) }}</td>
             <td class="dim-cell">{{ f.horizon_hours }}h</td>
-            <td class="ts-cell">{{ fmtTime(f.computed_at) }}</td>
+            <td class="ts-cell">{{ fmtTime(f.generated_at) }}</td>
           </tr>
         </tbody>
         <tbody v-else><tr><td colspan="7" class="empty-row">{{ loading ? 'Loading…' : 'No demand forecast data.' }}</td></tr></tbody>
@@ -357,7 +357,7 @@ function analysePredictions(input: string): AnalysisResult {
 
   // ── Summary ──────────────────────────────────────────────────────────
   if (isSummary || (!isTraffic && !isSafety && !isInfra && !isPT)) {
-    const criticalHotspots = safetyHotspots.value.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high').length
+    const criticalHotspots = safetyHotspots.value.filter(h => h.risk_tier === 'very_high').length
     const topRoute = [...demandForecasts.value].sort((a, b) => b.predicted_passengers - a.predicted_passengers)[0]
     return {
       text: [
@@ -416,10 +416,10 @@ function analysePredictions(input: string): AnalysisResult {
     let filterDesc = ''
 
     if (/\b(critical|extreme|worst|highest)\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high')
+      data = data.filter(h => h.risk_tier === 'very_high')
       filterDesc = 'critical tier'
     } else if (/\bhigh\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high' || h.risk_tier === 'high')
+      data = data.filter(h => h.risk_tier === 'very_high' || h.risk_tier === 'high')
       filterDesc = 'high or critical tier'
     } else if (/\blow\b/.test(t)) {
       data = data.filter(h => h.risk_tier === 'low')
@@ -432,14 +432,14 @@ function analysePredictions(input: string): AnalysisResult {
     const rows = data.slice(0, 10).map(h => ({
       'Road Segment':  h.segment_road_code ?? h.road_segment ?? '-',
       'Risk Tier':     h.risk_tier,
-      'Risk Score':    `${((h.predicted_risk_score ?? 0) * 100).toFixed(0)}%`,
+      'Risk Score':    `${(h.predicted_risk_score ?? 0).toFixed(0)}%`,
       'Horizon (d)':   h.horizon_days,
       'Key Factors':   toFactors(h.contributing_factors).slice(0, 2).map((f: string) => f.replace(/_/g, ' ')).join(', ') || '-',
     }))
 
     return {
       text: data.length
-        ? `${data.length} predicted safety hotspot${data.length > 1 ? 's' : ''}${filterDesc ? ` at ${filterDesc}` : ''}. Highest risk: ${top?.segment_road_code ?? top?.road_segment ?? 'unknown'} at ${((top?.predicted_risk_score ?? 0) * 100).toFixed(0)}%. Model is pre-production; predictions will sharpen with more incident history.`
+        ? `${data.length} predicted safety hotspot${data.length > 1 ? 's' : ''}${filterDesc ? ` at ${filterDesc}` : ''}. Highest risk: ${top?.segment_road_code ?? top?.road_segment ?? 'unknown'} at ${(top?.predicted_risk_score ?? 0).toFixed(0)}%. Model is pre-production; predictions will sharpen with more incident history.`
         : `No safety hotspots${filterDesc ? ` at ${filterDesc}` : ''} in current model outputs.`,
       result: data.length ? { rows, total: data.length, source: 'Safety Hotspots · NTSA ML Model' } : null,
     }
@@ -454,15 +454,15 @@ function analysePredictions(input: string): AnalysisResult {
       data = data.filter(s => (s.failure_probability ?? 0) >= 0.7)
       filterDesc = 'critical failure probability ≥ 70%'
     } else if (/\b(poor|bad|deteriorat)\b/.test(t)) {
-      data = data.filter(s => s.predicted_condition_class === 'poor' || s.predicted_condition_class === 'critical')
-      filterDesc = 'predicted poor or critical condition'
+      data = data.filter(s => s.predicted_condition_class === 'poor' || s.predicted_condition_class === 'very_poor')
+      filterDesc = 'predicted poor or very poor condition'
     }
 
     data.sort((a, b) => (b.failure_probability ?? 0) - (a.failure_probability ?? 0))
 
     const top = data[0]
     const rows = data.slice(0, 10).map(s => ({
-      'Road Code':      s.road_code ?? s.segment_road_code ?? '-',
+      'Road Code':      s.segment_road_code ?? '-',
       'Condition':      (s.predicted_condition_class ?? '-').replace(/_/g, ' '),
       'Failure Prob.':  `${((s.failure_probability ?? 0) * 100).toFixed(0)}%`,
       'Horizon (mo)':   s.horizon_months,
@@ -470,7 +470,7 @@ function analysePredictions(input: string): AnalysisResult {
 
     return {
       text: data.length
-        ? `${data.length} road segment${data.length > 1 ? 's' : ''} predicted for deterioration${filterDesc ? ` (${filterDesc})` : ''}. Highest risk: ${top?.road_code ?? top?.segment_road_code ?? 'unknown'} at ${((top?.failure_probability ?? 0) * 100).toFixed(0)}% failure probability. Infrastructure ML model is in pre-production.`
+        ? `${data.length} road segment${data.length > 1 ? 's' : ''} predicted for deterioration${filterDesc ? ` (${filterDesc})` : ''}. Highest risk: ${top?.segment_road_code ?? 'unknown'} at ${((top?.failure_probability ?? 0) * 100).toFixed(0)}% failure probability. Infrastructure ML model is in pre-production.`
         : `No road segments${filterDesc ? ` matching ${filterDesc}` : ''} found in current model outputs.`,
       result: data.length ? { rows, total: data.length, source: 'Road Deterioration · KeNHA ML Model' } : null,
     }
@@ -597,15 +597,15 @@ function congBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function riskBadge(t: string) {
-  const m: Record<string,string> = { critical:'danger', very_high:'danger', high:'warning', medium:'fair', low:'success' }
+  const m: Record<string,string> = { very_high:'danger', high:'warning', medium:'fair', low:'success' }
   return m[t] ?? 'neutral'
 }
 function riskColor(t: string) {
-  const m: Record<string,string> = { critical:'#ef4444', very_high:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' }
+  const m: Record<string,string> = { very_high:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' }
   return m[t] ?? '#94a3b8'
 }
 function condBadge(c: string) {
-  const m: Record<string,string> = { good:'success', fair:'fair', poor:'warning', critical:'danger', failed:'danger' }
+  const m: Record<string,string> = { very_good:'success', good:'success', fair:'fair', poor:'warning', very_poor:'danger', under_con:'neutral' }
   return m[c] ?? 'neutral'
 }
 function modelColor(m: string) {
@@ -615,6 +615,7 @@ function modelColor(m: string) {
 function toFactors(v: unknown): string[] {
   if (Array.isArray(v)) return v as string[]
   if (typeof v === 'string' && v) return v.split(',').map(s => s.trim())
+  if (v && typeof v === 'object') return Object.keys(v as Record<string, unknown>)
   return []
 }
 

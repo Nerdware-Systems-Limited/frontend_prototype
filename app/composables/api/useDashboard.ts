@@ -100,7 +100,7 @@ export function useDashboard() {
           id,
           name: humanize(id),
           status: c.status === 'ok' ? 'online' as const
-                : c.status === 'warn' ? 'degraded' as const
+                : c.status === 'degraded' ? 'degraded' as const
                 : 'offline' as const,
         }))
       : []

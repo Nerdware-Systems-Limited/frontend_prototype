@@ -96,7 +96,7 @@ export interface HealthResponse {
 }
 
 export interface ComponentStatus {
-  status: 'ok' | 'warn' | 'error'
+  status: 'ok' | 'degraded' | 'error'
   response_ms?: number
   detail?: string
   active_workers?: number

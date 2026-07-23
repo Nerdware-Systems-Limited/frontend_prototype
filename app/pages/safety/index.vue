@@ -212,7 +212,7 @@
           <tr v-for="iv in interventions" :key="iv.id">
             <td>{{ iv.segment_road_code ?? '-' }}</td>
             <td><BadgePill variant="info">{{ iv.intervention_type.replace(/_/g,' ') }}</BadgePill></td>
-            <td>{{ iv.cost_kes ? `KES ${fmtKsh(iv.cost_kes)}` : '-' }}</td>
+            <td>{{ iv.cost_kes != null ? `KES ${fmtKsh(iv.cost_kes)}` : '-' }}</td>
             <td>{{ iv.before_count ?? '-' }}</td>
             <td>{{ iv.after_count ?? '-' }}</td>
             <td>
@@ -290,7 +290,7 @@ async function load() {
     safety.summary(),
     safety.hotspots({ page_size: 20 }),
     safety.topBlackspots(),
-    safety.interventionEffectiveness(),
+    safety.interventions({ page_size: 20, ordering: '-effectiveness_pct' }),
     gis.roads({ limit: 300, simplify: 0.01 }),
   ])
 
@@ -321,12 +321,15 @@ function fmtPct(v: number | null | undefined) {
   if (v == null) return '-'
   return `${v.toFixed(1)}%`
 }
-function fmtKsh(v: number | null | undefined) {
+function fmtKsh(v: number | string | null | undefined) {
+  // cost_kes comes back as a string — DRF serializes DecimalField as string, not number.
   if (v == null) return '-'
-  if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`
-  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`
-  return v.toLocaleString()
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (Number.isNaN(n)) return '-'
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+  return n.toLocaleString()
 }
 function fmtDate(iso: string) {
   try { return new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) }

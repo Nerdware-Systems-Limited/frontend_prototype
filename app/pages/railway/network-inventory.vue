@@ -384,10 +384,10 @@ function isDue(s: string | null | undefined) { return !!s && new Date(s).getTime
 
 // ── Station passenger activity drill-down (from loaded tickets/operations) ──
 function stationActivity(code: string) {
-  const boardings  = tickets.value.filter(tk => tk.origin === code).length
-  const alightings = tickets.value.filter(tk => tk.destination === code).length
+  const boardings  = tickets.value.filter(tk => tk.origin_code === code).length
+  const alightings = tickets.value.filter(tk => tk.destination_code === code).length
   const revenue = tickets.value
-    .filter(tk => tk.origin === code || tk.destination === code)
+    .filter(tk => tk.origin_code === code || tk.destination_code === code)
     .reduce((s, tk) => s + parseFloat(tk.fare_kes || '0'), 0)
   const ops = operations.value.filter(o => o.current_station_code === code)
   const withOcc = ops.filter(o => o.occupancy_pct != null)

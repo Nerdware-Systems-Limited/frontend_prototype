@@ -167,9 +167,12 @@ async function load() {
   error.value = null
   const dl = useDriverLicensing()
 
+  // Note: the backend endpoint has no full-text search param (search=
+  // is a silent no-op there - see useDriverLicensing.ts), so the search
+  // box below filters the loaded page client-side instead.
   const [drvRes, licRes, expRes] = await Promise.allSettled([
     dl.drivers({ page_size: 100 }),
-    dl.licences({ page_size: 100, search: search.value || undefined }),
+    dl.licences({ page_size: 100 }),
     dl.expiring(30),
   ])
 
@@ -197,6 +200,11 @@ function clearFilters() {
 const filteredLicences = computed(() => licences.value.filter(d => {
   if (statusFilter.value && d.status !== statusFilter.value) return false
   if (psvOnly.value && !d.is_psv) return false
+  if (search.value) {
+    const q = search.value.toLowerCase()
+    const hay = `${d.license_number} ${d.driver_name}`.toLowerCase()
+    if (!hay.includes(q)) return false
+  }
   return true
 }))
 

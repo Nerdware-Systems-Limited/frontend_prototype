@@ -221,6 +221,17 @@ const agencyBudgetsScoped = computed(() =>
   selectedAgency.value ? budgets.value.filter(b => b.agency_code === selectedAgency.value) : budgets.value,
 )
 
+// MaintenanceBudgetFilter's `agency` param matches the Agency UUID, not its
+// code - build the mapping from whatever loaded rows carry both `agency`
+// (uuid) and `agency_code`.
+const agencyCodeToId = computed(() => {
+  const m: Record<string, string> = {}
+  for (const b of budgets.value) if (b.agency_code && b.agency) m[b.agency_code] = b.agency
+  for (const p of projects.value) if (p.agency_code && p.agency) m[p.agency_code] = p.agency
+  for (const s of segments.value) if (s.agency_code && s.agency) m[s.agency_code] = s.agency
+  return m
+})
+
 // latest-FY budget per agency (avoids double counting multi-year history in KPI totals)
 const latestPerAgency = computed(() => {
   const m = new Map<string, MaintenanceBudget>()
@@ -309,7 +320,10 @@ function budgetPct(part: string, whole: string) {
 // endpoint) - more complete than exporting only the currently-loaded page.
 const budgetExportHref = computed(() => {
   const q = new URLSearchParams({ format: 'csv' })
-  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  // MaintenanceBudgetFilter's `agency` expects the Agency UUID, not its
+  // code (passing a non-UUID code 500s server-side).
+  const agencyId = selectedAgency.value ? agencyCodeToId.value[selectedAgency.value] : undefined
+  if (agencyId) q.set('agency', agencyId)
   return `/api/v1/infrastructure/maintenance-budgets/export/?${q.toString()}`
 })
 </script>

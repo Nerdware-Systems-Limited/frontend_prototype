@@ -182,9 +182,10 @@
           <option value="beam">Beam</option>
           <option value="arch">Arch</option>
           <option value="suspension">Suspension</option>
-          <option value="cable_stayed">Cable Stayed</option>
           <option value="truss">Truss</option>
           <option value="culvert">Culvert</option>
+          <option value="bailey">Bailey</option>
+          <option value="box_culvert">Box Culvert</option>
         </select>
         <input v-model="nameSearch" class="select-sm" placeholder="Search bridge name…" style="min-width:180px" />
         <button class="btn" @click="condFilter=''; typeFilter=''; nameSearch=''">Clear</button>

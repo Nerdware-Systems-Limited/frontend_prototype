@@ -17,8 +17,8 @@ import type { Paged } from '~/types/uapts'
 export type RoadClass =
   | 'A' | 'B' | 'C' | 'D' | 'E' | 'urban' | 'rural'
   | 'Au' | 'Bu' | 'Cu' | 'Du' | 'Eu' | 'F' | 'Fu' | 'G' | 'Gu' | 'S' | 'unclass'
-export type SurfaceType =
-  | 'asphalt' | 'concrete' | 'gravel' | 'earth' | 'paved' | 'other'
+// Backend SURFACE_TYPE_CHOICES only has these two values (apps/infrastructure/models.py).
+export type SurfaceType = 'paved' | 'unpaved'
 // Road segments and bridges use different real condition scales on this backend.
 export type RoadConditionClass = 'very_good' | 'good' | 'fair' | 'poor' | 'very_poor' | 'under_con'
 export type BridgeConditionClass = 'excellent' | 'good' | 'fair' | 'poor' | 'critical'
@@ -29,14 +29,18 @@ export type WorkType =
   | 'pavement' | 'lighting' | 'bridge' | 'drainage' | 'signage' | 'marking' | 'vegetation' | 'emergency'
 export type ProjectStatus =
   | 'planning' | 'procurement' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+// Streetlight.STATUS_CHOICES (apps/infrastructure/models.py).
 export type StreetlightStatus =
-  | 'operational' | 'faulty' | 'damaged' | 'maintenance' | 'decommissioned'
-export type LampType = 'led' | 'sodium' | 'halogen' | 'solar' | 'fluorescent' | 'other'
-export type TrafficSignalStatus = 'operational' | 'faulty' | 'maintenance' | 'offline'
+  | 'operational' | 'faulty' | 'damaged' | 'missing' | 'under_installation'
+export type LampType = 'led' | 'sodium' | 'halogen' | 'solar'
+// TrafficSignal.STATUS_CHOICES — note real value is 'fault', not 'faulty'.
+export type TrafficSignalStatus = 'operational' | 'degraded' | 'fault' | 'offline' | 'maintenance'
 export type TrafficSignalMode = 'fixed_time' | 'actuated' | 'adaptive' | 'manual' | 'flashing'
+// Bridge.BRIDGE_TYPE_CHOICES.
 export type BridgeType =
-  | 'beam' | 'arch' | 'suspension' | 'cable_stayed' | 'truss' | 'culvert' | 'other'
-export type WIMVerdict = 'compliant' | 'overloaded' | 'gross_overload' | 'underloaded'
+  | 'beam' | 'arch' | 'suspension' | 'truss' | 'culvert' | 'bailey' | 'box_culvert'
+// WIMReading.VERDICT_CHOICES — there is no 'underloaded' verdict on this backend.
+export type WIMVerdict = 'compliant' | 'overloaded' | 'gross_overload'
 
 // ── Shapes ──────────────────────────────────────────────────────────
 
@@ -327,6 +331,22 @@ export interface InfrastructureSummary {
   generated_at: string
 }
 
+// The `condition-map` action is a custom @action rollup, not the standard
+// paginated list — it returns a bare `{count, results}` (no next/previous/
+// page/page_size), and each row is a purpose-built subset of RoadSegment
+// fields plus a computed lat/lon centroid, not a full RoadSegment.
+export interface RoadSegmentMapPoint {
+  id: string
+  road_name: string
+  road_code: string
+  road_class: RoadClass
+  iri_value: number | null
+  pci_value: number | null
+  condition_class: RoadConditionClass | null
+  latitude: number | null
+  longitude: number | null
+}
+
 // ── Query type ──────────────────────────────────────────────────────
 
 export interface InfrastructureQuery {
@@ -353,12 +373,14 @@ export function useInfrastructure() {
         query: cleanQuery(q as Record<string, unknown>),
       }),
     getSegment: (id: string) => api<RoadSegment>(`${I}/road-segments/${id}/`),
+    // NB: this action ignores `page_size` server-side (always returns up to
+    // 5000 rows) - the param is passed defensively in case that changes.
     segmentConditionMap: (q?: { page_size?: number }) =>
-      api<Paged<RoadSegment>>(`${I}/road-segments/condition-map/`, {
+      api<{ count: number; results: RoadSegmentMapPoint[] }>(`${I}/road-segments/condition-map/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
     segmentConditionDistribution: () =>
-      api<{ results: Array<{ condition_class: string; total: number; length: number }> }>(
+      api<{ count: number; results: Array<{ condition_class: string; total: number; total_length_km: number }> }>(
         `${I}/road-segments/condition-distribution/`,
       ),
     segmentIRIHistogram: () => api<unknown>(`${I}/road-segments/iri-histogram/`),

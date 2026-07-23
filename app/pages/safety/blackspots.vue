@@ -118,7 +118,7 @@
               <td>{{ bs.kde_intensity != null ? bs.kde_intensity.toFixed(4) : '-' }}</td>
               <td>{{ bs.radius_m ?? '-' }}</td>
               <td>{{ bs.window_days }}</td>
-              <td style="font-size:12px">{{ fmtDate(bs.last_computed_at) }}</td>
+              <td style="font-size:12px">{{ bs.last_computed_at ? fmtDate(bs.last_computed_at) : '-' }}</td>
             </tr>
             <tr v-if="expanded === bs.id" class="detail-row">
               <td :colspan="9">
@@ -153,11 +153,11 @@
               <div
                 class="bar-fill"
                 :style="{
-                  width: `${maxCause > 0 ? ((c.count ?? c.accident_count ?? 0) / maxCause) * 100 : 0}%`,
+                  width: `${maxCause > 0 ? ((c.total ?? 0) / maxCause) * 100 : 0}%`,
                 }"
               />
             </div>
-            <div class="bar-val">{{ fmtNum(c.count ?? c.accident_count ?? 0) }}</div>
+            <div class="bar-val">{{ fmtNum(c.total ?? 0) }}</div>
           </div>
         </div>
         <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
@@ -290,7 +290,7 @@ const avgKDE = computed(() => {
   return withKDE.reduce((s, b) => s + b.kde_intensity!, 0) / withKDE.length
 })
 const maxCause = computed(() =>
-  Math.max(1, ...causeData.value.map(c => c.count ?? c.accident_count ?? 0)),
+  Math.max(1, ...causeData.value.map(c => c.total ?? 0)),
 )
 
 const mapMarkers = computed((): MarkerSpec[] => {
@@ -331,11 +331,11 @@ function fmtDate(iso: string) {
   try { return new Date(iso).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
   catch { return iso }
 }
-function tierBadge(t: string) {
+function tierBadge(t: string | null) {
   const m: Record<string,string> = { critical:'danger', very_high:'danger', high:'warning', medium:'fair', low:'success' }
-  return m[t] ?? 'neutral'
+  return (t && m[t]) || 'neutral'
 }
-function riskBadge(t: string) {
+function riskBadge(t: string | null) {
   return tierBadge(t)
 }
 </script>

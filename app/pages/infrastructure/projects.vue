@@ -234,10 +234,8 @@
         <select v-model="maintStatusFilter" class="select-sm">
           <option value="">All statuses</option>
           <option value="planned">Planned</option>
-          <option value="scheduled">Scheduled</option>
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
-          <option value="on_hold">On Hold</option>
           <option value="cancelled">Cancelled</option>
         </select>
         <select v-model="maintPriorityFilter" class="select-sm">
@@ -385,6 +383,18 @@ const agencyLabel = computed(() => selectedAgency.value || 'All Agencies')
 const krbHasFundingOnly = computed(() => !agencyOptions.value.some(a => a.code === 'KRB') && agencyBudgets('KRB').length > 0)
 function agencyBudgets(code: string) { return budgets.value.filter(b => b.agency_code === code) }
 
+// ConstructionProjectFilter/MaintenanceOrderFilter's `agency` param matches
+// the Agency UUID, not its code - build the mapping from whatever loaded
+// rows carry both `agency` (uuid) and `agency_code`.
+const agencyCodeToId = computed(() => {
+  const m: Record<string, string> = {}
+  for (const p of projects.value) if (p.agency_code && p.agency) m[p.agency_code] = p.agency
+  for (const b of bridges.value) if (b.agency_code && b.agency) m[b.agency_code] = b.agency
+  for (const b of budgets.value) if (b.agency_code && b.agency) m[b.agency_code] = b.agency
+  for (const s of segments.value) if (s.agency_code && s.agency) m[s.agency_code] = s.agency
+  return m
+})
+
 // ── Agency-scoped datasets ───────────────────────────────────────────────
 const agencyProjects = computed(() => selectedAgency.value ? projects.value.filter(p => p.agency_code === selectedAgency.value) : projects.value)
 const agencyDelayed  = computed(() => selectedAgency.value ? delayed.value.filter(p => p.agency_code === selectedAgency.value) : delayed.value)
@@ -446,9 +456,12 @@ const filteredOrders = computed(() =>
 
 // Real server-side exports (honor the same django-filter params as their
 // list endpoints) - more complete than exporting only the currently-loaded page.
+// Both filters' `agency` param expects the Agency UUID, not its code
+// (passing a non-UUID code 500s server-side) - resolve via agencyCodeToId.
 const projectExportHref = computed(() => {
   const q = new URLSearchParams({ format: 'csv' })
-  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  const agencyId = selectedAgency.value ? agencyCodeToId.value[selectedAgency.value] : undefined
+  if (agencyId) q.set('agency', agencyId)
   if (statusFilter.value) q.set('status', statusFilter.value)
   if (countySearch.value) q.set('county', countySearch.value)
   if (nameSearch.value) q.set('search', nameSearch.value)
@@ -456,7 +469,8 @@ const projectExportHref = computed(() => {
 })
 const ordersExportHref = computed(() => {
   const q = new URLSearchParams({ format: 'csv' })
-  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  const agencyId = selectedAgency.value ? agencyCodeToId.value[selectedAgency.value] : undefined
+  if (agencyId) q.set('agency', agencyId)
   if (maintStatusFilter.value) q.set('status', maintStatusFilter.value)
   if (maintPriorityFilter.value) q.set('priority', maintPriorityFilter.value)
   return `/api/v1/infrastructure/maintenance-orders/export/?${q.toString()}`

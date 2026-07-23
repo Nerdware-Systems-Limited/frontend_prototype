@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 export { useApi, cleanQuery, type ApiOptions } from './_client'
-export { useGis } from './useGis'
+export { useGis, type GeoJSONFeature, type GeoJSONFeatureCollection, type MapOverviewBundle } from './useGis'
 
 export { useSystemApi, useServiceHealth } from './useSystem'
 export { useAgencies, useDepartments, useRoles, useUsers, type ListOpts } from './useAccounts'
@@ -28,6 +28,7 @@ export {
   type SpeedGovernorStatus, type GovernorStatus,
   type TripPlayback, type TripStatus, type FleetUtilization,
   type WeighbridgeStation, type WeighbridgeEvent, type GovernmentFleet,
+  type DriverBehaviourSummary, type TripPath,
   type FleetQuery,
 } from './useFleet'
 export {
@@ -66,7 +67,7 @@ export { useReports, type ReportTemplate, type ReportRun, type ReportsQuery } fr
 export { useIntegrations, type DataSource, type IngestedRecord, type Integration, type IntegrationQuery, type RecordsQuery } from './useIntegrations'
 export { usePublicTransport, type PTSummary, type Sacco, type Route, type BRTStop, type Schedule, type ScheduleAdherence, type FareCollection, type DemandForecast, type ServiceQualityScore, type OperatorMetric, type PaymentTransaction, type FleetDeployment, type PTFeed, type PassengerFeedback, type PSVLicense, type PTQuery, type ComplianceSummary, type ComplianceCheckType } from './usePublicTransport'
 export { useVehicleInspections, type VehicleInspection, type InspectionResult, type InspectionQuery, type VehicleInspectionSummary } from './useVehicleInspections'
-export { useDriverLicensing, type Driver, type DriverLicence, type LicenceClass, type LicenceStatus, type DriverQuery, type DriverLicenceQuery } from './useDriverLicensing'
+export { useDriverLicensing, type Driver, type DriverLicence, type LicenceClass, type LicenceStatus, type DriverQuery, type DriverLicenceQuery, type RevealedDriverIdentity } from './useDriverLicensing'
 export { useRailway, type RailwaySummary, type RailwayKpis, type LiveOperation, type OnTimeStats, type FreightSummary, type IncidentSummary, type RailIncidentStats, type RidershipSummary, type RailLine, type RailStation, type Train, type TrainSchedule, type TrainOperation, type FreightManifest, type RailIncident, type RailTicket, type RailQuery, type RailNetwork, type RailGauge, type RailStatus, type StationType, type ServiceType, type TrainType, type TrainStatus, type ServiceClass, type DayType, type OpStatus, type DelayReason, type CargoType, type IncidentType, type IncidentSeverity, type TicketClass, type Channel } from './useRailway'
 export {
   useRailInfrastructure,
@@ -82,10 +83,10 @@ export { useRailSafety, type CorrectiveAction, type RailRiskIndicator, type Inve
 export { useNotifications, type Notification, type AlertRule, type Condition, type LeafCondition, type CompositeCondition, type ConditionOp, type Severity, type Channel as NotificationChannel, type NotificationQuery, type RuleQuery, type NotificationListResponse, type UnreadCountResponse, type MarkReadResponse, type MarkAllReadResponse, type AlertRuleListResponse, type NotifyRequest, type CreateRuleRequest, type HealthResponse } from './useNotifications'
 export { useAviationMaritime, type AviationSummary, type MaritimeOps, type Airport, type Airline, type Aircraft, type Flight, type FlightStatus, type FlightOTP, type CargoByCommodity, type CabinClass, type PassengerByAirport, type Port, type Berth, type Vessel, type VesselMovement, type ContainerByPort, type IntermodalOnTime, type SafetySeverity, type SafetyReportType, type AocStatus, type AircraftType, type AirportType, type BerthType, type ContainerDirection, type ConnectionType, type ConnectionDirection, type PortType, type VesselType, type VesselMovementType, type VesselMovementStatus, type Commodity, type AviationQuery, type PortQuery } from './useAviationMaritime'
 export { useAviationInfrastructure, type Runway, type Navaid, type AviationFacility, type AviationCapitalWork, type AviationInfraSummary, type RunwayStatus, type NavaidType, type NavaidStatus, type AviationFacilityType, type AviationFacilityStatus, type AviationInfraQuery } from './useAviationInfrastructure'
-export { useMaritimeInfrastructure, type Channel as MaritimeChannel, type MaritimeNavaid, type DryDock, type InlandContainerDepot, type MaritimeCapitalWork, type MaritimeInfraSummary, type ChannelStatus, type MaritimeNavaidType, type MaritimeNavaidStatus, type DryDockStatus, type ICDStatus, type MaritimeInfraQuery } from './useMaritimeInfrastructure'
-export { useMaritimeServices, type CargoHandlingRecord, type CargoHandlingOp, type PilotageRecord, type PilotageIncidentFlag, type MaritimeLicence, type LicenceCategory, type LicenceStatus, type MaritimeServicesSummary, type MaritimeServicesQuery } from './useMaritimeServices'
-export { useMaritimeCargo, type MaritimeCargoType, type CargoTypeStat, type PipelineDirection, type ImportStage, type ExportStage, type PipelineShipment, type CargoHandlingStageKpi, type OnwardTransportMode, type GreenFlag as CargoGreenFlag, type OnwardTransportStat, type MaritimeCargoSummary, type MaritimeCargoQuery } from './useMaritimeCargo'
-export { useMaritimeWaterways, type WaterwayCategory, type Waterway, type WaterwayInfraItem, type WaterwayInfrastructureRecord, type MaritimeWaterwaysSummary, type MaritimeWaterwaysQuery } from './useMaritimeWaterways'
-export { useMaritimeGreenTransport, type VesselFuelType, type VesselEmissionRecord, type GreenModeCategory, type GreenTransportModeStat, type EvFleetStat, type ReeferEnergyRecord, type MaritimeGreenSummary, type MaritimeGreenQuery } from './useMaritimeGreenTransport'
-export { useMaritimePerformance, type PortPerformanceKpi, type PortRankingScore, type MaritimePerformanceSummary, RANK_WEIGHTS } from './useMaritimePerformance'
+export { useMaritimeInfrastructure, type Channel as MaritimeChannel, type MaritimeNavaid, type DryDock, type InlandContainerDepot, type MaritimeCapitalWork, type MaritimeInfraSummary, type InfraSummaryPort, type InfraSummaryChannel, type MaritimeNavaidType, type MaritimeNavaidStatus, type DryDockType, type DryDockOperationalStatus, type CapitalWorkType, type CapitalWorkStatus, type MaritimeInfraQuery } from './useMaritimeInfrastructure'
+export { useMaritimeServices, type CargoHandlingRecord, type CargoHandlingOp, type PilotageRecord, type MaritimeLicence, type LicenceCategory, type LicenceStatus, type MaritimeServicesSummary, type ServicesSummaryPort, type LicenceExpiryCount, type MaritimeServicesQuery } from './useMaritimeServices'
+export { useMaritimeCargo, type MaritimeCargoType, type CargoDirection, type CargoTypeStat, type PipelineDirection, type PipelineDestinationMode, type PipelineShipment, type TrackedStat, type HandlingStageKpis, type OnwardTransportMode, type GreenFlag as CargoGreenFlag, type OnwardTransportStat, type CargoSummaryPort, type MaritimeCargoSummary, type MaritimeCargoQuery } from './useMaritimeCargo'
+export { useMaritimeWaterways, type WaterwayCategory, type Waterway, type WaterwayInfrastructure, type TrackedCount, type WaterwaySummaryChannel, type WaterwaySummaryRow, type MaritimeWaterwaysSummary, type MaritimeWaterwaysQuery } from './useMaritimeWaterways'
+export { useMaritimeGreenTransport, type VesselFuelType, type VesselEmissionRecord, type EVFleetVehicleType, type EVFleetRecord, type GreenModeWaterStat, type GreenModeEvStat, type GreenTransportModeStat, type ReeferEnergyRecord, type GreenSummaryPort, type MaritimeGreenSummary, type MaritimeGreenQuery } from './useMaritimeGreenTransport'
+export { useMaritimePerformance, type PerformanceSummaryPort, type MaritimePerformanceSummary, type TrackedKpiField, type PortPerformanceKpi, type RankingCategory, type PortRankingScore, type MaritimeRanking, RANK_WEIGHTS } from './useMaritimePerformance'
 export { useTraining, type TrainingCourse, type TrainingCohort, type TrainingEnrollment, type TrainingCompletion, type TrainingSession, type TrainingAttendance, type TrainingRevenue, type CourseCategory, type DeliveryMode, type CertificationBody, type CohortStatus, type EnrollmentStatus, type PaymentStatus, type CompletionOutcome, type RevenueStream, type PaymentMethod, type SessionType, type AttendanceStatus, type TrainingQuery } from './useTraining'

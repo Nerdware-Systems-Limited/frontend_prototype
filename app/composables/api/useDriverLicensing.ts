@@ -57,18 +57,41 @@ export interface DriverLicence {
   updated_at?: string
 }
 
+// NOTE: neither DriverViewSet nor DriverLicenseViewSet declares
+// `search_fields` (apps/fleet/views.py), so DRF's SearchFilter is a silent
+// no-op on both endpoints - a `search=` param is accepted but never filters
+// anything. The real server-side filters are the ones below (see each
+// ViewSet's get_queryset()). `ordering` still works (OrderingFilter falls
+// back to allowing any serializer field when `ordering_fields` isn't set).
 export interface DriverQuery {
   page?: number
   page_size?: number
   ordering?: string
-  search?: string
+  agency?: string
+  operator?: string
+  /** Case-insensitive substring match on full_name. */
+  name?: string
 }
 
 export interface DriverLicenceQuery {
   page?: number
   page_size?: number
   ordering?: string
-  search?: string
+  driver?: string
+  status?: LicenceStatus
+  /** Licence class, e.g. "D". Maps to the backend's `class` query param. */
+  licenceClass?: LicenceClass
+  /** true = only licences with a PSV badge number set. */
+  psv?: boolean
+}
+
+/** Real shape of GET /fleet/drivers/{id}/reveal-id/ - a purpose-built
+ *  unmasked-identity payload, not the full Driver record. Admin-only,
+ *  audit-logged server-side. */
+export interface RevealedDriverIdentity {
+  full_name: string
+  national_id: string
+  phone: string
 }
 
 export function useDriverLicensing() {
@@ -81,10 +104,16 @@ export function useDriverLicensing() {
       api<Paged<Driver>>(`${D}/`, { query: cleanQuery(q as Record<string, unknown>) }),
     getDriver: (id: string) => api<Driver>(`${D}/${id}/`),
     driverLicenceHistory: (id: string) => api<Paged<DriverLicence> | DriverLicence[]>(`${D}/${id}/licenses/`),
-    revealDriverId: (id: string) => api<Driver>(`${D}/${id}/reveal-id/`),
+    revealDriverId: (id: string) => api<RevealedDriverIdentity>(`${D}/${id}/reveal-id/`),
 
-    licences: (q?: DriverLicenceQuery) =>
-      api<Paged<DriverLicence>>(`${L}/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    licences: (q?: DriverLicenceQuery) => {
+      // `licenceClass` -> backend's `class` param (avoided as a TS field
+      // name since `class` reads awkwardly as an object key).
+      const { licenceClass, ...rest } = q ?? {}
+      return api<Paged<DriverLicence>>(`${L}/`, {
+        query: cleanQuery({ ...rest, class: licenceClass } as Record<string, unknown>),
+      })
+    },
     getLicence: (id: string) => api<DriverLicence>(`${L}/${id}/`),
     expiring: (days = 30) => api<DriverLicence[] | Paged<DriverLicence>>(`${L}/expiring/?days=${days}`),
   }

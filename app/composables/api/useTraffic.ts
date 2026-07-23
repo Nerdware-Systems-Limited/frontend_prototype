@@ -112,6 +112,7 @@ export interface TrafficForecast {
   upper_volume: number
   lower_speed_kmh: number
   upper_speed_kmh: number
+  generated_at: string
 }
 
 export interface ODMatrix {
@@ -181,8 +182,10 @@ export interface TrafficQuery {
   status?: string
   congestion?: CongestionLevel
   vehicle_class?: string
-  date_from?: string
-  date_to?: string
+  // NB: TrafficCountViewSet.get_queryset() reads these as `from`/`to`
+  // (not `date_from`/`date_to`) — see apps/traffic/views.py.
+  from?: string
+  to?: string
 }
 
 export function useTraffic() {
@@ -236,9 +239,14 @@ export function useTraffic() {
         api<Paged<CountingStation>>('/api/v1/traffic/counting-stations/', { query: { page_size: 200 } }),
         api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/', { query: { status: 'active', page_size: 100 } }),
       ])
-      const markers: import('~/components/UaptsMap.vue').MarkerSpec[] = []      
+      const markers: import('~/components/UaptsMap.vue').MarkerSpec[] = []
+      // Station id -> coords lookup, reused below for event markers since
+      // TrafficCountSerializer only returns `station` as a bare FK id
+      // (string), never a nested {latitude, longitude} object.
+      const stationCoords = new Map<string, { latitude: number; longitude: number }>()
       for (const s of (stations as any).results ?? []) {
         if (s.latitude == null || s.longitude == null) continue
+        stationCoords.set(s.id, { latitude: s.latitude, longitude: s.longitude })
         const colour =
           s.equipment_status === 'operational' ? 'green'
           : s.equipment_status === 'degraded' ? 'yellow'
@@ -256,12 +264,15 @@ export function useTraffic() {
       }
       for (const e of (events as any).results ?? []) {
         if (e.segment_id == null) continue
-        // Pull a single traffic count lat/lon for the segment if we have it.
+        // Pull a single traffic count for the segment if we have it — its
+        // `station` field is just the station id, so resolve coords via
+        // the station lookup built above rather than a nested object.
         const tc = await api<Paged<TrafficCount>>(
           `/api/v1/traffic/counts/?segment=${e.segment_id}&page_size=1`,
         )
         const tcRow = (tc as any).results?.[0]
-        if (!tcRow || tcRow.station?.latitude == null) continue
+        const coords = tcRow?.station ? stationCoords.get(tcRow.station) : undefined
+        if (!coords) continue
         const colour =
           e.severity === 'critical' ? 'red'
           : e.severity === 'high' ? 'orange'
@@ -269,8 +280,8 @@ export function useTraffic() {
           : 'blue'
         markers.push({
           id: `event-${e.id}`,
-          lat: tcRow.station.latitude,
-          lon: tcRow.station.longitude,
+          lat: coords.latitude,
+          lon: coords.longitude,
           title: `[${e.severity.toUpperCase()}] Congestion`,
           subtitle: `Delay ${e.delay_minutes} min · Impact radius ${e.impact_radius_km.toFixed(1)} km`,
           color: colour,

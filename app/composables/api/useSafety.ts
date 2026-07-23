@@ -34,8 +34,8 @@ export type ViolationType =
   | 'speeding' | 'red_light' | 'lane_violation' | 'no_seatbelt' | 'drunk_driving'
   | 'no_license' | 'illegal_psv' | 'overloading' | 'other'
 export type InterventionType =
-  | 'rumble_strip' | 'speed_table' | 'signage' | 'streetlight'
-  | 'guardrail' | 'rechannelization' | 'crosswalk' | 'other'
+  | 'speed_cushion' | 'rumble_strips' | 'footbridge' | 'signage'
+  | 'lighting' | 'road_marking' | 'junction_redesign' | 'barrier' | 'speed_camera'
 
 // ── Shapes ──────────────────────────────────────────────────────────
 
@@ -96,13 +96,13 @@ export interface BlackSpot {
   segment_road_name: string | null
   accident_count_rolling: number
   fatality_count_rolling: number
-  ranking_tier: BlackSpotTier
+  ranking_tier: BlackSpotTier | null
   kde_intensity: number | null
   radius_m: number | null
   window_days: number
   centroid_latitude: number | null
   centroid_longitude: number | null
-  last_computed_at: string
+  last_computed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -170,7 +170,7 @@ export interface SafetyIntervention {
   intervention_type: InterventionType
   description: string
   installed_at: string | null
-  cost_kes: number | null
+  cost_kes: string | null
   before_count: number | null
   after_count: number | null
   effectiveness_pct: number | null
@@ -221,6 +221,33 @@ export interface SafetySummary {
   active_dispatches: number
   recent_violations_24h: number
   generated_at: string
+}
+
+// ── Custom rollup payloads (non-paginated, non-Paged<T> shapes) ──────
+
+/** GET /predictive-hotspots/heatmap/ — reduced points, not a Paged<PredictiveHotspot>. */
+export interface PredictiveHotspotHeatmapPoint {
+  lat: number
+  lon: number
+  score: number
+  tier: RiskTier
+}
+export interface PredictiveHotspotHeatmap {
+  count: number
+  results: PredictiveHotspotHeatmapPoint[]
+}
+
+/** GET /interventions/effectiveness/ — aggregated by intervention_type, not individual records. */
+export interface InterventionEffectivenessRow {
+  intervention_type: InterventionType
+  count: number
+  avg_effectiveness: number | null
+  total_before: number | null
+  total_after: number | null
+}
+export interface InterventionEffectiveness {
+  count: number
+  results: InterventionEffectivenessRow[]
 }
 
 // ── Query type ──────────────────────────────────────────────────────
@@ -291,7 +318,7 @@ export function useSafety() {
       api<Paged<PredictiveHotspot>>(`${S}/predictive-hotspots/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    hotspotHeatmap: () => api<Paged<PredictiveHotspot>>(`${S}/predictive-hotspots/heatmap/`),
+    hotspotHeatmap: () => api<PredictiveHotspotHeatmap>(`${S}/predictive-hotspots/heatmap/`),
 
     // ── KPIs ───────────────────────────────────────────────────────
     kpis: (q?: SafetyQuery) =>
@@ -305,7 +332,7 @@ export function useSafety() {
         query: cleanQuery(q as Record<string, unknown>),
       }),
     interventionEffectiveness: () =>
-      api<Paged<SafetyIntervention>>(`${S}/interventions/effectiveness/`),
+      api<InterventionEffectiveness>(`${S}/interventions/effectiveness/`),
 
     // ── Violations ─────────────────────────────────────────────────
     violations: (q?: SafetyQuery) =>

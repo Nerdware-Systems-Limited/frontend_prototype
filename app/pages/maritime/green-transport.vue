@@ -11,57 +11,57 @@
   </PageHeader>
 
   <div v-if="error" class="error-banner">
-    ⚠ {{ error }} Vessel emissions, EV fleet, and reefer-energy tracking is not yet integrated from KPA/KMA.
+    ⚠ {{ error }}
   </div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Avg CO₂ / TEU-km" :value="summary ? `${summary.kpis.avg_co2_per_teu_km_g.toFixed(0)}g` : '-'" sub="IMO target: -40% by 2030" source="batch" source-title="KPA" />
-    <KpiCard label="Shore Power Usage" :value="summary ? pct(summary.kpis.shore_power_usage_pct) : '-'" sub="% of port time cold-ironed" trend-direction="up" source="batch" source-title="KPA" />
-    <KpiCard label="EV Truck Fleet" :value="summary ? fmtNum(summary.kpis.ev_truck_fleet_size) : '-'" sub="Registered in port access zones" source="batch" source-title="KPA / Private Operators" />
-    <KpiCard label="EV Train Share" :value="summary ? pct(summary.kpis.ev_train_share_pct) : '-'" sub="Of SGR locomotive fleet" source="batch" source-title="Kenya Railways" />
-    <KpiCard label="CO₂ Saved / month" :value="summary ? `${fmtNum(summary.kpis.co2_saved_tonnes_month)}t` : '-'" sub="EV trucks/trains vs diesel" trend-direction="up" source="batch" source-title="KPA" />
-    <KpiCard label="Reefer Plug Utilisation" :value="summary ? pct(summary.kpis.reefer_plug_utilisation_pct) : '-'" sub="Capacity planning" source="batch" source-title="KPA Terminal Mgmt" />
+    <KpiCard label="Avg CO₂ / TEU-km" :value="waterMode ? (waterMode.avg_g_co2_per_teu_km != null ? `${waterMode.avg_g_co2_per_teu_km.toFixed(0)}g` : '-') : '-'" sub="IMO target: -40% by 2030" source="live" source-title="KMA" />
+    <KpiCard label="Shore Power Usage" :value="waterMode ? pct(waterMode.avg_shore_power_pct) : '-'" sub="% of port time cold-ironed" trend-direction="up" source="live" source-title="KMA" />
+    <KpiCard label="EV Truck Fleet" :value="evTruckMode ? fmtNum(evTruckMode.fleet_size) : '-'" sub="Registered in port access zones" source="live" source-title="KPA / Private Operators" />
+    <KpiCard label="EV Train Fleet" :value="evTrainMode ? fmtNum(evTrainMode.fleet_size) : '-'" sub="Of SGR locomotive fleet" source="live" source-title="Kenya Railways" />
+    <KpiCard label="CO₂ Saved" :value="fmtNum(co2SavedTotal, 1) + 't'" :sub="`EV trucks/trains vs diesel, last ${modeStatsSummary?.days ?? 30}d`" trend-direction="up" source="live" source-title="KPA" />
+    <KpiCard label="Marine Pollution Incidents" :value="fmtNum(pollutionIncidentsTotal)" :sub="`Oil-spill incidents, last ${summary?.days ?? 30}d`" source="live" source-title="KMA" />
   </div>
 
   <!-- Three sub-categories -->
-  <SectionTitle pill="KPA / KMA · Pending Integration">Green Transport - Three Sub-Categories</SectionTitle>
+  <SectionTitle pill="KPA / KMA · Live">Green Transport - Three Sub-Categories</SectionTitle>
   <div class="card">
     <div class="card-body">
       <table>
-        <thead><tr><th>Category</th><th>Metric</th><th>Value</th><th>Target</th></tr></thead>
-        <tbody v-if="modeStats.length">
-          <tr v-for="m in modeStats" :key="m.label">
-            <td><BadgePill :variant="categoryBadge(m.category)">{{ categoryLabel(m.category) }}</BadgePill></td>
-            <td style="font-size:12px">{{ m.metric_label }}</td>
-            <td style="font-weight:600">{{ m.metric_value != null ? `${m.metric_value} ${m.metric_unit}` : '-' }}</td>
-            <td style="font-size:12px">{{ m.target_value != null ? `${m.target_value} ${m.metric_unit}` : '-' }}</td>
+        <thead><tr><th>Category</th><th>Key Metric</th><th>Detail</th><th>Target</th></tr></thead>
+        <tbody v-if="modeRows.length">
+          <tr v-for="m in modeRows" :key="m.mode">
+            <td><BadgePill :variant="categoryBadge(m.mode)">{{ m.label }}</BadgePill></td>
+            <td style="font-size:12px;font-weight:600">{{ m.keyMetricLabel }}: {{ m.keyMetricValue }}</td>
+            <td style="font-size:12px">{{ m.detail }}</td>
+            <td style="font-size:12px">{{ m.target ?? '-' }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Green-transport mode statistics have not been integrated yet.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No green-transport mode statistics for this period.' }}</td></tr></tbody>
       </table>
     </div>
   </div>
 
   <!-- Vessel emissions -->
-  <SectionTitle pill="KPA · Pending Integration">Vessel Emissions by Fuel Type</SectionTitle>
+  <SectionTitle pill="KPA · Live">Vessel Emissions by Fuel Type</SectionTitle>
   <div class="card">
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Vessel</th><th>Port</th><th>Fuel Type</th><th>Consumption (t)</th><th>CO₂/TEU-km</th><th>Shore Power</th><th>Voyage Date</th></tr></thead>
+          <thead><tr><th>Vessel</th><th>Port</th><th>Fuel Type</th><th>Consumption (t)</th><th>CO₂/TEU-km</th><th>Shore Power</th><th>Report Date</th></tr></thead>
           <tbody v-if="emissions.length">
             <tr v-for="e in emissions.slice(0, 30)" :key="e.id">
-              <td style="font-weight:600;font-size:12px">{{ e.vessel_name }}</td>
+              <td style="font-weight:600;font-size:12px">{{ e.vessel_name ?? '-' }}</td>
               <td style="font-family:monospace;font-size:12px">{{ e.port_unlocode ?? '-' }}</td>
               <td><BadgePill :variant="fuelBadge(e.fuel_type)">{{ e.fuel_type.toUpperCase() }}</BadgePill></td>
               <td>{{ fmtNum(e.fuel_consumption_tonnes, 1) }}</td>
-              <td>{{ e.co2_per_teu_km_g != null ? `${e.co2_per_teu_km_g.toFixed(0)}g` : '-' }}</td>
-              <td><BadgePill :variant="e.shore_power_used ? 'success' : 'neutral'">{{ e.shore_power_used ? 'Connected' : 'No' }}</BadgePill></td>
-              <td style="font-size:12px">{{ fmtDay(e.voyage_date) }}</td>
+              <td>{{ e.co2_g_per_teu_km != null ? `${e.co2_g_per_teu_km.toFixed(0)}g` : '-' }}</td>
+              <td>{{ e.shore_power_pct != null ? pct(e.shore_power_pct) : '-' }}</td>
+              <td style="font-size:12px">{{ fmtDay(e.report_date) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Vessel emissions data has not been integrated from KPA yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No vessel emissions records for this period.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -70,38 +70,45 @@
   <!-- EV Fleet + Reefer energy -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header">EV Fleet (Trucks &amp; Trains)</div>
+      <div class="card-header">EV Fleet Records (Trucks &amp; Trains)</div>
       <div class="card-body">
-        <table>
-          <thead><tr><th>Fleet Type</th><th>In Service</th><th>kWh / month</th><th>km / month</th><th>CO₂ Saved / month</th></tr></thead>
-          <tbody v-if="evFleet.length">
-            <tr v-for="f in evFleet" :key="f.fleet_type">
-              <td><BadgePill variant="success">{{ f.fleet_type.replace(/_/g,' ') }}</BadgePill></td>
-              <td>{{ fmtNum(f.count_in_service) }}</td>
-              <td>{{ fmtNum(f.kwh_consumed_month) }}</td>
-              <td>{{ f.km_driven_month != null ? fmtNum(f.km_driven_month) : '-' }}</td>
-              <td>{{ fmtNum(f.co2_saved_tonnes_month, 1) }}t</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'EV fleet data not yet integrated.' }}</td></tr></tbody>
-        </table>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Vehicle Type</th><th>Port</th><th>Report Date</th><th>Fleet Size</th><th>kWh</th><th>km Driven</th><th>CO₂ Saved</th></tr></thead>
+            <tbody v-if="evFleet.length">
+              <tr v-for="f in evFleet.slice(0, 20)" :key="f.id">
+                <td><BadgePill variant="success">{{ f.vehicle_type.replace(/_/g,' ') }}</BadgePill></td>
+                <td style="font-family:monospace;font-size:12px">{{ f.port_unlocode ?? '-' }}</td>
+                <td style="font-size:11px">{{ fmtDay(f.report_date) }}</td>
+                <td>{{ fmtNum(f.fleet_size) }}</td>
+                <td>{{ fmtNum(f.energy_kwh) }}</td>
+                <td>{{ fmtNum(f.km_driven) }}</td>
+                <td>{{ fmtNum(f.co2_saved_tonnes, 1) }}t</td>
+              </tr>
+            </tbody>
+            <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No EV fleet records for this period.' }}</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
     <div class="card">
       <div class="card-header">Cold Chain - Reefer Energy</div>
       <div class="card-body">
-        <table>
-          <thead><tr><th>Port</th><th>Plugs (in use / total)</th><th>kWh / month</th><th>Commodity</th></tr></thead>
-          <tbody v-if="reeferEnergy.length">
-            <tr v-for="r in reeferEnergy" :key="r.id">
-              <td style="font-family:monospace;font-weight:600;font-size:12px">{{ r.port_unlocode }}</td>
-              <td>{{ r.reefer_plugs_in_use }} / {{ r.reefer_plugs_total }}</td>
-              <td>{{ fmtNum(r.kwh_consumed_month) }}</td>
-              <td style="font-size:12px">{{ r.commodity ?? '-' }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'Reefer energy data not yet integrated.' }}</td></tr></tbody>
-        </table>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Port</th><th>Report Date</th><th>Plugged-in Containers</th><th>kWh</th></tr></thead>
+            <tbody v-if="reeferEnergy.length">
+              <tr v-for="r in reeferEnergy.slice(0, 20)" :key="r.id">
+                <td style="font-family:monospace;font-weight:600;font-size:12px">{{ r.port_unlocode }}</td>
+                <td style="font-size:11px">{{ fmtDay(r.report_date) }}</td>
+                <td>{{ fmtNum(r.plugged_in_containers) }}</td>
+                <td>{{ fmtNum(r.energy_kwh) }}</td>
+              </tr>
+            </tbody>
+            <tbody v-else><tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No reefer energy records for this period.' }}</td></tr></tbody>
+          </table>
+        </div>
+        <div class="source-note">Total reefer plug capacity per port and per-shipment commodity aren't tracked on this backend - only energy drawn by plugged-in containers.</div>
       </div>
     </div>
   </div>
@@ -112,12 +119,12 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Green Transport')
 
 import { useMaritimeGreenTransport } from '~/composables/api'
-import type { MaritimeGreenSummary, VesselEmissionRecord, GreenTransportModeStat, EvFleetStat, ReeferEnergyRecord, VesselFuelType, GreenModeCategory } from '~/composables/api'
+import type { MaritimeGreenSummary, VesselEmissionRecord, GreenTransportModeStat, GreenModeWaterStat, GreenModeEvStat, EVFleetRecord, ReeferEnergyRecord, VesselFuelType } from '~/composables/api'
 
 const summary      = ref<MaritimeGreenSummary | null>(null)
-const modeStats    = ref<GreenTransportModeStat[]>([])
+const modeStatsSummary = ref<{ days: number; modes: GreenTransportModeStat[]; generated_at: string } | null>(null)
 const emissions    = ref<VesselEmissionRecord[]>([])
-const evFleet      = ref<EvFleetStat[]>([])
+const evFleet      = ref<EVFleetRecord[]>([])
 const reeferEnergy = ref<ReeferEnergyRecord[]>([])
 const loading      = ref(true)
 const error        = ref<string | null>(null)
@@ -131,15 +138,15 @@ async function load() {
     gt.summary(),
     gt.modeStats(),
     gt.vesselEmissions({ page_size: 50 }),
-    gt.evFleet(),
-    gt.reeferEnergy({}),
+    gt.evFleet({ page_size: 50 }),
+    gt.reeferEnergy({ page_size: 50 }),
   ])
 
   if (sumRes.status === 'fulfilled') summary.value = sumRes.value
-  if (msRes.status  === 'fulfilled') modeStats.value = (msRes.value as any).results ?? []
-  if (emRes.status  === 'fulfilled') emissions.value = (emRes.value as any).results ?? []
-  if (evRes.status  === 'fulfilled') evFleet.value = (evRes.value as any).results ?? []
-  if (rfRes.status  === 'fulfilled') reeferEnergy.value = (rfRes.value as any).results ?? []
+  if (msRes.status  === 'fulfilled') modeStatsSummary.value = msRes.value
+  if (emRes.status  === 'fulfilled') emissions.value = emRes.value.results ?? []
+  if (evRes.status  === 'fulfilled') evFleet.value = evRes.value.results ?? []
+  if (rfRes.status  === 'fulfilled') reeferEnergy.value = rfRes.value.results ?? []
 
   if ([sumRes, msRes, emRes, evRes, rfRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime Green Transport API.'
@@ -148,6 +155,34 @@ async function load() {
 }
 
 onMounted(load)
+
+const modeStats = computed(() => modeStatsSummary.value?.modes ?? [])
+const waterMode = computed(() => modeStats.value.find((m): m is GreenModeWaterStat => m.mode === 'water') ?? null)
+const evTruckMode = computed(() => modeStats.value.find((m): m is GreenModeEvStat => m.mode === 'ev_truck') ?? null)
+const evTrainMode = computed(() => modeStats.value.find((m): m is GreenModeEvStat => m.mode === 'ev_train') ?? null)
+const co2SavedTotal = computed(() => (evTruckMode.value?.co2_saved_tonnes ?? 0) + (evTrainMode.value?.co2_saved_tonnes ?? 0))
+const pollutionIncidentsTotal = computed(() => summary.value?.ports.reduce((s, p) => s + p.marine_pollution_incidents, 0) ?? 0)
+
+const modeRows = computed(() => modeStats.value.map(m => {
+  if (m.mode === 'water') {
+    return {
+      mode: m.mode,
+      label: m.label,
+      keyMetricLabel: 'Avg gCO₂/TEU-km',
+      keyMetricValue: m.avg_g_co2_per_teu_km != null ? m.avg_g_co2_per_teu_km.toFixed(0) : '-',
+      detail: `${fmtNum(m.co2_emissions_tonnes, 1)}t CO₂ total, ${pct(m.avg_shore_power_pct)} shore power`,
+      target: m.target,
+    }
+  }
+  return {
+    mode: m.mode,
+    label: m.label,
+    keyMetricLabel: 'Fleet Size',
+    keyMetricValue: fmtNum(m.fleet_size),
+    detail: `${fmtNum(m.energy_kwh)} kWh, ${fmtNum(m.km_driven)} km, ${fmtNum(m.co2_saved_tonnes, 1)}t CO₂ saved`,
+    target: null,
+  }
+}))
 
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -158,13 +193,9 @@ function fmtDay(s: string) {
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
   catch { return s }
 }
-function categoryLabel(c: GreenModeCategory) {
-  const m: Record<GreenModeCategory,string> = { water: 'Water (Vessels)', rail: 'Trains', ev_vehicle: 'EV Vehicles' }
-  return m[c] ?? c
-}
-function categoryBadge(c: GreenModeCategory) {
-  const m: Record<GreenModeCategory,string> = { water: 'info', rail: 'neutral', ev_vehicle: 'success' }
-  return m[c] ?? 'neutral'
+function categoryBadge(mode: string) {
+  const m: Record<string,string> = { water: 'info', ev_truck: 'success', ev_train: 'success' }
+  return m[mode] ?? 'neutral'
 }
 function fuelBadge(f: VesselFuelType) {
   const m: Record<VesselFuelType,string> = { hfo:'danger', mgo:'warning', lng:'info', methanol:'info', zero_emission:'success' }
@@ -178,4 +209,5 @@ function fuelBadge(f: VesselFuelType) {
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .table-scroll { overflow-x:auto; }
+.source-note { margin-top:10px; font-size:11px; color:#94a3b8; }
 </style>

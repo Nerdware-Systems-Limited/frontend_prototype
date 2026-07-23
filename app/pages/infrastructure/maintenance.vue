@@ -16,7 +16,7 @@
   <div class="kpi-grid">
     <KpiCard
       label="Open Orders"
-      :value="fmtNum(countByStatus('planned') + countByStatus('scheduled'))"
+      :value="fmtNum(countByStatus('planned'))"
       sub="Not yet started"
       source="live" source-title="KeNHA MMS"
     />
@@ -256,7 +256,8 @@
         <select v-model="signalStatusFilter" class="select-sm">
           <option value="">All statuses</option>
           <option value="operational">Operational</option>
-          <option value="faulty">Faulty</option>
+          <option value="degraded">Degraded</option>
+          <option value="fault">Fault</option>
           <option value="maintenance">Maintenance</option>
           <option value="offline">Offline</option>
         </select>
@@ -468,7 +469,7 @@ function failColor(p: number | null | undefined) {
   return p >= 0.7 ? '#ef4444' : p >= 0.4 ? '#f59e0b' : '#22c55e'
 }
 function sigBadge(s: string) {
-  const m: Record<string,string> = { operational:'success', faulty:'danger', maintenance:'warning', offline:'neutral' }
+  const m: Record<string,string> = { operational:'success', fault:'danger', degraded:'warning', maintenance:'warning', offline:'neutral' }
   return m[s] ?? 'neutral'
 }
 </script>

@@ -151,11 +151,11 @@
         </thead>
         <tbody v-if="paxRecords.length">
           <tr v-for="(r, i) in paxRecords.slice(0, 50)" :key="i">
-            <td>{{ r.airport_name ?? r.airport__name ?? '-' }}</td>
-            <td style="font-size:12px">{{ r.date ? fmtDate(r.date) : '-' }}</td>
-            <td style="font-weight:600">{{ fmtNum(r.total_pax ?? r.passengers) }}</td>
+            <td>{{ airportName(r.airport_code) }}</td>
+            <td style="font-size:12px">{{ r.report_date ? fmtDate(r.report_date) : '-' }}</td>
+            <td style="font-weight:600">{{ fmtNum(r.passengers) }}</td>
             <td>{{ fmtNum(r.domestic) }}</td>
-            <td>{{ fmtNum(r.intl ?? r.international) }}</td>
+            <td>{{ fmtNum(r.international) }}</td>
             <td style="font-size:12px">{{ r.revenue_kes ? fmtKES(parseFloat(r.revenue_kes)) : '-' }}</td>
           </tr>
         </tbody>
@@ -232,6 +232,10 @@ function fmtKES(n: number | null | undefined) {
 function fmtDate(s: string) {
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
   catch { return s }
+}
+function airportName(code: string | null | undefined) {
+  if (!code) return '-'
+  return airports.value.find(a => a.iata_code === code)?.name ?? code
 }
 </script>
 

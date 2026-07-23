@@ -83,7 +83,7 @@
             <td class="mono-cell cert-no">{{ c.certificate_number || '-' }}</td>
             <td class="name-cell">{{ c.enrollment_detail?.full_name ?? '-' }}</td>
             <td class="mono-cell">{{ c.enrollment_detail?.national_id ?? '-' }}</td>
-            <td class="mono-cell">{{ c.enrollment_detail?.cohort_detail?.cohort_code ?? '-' }}</td>
+            <td class="mono-cell">{{ c.enrollment_detail?.cohort ? c.enrollment_detail.cohort.slice(0, 8) : '-' }}</td>
             <td>
               <BadgePill :variant="outcomeBadge(c.outcome)" size="sm">{{ outcomeLabel(c.outcome) }}</BadgePill>
             </td>

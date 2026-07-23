@@ -85,16 +85,16 @@
 
           <div v-if="governorDetail" class="gov-detail">
             <div class="gov-detail-row">
-              <span>Online</span><strong>{{ fmtNum(governorDetail.online) }}</strong>
+              <span>Online</span><strong>{{ fmtNum(governorDetail.by_status?.online) }}</strong>
             </div>
             <div class="gov-detail-row">
-              <span>Tampered</span><strong style="color:#ef4444">{{ fmtNum(governorDetail.tampered) }}</strong>
+              <span>Tampered</span><strong style="color:#ef4444">{{ fmtNum(governorDetail.by_status?.tampered) }}</strong>
             </div>
             <div class="gov-detail-row">
-              <span>Fault</span><strong style="color:#f59e0b">{{ fmtNum(governorDetail.fault) }}</strong>
+              <span>Fault</span><strong style="color:#f59e0b">{{ fmtNum(governorDetail.by_status?.fault) }}</strong>
             </div>
             <div class="gov-detail-row">
-              <span>Offline</span><strong style="color:#94a3b8">{{ fmtNum(governorDetail.offline) }}</strong>
+              <span>Offline</span><strong style="color:#94a3b8">{{ fmtNum(governorDetail.by_status?.offline) }}</strong>
             </div>
           </div>
         </div>

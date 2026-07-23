@@ -227,14 +227,14 @@
   <div class="card">
     <div class="card-body">
       <div v-if="metObs.length" class="met-grid">
-        <div v-for="m in metObs" :key="m.id ?? m.station" class="met-card">
-          <div style="font-weight:700;font-size:13px">{{ m.station_name ?? m.station }}</div>
+        <div v-for="m in metObs" :key="m.id ?? m.station_code" class="met-card">
+          <div style="font-weight:700;font-size:13px">{{ m.station_name ?? m.station_code }}</div>
           <div style="font-size:12px;color:#64748b">
             {{ m.temperature_c != null ? `${m.temperature_c.toFixed(0)}°C` : '' }}
-            {{ m.wind_speed_kmh != null ? `· ${m.wind_speed_kmh.toFixed(0)} km/h` : '' }}
-            {{ m.visibility_km != null ? `· ${m.visibility_km.toFixed(0)} km vis` : '' }}
+            {{ m.wind_speed_kt != null ? `· ${m.wind_speed_kt.toFixed(0)} kt` : '' }}
+            {{ m.visibility_m != null ? `· ${(m.visibility_m / 1000).toFixed(1)} km vis` : '' }}
           </div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px">{{ m.condition?.replace(/_/g,' ') ?? '' }}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px">{{ (m.flight_category || m.sea_state || '')?.replace(/_/g,' ') }}</div>
         </div>
       </div>
       <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No meteorological data available.' }}</div>

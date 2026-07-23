@@ -265,6 +265,8 @@ export interface AviationQuery {
   status?: string
   date_from?: string
   date_to?: string
+  page?: number
+  page_size?: number
 }
 export interface PortQuery {
   port?: string
@@ -273,6 +275,31 @@ export interface PortQuery {
 }
 
 // ── Composable ───────────────────────────────────────────────────────
+
+/**
+ * `FlightViewSet` and `PassengerStatViewSet` (backend) don't support a
+ * `days` filter - only `date`/`date_from`/`date_to` (confirmed against
+ * apps/aviation_maritime/views.py `get_queryset()` for both). Passing
+ * `days=` straight through to `/flights/*` or `/passenger-stats/*` is
+ * silently ignored server-side, so the day-range buttons on the aviation
+ * pages had no effect. Translate `days` into `date_from` (same window the
+ * backend already computes for endpoints that DO support `days`, e.g.
+ * cargo-manifests/by-commodity) before it hits those two viewsets.
+ */
+function daysAgoISO(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+function withDaysAsDateFrom(
+  q: Record<string, string | number | boolean>,
+): Record<string, string | number | boolean> {
+  const { days, ...rest } = q
+  if (days != null && rest.date_from == null) {
+    rest.date_from = daysAgoISO(Number(days))
+  }
+  return rest
+}
 
 export function useAviationMaritime() {
   const api = useApi()
@@ -290,22 +317,24 @@ export function useAviationMaritime() {
     flightSchedules: (q?: { flight_number?: string; origin?: string; destination?: string; airline?: string }) =>
       api<Paged<any>>(`${AV}/flight-schedules/`, { query: cleanQuery(q as Record<string, unknown>) }),
     flights: (q?: AviationQuery) =>
-      api<Paged<Flight>>(`${AV}/flights/`, { query: cleanQuery(q as Record<string, unknown>) }),
+      api<Paged<Flight>>(`${AV}/flights/`, { query: withDaysAsDateFrom(cleanQuery(q as Record<string, unknown>)) }),
     flightsOTP: (days = 14) =>
-      api<FlightOTP>(`${AV}/flights/otp/?days=${days}`),
+      api<FlightOTP>(`${AV}/flights/otp/`, { query: { date_from: daysAgoISO(days) } }),
     flightsByStatus: (q?: AviationQuery) =>
       api<{ results: Array<{ status: string; count: number }> }>(`${AV}/flights/by-status/`, {
-        query: cleanQuery(q as Record<string, unknown>),
+        query: withDaysAsDateFrom(cleanQuery(q as Record<string, unknown>)),
       }),
     cargoManifests: (q?: { commodity?: string; days?: number }) =>
       api<Paged<any>>(`${AV}/cargo-manifests/`, { query: cleanQuery(q as Record<string, unknown>) }),
     cargoByCommodity: (days = 14) =>
       api<{ results: CargoByCommodity[] }>(`${AV}/cargo-manifests/by-commodity/?days=${days}`),
-    passengerStats: (q?: { airport?: string; airline?: string; days?: number }) =>
-      api<Paged<any>>(`${AV}/passenger-stats/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    passengerStats: (q?: { airport?: string; airline?: string; days?: number; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/passenger-stats/`, {
+        query: withDaysAsDateFrom(cleanQuery(q as Record<string, unknown>)),
+      }),
     passengersByAirport: (q?: { days?: number }) =>
       api<{ results: PassengerByAirport[] }>(`${AV}/passenger-stats/by-airport/`, {
-        query: cleanQuery(q as Record<string, unknown>),
+        query: withDaysAsDateFrom(cleanQuery(q as Record<string, unknown>)),
       }),
     safetyReports: (q?: { airport?: string; airline?: string; severity?: string; days?: number }) =>
       api<Paged<any>>(`${AV}/safety-reports/`, { query: cleanQuery(q as Record<string, unknown>) }),

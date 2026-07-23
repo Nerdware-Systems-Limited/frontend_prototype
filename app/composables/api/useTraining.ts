@@ -114,10 +114,22 @@ export interface TrainingEnrollment {
   updated_at: string
 }
 
+// Serialized via TrainingEnrollmentListSerializer (lightweight — no cohort_detail nesting).
+export interface TrainingEnrollmentSummary {
+  id: string
+  cohort: string
+  national_id: string
+  full_name: string
+  status: EnrollmentStatus
+  payment_status: PaymentStatus
+  amount_paid_kes: string
+  enrolled_at: string
+}
+
 export interface TrainingCompletion {
   id: string
   enrollment: string
-  enrollment_detail: TrainingEnrollment
+  enrollment_detail: TrainingEnrollmentSummary
   outcome: CompletionOutcome
   score_pct: number | null
   theory_score_pct: number | null
@@ -129,7 +141,7 @@ export interface TrainingCompletion {
   certificate_expiry: string | null
   is_certificate_valid: boolean
   issued_by: string | null
-  issued_by_name: string
+  issued_by_name: string | null
   created_at: string
   updated_at: string
 }
@@ -198,6 +210,30 @@ export interface TrainingQuery {
   ordering?: string
 }
 
+// GET /cohorts/{id}/stats/ — custom rollup, not a TrainingCohort.
+export interface TrainingCohortStats {
+  cohort_id: string
+  cohort_code: string
+  status: CohortStatus
+  capacity: number
+  enrolled_count: number
+  fill_rate_pct: number
+  enrollment_by_status: Record<EnrollmentStatus, number>
+  sessions: {
+    total: number
+    completed: number
+  }
+  revenue_total_kes: number | string
+}
+
+// GET /revenue/summary/ — monthly aggregation, not a TrainingRevenue row.
+export interface TrainingRevenueAggregate {
+  period: string
+  revenue_stream: RevenueStream
+  total_kes: string
+  transaction_count: number
+}
+
 // ── Composable ────────────────────────────────────────────────────────
 
 export function useTraining() {
@@ -227,13 +263,15 @@ export function useTraining() {
       $api<TrainingCohort>(`/api/v1/training/cohorts/${id}/`),
 
     cohortStats: (id: string) =>
-      $api<TrainingCohort>(`/api/v1/training/cohorts/${id}/stats/`),
+      $api<TrainingCohortStats>(`/api/v1/training/cohorts/${id}/stats/`),
 
+    // Custom @action — returns a bare array, not a paginated envelope.
     cohortEnrollments: (id: string) =>
-      $api<TrainingCohort>(`/api/v1/training/cohorts/${id}/enrollments/`),
+      $api<TrainingEnrollment[]>(`/api/v1/training/cohorts/${id}/enrollments/`),
 
+    // Custom @action — returns a bare array, not a paginated envelope.
     cohortSessions: (id: string) =>
-      $api<TrainingCohort>(`/api/v1/training/cohorts/${id}/sessions/`),
+      $api<TrainingSession[]>(`/api/v1/training/cohorts/${id}/sessions/`),
 
     enrollments: (q?: TrainingQuery & {
       payment_status?: string
@@ -255,8 +293,9 @@ export function useTraining() {
     attendance: (q?: TrainingQuery & {
       session?: string
       enrollment?: string
-      attendance_status?: string
+      national_id?: string
     }) =>
+      // Note: filter param is `status` (already on TrainingQuery), not `attendance_status`.
       $api<Paged<TrainingAttendance>>('/api/v1/training/attendance/', { query: cleanQuery(q) }),
 
     completions: (q?: TrainingQuery & { outcome?: string }) =>
@@ -276,6 +315,7 @@ export function useTraining() {
       received_at_from?: string
       received_at_to?: string
     }) =>
-      $api<TrainingRevenue[]>('/api/v1/training/revenue/summary/', { query: cleanQuery(q) }),
+      // Monthly aggregation rows, not TrainingRevenue ledger entries.
+      $api<TrainingRevenueAggregate[]>('/api/v1/training/revenue/summary/', { query: cleanQuery(q) }),
   }
 }

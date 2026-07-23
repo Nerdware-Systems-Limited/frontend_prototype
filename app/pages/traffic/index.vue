@@ -134,7 +134,7 @@
                 </div>
               </div>
               <div class="weather-impact" :style="{ color: impactColor(w.traffic_impact_score) }">
-                {{ w.traffic_impact_score.toFixed(0) }}% impact
+                {{ (w.traffic_impact_score * 100).toFixed(0) }}% impact
               </div>
             </div>
           </div>
@@ -364,7 +364,8 @@ function wxIcon(c: string) {
   return m[c] ?? '🌤️'
 }
 function impactColor(score: number) {
-  return score >= 70 ? '#ef4444' : score >= 40 ? '#f59e0b' : '#22c55e'
+  // traffic_impact_score is a 0..1 fraction from the backend, not 0..100.
+  return score >= 0.7 ? '#ef4444' : score >= 0.4 ? '#f59e0b' : '#22c55e'
 }
 </script>
 

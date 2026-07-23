@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { useAuthStore } from '~/stores/auth'
 
 export type AuditLog = {
   _id: string
@@ -12,11 +13,11 @@ export type AuditLog = {
   old_values: Record<string, unknown>
   new_values: Record<string, unknown>
   metadata: Record<string, unknown>
-  ip_address: string
+  ip_address: string | null      // GenericIPAddressField(null=True)
   user_agent: string
   request_path: string
   request_method: string
-  status_code: number
+  status_code: number | null     // PositiveSmallIntegerField(null=True)
   response_time: number | null  // null is valid
   created_at: string            // ISO string with tz offset
 }
@@ -63,9 +64,37 @@ export type Metrics = {
   active_sessions: number
 }
 
-const config    = useRuntimeConfig()
+// The Django consumer authenticates via ?token=<jwt> query-string (see
+// core/ws_auth.py JWTAuthMiddleware) - a browser WebSocket can't set a
+// custom Authorization header, so the token has to travel in the URL.
+// Without it every connection resolves to AnonymousUser (the consumer
+// doesn't reject anonymous connections, so this was a silent auth gap,
+// not a hard failure - WebSocketSession rows just never carried a real
+// user_id). Mirrors useNotificationSocket.ts's buildUrl().
+function buildUrl(baseUrl: string, token: string | null): string {
+  const url = new URL(baseUrl)
+  if (token) url.searchParams.set('token', token)
+  return url.toString()
+}
 
-export function useAuditSocket(url = config.public.wsUrl ?? 'ws://127.0.0.1:8000/ws/audit/') {
+export function useAuditSocket(urlOverride?: string) {
+  const config = useRuntimeConfig()
+  const authStore = useAuthStore()
+
+  // `wsUrl` is only set when NUXT_PUBLIC_WS_URL is explicitly configured
+  // (see nuxt.config.ts) - otherwise derive a same-host ws(s):// URL from
+  // `apiBase`, which is always correctly configured per-environment
+  // (confirmed live: NUXT_PUBLIC_API_BASE=http://localhost:8000 in dev).
+  // The previous hardcoded fallback ('ws://http://uapts.eu.cc/ws/audit/')
+  // had a doubled protocol and was never a valid WebSocket URL at all.
+  function deriveUrlFromApiBase(): string {
+    const apiBase = (config.public.apiBase as string) || 'http://localhost:8000'
+    const wsBase = apiBase.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')
+    return `${wsBase.replace(/\/$/, '')}/ws/audit/`
+  }
+
+  const baseUrl = urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase()
+
   const logs = ref<AuditLog[]>([])
   const metrics = ref<Metrics | null>(null)
   const isConnected = ref(false)
@@ -74,8 +103,36 @@ export function useAuditSocket(url = config.public.wsUrl ?? 'ws://127.0.0.1:8000
   let ws: WebSocket | null = null
   let pingInterval: ReturnType<typeof setInterval> | null = null
 
-  function connect() {
-    ws = new WebSocket(url)
+  async function connect() {
+    // WebSocket doesn't exist during SSR, and this composable can be
+    // touched before any onMounted() guard kicks in.
+    if (typeof window === 'undefined') return
+
+    // `accessToken` is memory-only (never persisted - see stores/auth.ts),
+    // so a fresh page load lands here with it still null until the app's
+    // silent-refresh flow completes. Without this wait, connect() would
+    // race that refresh and open the socket token-less nearly every time
+    // (reproduced live: WebSocketSession rows kept recording user_id='').
+    // Mirrors useNotificationSocket.ts's connect().
+    if (!authStore.isAccessTokenFresh()) {
+      if (authStore.refreshToken) {
+        const token = await authStore.refreshAccessToken()
+        if (!token) {
+          error.value = 'Session expired. Please log in again.'
+          return
+        }
+      } else if (!authStore.accessToken) {
+        error.value = 'Not authenticated.'
+        return
+      }
+    }
+
+    try {
+      ws = new WebSocket(buildUrl(baseUrl, authStore.accessToken))
+    } catch (err) {
+      error.value = `Failed to open WebSocket: ${err}`
+      return
+    }
 
     ws.onopen = () => {
       isConnected.value = true

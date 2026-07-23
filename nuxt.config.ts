@@ -22,7 +22,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'https://uapts.eu.cc',
-      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://http://uapts.eu.cc/ws/audit/',
+      // Left unset by default (rather than a hardcoded prod placeholder) so
+      // useAuditSocket can derive a same-host ws(s):// URL from `apiBase`
+      // when this isn't explicitly configured - see useAuditSocket.ts.
+      wsUrl: process.env.NUXT_PUBLIC_WS_URL || '',
       notificationsWsUrl:
         process.env.NUXT_PUBLIC_NOTIFICATIONS_WS_URL ??
         'wss://uapts.eu.cc/ws/notifications/',
