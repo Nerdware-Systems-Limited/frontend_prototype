@@ -381,7 +381,7 @@ function tierColor(tier: string) {
   return map[tier] ?? '#94a3b8'
 }
 function riskBadge(tier: string) {
-  const map: Record<string, string> = { critical: 'danger', high: 'warning', medium: 'fair', low: 'success' }
+  const map: Record<string, string> = { very_high: 'danger', critical: 'danger', high: 'warning', medium: 'fair', low: 'success' }
   return map[tier] ?? 'neutral'
 }
 
@@ -394,8 +394,8 @@ const mapMarkers = computed((): MarkerSpec[] => {
       lon: hs.longitude,
       title: `Risk: ${hs.predicted_risk_score.toFixed(2)}`,
       subtitle: `${hs.risk_tier} · ${hs.horizon_days}d horizon`,
-      color: hs.risk_tier === 'critical' ? 'red' : hs.risk_tier === 'high' ? 'orange' : 'yellow',
-      size: hs.risk_tier === 'critical' ? 'lg' : 'md',
+      color: (hs.risk_tier === 'critical' || hs.risk_tier === 'very_high') ? 'red' : hs.risk_tier === 'high' ? 'orange' : 'yellow',
+      size: (hs.risk_tier === 'critical' || hs.risk_tier === 'very_high') ? 'lg' : 'md',
     })
   })
   blackspots.value.forEach(bs => {

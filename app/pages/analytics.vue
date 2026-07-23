@@ -357,7 +357,7 @@ function analysePredictions(input: string): AnalysisResult {
 
   // ── Summary ──────────────────────────────────────────────────────────
   if (isSummary || (!isTraffic && !isSafety && !isInfra && !isPT)) {
-    const criticalHotspots = safetyHotspots.value.filter(h => h.risk_tier === 'critical').length
+    const criticalHotspots = safetyHotspots.value.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high').length
     const topRoute = [...demandForecasts.value].sort((a, b) => b.predicted_passengers - a.predicted_passengers)[0]
     return {
       text: [
@@ -416,10 +416,10 @@ function analysePredictions(input: string): AnalysisResult {
     let filterDesc = ''
 
     if (/\b(critical|extreme|worst|highest)\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'critical')
+      data = data.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high')
       filterDesc = 'critical tier'
     } else if (/\bhigh\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'high')
+      data = data.filter(h => h.risk_tier === 'critical' || h.risk_tier === 'very_high' || h.risk_tier === 'high')
       filterDesc = 'high or critical tier'
     } else if (/\blow\b/.test(t)) {
       data = data.filter(h => h.risk_tier === 'low')
@@ -597,11 +597,11 @@ function congBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function riskBadge(t: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'success' }
+  const m: Record<string,string> = { critical:'danger', very_high:'danger', high:'warning', medium:'fair', low:'success' }
   return m[t] ?? 'neutral'
 }
 function riskColor(t: string) {
-  const m: Record<string,string> = { critical:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' }
+  const m: Record<string,string> = { critical:'#ef4444', very_high:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' }
   return m[t] ?? '#94a3b8'
 }
 function condBadge(c: string) {

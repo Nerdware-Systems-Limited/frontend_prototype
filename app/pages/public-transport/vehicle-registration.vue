@@ -456,7 +456,7 @@ function resultBadge(r: string) {
   return m[r] ?? 'neutral'
 }
 function adherenceBadge(v: string) {
-  const m: Record<string,string> = { on_route:'success', minor_deviation:'warning', major_deviation:'danger' }
+  const m: Record<string,string> = { on_route:'success', deviation:'warning', unknown:'neutral' }
   return m[v] ?? 'neutral'
 }
 function severityBadge(s: string) {

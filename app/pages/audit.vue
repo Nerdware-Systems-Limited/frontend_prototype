@@ -27,14 +27,7 @@
     <input v-model="filters.user" class="select-sm" placeholder="User email…" style="min-width:160px" @change="reload" />
     <select v-model="filters.action" class="select-sm" @change="reload">
       <option value="">All actions</option>
-      <option value="create">Create</option>
-      <option value="update">Update</option>
-      <option value="delete">Delete</option>
-      <option value="login">Login</option>
-      <option value="logout">Logout</option>
-      <option value="export">Export</option>
-      <option value="generate">Generate</option>
-      <option value="view">View</option>
+      <option v-for="a in actionOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
     </select>
     <input v-model="filters.resource" class="select-sm" placeholder="Resource type…" @change="reload" />
     <input type="date" v-model="filters.date_from" class="select-sm" @change="reload" />
@@ -214,7 +207,15 @@ function resetFilters() {
   reload()
 }
 
+// Action filter options - fetched from the real backend rather than
+// hardcoded, so this never drifts from the actual set of audited actions.
+const actionOptions = ref<Array<{ value: string; label: string }>>([])
+async function loadActions() {
+  try { actionOptions.value = await useAudit().actions() } catch { /* keep dropdown empty on failure */ }
+}
+
 onMounted(() => load())
+onMounted(loadActions)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(() => load(), 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })

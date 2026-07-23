@@ -1230,7 +1230,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 
   for (const h of hotspots.value) {
     const color: MarkerSpec['color'] =
-      h.risk_tier === 'critical' ? 'red'
+      (h.risk_tier === 'critical' || h.risk_tier === 'very_high') ? 'red'
       : h.risk_tier === 'high'   ? 'orange'
       : h.risk_tier === 'medium' ? 'yellow'
       : 'gray'
@@ -1250,7 +1250,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
       title: h.segment_road_code ?? `Grid ${h.grid_cell_id?.slice(0, 8) ?? h.id.slice(0, 8)}`,
       rows,
       color,
-      size:  h.risk_tier === 'critical' ? 'lg' : 'md',
+      size:  (h.risk_tier === 'critical' || h.risk_tier === 'very_high') ? 'lg' : 'md',
     })
   }
 

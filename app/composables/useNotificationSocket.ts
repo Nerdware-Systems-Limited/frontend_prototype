@@ -101,17 +101,22 @@ export function useNotificationSocket(wsBaseUrl?: string) {
     intentionalClose = false
     error.value = null
 
-    // Ensure we have a fresh access token before opening the socket.
-    if (authStore.refreshToken) {
-      const token = await authStore.refreshAccessToken()
+    // Only refresh if the current access token is missing or actually close to
+    // expiring - not on every (re)connect. Without this check, a WS that keeps
+    // getting dropped (e.g. a proxy/idle timeout) would hammer the refresh
+    // endpoint every reconnect cycle instead of only once every ~15 minutes.
+    if (!authStore.isAccessTokenFresh()) {
+      if (authStore.refreshToken) {
+        const token = await authStore.refreshAccessToken()
 
-      if (!token) {
-        error.value = 'Session expired. Please log in again.'
+        if (!token) {
+          error.value = 'Session expired. Please log in again.'
+          return
+        }
+      } else if (!authStore.accessToken) {
+        error.value = 'Not authenticated.'
         return
       }
-    } else if (!authStore.accessToken) {
-      error.value = 'Not authenticated.'
-      return
     }
 
     try {

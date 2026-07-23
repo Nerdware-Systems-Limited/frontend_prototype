@@ -332,7 +332,7 @@ function fmtDate(iso: string) {
   catch { return iso }
 }
 function tierBadge(t: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'success' }
+  const m: Record<string,string> = { critical:'danger', very_high:'danger', high:'warning', medium:'fair', low:'success' }
   return m[t] ?? 'neutral'
 }
 function riskBadge(t: string) {

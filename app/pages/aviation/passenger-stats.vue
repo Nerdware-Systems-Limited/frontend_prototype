@@ -92,9 +92,9 @@
               </div>
               <span style="font-size:11px">{{ p.total_pax > 0 ? ((p.intl / p.total_pax) * 100).toFixed(0) : 0 }}%</span>
             </td>
-            <td style="font-size:12px">{{ fmtKES(parseFloat(p.revenue_kes)) }}</td>
+            <td style="font-size:12px">{{ fmtKES(p.revenue_kes) }}</td>
             <td style="font-size:12px">
-              {{ p.total_pax > 0 ? fmtKES(parseFloat(p.revenue_kes) / p.total_pax) : '-' }}
+              {{ p.total_pax > 0 ? fmtKES(p.revenue_kes / p.total_pax) : '-' }}
             </td>
           </tr>
         </tbody>
@@ -214,7 +214,7 @@ onUnmounted(() => { if (t) clearInterval(t) })
 const totalPax      = computed(() => byAirport.value.reduce((s, p) => s + p.total_pax, 0))
 const totalDomestic = computed(() => byAirport.value.reduce((s, p) => s + p.domestic, 0))
 const totalIntl     = computed(() => byAirport.value.reduce((s, p) => s + p.intl, 0))
-const totalRevenue  = computed(() => byAirport.value.reduce((s, p) => s + parseFloat(p.revenue_kes), 0))
+const totalRevenue  = computed(() => byAirport.value.reduce((s, p) => s + p.revenue_kes, 0))
 const maxPax        = computed(() => Math.max(1, ...byAirport.value.map(p => Math.max(p.domestic, p.intl))))
 
 // ── Helpers ────────────────────────────────────────────────────────────────

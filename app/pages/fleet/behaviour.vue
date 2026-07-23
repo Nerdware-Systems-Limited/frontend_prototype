@@ -36,10 +36,10 @@
         <select v-model="eventTypeFilter" class="select-sm">
           <option value="">All event types</option>
           <option value="speeding">Speeding</option>
-          <option value="harsh_braking">Harsh Braking</option>
-          <option value="harsh_acceleration">Harsh Acceleration</option>
-          <option value="route_deviation">Route Deviation</option>
-          <option value="fatigue">Fatigue</option>
+          <option value="harsh_brake">Harsh Braking</option>
+          <option value="harsh_accel">Harsh Acceleration</option>
+          <option value="excessive_idle">Excessive Idling</option>
+          <option value="sharp_turn">Sharp Turn</option>
         </select>
         <button class="btn" @click="eventSearch=''; severityFilter=''; eventTypeFilter=''; load()">Clear</button>
         <ExportButton filename="uapts-driver-behaviour-events.csv" :rows="filteredEvents" :columns="eventExportColumns" style="margin-left:auto" />

@@ -33,7 +33,7 @@ export interface Route {
   route_name: string
   route_short_name?: string
   service_type: ServiceType
-  fare_kes: number
+  fare_kes: string
   distance_km: number
   path_geometry: [number, number][]
   geometry: [number, number][]
@@ -92,8 +92,8 @@ export interface FareCollection {
   route_name?: string
   payment_channel: 'cash' | 'bebapay' | 'mpesa' | 'card' | 'other'
   transaction_count: number
-  total_kes: number
-  avg_fare_kes: number
+  total_kes: string
+  avg_fare_kes: string
   collected_hour: string
 }
 
@@ -134,7 +134,7 @@ export interface OperatorMetric {
   total_trips: number
   on_time_pct: number
   complaint_count: number
-  revenue_kes: number
+  revenue_kes: string
   fleet_utilization_pct: number
   rank_position: number
 }
@@ -145,7 +145,7 @@ export interface PaymentTransaction {
   route?: string | null
   route_name?: string | null
   provider: 'bebapay' | 'mpesa' | 'airtel_money' | 'equity' | 'coop'
-  amount_kes: number
+  amount_kes: string
   boarded_stop?: string | null
   boarded_stop_name?: string | null
   alighted_stop?: string

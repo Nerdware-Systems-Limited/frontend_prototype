@@ -2,11 +2,11 @@
 // ─────────────────────────────────────────────────────────────────────
 // /api/v1/audit/* - audit-trail endpoint, backed by MongoDB.
 //
-// Pagination: limit/offset style - the API accepts a `limit` query param
-// (verified against the live schema) and returns `count`, `next`,
-// `previous`, `results`. The `next`/`previous` URLs already carry the
-// limit forward, so only the *first* request needs to set it - navigate
-// subsequent pages by following those URLs (see listFromUrl).
+// Pagination: page-number style - the API accepts `limit` (page size) and
+// `page` query params and returns `count`, `next`, `previous`, `results`,
+// where `next`/`previous` are absolute `...?limit=N&page=M` URLs (confirmed
+// live - NOT limit/offset style despite the param being named `limit`).
+// `listFromUrl` just follows those URLs verbatim, so it works either way.
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi, cleanQuery } from './_client'
@@ -17,7 +17,7 @@ import type { Paged } from '~/types/uapts'
 export interface AuditEntry {
   // identifiers
   _id: string
-  id: string                          // normalised to string (API sends int)
+  id: string                          // normalised to string below - the API sends int
 
   // actor
   user_id: string | null              // "None" string or null → treat as absent
@@ -74,6 +74,10 @@ export interface AuditPage {
 
 // ── Composable ─────────────────────────────────────────────────────────────
 
+function normalisePage(p: AuditPage): AuditPage {
+  return { ...p, results: p.results.map(e => ({ ...e, id: String(e.id) })) }
+}
+
 export function useAudit() {
   const api = useApi()
 
@@ -83,26 +87,33 @@ export function useAudit() {
      * Returns the full page envelope so the caller can read next/previous.
      * Pass `limit` explicitly - the server default is small (10-20 rows).
      */
-    list: (q?: AuditQuery): Promise<AuditPage> =>
-      api<AuditPage>('/api/v1/audit/logs/', { query: cleanQuery(q as Record<string, unknown>) }),
+    list: async (q?: AuditQuery): Promise<AuditPage> => {
+      const page = await api<AuditPage>('/api/v1/audit/logs/', { query: cleanQuery(q as Record<string, unknown>) })
+      return normalisePage(page)
+    },
 
     /**
      * Navigate to an absolute next/previous URL returned by the API.
      * Strips the origin so the request goes through the configured $api base.
      */
-    listFromUrl: (absoluteUrl: string): Promise<AuditPage> => {
+    listFromUrl: async (absoluteUrl: string): Promise<AuditPage> => {
       const path = new URL(absoluteUrl).pathname + new URL(absoluteUrl).search
-      return api<AuditPage>(path)
+      return normalisePage(await api<AuditPage>(path))
     },
 
     /** GET /api/v1/audit/logs/{id}/ - single entry. */
-    get: (id: string) => api<AuditEntry>(`/api/v1/audit/logs/${id}/`),
+    get: async (id: string) => {
+      const entry = await api<AuditEntry>(`/api/v1/audit/logs/${id}/`)
+      return { ...entry, id: String(entry.id) }
+    },
 
     /** GET /api/v1/audit/my-logs/ - actions performed by the current user. */
-    myLogs: (q?: AuditQuery): Promise<AuditPage> =>
-      api<AuditPage>('/api/v1/audit/my-logs/', { query: cleanQuery(q as Record<string, unknown>) }),
+    myLogs: async (q?: AuditQuery): Promise<AuditPage> => {
+      const page = await api<AuditPage>('/api/v1/audit/my-logs/', { query: cleanQuery(q as Record<string, unknown>) })
+      return normalisePage(page)
+    },
 
     /** GET /api/v1/audit/actions/ - distinct action types available to filter by. */
-    actions: () => api<string[] | { results: string[] }>('/api/v1/audit/actions/'),
+    actions: () => api<Array<{ value: string; label: string }>>('/api/v1/audit/actions/'),
   }
 }

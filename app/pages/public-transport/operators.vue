@@ -398,8 +398,8 @@ const operators = computed(() => saccos.value.map(s => {
   const compliantCount = complianceForSacco.filter(c => c.status === 'compliant').length
   const routeCompliance = complianceForSacco.length ? (compliantCount / complianceForSacco.length) * 100 : null
 
-  const revenue = latestMetric?.revenue_kes
-    ?? (paymentsForSacco.length ? paymentsForSacco.reduce((sum, p) => sum + Number(p.amount_kes || 0), 0) : null)
+  const revenue = latestMetric?.revenue_kes != null ? Number(latestMetric.revenue_kes)
+    : (paymentsForSacco.length ? paymentsForSacco.reduce((sum, p) => sum + Number(p.amount_kes || 0), 0) : null)
 
   const paymentChannels = [...new Set(paymentsForSacco.map(p => p.provider))]
 

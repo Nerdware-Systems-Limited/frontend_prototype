@@ -22,10 +22,9 @@ export type VehicleType =
 export type GovernorStatus = 'online' | 'tampered' | 'fault' | 'offline'
 export type GeofenceEventType = 'entry' | 'exit' | 'dwell'
 export type BehaviourEventType =
-  | 'speeding' | 'harsh_brake' | 'harsh_accel' | 'idle' | 'cornering'
-  | 'route_deviation'
+  | 'speeding' | 'harsh_brake' | 'harsh_accel' | 'excessive_idle' | 'sharp_turn'
 export type BehaviourSeverity = 'low' | 'medium' | 'high' | 'critical'
-export type RouteAdherenceVerdict = 'on_route' | 'minor_deviation' | 'major_deviation'
+export type RouteAdherenceVerdict = 'on_route' | 'deviation' | 'unknown'
 export type TripStatus = 'completed' | 'in_progress' | 'cancelled'
 
 // ── Vehicle ──────────────────────────────────────────────────────────
@@ -207,7 +206,7 @@ export interface WeighbridgeEvent {
   plate_number: string
   station: string
   station_name: string
-  axle_load_per_group: number[] | null
+  axle_load_per_group: Record<string, number> | null
   overload_amount_kg: number | null
   recorded_at: string
 }

@@ -133,6 +133,22 @@ export const useAuthStore = defineStore('auth', () => {
     _clearTokens()
   }
 
+  // ── Token freshness check ──────────────────────────────────────────────────
+  // Decodes the access token's `exp` claim (no signature verification needed -
+  // we trust our own token) so callers like the notification socket can skip
+  // refreshAccessToken() when the current token is still valid, instead of
+  // forcing a refresh on every single (re)connect attempt.
+  function isAccessTokenFresh(bufferMs = 60_000): boolean {
+    if (!accessToken.value) return false
+    try {
+      const payload = JSON.parse(atob(accessToken.value.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      if (typeof payload.exp !== 'number') return false
+      return Date.now() < payload.exp * 1000 - bufferMs
+    } catch {
+      return false
+    }
+  }
+
   // ── Silent token refresh ───────────────────────────────────────────────────
   async function refreshAccessToken(): Promise<string | null> {
     if (!refreshToken.value) return null
@@ -203,6 +219,6 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     accessToken, refreshToken, user, isLoading,
     isAuthenticated, userInitials,
-    hydrate, login, logout, forceLogout, refreshAccessToken, fetchMe,
+    hydrate, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
   }
 })

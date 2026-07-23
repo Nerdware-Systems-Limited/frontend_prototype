@@ -111,7 +111,7 @@ export interface PassengerByAirport {
   total_pax: number
   domestic: number
   intl: number
-  revenue_kes: string
+  revenue_kes: number
 }
 
 export type SafetySeverity = 'fatal' | 'serious' | 'minor' | 'none' | 'incident'
@@ -294,7 +294,7 @@ export function useAviationMaritime() {
     flightsOTP: (days = 14) =>
       api<FlightOTP>(`${AV}/flights/otp/?days=${days}`),
     flightsByStatus: (q?: AviationQuery) =>
-      api<{ results: Array<{ status: string; c: number }> }>(`${AV}/flights/by-status/`, {
+      api<{ results: Array<{ status: string; count: number }> }>(`${AV}/flights/by-status/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
     cargoManifests: (q?: { commodity?: string; days?: number }) =>

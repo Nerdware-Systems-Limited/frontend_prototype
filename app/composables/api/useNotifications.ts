@@ -69,7 +69,7 @@ export interface AlertRule {
   id: string
   name: string
   event_type: string
-  condition: Condition | null
+  condition?: Condition | null
   severity: Severity
   channels: Channel[]
   target_roles: string[]
@@ -86,7 +86,7 @@ export interface AlertRule {
 
 export interface NotificationListResponse {
   count: number
-  unread_count: number
+  unread_count?: number
   limit: number
   skip: number
   results: Notification[]

@@ -174,7 +174,7 @@
               </div>
               <span style="font-size:11px">{{ p.total_pax > 0 ? ((p.intl / p.total_pax) * 100).toFixed(0) : 0 }}%</span>
             </td>
-            <td style="font-size:12px">KES {{ fmtKES(parseFloat(p.revenue_kes)) }}</td>
+            <td style="font-size:12px">KES {{ fmtKES(p.revenue_kes) }}</td>
           </tr>
         </tbody>
         <tbody v-else>
@@ -296,7 +296,12 @@ async function load() {
   if (flRes.status  === 'fulfilled') flights.value     = (flRes.value as any).results ?? []
   if (cgRes.status  === 'fulfilled') cargo.value       = (cgRes.value as any).results ?? []
   if (pxRes.status  === 'fulfilled') pax.value         = (pxRes.value as any).results ?? []
-  if (stRes.status  === 'fulfilled') statusDist.value  = (stRes.value as any).results ?? statusDist.value
+  if (stRes.status  === 'fulfilled') {
+    // by-status endpoint returns `{status, count}` while the summary's own
+    // by_status uses `{status, c}` - normalise to the `c` shape the template expects.
+    const results = (stRes.value as any).results
+    if (results?.length) statusDist.value = results.map((r: any) => ({ status: r.status, c: r.count }))
+  }
   if (metRes.status === 'fulfilled') metObs.value      = (metRes.value as any).results ?? []
   if (sfRes.status  === 'fulfilled') safetyStats.value = sfRes.value
 

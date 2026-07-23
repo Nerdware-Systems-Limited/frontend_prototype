@@ -29,7 +29,7 @@ export interface ReportRun {
   completed_at?: string
   download_url?: string
   file_size_bytes?: number
-  error?: string
+  error?: string | null
 }
 
 export interface ReportsQuery {
@@ -66,8 +66,21 @@ export function useReports() {
     generate: (body: GeneratePayload) =>
       api<ReportRun>('/api/v1/reports/generate/', { method: 'POST', body }),
 
-    /** GET /api/v1/reports/<id>/ - fetch current status of a single run */
-    run: (id: string) => api<ReportRun>(`/api/v1/reports/${id}/`),
+    /**
+     * Poll the status of a single run. There is no dedicated single-run-status
+     * endpoint on this backend - the schema documents /api/v1/reports/<id>/ but
+     * it's actually the template-catalog ViewSet mounted a second time (confirmed
+     * live: 404 for a real run id) - so this re-fetches recent run history and
+     * finds the matching id client-side.
+     */
+    run: async (id: string) => {
+      const page = await api<{ count: number; results: ReportRun[] }>(
+        '/api/v1/reports/runs/', { query: { page_size: 50 } },
+      )
+      const found = page.results.find(r => r.id === id)
+      if (!found) throw new Error(`Report run ${id} not found in recent history`)
+      return found
+    },
 
     /**
      * Returns the direct download URL for a completed run.

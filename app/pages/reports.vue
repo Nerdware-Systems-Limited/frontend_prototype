@@ -69,7 +69,7 @@
       <div class="tc-top">
         <div class="tc-head">
           <span class="tc-name">{{ tmpl.name }}</span>
-          <BadgePill v-if="tmpl.schedule_cron" variant="fair">Scheduled</BadgePill>
+          <BadgePill v-if="tmpl.schedule" variant="fair">Scheduled</BadgePill>
           <BadgePill v-else variant="neutral">On-demand</BadgePill>
         </div>
         <div v-if="tmpl.module" class="tc-module">{{ tmpl.module }}</div>
@@ -244,8 +244,6 @@ function stopPolling() {
   if (pollTimer)    { clearInterval(pollTimer);    pollTimer = null }
   if (pollDeadline) { clearTimeout(pollDeadline);  pollDeadline = null }
 }
-
-function downloadUrl(runId: string) { return useReports().downloadUrl(runId) }
 
 function runBadge(s: string) {
   const m: Record<string,string> = { completed:'success', running:'info', failed:'danger', queued:'neutral' }

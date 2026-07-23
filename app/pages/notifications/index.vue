@@ -154,8 +154,10 @@
 definePageMeta({ layout: 'default' })
 useNavSubtitle('Notifications')
 
-import { useNotifications, useNotificationSocket } from '~/composables/api'
+import { storeToRefs } from 'pinia'
+import { useNotifications } from '~/composables/api'
 import type { Notification } from '~/composables/api'
+import { useNotificationStore } from '~/stores/notifications'
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const
 
@@ -169,13 +171,16 @@ const deletingId     = ref<string | null>(null)
 const markingAll     = ref(false)
 
 // ── WebSocket live feed ──────────────────────────────────────────────────
-const socket          = useNotificationSocket()
-const streamConnected = socket.isConnected
-const liveUnread      = socket.unreadCount
-const streamError     = socket.error
+// Reuses the app-wide socket connection (connected/disconnected once from
+// AppTopNav.vue for the whole session) rather than opening a second,
+// independent connection just for this page.
+const socket = useNotificationStore()
+// Pinia auto-unwraps refs when read directly off the store instance, which
+// loses reactivity on plain destructuring - storeToRefs keeps these reactive.
+const { notifications: liveNotifications, isConnected: streamConnected, unreadCount: liveUnread, error: streamError } = storeToRefs(socket)
 
-watch(() => socket.notifications.value.length, () => {
-  const newest = socket.notifications.value[0]
+watch(() => liveNotifications.value.length, () => {
+  const newest = liveNotifications.value[0]
   if (newest && !notifications.value.some(n => n.id === newest.id))
     notifications.value.unshift(newest)
 })
@@ -191,7 +196,7 @@ async function load() {
   loading.value = false
 }
 
-onMounted(() => { socket.connect(); load() })
+onMounted(() => { load() })
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 60_000) })
 onUnmounted(() => { if (t) clearInterval(t) })

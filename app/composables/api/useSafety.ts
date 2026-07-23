@@ -13,25 +13,26 @@ import type { Paged } from '~/types/uapts'
 
 // ── Domain enums ────────────────────────────────────────────────────
 
-export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical' | 'fatal'
+export type IncidentSeverity = 'minor' | 'serious' | 'fatal'
 export type IncidentStatus =
   | 'reported' | 'triaged' | 'dispatched' | 'on_scene'
   | 'resolved' | 'closed' | 'cancelled'
 export type IncidentType =
-  | 'accident' | 'near_miss' | 'breakdown' | 'hazard' | 'violation' | 'other'
+  | 'accident' | 'hazard' | 'obstruction' | 'flooding' | 'fire' | 'security'
+  | 'breakdown' | 'rail_incident' | 'aviation_incident' | 'maritime_incident'
 export type ReportingChannel =
-  | 'mobile_app' | 'hotline' | 'radio' | 'partner_api' | 'roadside_cam'
-  | 'social_media' | 'other'
+  | 'mobile_app' | 'web_portal' | 'call_centre' | 'automated_detection'
 export type DispatchServiceType =
-  | 'ambulance' | 'fire' | 'police' | 'tow' | 'traffic_management' | 'hazmat'
+  | 'police' | 'ambulance' | 'fire' | 'kenya_red_cross'
+  | 'traffic_police' | 'highway_authority' | 'tow'
 export type DispatchStatus =
   | 'recommended' | 'acknowledged' | 'en_route' | 'on_scene'
   | 'completed' | 'cancelled'
 export type BlackSpotTier = 'critical' | 'high' | 'medium' | 'low'
-export type RiskTier = 'critical' | 'high' | 'medium' | 'low'
+export type RiskTier = 'very_high' | 'high' | 'medium' | 'low'
 export type ViolationType =
-  | 'speeding' | 'red_light' | 'wrong_way' | 'no_seatbelt'
-  | 'overloading' | 'no_license' | 'other'
+  | 'speeding' | 'red_light' | 'lane_violation' | 'no_seatbelt' | 'drunk_driving'
+  | 'no_license' | 'illegal_psv' | 'overloading' | 'other'
 export type InterventionType =
   | 'rumble_strip' | 'speed_table' | 'signage' | 'streetlight'
   | 'guardrail' | 'rechannelization' | 'crosswalk' | 'other'
@@ -183,7 +184,7 @@ export interface TrafficViolation {
   vehicle: string | null
   plate_number: string
   violation_type: ViolationType
-  fine_kes: number | null
+  fine_kes: string
   latitude: number | null
   longitude: number | null
   occurred_at: string

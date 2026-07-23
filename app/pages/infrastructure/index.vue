@@ -16,15 +16,16 @@
   <div class="agency-tabs">
     <button class="agency-tab" :class="{ active: selectedAgency === '' }" @click="selectAgency('')">
       All Agencies
-      <span class="agency-tab-count">{{ segments.length }}</span>
+      <span class="agency-tab-count">{{ summary ? fmtNum(summary.network.total_segments) : fmtNum(segments.length) }}</span>
     </button>
     <button
       v-for="a in agencyOptions" :key="a.code"
       class="agency-tab" :class="{ active: selectedAgency === a.code }"
       @click="selectAgency(a.code)"
+      title="Approximate - based on a sample, not a full per-agency count"
     >
       {{ a.name }}
-      <span class="agency-tab-count">{{ a.count }}</span>
+      <span class="agency-tab-count">~{{ fmtNum(a.count) }}</span>
     </button>
   </div>
 
@@ -37,33 +38,33 @@
     <KpiCard
       label="Network Length"
       :value="`${fmtNum(stats.totalLength, 0)} km`"
-      :sub="`${fmtNum(stats.segmentCount)} segments`"
-      source="batch" source-title="Agency Survey"
+      :sub="stats.usingAggregate ? `${segmentsLabel} · network-wide` : `${segmentsLabel} · estimated`"
+      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
     />
     <KpiCard
       label="Asset Count"
       :value="fmtNum(stats.assetCount)"
-      sub="Segments + bridges + streetlights"
-      source="batch" source-title="Agency Survey"
+      :sub="stats.usingAggregate ? 'Segments + bridges + streetlights · network-wide' : 'Segments + bridges + streetlights · estimated'"
+      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
     />
     <KpiCard
       label="Avg IRI"
       :value="stats.avgIri != null ? stats.avgIri.toFixed(2) : '-'"
-      sub="International Roughness Index (m/km)"
+      :sub="stats.usingAggregate ? 'IRI (m/km) · network-wide average' : 'IRI (m/km) · estimated'"
       :trend-direction="stats.avgIri != null && stats.avgIri <= 4 ? 'up' : 'down'"
-      source="batch" source-title="Agency Survey"
+      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
     />
     <KpiCard
       label="Avg PCI"
       :value="stats.avgPci != null ? stats.avgPci.toFixed(1) : '-'"
-      sub="Pavement Condition Index (0–100)"
+      :sub="stats.usingAggregate ? 'PCI (0–100) · network-wide average' : 'PCI (0–100) · estimated'"
       :trend-direction="stats.avgPci != null && stats.avgPci >= 70 ? 'up' : 'down'"
-      source="batch" source-title="Agency Survey"
+      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
     />
     <KpiCard
       label="Data Completeness"
       :value="stats.completenessPct != null ? `${stats.completenessPct.toFixed(0)}%` : '-'"
-      sub="Segments with IRI + PCI recorded"
+      sub="IRI + PCI recorded · estimated"
       :trend-direction="stats.completenessPct != null && stats.completenessPct >= 80 ? 'up' : 'down'"
       source="batch" source-title="Agency Survey"
     />
@@ -74,11 +75,15 @@
       source="batch" source-title="Agency Survey"
     />
   </div>
+  <div v-if="!stats.usingAggregate" class="sample-caveat">
+    Network Length/IRI/PCI/Condition are only exact when "All Agencies" is selected - no per-agency aggregate exists on the backend, so {{ agencyLabel }}'s figures above are estimated from loaded records.
+  </div>
 
   <!-- Class / surface / condition distribution -->
   <div class="three-col">
     <div class="card">
       <div class="card-header">Road Class Distribution</div>
+      <div v-if="stats.isSample" class="dist-caveat">Estimated - no network-wide breakdown exists for this metric.</div>
       <div class="card-body">
         <div v-if="stats.byClass.length" class="dist-list">
           <div v-for="d in stats.byClass" :key="d.key" class="dist-row">
@@ -93,6 +98,7 @@
 
     <div class="card">
       <div class="card-header">Surface Type Distribution</div>
+      <div v-if="stats.isSample" class="dist-caveat">Estimated - no network-wide breakdown exists for this metric.</div>
       <div class="card-body">
         <div v-if="stats.bySurface.length" class="dist-list">
           <div v-for="d in stats.bySurface" :key="d.key" class="dist-row">
@@ -107,12 +113,13 @@
 
     <div class="card">
       <div class="card-header">Condition Distribution</div>
+      <div v-if="!stats.usingAggregate" class="dist-caveat">Estimated - no per-agency breakdown exists on the backend.</div>
       <div class="card-body">
         <div v-if="stats.byCondition.length" class="dist-list">
           <div v-for="d in stats.byCondition" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: `${stats.segmentCount > 0 ? (d.count / stats.segmentCount) * 100 : 0}%`, background: condColor(d.key) }" /></div>
-            <span class="dist-val">{{ d.count }}</span>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: `${stats.conditionBase > 0 ? (d.count / stats.conditionBase) * 100 : 0}%`, background: condColor(d.key) }" /></div>
+            <span class="dist-val">{{ fmtNum(d.count) }}</span>
           </div>
         </div>
         <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
@@ -197,11 +204,12 @@
         </select>
         <select v-model="conditionFilter" class="select-sm">
           <option value="">All conditions</option>
+          <option value="very_good">Very Good</option>
           <option value="good">Good</option>
           <option value="fair">Fair</option>
           <option value="poor">Poor</option>
-          <option value="critical">Critical</option>
-          <option value="failed">Failed</option>
+          <option value="very_poor">Very Poor</option>
+          <option value="under_con">Under Construction</option>
         </select>
         <button class="btn" @click="clearTableFilters">Clear</button>
         <ExportButton filename="uapts-road-inventory.csv" :href="roadInventoryExportHref" style="margin-left:auto" />
@@ -248,11 +256,23 @@
           <tbody v-else>
             <tr>
               <td colspan="13" style="text-align:center;color:#94a3b8;padding:16px">
-                {{ loading ? 'Loading inventory…' : 'No road segments match the current filters.' }}
+                {{ tableLoading ? 'Loading inventory…' : 'No road segments match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="pagination">
+        <button class="btn" :disabled="tablePage <= 1 || tableLoading" @click="goToPage(tablePage - 1)">← Prev</button>
+        <span class="page-info">Page {{ fmtNum(tablePage) }} of {{ fmtNum(tableTotalPages) }} · {{ fmtNum(tableTotal) }} segments</span>
+        <button class="btn" :disabled="tablePage >= tableTotalPages || tableLoading" @click="goToPage(tablePage + 1)">Next →</button>
+        <select v-model.number="tablePageSize" class="select-sm">
+          <option :value="25">25 / page</option>
+          <option :value="50">50 / page</option>
+          <option :value="100">100 / page</option>
+          <option :value="200">200 / page</option>
+        </select>
       </div>
     </div>
   </div>
@@ -292,6 +312,7 @@
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="card-header">Missing Geometry ({{ qualityChecks.missingGeometry.length }})</div>
+    <div class="dist-caveat">Checked against a capped sample of the network's geometry records - segments outside that sample may be flagged here even if they do have coordinates.</div>
     <div class="card-body scroll-body">
       <table v-if="qualityChecks.missingGeometry.length">
         <thead><tr><th>Agency</th><th>Road Code</th><th>Road Name</th></tr></thead>
@@ -369,7 +390,17 @@ const route  = useRoute()
 const router = useRouter()
 
 const summary      = ref<InfrastructureSummary | null>(null)
-const segments     = ref<RoadSegment[]>([])
+// Currently displayed segments - the full unfiltered sample when no agency is
+// selected, or a fresh server-side `agency=`-filtered fetch once one is picked.
+const segments      = ref<RoadSegment[]>([])
+// Real row count for the current scope (from the API's `count` field) - the
+// road-segments table has 588k+ rows, so `segments.value.length` is only ever
+// a sample, never the true total.
+const segmentsTotal = ref(0)
+// Small unfiltered baseline sample - independent of the selected tab, used to
+// populate the agency tab list, the class/surface filter dropdowns, and the
+// cross-agency data-quality checks (which must not be scoped to one agency).
+const allAgencySample = ref<RoadSegment[]>([])
 const bridges      = ref<Bridge[]>([])
 const budgets      = ref<MaintenanceBudget[]>([])
 const onMapIds     = ref<Set<string>>(new Set())
@@ -395,6 +426,8 @@ function agencyLink(path: string) {
 }
 function clearTableFilters() {
   search.value = ''; classFilter.value = ''; surfaceFilter.value = ''; conditionFilter.value = ''
+  tablePage.value = 1
+  loadTablePage()
 }
 
 async function load() {
@@ -404,26 +437,27 @@ async function load() {
   const gis   = useGis()
   const agenciesApi = useAgencies()
 
-  const [sumRes, segRes, bridgeRes, budgetRes, mapRes, riskRes, sigRes, roadsRes, agencyRes] = await Promise.allSettled([
+  const [sumRes, sampleRes, bridgeRes, budgetRes, riskRes, sigRes, roadsRes, agencyRes] = await Promise.allSettled([
     infra.summary(),
-    infra.segments({ page_size: 200 }),
+    infra.segments({ page_size: 300 }),
     infra.bridges({ page_size: 200 }),
     infra.budgets({ page_size: 50 }),
-    infra.segmentConditionMap(),
     infra.atRiskForecasts(),
     infra.signalFaults(),
     gis.roads({ limit: 500, simplify: 0.02 }),
     agenciesApi.list({ page_size: 50 }),
   ])
 
-  if (sumRes.status    === 'fulfilled') summary.value = sumRes.value
-  if (segRes.status    === 'fulfilled') segments.value = (segRes.value as any).results ?? []
+  if (sumRes.status === 'fulfilled') summary.value = sumRes.value
+  if (sampleRes.status === 'fulfilled') {
+    allAgencySample.value = (sampleRes.value as any).results ?? []
+    if (!selectedAgency.value) {
+      segments.value = allAgencySample.value
+      segmentsTotal.value = (sampleRes.value as any).count ?? summary.value?.network.total_segments ?? segments.value.length
+    }
+  }
   if (bridgeRes.status === 'fulfilled') bridges.value  = (bridgeRes.value as any).results ?? []
   if (budgetRes.status === 'fulfilled') budgets.value  = (budgetRes.value as any).results ?? []
-  if (mapRes.status    === 'fulfilled') {
-    const raw = (mapRes.value as any).results ?? []
-    onMapIds.value = new Set(raw.map((r: any) => r.id))
-  }
   if (riskRes.status === 'fulfilled') atRisk.value       = (riskRes.value as any).results ?? []
   if (sigRes.status  === 'fulfilled') signalFaults.value = (sigRes.value as any).results ?? []
   if (roadsRes.status === 'fulfilled') roadsGeo.value    = roadsRes.value
@@ -432,21 +466,68 @@ async function load() {
     agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
   }
 
-  if ([sumRes, segRes].every(r => r.status === 'rejected'))
+  // Re-apply the selected agency's own server-filtered fetch (e.g. deep link
+  // landed on ?agency=KeNHA) - the unfiltered sample above may contain zero
+  // rows for it, so it must never be derived by client-filtering that sample.
+  if (selectedAgency.value) await loadAgencySegments(selectedAgency.value)
+
+  if ([sumRes, sampleRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
 
   loading.value = false
 }
 
+async function loadAgencySegments(code: string) {
+  const infra = useInfrastructure()
+  try {
+    const res = await infra.segments({ agency_code: code, page_size: 300 }) as any
+    segments.value = res.results ?? []
+    segmentsTotal.value = res.count ?? segments.value.length
+  } catch {
+    segments.value = []
+    segmentsTotal.value = 0
+  }
+}
+
+// condition-map has no documented way to cap or filter its response and the
+// table it backs (588k+ rows) - fetch it once on load rather than on every
+// 120s refresh tick, and pass a defensive page_size in case the server does
+// happen to honor it.
+async function loadConditionMap() {
+  const infra = useInfrastructure()
+  try {
+    const res = await infra.segmentConditionMap({ page_size: 500 }) as any
+    onMapIds.value = new Set((res.results ?? []).map((r: any) => r.id))
+  } catch { /* leave onMapIds as-is */ }
+}
+
+watch(selectedAgency, async (code) => {
+  loading.value = true
+  if (code) await loadAgencySegments(code)
+  else {
+    segments.value = allAgencySample.value
+    segmentsTotal.value = summary.value?.network.total_segments ?? allAgencySample.value.length
+  }
+  loading.value = false
+  tablePage.value = 1
+  loadTablePage()
+})
+
 onMounted(load)
+onMounted(loadConditionMap)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Agency tabs ──────────────────────────────────────────────────────────
+// Derived from the unfiltered baseline sample, not the currently displayed
+// (possibly agency-scoped) `segments` - so the tab list itself doesn't
+// collapse to one agency once a tab is selected. Counts are therefore only
+// approximate (a sample of 300 out of 588k+ rows), never a true per-agency
+// total - there's no backend endpoint for that.
 const agencyOptions = computed(() => {
   const m = new Map<string, number>()
-  for (const s of segments.value) {
+  for (const s of allAgencySample.value) {
     if (!s.agency_code) continue
     m.set(s.agency_code, (m.get(s.agency_code) ?? 0) + 1)
   }
@@ -457,11 +538,11 @@ const agencyOptions = computed(() => {
 const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
 
 // ── Agency-scoped datasets ───────────────────────────────────────────────
-const agencySegments = computed(() =>
-  selectedAgency.value ? segments.value.filter(s => s.agency_code === selectedAgency.value) : segments.value,
-)
+// `segments` is already agency-scoped (server-side `agency=` filter) once a
+// tab is selected - see loadAgencySegments() - so no client-side filter step
+// is needed here.
 const agencyCriticalBridges = computed(() =>
-  bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && ['poor', 'critical', 'failed'].includes(b.condition_class)),
+  bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && ['poor', 'critical'].includes(b.condition_class)),
 )
 const agencyOverdueInspections = computed(() =>
   bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && b.next_inspection_at && new Date(b.next_inspection_at).getTime() < Date.now()).length,
@@ -481,16 +562,25 @@ const agencyBudget = computed(() => {
   return pool.reduce((latest, b) => !latest || b.fiscal_year > latest.fiscal_year ? b : latest, null as MaintenanceBudget | null)
 })
 
-// ── Per-agency stats panel ──────────────────────────────────────────────
+// ── Network / per-agency stats panel ─────────────────────────────────────
+// All-Agencies view: Network Length, Avg IRI/PCI, Asset Count and Condition
+// Distribution come from the real server-side aggregate (summary.network) -
+// exact, not a sample. There is no per-agency equivalent endpoint, so once a
+// specific agency is selected those same figures fall back to being computed
+// from the (now server-filtered, but still page-capped) loaded segments, and
+// are labelled as sample-based in the template via `isSample`/`totalSegmentsReal`.
+// Class/Surface distribution and Data Completeness have no aggregate at all
+// and are always sample-based, regardless of agency selection.
 const stats = computed(() => {
-  const list = agencySegments.value
+  const list = segments.value
   const segmentCount = list.length
-  const totalLength = list.reduce((s, r) => s + (r.length_km ?? 0), 0)
-  const assetCount = list.reduce((s, r) => s + 1 + (r.bridge_count ?? 0) + (r.streetlight_count ?? 0), 0)
+  const totalSegmentsReal = segmentsTotal.value || segmentCount
+  const isSample = segmentCount < totalSegmentsReal
+
   const iriVals = list.filter(r => r.iri_value != null).map(r => r.iri_value as number)
   const pciVals = list.filter(r => r.pci_value != null).map(r => r.pci_value as number)
-  const avgIri = iriVals.length ? iriVals.reduce((a, b) => a + b, 0) / iriVals.length : null
-  const avgPci = pciVals.length ? pciVals.reduce((a, b) => a + b, 0) / pciVals.length : null
+  const sampleAvgIri = iriVals.length ? iriVals.reduce((a, b) => a + b, 0) / iriVals.length : null
+  const sampleAvgPci = pciVals.length ? pciVals.reduce((a, b) => a + b, 0) / pciVals.length : null
   const complete = list.filter(r => r.iri_value != null && r.pci_value != null).length
   const completenessPct = segmentCount ? (complete / segmentCount) * 100 : null
   const surveyDates = list.filter(r => r.last_evaluated_at).map(r => new Date(r.last_evaluated_at as string).getTime())
@@ -498,10 +588,31 @@ const stats = computed(() => {
 
   const byClass = countBy(list, r => r.road_class)
   const bySurface = countBy(list, r => r.surface_type)
-  const byCondition = countBy(list, r => r.condition_class)
 
-  return { segmentCount, totalLength, assetCount, avgIri, avgPci, completenessPct, latestSurvey, byClass, bySurface, byCondition }
+  const net = !selectedAgency.value ? summary.value?.network ?? null : null
+  const usingAggregate = !!net
+  const totalLength = net ? net.total_length_km : list.reduce((s, r) => s + (r.length_km ?? 0), 0)
+  const avgIri = net ? net.iri_average : sampleAvgIri
+  const avgPci = net ? net.pci_average : sampleAvgPci
+  const byCondition = net
+    ? net.condition_distribution
+        .map(c => ({ key: c.condition_class || 'unrecorded', count: c.total }))
+        .sort((a, b) => b.count - a.count)
+    : countBy(list, r => r.condition_class ?? 'unrecorded')
+  const conditionBase = net ? net.total_segments : segmentCount
+  const assetCount = net
+    ? net.total_segments + (summary.value?.bridges.total ?? 0) + (summary.value?.streetlights.total ?? 0)
+    : list.reduce((s, r) => s + 1 + (r.bridge_count ?? 0) + (r.streetlight_count ?? 0), 0)
+
+  return {
+    segmentCount, totalSegmentsReal, isSample, usingAggregate,
+    totalLength, assetCount, avgIri, avgPci, completenessPct, latestSurvey,
+    byClass, bySurface, byCondition, conditionBase,
+  }
 })
+
+// Real total (from the API's `count` field), never a raw sample size - see stats().
+const segmentsLabel = computed(() => `${fmtNum(stats.value.totalSegmentsReal)} segments`)
 
 function countBy<T>(list: T[], keyFn: (t: T) => string) {
   const m = new Map<string, number>()
@@ -509,25 +620,60 @@ function countBy<T>(list: T[], keyFn: (t: T) => string) {
   return [...m.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count)
 }
 
-// ── Inventory table ──────────────────────────────────────────────────────
-const roadClasses  = computed(() => [...new Set(segments.value.map(s => s.road_class))].sort())
-const surfaceTypes = computed(() => [...new Set(segments.value.map(s => s.surface_type))].sort())
+// ── Inventory table (server-side paginated - the table is a real page of the
+// 588k+ row dataset, not a client-filtered slice of a fixed sample) ────────
+const roadClasses  = computed(() => [...new Set(allAgencySample.value.map(s => s.road_class))].sort())
+const surfaceTypes = computed(() => [...new Set(allAgencySample.value.map(s => s.surface_type))].sort())
 
-const tableSegments = computed(() => agencySegments.value.filter(s => {
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    if (!s.road_name.toLowerCase().includes(q) && !s.road_code.toLowerCase().includes(q)) return false
+const tableSegments  = ref<RoadSegment[]>([])
+const tableTotal     = ref(0)
+const tablePage      = ref(1)
+const tablePageSize  = ref(50)
+const tableLoading   = ref(true)
+const tableTotalPages = computed(() => Math.max(1, Math.ceil(tableTotal.value / tablePageSize.value)))
+
+async function loadTablePage() {
+  tableLoading.value = true
+  const infra = useInfrastructure()
+  try {
+    const res = await infra.segments({
+      agency_code: selectedAgency.value || undefined,
+      page: tablePage.value,
+      page_size: tablePageSize.value,
+      search: search.value || undefined,
+      road_class: classFilter.value || undefined,
+      surface: surfaceFilter.value || undefined,
+      condition: conditionFilter.value || undefined,
+    }) as any
+    tableSegments.value = res.results ?? []
+    tableTotal.value = res.count ?? 0
+  } catch {
+    tableSegments.value = []
+    tableTotal.value = 0
   }
-  if (classFilter.value && s.road_class !== classFilter.value) return false
-  if (surfaceFilter.value && s.surface_type !== surfaceFilter.value) return false
-  if (conditionFilter.value && s.condition_class !== conditionFilter.value) return false
-  return true
-}))
+  tableLoading.value = false
+}
+function goToPage(p: number) {
+  if (p < 1 || p > tableTotalPages.value) return
+  tablePage.value = p
+  loadTablePage()
+}
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => { tablePage.value = 1; loadTablePage() }, 400)
+})
+watch([classFilter, surfaceFilter, conditionFilter, tablePageSize], () => {
+  tablePage.value = 1
+  loadTablePage()
+})
+onMounted(loadTablePage)
+
 // Real server-side export (honors the same django-filter params as the list
 // endpoint) - more complete than exporting only the currently-loaded page.
 const roadInventoryExportHref = computed(() => {
   const q = new URLSearchParams({ format: 'csv' })
-  if (selectedAgency.value) q.set('agency', selectedAgency.value)
+  if (selectedAgency.value) q.set('agency_code', selectedAgency.value)
   if (classFilter.value) q.set('road_class', classFilter.value)
   if (surfaceFilter.value) q.set('surface', surfaceFilter.value)
   if (conditionFilter.value) q.set('condition', conditionFilter.value)
@@ -535,10 +681,11 @@ const roadInventoryExportHref = computed(() => {
   return `/api/v1/infrastructure/road-segments/export/?${q.toString()}`
 })
 
-// ── Cross-agency data quality (always computed over the full dataset) ───
+// ── Cross-agency data quality (computed over the unfiltered baseline sample,
+// independent of the selected agency tab) ────────────────────────────────
 const qualityChecks = computed(() => {
   const byCode = new Map<string, RoadSegment[]>()
-  for (const s of segments.value) {
+  for (const s of allAgencySample.value) {
     const arr = byCode.get(s.road_code) ?? []
     arr.push(s)
     byCode.set(s.road_code, arr)
@@ -553,15 +700,18 @@ const qualityChecks = computed(() => {
     }))
 
   const oneYearAgo = Date.now() - 365 * 86_400_000
-  const stale = segments.value.filter(s => !s.last_evaluated_at || new Date(s.last_evaluated_at).getTime() < oneYearAgo)
-  const missingGeometry = segments.value.filter(s => !onMapIds.value.has(s.id))
+  const stale = allAgencySample.value.filter(s => !s.last_evaluated_at || new Date(s.last_evaluated_at).getTime() < oneYearAgo)
+  // onMapIds is itself a capped sample of the (588k+ row) condition-map
+  // endpoint, so a segment missing from it isn't proof it lacks geometry -
+  // only that it wasn't in the window we fetched. See the caveat in the template.
+  const missingGeometry = allAgencySample.value.filter(s => !onMapIds.value.has(s.id))
 
   return { duplicates, stale, missingGeometry }
 })
 
 // ── Map markers (only plotted when the API returns real coordinates) ────
 const segmentMarkers = computed((): MarkerSpec[] => {
-  const raw = agencySegments.value as any[]
+  const raw = segments.value as any[]
   return raw
     .filter(s => s.latitude != null && s.longitude != null)
     .map(s => ({
@@ -570,7 +720,11 @@ const segmentMarkers = computed((): MarkerSpec[] => {
       lon: s.longitude,
       title: `${s.road_name} (${s.road_code})`,
       subtitle: `${s.condition_class} · IRI ${s.iri_value ?? '-'} · PCI ${s.pci_value ?? '-'}`,
-      color: s.condition_class === 'good' ? 'green' : s.condition_class === 'fair' ? 'yellow' : s.condition_class === 'poor' ? 'orange' : 'red',
+      color: (s.condition_class === 'good' || s.condition_class === 'very_good') ? 'green'
+           : s.condition_class === 'fair' ? 'yellow'
+           : s.condition_class === 'poor' ? 'orange'
+           : s.condition_class === 'very_poor' ? 'red'
+           : 'gray',
       size: 'sm',
     }))
 })
@@ -601,11 +755,11 @@ function freshnessLabel(iso: string | undefined) {
   } catch { return 'Live' }
 }
 function condColor(cls: string): string {
-  const m: Record<string,string> = { good:'#22c55e', fair:'#84cc16', poor:'#f59e0b', critical:'#ef4444', failed:'#7f1d1d' }
+  const m: Record<string,string> = { very_good:'#16a34a', good:'#22c55e', fair:'#84cc16', poor:'#f59e0b', very_poor:'#ef4444', under_con:'#94a3b8' }
   return m[cls] ?? '#94a3b8'
 }
 function condBadge(cls: string) {
-  const m: Record<string,string> = { good:'success', fair:'fair', poor:'warning', critical:'danger', failed:'danger' }
+  const m: Record<string,string> = { very_good:'success', good:'success', fair:'fair', poor:'warning', very_poor:'danger', under_con:'info' }
   return m[cls] ?? 'neutral'
 }
 function failColor(p: number | null | undefined) {
@@ -620,6 +774,8 @@ function sigBadge(s: string) {
 
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.sample-caveat { margin:-8px 0 16px; font-size:11.5px; color:#94a3b8; }
+.dist-caveat { font-size:11px; color:#94a3b8; padding:0 14px 6px; margin-top:-4px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
 .agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
 .agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
@@ -649,6 +805,8 @@ function sigBadge(s: string) {
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
+.pagination { display:flex; justify-content:center; align-items:center; gap:16px; padding-top:12px; border-top:1px solid #f1f5f9; margin-top:8px; }
+.page-info { font-size:12.5px; color:#64748b; white-space:nowrap; }
 .scroll-body { max-height:320px; overflow-y:auto; }
 .link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }

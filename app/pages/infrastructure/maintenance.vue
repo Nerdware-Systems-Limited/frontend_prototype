@@ -123,10 +123,8 @@
         <select v-model="statusFilter" class="select-sm">
           <option value="">All statuses</option>
           <option value="planned">Planned</option>
-          <option value="scheduled">Scheduled</option>
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
-          <option value="on_hold">On Hold</option>
           <option value="cancelled">Cancelled</option>
         </select>
         <select v-model="priorityFilter" class="select-sm">
@@ -138,10 +136,14 @@
         </select>
         <select v-model="typeFilter" class="select-sm">
           <option value="">All work types</option>
-          <option value="routine">Routine</option>
-          <option value="periodic">Periodic</option>
-          <option value="rehabilitation">Rehabilitation</option>
-          <option value="emergency">Emergency</option>
+          <option value="pavement">Pavement</option>
+          <option value="lighting">Lighting</option>
+          <option value="bridge">Bridge</option>
+          <option value="drainage">Drainage</option>
+          <option value="signage">Signage</option>
+          <option value="marking">Road Marking</option>
+          <option value="vegetation">Vegetation Control</option>
+          <option value="emergency">Emergency Repair</option>
         </select>
         <button class="btn" @click="orderSearch=''; statusFilter=''; priorityFilter=''; typeFilter=''">Clear</button>
         <ExportButton filename="uapts-maintenance-orders.csv" :href="ordersExportHref" style="margin-left:auto" />
@@ -458,7 +460,7 @@ function budgetPct(part: string, whole: string) {
   return w > 0 ? (p / w) * 100 : 0
 }
 function condBadge(cls: string) {
-  const m: Record<string,string> = { good:'success', fair:'fair', poor:'warning', critical:'danger', failed:'danger' }
+  const m: Record<string,string> = { very_good:'success', good:'success', fair:'fair', poor:'warning', very_poor:'danger', under_con:'info' }
   return m[cls] ?? 'neutral'
 }
 function failColor(p: number | null | undefined) {

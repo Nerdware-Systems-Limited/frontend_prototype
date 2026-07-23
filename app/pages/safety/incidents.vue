@@ -48,10 +48,8 @@
     <select v-model="severityFilter" class="select-sm">
       <option value="">All severities</option>
       <option value="fatal">Fatal</option>
-      <option value="critical">Critical</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
+      <option value="serious">Serious</option>
+      <option value="minor">Minor</option>
     </select>
     <select v-model="statusFilter" class="select-sm">
       <option value="">All statuses</option>
@@ -352,11 +350,10 @@ const incidentMarkers = computed((): MarkerSpec[] =>
       lon: i.longitude!,
       title: i.title,
       subtitle: `${i.severity} · ${i.status}`,
-      color: i.severity === 'fatal' || i.severity === 'critical' ? 'red'
-           : i.severity === 'high' ? 'orange'
-           : i.severity === 'medium' ? 'yellow'
+      color: i.severity === 'fatal' ? 'red'
+           : i.severity === 'serious' ? 'orange'
            : 'blue',
-      size: i.severity === 'fatal' ? 'lg' : i.severity === 'critical' ? 'md' : 'sm',
+      size: i.severity === 'fatal' ? 'lg' : i.severity === 'serious' ? 'md' : 'sm',
     })),
 )
 
@@ -370,7 +367,7 @@ function fmtTime(iso: string) {
   catch { return iso }
 }
 function sevBadge(sev: string) {
-  const m: Record<string,string> = { fatal:'danger', critical:'danger', high:'warning', medium:'fair', low:'success' }
+  const m: Record<string,string> = { fatal:'danger', serious:'warning', minor:'info' }
   return m[sev] ?? 'neutral'
 }
 function dispatchBadge(status: string) {

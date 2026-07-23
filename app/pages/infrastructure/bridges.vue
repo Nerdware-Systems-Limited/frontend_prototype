@@ -171,11 +171,11 @@
       <div class="filter-row">
         <select v-model="condFilter" class="select-sm">
           <option value="">All conditions</option>
+          <option value="excellent">Excellent</option>
           <option value="good">Good</option>
           <option value="fair">Fair</option>
           <option value="poor">Poor</option>
           <option value="critical">Critical</option>
-          <option value="failed">Failed</option>
         </select>
         <select v-model="typeFilter" class="select-sm">
           <option value="">All types</option>
@@ -413,7 +413,7 @@ const bridgeMarkers = computed((): MarkerSpec[] =>
       lon: b.longitude!,
       title: b.bridge_name,
       subtitle: `${b.bridge_type} · Score: ${b.condition_score?.toFixed(1) ?? '-'} · ${b.condition_class}`,
-      color: b.condition_class === 'good' ? 'green'
+      color: (b.condition_class === 'good' || b.condition_class === 'excellent') ? 'green'
            : b.condition_class === 'fair' ? 'yellow'
            : b.condition_class === 'poor' ? 'orange'
            : 'red',
@@ -454,7 +454,7 @@ function scoreColor(score: number | null | undefined) {
   return score >= 80 ? '#22c55e' : score >= 60 ? '#84cc16' : score >= 40 ? '#f59e0b' : '#ef4444'
 }
 function condBadge(cls: string) {
-  const m: Record<string,string> = { good:'success', fair:'fair', poor:'warning', critical:'danger', failed:'danger' }
+  const m: Record<string,string> = { excellent:'success', good:'success', fair:'fair', poor:'warning', critical:'danger' }
   return m[cls] ?? 'neutral'
 }
 </script>

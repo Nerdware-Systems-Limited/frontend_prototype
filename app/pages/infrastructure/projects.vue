@@ -134,7 +134,8 @@
       <div class="filter-row">
         <select v-model="statusFilter" class="select-sm">
           <option value="">All statuses</option>
-          <option value="planned">Planned</option>
+          <option value="planning">Planning</option>
+          <option value="procurement">Procurement</option>
           <option value="in_progress">In Progress</option>
           <option value="on_hold">On Hold</option>
           <option value="completed">Completed</option>
@@ -387,7 +388,7 @@ function agencyBudgets(code: string) { return budgets.value.filter(b => b.agency
 // ── Agency-scoped datasets ───────────────────────────────────────────────
 const agencyProjects = computed(() => selectedAgency.value ? projects.value.filter(p => p.agency_code === selectedAgency.value) : projects.value)
 const agencyDelayed  = computed(() => selectedAgency.value ? delayed.value.filter(p => p.agency_code === selectedAgency.value) : delayed.value)
-const agencyCriticalBridges = computed(() => bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && ['poor','critical','failed'].includes(b.condition_class)))
+const agencyCriticalBridges = computed(() => bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && ['poor','critical'].includes(b.condition_class)))
 const agencyOverdueInspections = computed(() => bridges.value.filter(b => (!selectedAgency.value || b.agency_code === selectedAgency.value) && b.next_inspection_at && new Date(b.next_inspection_at).getTime() < Date.now()).length)
 const agencySignalFaults = computed(() => signalFaults.value.filter(s => !selectedAgency.value || s.agency_code === selectedAgency.value))
 const agencyClosures = computed(() => {
@@ -498,7 +499,7 @@ function fmtDate(s: string | null | undefined) {
   catch { return s }
 }
 function statusBadge(s: string) {
-  const m: Record<string,string> = { in_progress:'info', completed:'success', on_hold:'warning', planned:'neutral', cancelled:'danger' }
+  const m: Record<string,string> = { in_progress:'info', completed:'success', on_hold:'warning', planning:'neutral', procurement:'neutral', cancelled:'danger' }
   return m[s] ?? 'neutral'
 }
 function maintStatusBadge(s: string) {

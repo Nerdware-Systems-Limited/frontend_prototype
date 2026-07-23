@@ -15,18 +15,20 @@ import type { Paged } from '~/types/uapts'
 // ── Enums ───────────────────────────────────────────────────────────
 
 export type RoadClass =
-  | 'national_trunk' | 'national_secondary' | 'primary'
-  | 'secondary' | 'tertiary' | 'unclassified' | 'rural' | 'urban'
+  | 'A' | 'B' | 'C' | 'D' | 'E' | 'urban' | 'rural'
+  | 'Au' | 'Bu' | 'Cu' | 'Du' | 'Eu' | 'F' | 'Fu' | 'G' | 'Gu' | 'S' | 'unclass'
 export type SurfaceType =
   | 'asphalt' | 'concrete' | 'gravel' | 'earth' | 'paved' | 'other'
-export type ConditionClass = 'good' | 'fair' | 'poor' | 'critical' | 'failed'
+// Road segments and bridges use different real condition scales on this backend.
+export type RoadConditionClass = 'very_good' | 'good' | 'fair' | 'poor' | 'very_poor' | 'under_con'
+export type BridgeConditionClass = 'excellent' | 'good' | 'fair' | 'poor' | 'critical'
 export type MaintenanceStatus =
-  | 'planned' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'on_hold'
+  | 'planned' | 'in_progress' | 'completed' | 'cancelled'
 export type MaintenancePriority = 'low' | 'medium' | 'high' | 'urgent'
 export type WorkType =
-  | 'routine' | 'periodic' | 'rehabilitation' | 'emergency' | 'snow_ice' | 'other'
+  | 'pavement' | 'lighting' | 'bridge' | 'drainage' | 'signage' | 'marking' | 'vegetation' | 'emergency'
 export type ProjectStatus =
-  | 'planned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+  | 'planning' | 'procurement' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
 export type StreetlightStatus =
   | 'operational' | 'faulty' | 'damaged' | 'maintenance' | 'decommissioned'
 export type LampType = 'led' | 'sodium' | 'halogen' | 'solar' | 'fluorescent' | 'other'
@@ -57,7 +59,7 @@ export interface RoadSegment {
   pci_value: number | null
   pci_measured_at: string | null
   rut_depth_mm: number | null
-  condition_class: ConditionClass
+  condition_class: RoadConditionClass | null
   last_evaluated_at: string | null
   bridge_count: number
   streetlight_count: number
@@ -118,7 +120,7 @@ export interface Bridge {
   span_length_m: number | null
   load_capacity_tonnes: number | null
   condition_score: number | null
-  condition_class: ConditionClass
+  condition_class: BridgeConditionClass
   year_built: number | null
   last_inspection_at: string | null
   next_inspection_at: string | null
@@ -183,7 +185,7 @@ export interface DeteriorationForecast {
   horizon_months: number
   predicted_pci: number | null
   predicted_iri: number | null
-  predicted_condition_class: ConditionClass | null
+  predicted_condition_class: RoadConditionClass | null
   failure_probability: number | null
   lower_pci: number | null
   upper_pci: number | null
@@ -262,7 +264,7 @@ export interface AssetInventorySnapshot {
   total_count: number
   operational_count: number
   faulty_count: number
-  value_kes: number | null
+  value_kes: string | null
   created_at: string
   updated_at: string
 }
@@ -350,8 +352,10 @@ export function useInfrastructure() {
         query: cleanQuery(q as Record<string, unknown>),
       }),
     getSegment: (id: string) => api<RoadSegment>(`${I}/road-segments/${id}/`),
-    segmentConditionMap: () =>
-      api<Paged<RoadSegment>>(`${I}/road-segments/condition-map/`),
+    segmentConditionMap: (q?: { page_size?: number }) =>
+      api<Paged<RoadSegment>>(`${I}/road-segments/condition-map/`, {
+        query: cleanQuery(q as Record<string, unknown>),
+      }),
     segmentConditionDistribution: () =>
       api<{ results: Array<{ condition_class: string; total: number; length: number }> }>(
         `${I}/road-segments/condition-distribution/`,

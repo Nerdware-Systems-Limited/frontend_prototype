@@ -152,6 +152,21 @@ export interface TrainingSession {
   updated_at: string
 }
 
+export interface TrainingAttendance {
+  id: string
+  session: string
+  session_title: string
+  enrollment: string
+  enrollment_name: string
+  status: AttendanceStatus
+  marked_at: string | null
+  marked_by: string | null
+  marked_by_name: string | null
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 export interface TrainingRevenue {
   id: string
   cohort: string
@@ -242,7 +257,7 @@ export function useTraining() {
       enrollment?: string
       attendance_status?: string
     }) =>
-      $api<Paged<any>>('/api/v1/training/attendance/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingAttendance>>('/api/v1/training/attendance/', { query: cleanQuery(q) }),
 
     completions: (q?: TrainingQuery & { outcome?: string }) =>
       $api<Paged<TrainingCompletion>>('/api/v1/training/completions/', { query: cleanQuery(q) }),
@@ -261,6 +276,6 @@ export function useTraining() {
       received_at_from?: string
       received_at_to?: string
     }) =>
-      $api<TrainingRevenue>('/api/v1/training/revenue/summary/', { query: cleanQuery(q) }),
+      $api<TrainingRevenue[]>('/api/v1/training/revenue/summary/', { query: cleanQuery(q) }),
   }
 }

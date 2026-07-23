@@ -46,7 +46,8 @@ export {
 export {
   useInfrastructure,
   type InfrastructureSummary,
-  type RoadSegment, type RoadClass, type SurfaceType, type ConditionClass,
+  type RoadSegment, type RoadClass, type SurfaceType,
+  type RoadConditionClass, type BridgeConditionClass,
   type MaintenanceOrder, type MaintenanceStatus, type MaintenancePriority, type WorkType,
   type RegionalOffice,
   type FieldSurvey,
@@ -79,8 +80,7 @@ export {
 } from './useRailInfrastructure'
 export { useRailSafety, type CorrectiveAction, type RailRiskIndicator, type InvestigationStatus, type RailRiskType, type RailSafetyQuery } from './useRailSafety'
 export { useNotifications, type Notification, type AlertRule, type Condition, type LeafCondition, type CompositeCondition, type ConditionOp, type Severity, type Channel as NotificationChannel, type NotificationQuery, type RuleQuery, type NotificationListResponse, type UnreadCountResponse, type MarkReadResponse, type MarkAllReadResponse, type AlertRuleListResponse, type NotifyRequest, type CreateRuleRequest, type HealthResponse } from './useNotifications'
-export { useNotificationSocket } from './useNotificationSocket'
 export { useAviationMaritime, type AviationSummary, type MaritimeOps, type Airport, type Airline, type Aircraft, type Flight, type FlightStatus, type FlightOTP, type CargoByCommodity, type CabinClass, type PassengerByAirport, type Port, type Berth, type Vessel, type VesselMovement, type ContainerByPort, type IntermodalOnTime, type SafetySeverity, type SafetyReportType, type AocStatus, type AircraftType, type AirportType, type BerthType, type ContainerDirection, type ConnectionType, type ConnectionDirection, type PortType, type VesselType, type VesselMovementType, type VesselMovementStatus, type Commodity, type AviationQuery, type PortQuery } from './useAviationMaritime'
 export { useAviationInfrastructure, type Runway, type Navaid, type AviationFacility, type AviationCapitalWork, type AviationInfraSummary, type RunwayStatus, type NavaidType, type NavaidStatus, type AviationFacilityType, type AviationFacilityStatus, type AviationInfraQuery } from './useAviationInfrastructure'
 export { useMaritimeInfrastructure, type Channel as MaritimeChannel, type MaritimeNavaid, type DryDock, type InlandContainerDepot, type MaritimeCapitalWork, type MaritimeInfraSummary, type ChannelStatus, type MaritimeNavaidType, type MaritimeNavaidStatus, type DryDockStatus, type ICDStatus, type MaritimeInfraQuery } from './useMaritimeInfrastructure'
-export { useTraining, type TrainingCourse, type TrainingCohort, type TrainingEnrollment, type TrainingCompletion, type TrainingSession, type TrainingRevenue, type CourseCategory, type DeliveryMode, type CertificationBody, type CohortStatus, type EnrollmentStatus, type PaymentStatus, type CompletionOutcome, type RevenueStream, type PaymentMethod, type SessionType, type AttendanceStatus, type TrainingQuery } from './useTraining'
+export { useTraining, type TrainingCourse, type TrainingCohort, type TrainingEnrollment, type TrainingCompletion, type TrainingSession, type TrainingAttendance, type TrainingRevenue, type CourseCategory, type DeliveryMode, type CertificationBody, type CohortStatus, type EnrollmentStatus, type PaymentStatus, type CompletionOutcome, type RevenueStream, type PaymentMethod, type SessionType, type AttendanceStatus, type TrainingQuery } from './useTraining'
