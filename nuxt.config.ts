@@ -8,7 +8,7 @@ export default defineNuxtConfig({
 
   vite: {
     optimizeDeps: {
-      include: ['@vue/devtools-core', '@vue/devtools-kit', 'leaflet'],
+      include: ['@vue/devtools-core', '@vue/devtools-kit', 'leaflet', 'protomaps-leaflet'],
     },
   },
 
@@ -29,6 +29,7 @@ export default defineNuxtConfig({
       notificationsWsUrl:
         process.env.NUXT_PUBLIC_NOTIFICATIONS_WS_URL ??
         'wss://uapts.eu.cc/ws/notifications/',
+      tilesBase: process.env.NUXT_PUBLIC_TILES_BASE ?? 'https://uapts.eu.cc/media/',
     }
   },
 

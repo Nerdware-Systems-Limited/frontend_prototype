@@ -8,7 +8,9 @@
       <button class="btn btn-ghost" type="button" @click="copyShareLink">
         {{ copyLinkStatus === 'copied' ? '✓ Link copied' : copyLinkStatus === 'error' ? 'Copy failed' : '⚲ Copy link' }}
       </button>
-      <button class="btn" :disabled="loading" @click="load">↻ Reload Layers</button>
+      <button class="btn" :disabled="loading" @click="load({ force: true })">
+        <span class="btn-icon" :class="{ spinning: loading }">↻</span> Reload Layers
+      </button>
     </template>
   </PageHeader>
 
@@ -23,7 +25,7 @@
     <aside class="gis-panel">
 
       <!-- Search -->
-      <div v-if="layers.boundary && adminLevel !== 0" class="panel-section panel-search">
+      <div class="panel-section panel-search">
         <div class="search-box">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7"/>
@@ -37,15 +39,16 @@
             role="combobox"
             aria-controls="gis-search-listbox"
             :aria-expanded="searchOpen && searchResults.length > 0"
+            :aria-activedescendant="searchActiveIndex >= 0 ? `search-opt-${searchActiveIndex}` : undefined"
             @focus="searchOpen = true"
-            @blur="onSearchBlur"
+            @blur="searchOpen = false"
             @keydown="onSearchKeydown"
           />
           <button v-if="searchQuery" type="button" class="search-clear" aria-label="Clear search" @mousedown.prevent="searchQuery = ''">×</button>
         </div>
         <ul v-if="searchOpen && searchResults.length" id="gis-search-listbox" role="listbox" class="search-results">
           <li
-            v-for="(r, i) in searchResults" :key="r.id"
+            v-for="(r, i) in searchResults" :key="r.id" :id="`search-opt-${i}`"
             role="option" :aria-selected="i === searchActiveIndex"
             class="search-result-row" :class="{ active: i === searchActiveIndex }"
             @mousedown.prevent="selectSearchResult(r)"
@@ -68,14 +71,21 @@
           <span class="layer-name" :class="{ 'layer-dim': !layers.boundary }">Kenya Boundary</span>
           <div class="layer-switch" :class="{ on: layers.boundary }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
+        <div v-if="layerErrors.boundary" class="layer-error">⚠ {{ layerErrors.boundary }}</div>
 
         <button type="button" class="layer-row" role="switch" :aria-checked="layers.roads" @click="toggleLayer('roads')">
           <span class="layer-swatch" :style="{ background: layers.roads ? '#f59e0b' : '#334155' }" aria-hidden="true" />
           <span class="layer-name" :class="{ 'layer-dim': !layers.roads }">Road Network</span>
-          <span v-if="roadCount" class="layer-badge">{{ fmtNum(roadCount) }}</span>
+          <span v-if="layers.roads" class="layer-badge">Live</span>
           <div class="layer-switch" :class="{ on: layers.roads }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
-        <div v-if="layerErrors.boundary" class="layer-error">⚠ {{ layerErrors.boundary }}</div>
+
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.railway" @click="toggleLayer('railway')">
+          <span class="layer-swatch" :style="{ background: layers.railway ? '#ec4899' : '#334155' }" aria-hidden="true" />
+          <span class="layer-name" :class="{ 'layer-dim': !layers.railway }">Railway</span>
+          <span v-if="layers.railway" class="layer-badge">Live</span>
+          <div class="layer-switch" :class="{ on: layers.railway }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
 
         <button type="button" class="layer-row" role="switch" :aria-checked="layers.routes" @click="toggleLayer('routes')">
           <span class="layer-swatch" :style="{ background: layers.routes ? '#34d399' : '#334155' }" aria-hidden="true" />
@@ -84,21 +94,34 @@
           <div class="layer-switch" :class="{ on: layers.routes }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
         <div v-if="layerErrors.routes" class="layer-error">⚠ {{ layerErrors.routes }}</div>
+
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.stations" @click="toggleLayer('stations')">
+          <span class="layer-swatch" :style="{ background: layers.stations ? '#10b981' : '#334155' }" aria-hidden="true" />
+          <span class="layer-name" :class="{ 'layer-dim': !layers.stations }">Stations</span>
+          <span v-if="stationCount" class="layer-badge">{{ fmtNum(stationCount) }}</span>
+          <div class="layer-switch" :class="{ on: layers.stations }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
+
+        <button type="button" class="layer-row" role="switch" :aria-checked="layers.events" @click="toggleLayer('events')">
+          <span class="layer-swatch" :style="{ background: layers.events ? '#ef4444' : '#334155' }" aria-hidden="true" />
+          <span class="layer-name" :class="{ 'layer-dim': !layers.events }">Live Events</span>
+          <span v-if="eventCount" class="layer-badge">{{ fmtNum(eventCount) }}</span>
+          <div class="layer-switch" :class="{ on: layers.events }" aria-hidden="true"><span class="layer-thumb" /></div>
+        </button>
+        <div v-if="layerErrors.overview" class="layer-error">⚠ {{ layerErrors.overview }}</div>
       </div>
 
-      <!-- Additional spatial layers (GeoJSON catalog - fetched/rendered by UaptsMap itself) -->
-      <div class="panel-section">
-        <div class="panel-section-title">Additional Spatial Layers</div>
-        <button
-          v-for="c in CATALOG_LAYER_LIST" :key="c.key"
-          type="button" class="layer-row" role="switch" :aria-checked="catalogLayers[c.key]"
-          @click="toggleCatalogLayer(c.key)"
-        >
-          <span class="layer-swatch" :style="{ background: catalogLayers[c.key] ? c.color : '#334155' }" aria-hidden="true" />
-          <span class="layer-name" :class="{ 'layer-dim': !catalogLayers[c.key] }">{{ c.label }}</span>
-          <div class="layer-switch" :class="{ on: catalogLayers[c.key] }" aria-hidden="true"><span class="layer-thumb" /></div>
+      <!-- Live-data viewport sync (shown once anything bbox-scoped is on) -->
+      <div v-if="layers.routes || layers.stations || layers.events" class="panel-section">
+        <div class="panel-section-title">Live Data</div>
+        <button type="button" class="layer-row" role="switch" :aria-checked="syncToView" @click="syncToView = !syncToView">
+          <span class="layer-swatch" :style="{ background: syncToView ? '#818cf8' : '#334155' }" aria-hidden="true" />
+          <span class="layer-name" :class="{ 'layer-dim': !syncToView }">Sync to map view</span>
+          <div class="layer-switch" :class="{ on: syncToView }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
-        <div class="source-note">Counts for these layers show in the map's own legend overlay.</div>
+        <p class="section-hint">
+          {{ syncToView ? 'Routes, stations and events refresh as you pan and zoom.' : 'Showing a fixed nationwide snapshot.' }}
+        </p>
       </div>
 
       <!-- County detail level (shown when boundary is on) -->
@@ -120,20 +143,53 @@
 
       <!-- Filters (shown contextually) -->
       <div v-if="layers.roads" class="panel-section">
-        <div class="panel-section-title">Road Filter</div>
-        <select v-model="highwayFilter" class="panel-select" @change="reloadRoads">
-          <option value="">All highway types</option>
-          <option value="trunk">Trunk roads</option>
-          <option value="primary">Primary roads</option>
-          <option value="secondary">Secondary roads</option>
-          <option value="tertiary">Tertiary roads</option>
-          <option value="unclassified">Unclassified</option>
+        <div class="panel-section-title">Road Class</div>
+        <select v-model="roadClassFilter" class="panel-select" aria-label="Filter roads by Road Class">
+          <option value="">All classes</option>
+          <option value="A">A — International trunk</option>
+          <option value="B">B — National trunk</option>
+          <option value="C">C — Primary</option>
+          <option value="D">D — Secondary</option>
+          <option value="E">E — Minor</option>
+          <option value="F">F</option>
+          <option value="G">G — Unclassified</option>
+          <option value="S">S — Special purpose</option>
+        </select>
+      </div>
+
+      <div v-if="layers.roads" class="panel-section">
+        <div class="panel-section-title">Road Condition</div>
+        <select v-model="conditionFilter" class="panel-select" aria-label="Filter roads by Surface Condition">
+          <option value="">All conditions</option>
+          <option value="Poor">Poor</option>
+          <option value="Fair">Fair</option>
+          <option value="Good">Good</option>
+          <option value="Under Construction">Under Construction</option>
+        </select>
+      </div>
+
+      <div v-if="layers.roads" class="panel-section">
+        <div class="panel-section-title">Road Agency</div>
+        <input
+          v-model="roadAgencyFilterInput"
+          type="text"
+          class="panel-text-input"
+          placeholder="e.g. KeNHA…"
+          aria-label="Filter roads by Road Agency"
+        />
+      </div>
+
+      <div v-if="layers.roads" class="panel-section">
+        <div class="panel-section-title">Road County</div>
+        <select v-model="roadCountyFilter" class="panel-select" aria-label="Filter roads by County">
+          <option value="">All counties</option>
+          <option v-for="c in KENYA_COUNTIES" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
 
       <div v-if="layers.routes" class="panel-section">
         <div class="panel-section-title">Route Service Type</div>
-        <select v-model="serviceTypeFilter" class="panel-select" @change="reloadRoutes">
+        <select v-model="serviceTypeFilter" class="panel-select" aria-label="Filter routes by service type" @change="reloadRoutes">
           <option value="">All service types</option>
           <option value="bus">Bus</option>
           <option value="brt">BRT (Rapid Transit)</option>
@@ -153,7 +209,9 @@
           type="range" v-model.number="simplify"
           min="0.001" max="0.05" step="0.005"
           class="detail-slider"
-          @change="load"
+          aria-label="Geometry detail level"
+          :aria-valuetext="detailLabel"
+          @change="onSimplifyChange"
         />
         <div class="detail-hints">
           <span>High</span>
@@ -164,12 +222,11 @@
 
       <!-- Road legend -->
       <div v-if="layers.roads" class="panel-section">
-        <div class="panel-section-title">Road Classification</div>
+        <div class="panel-section-title">Road Condition</div>
         <div class="legend-list">
           <div v-for="l in roadLegend" :key="l.label" class="legend-row">
             <span class="legend-line" :style="{ background: l.color, height: l.weight + 'px' }" />
             <span class="legend-text">{{ l.label }}</span>
-            <span class="legend-agency">{{ l.agency }}</span>
           </div>
         </div>
       </div>
@@ -196,9 +253,18 @@
           </span>
         </div>
         <div class="stat-row">
-          <span class="stat-dot" :style="{ background: roadCount ? '#f59e0b' : '#334155' }" />
+          <span class="stat-dot" :style="{ background: layers.roads ? '#f59e0b' : '#334155' }" />
           <span class="stat-label">Road segments</span>
-          <span class="stat-val" :class="{ 'stat-ok': !!roadCount }">{{ fmtNum(roadCount) }}</span>
+          <span class="stat-val" :class="{ 'stat-ok': layers.roads }">
+            {{ layers.roads ? 'Streaming (PMTiles)' : 'Off' }}
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-dot" :style="{ background: layers.railway ? '#ec4899' : '#334155' }" />
+          <span class="stat-label">Rail network</span>
+          <span class="stat-val" :class="{ 'stat-ok': layers.railway }">
+            {{ layers.railway ? 'Streaming (PMTiles)' : 'Off' }}
+          </span>
         </div>
         <div class="stat-row">
           <span class="stat-dot" :style="{ background: routeCount ? '#34d399' : '#334155' }" />
@@ -206,9 +272,14 @@
           <span class="stat-val" :class="{ 'stat-ok': !!routeCount }">{{ fmtNum(routeCount) }}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-dot" :style="{ background: activeCatalogKeys.length ? '#3b82f6' : '#334155' }" />
-          <span class="stat-label">Additional layers</span>
-          <span class="stat-val" :class="{ 'stat-ok': activeCatalogKeys.length > 0 }">{{ activeCatalogKeys.length }} on</span>
+          <span class="stat-dot" :style="{ background: stationCount ? '#10b981' : '#334155' }" />
+          <span class="stat-label">Stations</span>
+          <span class="stat-val" :class="{ 'stat-ok': !!stationCount }">{{ fmtNum(stationCount) }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-dot" :style="{ background: eventCount ? '#ef4444' : '#334155' }" />
+          <span class="stat-label">Live events</span>
+          <span class="stat-val" :class="{ 'stat-ok': !!eventCount }">{{ fmtNum(eventCount) }}</span>
         </div>
         <div class="stat-total">
           {{ fmtNum(featureCount) }} total features
@@ -237,16 +308,23 @@
       <div class="gis-map-wrap">
         <ClientOnly>
           <UaptsMap
-            ref="mapComponentRef"
+            ref="mapComponent"
             :boundary="layers.boundary ? boundary : undefined"
-            :roads="layers.roads ? roads : undefined"
+            :roads-tiles-url="layers.roads ? roadsTilesUrl : undefined"
+            :roads-class-filter="roadClassFilter"
+            :roads-condition-filter="conditionFilter"
+            :roads-agency-filter="roadAgencyFilter"
+            :roads-county-filter="roadCountyFilter"
+            :rails-tiles-url="layers.railway ? railsTilesUrl : undefined"
             :lines="layers.routes ? routeLines : undefined"
-            :layers="activeCatalogKeys"
-            :show-legend="activeCatalogKeys.length > 0"
-            :center="[-0.5, 37.5]"
-            :zoom="6"
+            :markers="activeMarkers"
+            :center="initialCenter"
+            :zoom="initialZoom"
             :height="mapHeight"
+            v-model:basemap="basemap"
+            show-map-toolbar
             @feature-click="handleFeatureClick"
+            @bounds-change="onBoundsChange"
           />
           <template #fallback>
             <div class="map-placeholder" :style="{ height: mapHeight }">
@@ -277,13 +355,19 @@
         </span>
         <span class="statusbar-sep" />
         <span class="statusbar-item">{{ fmtNum(featureCount) }} features</span>
+        <span v-if="currentZoom != null" class="statusbar-sep" />
+        <span v-if="currentZoom != null" class="statusbar-item statusbar-dim">Zoom {{ currentZoom.toFixed(1) }}</span>
         <span v-if="layers.roads" class="statusbar-sep" />
         <span v-if="layers.roads" class="statusbar-item">
-          Roads: {{ highwayFilter || 'All types' }}
+          Roads: {{ roadClassFilter || 'All classes' }}<template v-if="conditionFilter"> · {{ conditionFilter }}</template><template v-if="roadAgencyFilter"> · {{ roadAgencyFilter }}</template><template v-if="roadCountyFilter"> · {{ roadCountyFilter }}</template>
         </span>
         <span v-if="layers.routes" class="statusbar-sep" />
         <span v-if="layers.routes" class="statusbar-item">
           Routes: {{ serviceTypeFilter || 'All services' }}
+        </span>
+        <span v-if="(layers.routes || layers.stations || layers.events) && syncToView" class="statusbar-sep" />
+        <span v-if="(layers.routes || layers.stations || layers.events) && syncToView" class="statusbar-item statusbar-county">
+          <span class="statusbar-dot ready" />Synced to view
         </span>
         <span class="statusbar-spacer" />
         <span v-if="selectedCounty" class="statusbar-item statusbar-county">
@@ -296,45 +380,6 @@
       </div>
     </div>
   </div>
-
-  <!-- ── Tabular feature registry - independent of map rendering ────── -->
-  <!-- Always rendered (not gated on the map/ClientOnly above) so the page
-       stays useful if Leaflet fails to load. -->
-  <div class="two-col" style="margin-top:16px">
-    <div v-if="layers.roads" class="card">
-      <div class="card-header">Road Segments ({{ roadCount }})</div>
-      <div class="card-body table-scroll" style="max-height:360px;overflow-y:auto">
-        <table>
-          <thead><tr><th>Name</th><th>Highway Type</th><th>Feature ID</th></tr></thead>
-          <tbody v-if="roadFeatureRows.length">
-            <tr v-for="r in roadFeatureRows" :key="r.id">
-              <td style="font-weight:600;font-size:12px">{{ r.name }}</td>
-              <td><BadgePill variant="info">{{ r.highway }}</BadgePill></td>
-              <td style="font-size:11px;color:#94a3b8;font-family:monospace">{{ r.id }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No road features loaded.' }}</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div v-if="layers.routes" class="card">
-      <div class="card-header">PT Routes ({{ routeCount }})</div>
-      <div class="card-body table-scroll" style="max-height:360px;overflow-y:auto">
-        <table>
-          <thead><tr><th>Name</th><th>Service Type</th><th>Feature ID</th></tr></thead>
-          <tbody v-if="routeFeatureRows.length">
-            <tr v-for="r in routeFeatureRows" :key="r.id">
-              <td style="font-weight:600;font-size:12px">{{ r.name }}</td>
-              <td><BadgePill variant="info">{{ r.serviceType }}</BadgePill></td>
-              <td style="font-size:11px;color:#94a3b8;font-family:monospace">{{ r.id }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No route features loaded.' }}</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -342,28 +387,28 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('GIS Explorer')
 
 import { useGis } from '~/composables/api'
-import type { GeoJSONFeatureCollection } from '~/composables/api'
-import type { LineSpec } from '~/components/UaptsMap.vue'
+import type { GeoJSONFeatureCollection, LineSpec, MarkerSpec, MarkerColor } from '~/composables/api'
 
-type CatalogLayerKey = 'rail-lines' | 'rail-stations' | 'stations' | 'brt-stops' | 'congestion' | 'weather' | 'od-flow' | 'segments'
+type LayerKey = 'boundary' | 'roads' | 'routes' | 'stations' | 'events' | 'railway'
 
-// Matches UaptsMap.vue's own LAYER_CATALOG - kept here only for the
-// toggle-row label/color, the actual fetch+render is entirely inside
-// UaptsMap (catalog mode via the `:layers` prop).
-const CATALOG_LAYER_LIST: { key: CatalogLayerKey; label: string; color: string }[] = [
-  { key: 'rail-lines',    label: 'Rail Lines (SGR/MGR)', color: '#3b82f6' },
-  { key: 'rail-stations', label: 'Rail Stations',        color: '#ef4444' },
-  { key: 'stations',      label: 'Counting Stations',    color: '#10b981' },
-  { key: 'brt-stops',     label: 'BRT Stops',            color: '#3b82f6' },
-  { key: 'congestion',    label: 'Active Congestion',    color: '#ef4444' },
-  { key: 'weather',       label: 'Weather (KMD)',        color: '#06b6d4' },
-  { key: 'od-flow',       label: 'OD Trip Flows',        color: '#f59e0b' },
-  { key: 'segments',      label: 'Road Segments (Infra)', color: '#64748b' },
-]
-
-const boundary   = ref<GeoJSONFeatureCollection | null>(null)
-const roads      = ref<GeoJSONFeatureCollection | null>(null)
-const gisRoutes  = ref<GeoJSONFeatureCollection | null>(null)
+// boundary/routes/stations/events are always replaced wholesale, never
+// mutated in place (see load()/reload*() below) - shallowRef skips Vue's
+// deep-reactive-proxy wrap on what can be multi-thousand-point GeoJSON
+// (esp. constituency boundaries) without losing any reactivity we
+// actually rely on, since we only ever watch/read `.value` itself.
+const boundary     = shallowRef<GeoJSONFeatureCollection | null>(null)
+const gisRoutes    = shallowRef<GeoJSONFeatureCollection | null>(null)
+const stationsData = shallowRef<GeoJSONFeatureCollection | null>(null)
+const eventsData   = shallowRef<GeoJSONFeatureCollection | null>(null)
+// Roads are served as pre-tiled PMTiles (see apps/gis - Tier 3 pipeline),
+// not fetched as GeoJSON, so there's no ref to populate and no scan-cap
+// or feature-count ceiling regardless of viewport/zoom.
+const roadsTilesUrl = useGis().roadsPmtilesUrl()
+// Same deal as roadsTilesUrl - the physical rail network (rails.pmtiles),
+// streamed as PMTiles rather than fetched as GeoJSON. Distinct from the
+// `routes` layer below, which is scheduled PT service routes (including
+// any tagged service_type "rail") from tbl_pt_routes, not track infra.
+const railsTilesUrl = useGis().railsPmtilesUrl()
 const loading    = ref(true)
 const error      = ref<string | null>(null)
 // Per-layer soft errors (e.g. routes failed but boundary loaded fine) -
@@ -371,24 +416,49 @@ const error      = ref<string | null>(null)
 const layerErrors = ref<Record<string, string>>({})
 
 const simplify          = ref(0.01)
-const highwayFilter     = ref('')
+const roadClassFilter   = ref('')   // Road Class, e.g. "A" / "D" — see UaptsMap's roadsClassFilter prop
+const conditionFilter   = ref('')   // Surface Condition, e.g. "Poor" — see roadsConditionFilter prop
+// Road Agency, e.g. "KeNHA" — see roadsAgencyFilter prop (substring match).
+// roadAgencyFilterInput is what the text box binds to, updating on every
+// keystroke; roadAgencyFilter is the debounced value that actually drives
+// the map + URL, so typing doesn't tear down/rebuild the whole roads tile
+// layer (see UaptsMap's watcher) on every keystroke.
+const roadAgencyFilterInput = ref('')
+const roadAgencyFilter      = ref('')
+let agencyFilterTimer: ReturnType<typeof setTimeout> | null = null
+watch(roadAgencyFilterInput, (v) => {
+  if (agencyFilterTimer) clearTimeout(agencyFilterTimer)
+  agencyFilterTimer = setTimeout(() => { roadAgencyFilter.value = v.trim() }, 300)
+})
+// County, e.g. "Nairobi" — see roadsCountyFilter prop. Deliberately named
+// apart from selectedCounty below - that one's the boundary-click
+// highlight (a different feature, unrelated to this road filter).
+const roadCountyFilter  = ref('')
 const serviceTypeFilter = ref('')
 const adminLevel        = ref<0 | 1 | 2>(1)   // 0=country, 1=counties, 2=constituencies
+const basemap           = ref<'light' | 'dark' | 'satellite'>('light')
+const syncToView        = ref(true)           // scope routes/stations/events to the current map view
 
 // Highlighted county name (set via feature-click emit from UaptsMap)
 const selectedCounty = ref<string | null>(null)
 
-const layers = ref({ boundary: true, roads: true, routes: false })
-const catalogLayers = ref<Record<CatalogLayerKey, boolean>>({
-  'rail-lines': false, 'rail-stations': false, stations: false, 'brt-stops': false,
-  congestion: false, weather: false, 'od-flow': false, segments: false,
+const layers = ref<Record<LayerKey, boolean>>({
+  boundary: true, roads: true, routes: false, stations: false, events: false, railway: false,
 })
-const activeCatalogKeys = computed(() =>
-  (Object.keys(catalogLayers.value) as CatalogLayerKey[]).filter(k => catalogLayers.value[k]),
-)
 
 const mapHeight = 'calc(100vh - 232px)'
-const mapComponentRef = ref<{ flyTo: (lat: number, lon: number, zoom?: number) => void } | null>(null)
+const mapComponent = ref<any>(null)
+
+// Current viewport, reported by UaptsMap's @bounds-change. Drives the
+// bbox on routes/stations/events fetches when syncToView is on, and gets
+// persisted into the URL so a copied link reopens at the same place.
+const currentBbox   = shallowRef<[number, number, number, number] | null>(null)
+const currentZoom   = ref<number | null>(null)
+const currentCenter = shallowRef<[number, number] | null>(null)
+// Seed values for <UaptsMap :center :zoom> - only read once at mount, so
+// these only need to be right once (from the URL, if present).
+const initialCenter = ref<[number, number]>([-0.5, 37.5])
+const initialZoom   = ref(6)
 
 // ── URL state sync: makes the current view bookmarkable / shareable ───
 const route  = useRoute()
@@ -398,17 +468,22 @@ function hydrateFromQuery() {
   const q = route.query
   if (typeof q.layers === 'string') {
     const active = q.layers.split(',')
-    layers.value.boundary = active.includes('boundary')
-    layers.value.roads    = active.includes('roads')
-    layers.value.routes   = active.includes('routes')
-    for (const k of Object.keys(catalogLayers.value) as CatalogLayerKey[])
-      catalogLayers.value[k] = active.includes(k)
+    const known: LayerKey[] = ['boundary', 'roads', 'routes', 'stations', 'events', 'railway']
+    for (const k of known) layers.value[k] = active.includes(k)
   }
   if (q.admin === '0' || q.admin === '1' || q.admin === '2') adminLevel.value = Number(q.admin) as 0 | 1 | 2
-  if (typeof q.hwy === 'string') highwayFilter.value = q.hwy
+  if (typeof q.class === 'string') roadClassFilter.value = q.class
+  if (typeof q.cond === 'string') conditionFilter.value = q.cond
+  if (typeof q.agency === 'string') { roadAgencyFilterInput.value = q.agency; roadAgencyFilter.value = q.agency }
+  if (typeof q.county === 'string') roadCountyFilter.value = q.county
   if (typeof q.svc === 'string') serviceTypeFilter.value = q.svc
   const simplifyNum = Number(q.simplify)
   if (typeof q.simplify === 'string' && Number.isFinite(simplifyNum)) simplify.value = simplifyNum
+  if (q.basemap === 'light' || q.basemap === 'dark' || q.basemap === 'satellite') basemap.value = q.basemap
+  if (q.sync === '0') syncToView.value = false
+  const lat = Number(q.lat), lng = Number(q.lng), z = Number(q.z)
+  if (Number.isFinite(lat) && Number.isFinite(lng)) initialCenter.value = [lat, lng]
+  if (Number.isFinite(z)) initialZoom.value = z
 }
 hydrateFromQuery()
 
@@ -418,21 +493,24 @@ function scheduleUrlSync() {
   urlSyncTimer = setTimeout(syncStateToUrl, 400)
 }
 function syncStateToUrl() {
-  const active = [
-    ...(layers.value.boundary ? ['boundary'] : []),
-    ...(layers.value.roads ? ['roads'] : []),
-    ...(layers.value.routes ? ['routes'] : []),
-    ...activeCatalogKeys.value,
-  ]
+  const active = (Object.keys(layers.value) as LayerKey[]).filter(k => layers.value[k])
   const query: Record<string, string> = { layers: active.join(','), admin: String(adminLevel.value) }
-  if (highwayFilter.value) query.hwy = highwayFilter.value
+  if (roadClassFilter.value) query.class = roadClassFilter.value
+  if (conditionFilter.value) query.cond = conditionFilter.value
+  if (roadAgencyFilter.value) query.agency = roadAgencyFilter.value
+  if (roadCountyFilter.value) query.county = roadCountyFilter.value
   if (serviceTypeFilter.value) query.svc = serviceTypeFilter.value
   query.simplify = String(simplify.value)
+  if (basemap.value !== 'light') query.basemap = basemap.value
+  if (!syncToView.value) query.sync = '0'
+  if (currentCenter.value) { query.lat = currentCenter.value[0].toFixed(4); query.lng = currentCenter.value[1].toFixed(4) }
+  if (currentZoom.value != null) query.z = currentZoom.value.toFixed(2)
   router.replace({ query }).catch(() => {})
 }
 watch(
-  () => [layers.value.boundary, layers.value.roads, layers.value.routes, activeCatalogKeys.value.join(','),
-         adminLevel.value, highwayFilter.value, serviceTypeFilter.value, simplify.value],
+  () => [layers.value.boundary, layers.value.roads, layers.value.routes, layers.value.stations, layers.value.events, layers.value.railway,
+         adminLevel.value, roadClassFilter.value, conditionFilter.value, roadAgencyFilter.value, roadCountyFilter.value,
+         serviceTypeFilter.value, simplify.value, basemap.value, syncToView.value],
   scheduleUrlSync,
 )
 
@@ -449,8 +527,10 @@ async function copyShareLink() {
 
 // ── Data loading ────────────────────────────────────────────────────
 // requestToken guards every async load path below against out-of-order
-// responses (e.g. hitting "Reload" twice quickly) - whichever call
-// started most recently "wins"; older ones drop their result on arrival.
+// responses (the user pans twice quickly, toggles a layer mid-fetch, or
+// hits "Reload" while a viewport refresh is in flight) - whichever call
+// started most recently "wins"; older ones drop their result on arrival
+// instead of clobbering fresher state.
 let requestToken = 0
 
 function describeError(reason: unknown): string {
@@ -468,37 +548,51 @@ function clearLayerError(key: string) {
   layerErrors.value = next
 }
 
-async function load() {
+async function load(opts: { force?: boolean } = {}) {
   loading.value = true
   error.value   = null
   const myToken = ++requestToken
   const gis     = useGis()
+  const bbox    = syncToView.value ? (currentBbox.value ?? undefined) : undefined
 
+  // Named tasks (not a positional array) so every result's success or
+  // failure is tracked against the layer it actually belongs to - a
+  // rejected routes/stations/events call can no longer go unnoticed just
+  // because it wasn't sitting at a hardcoded array index.
   const tasks: Record<string, Promise<any>> = {
-    boundary: gis.kenyaBoundary({ admin_level: adminLevel.value }),
-    roads: gis.roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined }),
+    boundary: gis.kenyaBoundary({ admin_level: adminLevel.value, force: opts.force }),
   }
-  if (layers.value.routes)
-    tasks.routes = gis.routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined })
+  if (layers.value.routes) {
+    tasks.routes = gis.routes({
+      limit: 200, simplify: simplify.value,
+      service_type: serviceTypeFilter.value || undefined,
+      bbox, force: opts.force,
+    })
+  }
+  if (layers.value.stations || layers.value.events) {
+    const include = [layers.value.stations && 'stations', layers.value.events && 'events'].filter(Boolean).join(',')
+    tasks.overview = gis.mapOverview({ include, bbox, force: opts.force })
+  }
 
   const keys = Object.keys(tasks)
   const settled = await Promise.allSettled(keys.map(k => tasks[k]))
-  if (myToken !== requestToken) return // superseded by a newer load
+  if (myToken !== requestToken) { loading.value = false; return } // superseded by a newer load
 
   settled.forEach((result, i) => {
     const key = keys[i]
     if (result.status === 'fulfilled') {
       clearLayerError(key)
       if (key === 'boundary') boundary.value = result.value
-      else if (key === 'roads') roads.value = result.value
       else if (key === 'routes') gisRoutes.value = result.value
+      else if (key === 'overview') {
+        stationsData.value = result.value.stations ?? null
+        eventsData.value   = result.value.events ?? null
+      }
     } else {
       setLayerError(key, describeError(result.reason))
+      if (key === 'boundary') error.value = 'Unable to load the Kenya boundary layer from the UAPTS API.'
     }
   })
-
-  if (settled.every(r => r.status === 'rejected'))
-    error.value = 'Unable to load GIS layers from the UAPTS API.'
 
   loading.value = false
 }
@@ -531,23 +625,11 @@ function handleFeatureClick({ layer, feature }: { layer: string; feature: any })
   }
 }
 
-async function reloadRoads() {
-  const myToken = ++requestToken
-  try {
-    const res = await useGis().roads({ limit: 500, simplify: simplify.value, highway: highwayFilter.value || undefined })
-    if (myToken !== requestToken) return
-    roads.value = res
-    clearLayerError('roads')
-  } catch (err) {
-    if (myToken !== requestToken) return
-    setLayerError('roads', describeError(err))
-  }
-}
-
 async function reloadRoutes() {
   const myToken = ++requestToken
   try {
-    const res = await useGis().routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined })
+    const bbox = syncToView.value ? (currentBbox.value ?? undefined) : undefined
+    const res = await useGis().routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined, bbox })
     if (myToken !== requestToken) return
     gisRoutes.value = res
     clearLayerError('routes')
@@ -557,16 +639,90 @@ async function reloadRoutes() {
   }
 }
 
-async function toggleLayer(key: 'boundary' | 'roads' | 'routes') {
+async function reloadOverview() {
+  const include = [layers.value.stations && 'stations', layers.value.events && 'events'].filter(Boolean).join(',')
+  if (!include) return
+  const myToken = ++requestToken
+  try {
+    const bbox = syncToView.value ? (currentBbox.value ?? undefined) : undefined
+    const res = await useGis().mapOverview({ include, bbox })
+    if (myToken !== requestToken) return
+    stationsData.value = res.stations ?? null
+    eventsData.value   = res.events ?? null
+    clearLayerError('overview')
+  } catch (err) {
+    if (myToken !== requestToken) return
+    setLayerError('overview', describeError(err))
+  }
+}
+
+function onSimplifyChange() {
+  // Boundary geometry doesn't take a `simplify` param, so only routes
+  // (the one layer that does) need to reload here - not a full load().
+  if (layers.value.routes) reloadRoutes()
+}
+
+async function toggleLayer(key: LayerKey) {
   layers.value[key] = !layers.value[key]
   if (key === 'routes' && layers.value.routes && !gisRoutes.value) await reloadRoutes()
+  if ((key === 'stations' || key === 'events') && layers.value[key]) {
+    const needStations = layers.value.stations && !stationsData.value
+    const needEvents = layers.value.events && !eventsData.value
+    if (needStations || needEvents) await reloadOverview()
+  }
 }
-function toggleCatalogLayer(key: CatalogLayerKey) {
-  catalogLayers.value[key] = !catalogLayers.value[key]
+
+// ── Viewport tracking (from UaptsMap's @bounds-change) ─────────────────
+let viewportDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function onBoundsChange(payload: { bbox: [number, number, number, number]; zoom: number; center: [number, number] }) {
+  currentBbox.value   = payload.bbox
+  currentZoom.value   = payload.zoom
+  currentCenter.value = payload.center
+  scheduleUrlSync()
+
+  if (viewportDebounceTimer) clearTimeout(viewportDebounceTimer)
+  viewportDebounceTimer = setTimeout(() => {
+    if (syncToView.value && (layers.value.routes || layers.value.stations || layers.value.events)) refreshViewportData()
+  }, 500)
+}
+
+async function refreshViewportData() {
+  const gis = useGis()
+  const bbox = currentBbox.value ?? undefined
+  const tasks: Record<string, Promise<any>> = {}
+  if (layers.value.routes) {
+    tasks.routes = gis.routes({ limit: 200, simplify: simplify.value, service_type: serviceTypeFilter.value || undefined, bbox })
+  }
+  if (layers.value.stations || layers.value.events) {
+    const include = [layers.value.stations && 'stations', layers.value.events && 'events'].filter(Boolean).join(',')
+    tasks.overview = gis.mapOverview({ include, bbox })
+  }
+  const keys = Object.keys(tasks)
+  if (!keys.length) return
+
+  const myToken = ++requestToken
+  const settled = await Promise.allSettled(keys.map(k => tasks[k]))
+  if (myToken !== requestToken) return // a newer viewport change (or manual load) superseded this
+
+  settled.forEach((result, i) => {
+    const key = keys[i]
+    if (result.status === 'fulfilled') {
+      clearLayerError(key)
+      if (key === 'routes') gisRoutes.value = result.value
+      else if (key === 'overview') {
+        stationsData.value = result.value.stations ?? null
+        eventsData.value   = result.value.events ?? null
+      }
+    } else {
+      setLayerError(key, describeError(result.reason))
+    }
+  })
 }
 
 onMounted(load)
 
+// ── Derived render data for <UaptsMap> ───────────────────────────────
 const routeLines = computed<LineSpec[]>(() => {
   if (!gisRoutes.value) return []
   return (gisRoutes.value.features ?? []).flatMap((f: any, i: number) => {
@@ -585,29 +741,84 @@ const routeLines = computed<LineSpec[]>(() => {
   })
 })
 
-const roadCount    = computed(() => roads.value?.features?.length ?? 0)
-const routeCount   = computed(() => gisRoutes.value?.features?.length ?? 0)
+const STATION_MODE_COLOR: Record<string, MarkerColor> = { brt: 'purple', matatu: 'orange', bus: 'blue', rail: 'red', ferry: 'blue' }
+function stationColor(p: Record<string, any>): MarkerColor {
+  const mode = String(p.mode || p.station_type || '').toLowerCase()
+  return STATION_MODE_COLOR[mode] ?? 'blue'
+}
+function stationRows(p: Record<string, any>) {
+  const rows: Array<{ label: string; value: string }> = []
+  if (p.route_count != null) rows.push({ label: 'Routes serving', value: String(p.route_count) })
+  if (p.mode || p.station_type) rows.push({ label: 'Mode', value: String(p.mode ?? p.station_type) })
+  if (p.adm1) rows.push({ label: 'County', value: String(p.adm1) })
+  return rows.length ? rows : undefined
+}
+const stationMarkers = computed<MarkerSpec[]>(() => {
+  if (!stationsData.value) return []
+  return (stationsData.value.features ?? []).flatMap((f: any, i: number): MarkerSpec[] => {
+    const [lon, lat] = f.geometry?.coordinates ?? []
+    if (typeof lat !== 'number' || typeof lon !== 'number') return []
+    const p = f.properties ?? {}
+    return [{
+      id: p.id != null ? String(p.id) : `station-${i}`,
+      lat, lon,
+      title: p.name || p.station_name || p.stop_name || `Station ${i + 1}`,
+      badge: p.station_type || p.mode || 'Station',
+      rows: stationRows(p),
+      color: stationColor(p),
+      size: 'sm',
+    }]
+  })
+})
 
-// ── Tabular registry rows (mirrors what's plotted on the map, so the page
-// stays usable if the map itself fails to render) ──────────────────────
-const roadFeatureRows = computed(() =>
-  (roads.value?.features ?? []).map((f: any, i: number) => ({
-    id: f.id ?? f.properties?.id ?? String(i),
-    name: f.properties?.name ?? f.properties?.ref ?? '(unnamed)',
-    highway: (f.properties?.highway ?? 'unclassified').replace(/_/g, ' '),
-  })),
-)
-const routeFeatureRows = computed(() =>
-  (gisRoutes.value?.features ?? []).map((f: any, i: number) => ({
-    id: f.properties?.id ?? f.id ?? String(i),
-    name: f.properties?.name ?? f.properties?.route_name ?? '(unnamed)',
-    serviceType: f.properties?.service_type ?? 'unknown',
-  })),
-)
+const EVENT_SEVERITY_COLOR: Record<string, MarkerColor> = {
+  critical: 'red', high: 'red', incident: 'red',
+  congestion: 'orange', medium: 'orange', roadworks: 'yellow', advisory: 'yellow', low: 'yellow',
+}
+function eventColor(p: Record<string, any>): MarkerColor {
+  const key = String(p.severity || p.event_type || p.type || p.status || '').toLowerCase()
+  return EVENT_SEVERITY_COLOR[key] ?? 'red'
+}
+function eventRows(p: Record<string, any>) {
+  const rows: Array<{ label: string; value: string }> = []
+  if (p.severity) rows.push({ label: 'Severity', value: String(p.severity) })
+  if (p.delay_minutes != null) rows.push({ label: 'Delay (min)', value: String(p.delay_minutes) })
+  if (p.reported_at) rows.push({ label: 'Reported', value: String(p.reported_at) })
+  return rows.length ? rows : undefined
+}
+const eventMarkers = computed<MarkerSpec[]>(() => {
+  if (!eventsData.value) return []
+  return (eventsData.value.features ?? []).flatMap((f: any, i: number): MarkerSpec[] => {
+    const [lon, lat] = f.geometry?.coordinates ?? []
+    if (typeof lat !== 'number' || typeof lon !== 'number') return []
+    const p = f.properties ?? {}
+    return [{
+      id: p.id != null ? String(p.id) : `event-${i}`,
+      lat, lon,
+      title: p.name || p.event_type || p.description || `Event ${i + 1}`,
+      badge: p.event_type || p.severity || 'Event',
+      rows: eventRows(p),
+      color: eventColor(p),
+      size: (p.severity === 'critical' || p.severity === 'high') ? 'lg' : 'md',
+    }]
+  })
+})
+
+const activeMarkers = computed<MarkerSpec[]>(() => [
+  ...(layers.value.stations ? stationMarkers.value : []),
+  ...(layers.value.events ? eventMarkers.value : []),
+])
+
+const routeCount   = computed(() => gisRoutes.value?.features?.length ?? 0)
+const stationCount = computed(() => layers.value.stations ? (stationsData.value?.features?.length ?? 0) : 0)
+const eventCount   = computed(() => layers.value.events ? (eventsData.value?.features?.length ?? 0) : 0)
+// Roads no longer have a meaningful upfront count - PMTiles streams
+// per-tile at whatever density the current zoom warrants, so "how many
+// features" isn't a single number the way a fetched GeoJSON payload was.
 const featureCount = computed(() =>
   (layers.value.boundary && boundary.value ? 1 : 0) +
-  (layers.value.roads ? roadCount.value : 0) +
-  (layers.value.routes ? routeCount.value : 0),
+  (layers.value.routes ? routeCount.value : 0) +
+  stationCount.value + eventCount.value,
 )
 
 const detailLabel = computed(() => {
@@ -630,14 +841,32 @@ const adminLevelOptions = [
   { value: 2, label: 'Constituencies' },
 ]
 
+// Kenya's 47 counties (fixed since the 2010 constitution), for the road
+// "County" filter dropdown. Matched case-insensitively in UaptsMap (see
+// roadsCountyFilter), which absorbs an all-caps or all-lowercase source
+// column - but NOT punctuation/spacing differences. If the rebuilt
+// tileset's `county` values turn out to be formatted differently (e.g.
+// hyphenated vs spaced, or with a numeric KRB code prefix), swap the
+// values below to match rather than the display labels.
+const KENYA_COUNTIES = [
+  'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo-Marakwet', 'Embu', 'Garissa',
+  'Homa Bay', 'Isiolo', 'Kajiado', 'Kakamega', 'Kericho', 'Kiambu', 'Kilifi',
+  'Kirinyaga', 'Kisii', 'Kisumu', 'Kitui', 'Kwale', 'Laikipia', 'Lamu',
+  'Machakos', 'Makueni', 'Mandera', 'Marsabit', 'Meru', 'Migori', 'Mombasa',
+  "Murang'a", 'Nairobi', 'Nakuru', 'Nandi', 'Narok', 'Nyamira', 'Nyandarua',
+  'Nyeri', 'Samburu', 'Siaya', 'Taita-Taveta', 'Tana River', 'Tharaka-Nithi',
+  'Trans Nzoia', 'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot',
+]
+
 function fmtNum(v: number) { return v.toLocaleString() }
 
+// Mirrors conditionColorFor() in UaptsMap.vue - keep the two in sync.
 const roadLegend = [
-  { label: 'Trunk',        color: '#dc2626', weight: 3, agency: 'KeNHA' },
-  { label: 'Primary',      color: '#ea580c', weight: 2.5, agency: 'KeNHA' },
-  { label: 'Secondary',    color: '#ca8a04', weight: 2, agency: 'KeNHA / KURA' },
-  { label: 'Tertiary',     color: '#16a34a', weight: 1.5, agency: 'KeRRA / KURA' },
-  { label: 'Unclassified', color: '#64748b', weight: 1, agency: 'KeRRA' },
+  { label: 'Poor',                color: '#dc2626', weight: 4 },
+  { label: 'Fair',                color: '#f59e0b', weight: 4 },
+  { label: 'Good',                color: '#16a34a', weight: 4 },
+  { label: 'Under Construction',  color: '#2563eb', weight: 4 },
+  { label: 'No RICS match',       color: '#94a3b8', weight: 4 },
 ]
 
 const routeLegend = [
@@ -648,55 +877,73 @@ const routeLegend = [
   { label: 'Ferry',  color: '#06b6d4' },
 ]
 
-// ── County/constituency search (client-side, over the loaded boundary
-// layer - `center_lat`/`center_lon` are provided per-feature by the
-// backend, so "jump to" is a direct flyTo, no bbox math needed) ───────
-interface SearchResult { id: string; kind: string; name: string; lat: number; lon: number }
+// ── County / constituency search ─────────────────────────────────────
+interface SearchResult { id: string; name: string; kind: string; bbox: [number, number, number, number] }
+
+function geometryBbox(geometry: any): [number, number, number, number] | null {
+  let minLat = Infinity, minLon = Infinity, maxLat = -Infinity, maxLon = -Infinity
+  function walk(coords: any): void {
+    if (typeof coords?.[0] === 'number') {
+      const [lon, lat] = coords
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lon < minLon) minLon = lon
+      if (lon > maxLon) maxLon = lon
+      return
+    }
+    for (const c of coords ?? []) walk(c)
+  }
+  try { walk(geometry?.coordinates) } catch { return null }
+  if (![minLat, minLon, maxLat, maxLon].every(Number.isFinite)) return null
+  return [minLat, minLon, maxLat, maxLon]
+}
+
+// County/constituency/country only - rivers and landmarks are treated as
+// non-interactive background decoration elsewhere (UaptsMap skips their
+// popup/click binding too), so they're not sensible "jump to" targets.
+const searchableFeatures = computed<SearchResult[]>(() => {
+  const feats = boundary.value?.features ?? []
+  const out: SearchResult[] = []
+  for (const f of feats) {
+    const kind = f.properties?.kind
+    if (kind !== 'county' && kind !== 'constituency' && kind !== 'country') continue
+    const name = f.properties?.adm1_name || f.properties?.adm2_name || f.properties?.adm0_name || f.properties?.name
+    const bbox = geometryBbox(f.geometry)
+    if (!name || !bbox) continue
+    out.push({ id: `${kind}-${name}-${out.length}`, name, kind, bbox })
+  }
+  return out
+})
+
 const searchQuery = ref('')
 const searchOpen = ref(false)
 const searchActiveIndex = ref(-1)
 
 const searchResults = computed<SearchResult[]>(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q || !boundary.value) return []
-  const out: SearchResult[] = []
-  for (const f of boundary.value.features ?? []) {
-    const p = f.properties ?? {}
-    if (p.kind !== 'county' && p.kind !== 'constituency') continue
-    const name = p.kind === 'county' ? p.adm1_name : p.adm2_name
-    if (!name || !String(name).toLowerCase().includes(q)) continue
-    if (p.center_lat == null || p.center_lon == null) continue
-    out.push({ id: p.adm2_pcode || p.adm1_pcode || name, kind: p.kind, name, lat: p.center_lat, lon: p.center_lon })
-    if (out.length >= 8) break
-  }
-  return out
+  if (!q) return []
+  return searchableFeatures.value.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8)
 })
 
+watch(searchQuery, () => { searchOpen.value = searchQuery.value.trim().length > 0; searchActiveIndex.value = -1 })
+
 function selectSearchResult(r: SearchResult) {
-  searchQuery.value = r.name
+  mapComponent.value?.fitBounds(r.bbox)
+  if (r.kind === 'county' || r.kind === 'constituency') selectedCounty.value = r.name
+  searchQuery.value = ''
   searchOpen.value = false
   searchActiveIndex.value = -1
-  selectedCounty.value = r.name
-  mapComponentRef.value?.flyTo(r.lat, r.lon, r.kind === 'county' ? 9 : 11)
 }
-function onSearchBlur() {
-  // Delay so a click on a result (which fires @mousedown before blur) still registers.
-  setTimeout(() => { searchOpen.value = false }, 150)
-}
+
 function onSearchKeydown(e: KeyboardEvent) {
   if (!searchResults.value.length) return
-  if (e.key === 'ArrowDown') {
+  if (e.key === 'ArrowDown') { e.preventDefault(); searchActiveIndex.value = Math.min(searchActiveIndex.value + 1, searchResults.value.length - 1) }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); searchActiveIndex.value = Math.max(searchActiveIndex.value - 1, 0) }
+  else if (e.key === 'Enter') {
     e.preventDefault()
-    searchActiveIndex.value = (searchActiveIndex.value + 1) % searchResults.value.length
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    searchActiveIndex.value = searchActiveIndex.value <= 0 ? searchResults.value.length - 1 : searchActiveIndex.value - 1
-  } else if (e.key === 'Enter' && searchActiveIndex.value >= 0) {
-    e.preventDefault()
-    selectSearchResult(searchResults.value[searchActiveIndex.value])
-  } else if (e.key === 'Escape') {
-    searchOpen.value = false
-  }
+    const r = searchResults.value[searchActiveIndex.value] ?? searchResults.value[0]
+    if (r) selectSearchResult(r)
+  } else if (e.key === 'Escape') { searchOpen.value = false; searchActiveIndex.value = -1 }
 }
 </script>
 
@@ -743,103 +990,26 @@ function onSearchKeydown(e: KeyboardEvent) {
   justify-content: space-between;
 }
 
-/* ── Search ──────────────────────────────────────────────────────── */
-.panel-search { position: relative; }
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 7px;
-  background: #fff;
-}
-.search-icon { width: 14px; height: 14px; color: #94a3b8; flex-shrink: 0; }
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 12px;
-  color: #1e293b;
-  background: transparent;
-  min-width: 0;
-}
-.search-clear {
-  border: none;
-  background: none;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  padding: 0 2px;
-}
-.search-clear:hover { color: #475569; }
-.search-results {
-  position: absolute;
-  left: 16px; right: 16px; top: 100%;
-  margin-top: 4px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.1);
-  list-style: none;
-  padding: 4px;
-  z-index: 20;
-  max-height: 220px;
-  overflow-y: auto;
-}
-.search-result-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.search-result-row:hover, .search-result-row.active { background: #eff6ff; }
-.search-result-kind {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: #94a3b8;
-  background: #f1f5f9;
-  padding: 1px 6px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.search-result-name { color: #1e293b; font-weight: 500; }
-.search-empty {
-  position: absolute;
-  left: 16px; right: 16px; top: 100%;
-  margin-top: 4px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 12px;
-  color: #94a3b8;
-  z-index: 20;
-}
-
 /* ── Layer rows ──────────────────────────────────────────────────── */
 .layer-row {
   display: flex;
   align-items: center;
   gap: 9px;
+  width: 100%;
   padding: 7px 8px;
+  border: none;
   border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background 0.12s;
   margin-bottom: 2px;
   user-select: none;
-  border: none;
-  background: none;
-  width: 100%;
-  text-align: left;
-  font: inherit;
 }
 .layer-row:hover { background: #f1f5f9; }
+.layer-row:focus-visible { outline: 2px solid #6366f1; outline-offset: 1px; }
 
 .layer-swatch {
   display: inline-block;
@@ -867,14 +1037,6 @@ function onSearchKeydown(e: KeyboardEvent) {
   color: #64748b;
   font-variant-numeric: tabular-nums;
 }
-
-.layer-error {
-  font-size: 11px;
-  color: #b45309;
-  padding: 2px 8px 6px;
-}
-
-.source-note { margin-top: 6px; font-size: 10px; color: #94a3b8; }
 
 /* Custom toggle switch */
 .layer-switch {
@@ -925,6 +1087,20 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 .panel-select:hover { border-color: #cbd5e1; }
 .panel-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
+
+.panel-text-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 12px;
+  background: #fff;
+  color: #374151;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.panel-text-input::placeholder { color: #94a3b8; }
+.panel-text-input:hover { border-color: #cbd5e1; }
+.panel-text-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
 
 /* ── Detail slider ───────────────────────────────────────────────── */
 .detail-label {
@@ -1219,10 +1395,111 @@ function onSearchKeydown(e: KeyboardEvent) {
 
 .statusbar-county { color: #6366f1; font-weight: 600; }
 
-/* ── Feature registry tables ─────────────────────────────────────── */
-.two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-@media (max-width:900px) { .two-col { grid-template-columns:1fr; } }
-.table-scroll { overflow-x:auto; }
+/* ── Search ──────────────────────────────────────────────────────── */
+.panel-search { position: relative; }
+
+.search-box { position: relative; display: flex; align-items: center; }
+
+.search-icon {
+  position: absolute;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 7px 28px 7px 30px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 12.5px;
+  background: #fff;
+  color: #1e293b;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.search-input::placeholder { color: #94a3b8; }
+.search-input:hover { border-color: #cbd5e1; }
+.search-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, .12); }
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.search-clear:hover { background: #f1f5f9; color: #475569; }
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 14px;
+  right: 14px;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.search-result-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.search-result-row.active,
+.search-result-row:hover { background: #eef2ff; }
+.search-result-kind {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+.search-result-name { font-size: 12.5px; color: #1e293b; }
+.search-empty { margin-top: 6px; font-size: 11.5px; color: #94a3b8; padding: 0 2px; }
+
+/* ── Section hint / inline layer error ──────────────────────────────── */
+.section-hint { margin: 6px 0 0; font-size: 11px; color: #94a3b8; line-height: 1.4; }
+.layer-error {
+  margin: 2px 0 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ── Header actions ──────────────────────────────────────────────────── */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+.btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; }
+.btn-icon { display: inline-block; }
+.btn-icon.spinning { animation: spin 0.7s linear infinite; }
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .error-banner {
@@ -1235,16 +1512,22 @@ function onSearchKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
 }
 .error-dismiss {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  background: none;
+  border-radius: 50%;
+  background: transparent;
   color: #92400e;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
 }
-.error-dismiss:hover { color: #713f12; }
+.error-dismiss:hover { background: rgba(202, 138, 4, 0.15); }
 </style>
