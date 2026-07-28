@@ -90,6 +90,7 @@
           <NuxtLink class="sidebar-link" to="/aviation" :class="{ active: isActive('/aviation') }">Flight Movements</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/flights" :class="{ active: isActive('/aviation/flights') }">Flight Log</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/passenger-stats" :class="{ active: isActive('/aviation/passenger-stats') }">Passenger Stats</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/aviation/licensing" :class="{ active: isActive('/aviation/licensing') }">Aircraft Licencing</NuxtLink>
           <NuxtLink class="sidebar-link" to="/aviation/infrastructure" :class="{ active: isActive('/aviation/infrastructure') }">Aviation Infrastructure</NuxtLink>
         </div>
       </details>

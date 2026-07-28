@@ -9,6 +9,7 @@
       <div class="day-filter">
         <button v-for="d in [7, 14, 30]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
       </div>
+      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing →</NuxtLink>
       <NuxtLink to="/aviation/passenger-stats" class="btn-primary">Passenger Stats →</NuxtLink>
     </template>
   </PageHeader>

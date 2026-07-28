@@ -6,6 +6,7 @@
   >
     <template #actions>
       <NuxtLink to="/aviation" class="btn">Flight Movements →</NuxtLink>
+      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing →</NuxtLink>
       <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats →</NuxtLink>
     </template>
   </PageHeader>

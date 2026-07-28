@@ -647,16 +647,14 @@ function onOTPPaste(e: ClipboardEvent) {
 /* ─── Hero panel ─────────────────────────────────────────── */
 .hero-panel {
   flex: 1; height: 100vh;
-  /* Multimodal transport photograph, served locally from /public.
-     Drop the asset in as public/hero-multimodal.jpg — a frame that
-     carries more than one mode reads best here (e.g. the SGR
-     alongside the Mombasa port cranes, or an apron with freight).
-     Hotlinking a stock CDN was removed deliberately: it leaks
-     traffic off-network and breaks on restricted deployments.
-     Until the file is added, the gradient below stands on its own. */
+  /* Multimodal transport photograph, served locally from /public
+     (public/hero-multimodal.webp) — road, rail, maritime and air
+     side by side in one aerial frame. Hotlinking a stock CDN was
+     removed deliberately: it leaks traffic off-network and breaks
+     on restricted deployments. */
   background:
     linear-gradient(160deg, rgba(6, 28, 54, 0.88) 0%, rgba(13, 76, 139, 0.70) 52%, rgba(59, 130, 200, 0.34) 100%),
-    url('/hero-multimodal.jpg') center/cover no-repeat,
+    url('/hero-multimodal.webp') center/cover no-repeat,
     linear-gradient(160deg, var(--brand-darker) 0%, var(--brand) 100%);
   display: flex; align-items: center; justify-content: center; padding: 48px;
   position: relative; overflow: hidden;
@@ -665,27 +663,30 @@ function onOTPPaste(e: ClipboardEvent) {
   position: absolute; inset: 0;
   background: linear-gradient(to top, rgba(4, 22, 44, 0.62) 0%, transparent 60%);
 }
-.hero-content { position: relative; z-index: 1; color: #fff; }
+.hero-content {
+  position: relative; z-index: 1; color: #fff;
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 420px; text-align: center;
+}
 .hero-badge {
   display: inline-block; padding: 6px 16px; border-radius: 9999px;
   background: rgba(13, 76, 139, .62); border: 1px solid rgba(253, 185, 19, .6);
   font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; margin-bottom: 16px; backdrop-filter: blur(8px);
+  text-transform: uppercase; margin-bottom: 18px; backdrop-filter: blur(8px);
 }
 .hero-headline {
   font-size: clamp(1.75rem, 2.5vw, 2.5rem); font-weight: 700;
-  letter-spacing: -0.025em; line-height: 1.1; margin-bottom: 12px; max-width: 400px;
+  letter-spacing: -0.025em; line-height: 1.15; margin-bottom: 14px;
   text-shadow: 0 2px 12px rgba(0,0,0,.4);
 }
 .hero-body {
   font-size: 0.9375rem; color: rgba(255,255,255,.8); line-height: 1.7;
-  max-width: 380px; margin-bottom: 24px; text-shadow: 0 1px 6px rgba(0,0,0,.4);
+  max-width: 340px; margin: 0 auto 28px; text-shadow: 0 1px 6px rgba(0,0,0,.4);
 }
 
 /* ─── Hero: transport modes strip ────────────────────────── */
 .hero-modes {
-  display: flex; list-style: none; margin: 0 0 28px; padding: 0;
-  max-width: 400px;
+  display: flex; list-style: none; margin: 0 0 28px; padding: 0; width: 100%;
   border-top: 1px solid rgba(255,255,255,.18);
   border-bottom: 1px solid rgba(255,255,255,.18);
 }
@@ -699,8 +700,8 @@ function onOTPPaste(e: ClipboardEvent) {
   font-size: 0.625rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.1em; color: rgba(255,255,255,.72); line-height: 1;
 }
-.hero-stats { display: flex; align-items: center; gap: 20px; }
-.stat-item { display: flex; flex-direction: column; gap: 2px; }
+.hero-stats { display: flex; align-items: center; justify-content: center; gap: 20px; }
+.stat-item { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
 .stat-num { font-size: 1.375rem; font-weight: 700; line-height: 1; }
 .stat-label {
   font-size: 0.6875rem; font-weight: 500; text-transform: uppercase;
