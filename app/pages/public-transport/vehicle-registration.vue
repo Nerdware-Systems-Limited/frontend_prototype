@@ -39,25 +39,6 @@
       source="live" source-title="NTSA VREG"
     />
     <KpiCard
-      label="Registered Today"
-      :value="fmtNum(registeredCounts.today)"
-      sub="New registrations (loaded page)"
-      source="batch" source-title="NTSA VREG"
-    />
-    <KpiCard
-      label="Registered (7 Days)"
-      :value="fmtNum(registeredCounts.week)"
-      sub="7-day rolling total"
-      source="batch" source-title="NTSA VREG"
-    />
-    <KpiCard
-      label="Registered (This Month)"
-      :value="fmtNum(registeredCounts.month)"
-      sub="Current month"
-      trend-direction="up"
-      source="batch" source-title="NTSA VREG"
-    />
-    <KpiCard
       label="Speed Governor Online"
       :value="summary?.governor_compliance.online_pct != null ? summary.governor_compliance.online_pct.toFixed(1) + '%' : '-'"
       sub="Fleet-wide compliance"
@@ -165,6 +146,22 @@
           <option v-for="f in fuelTypes" :key="f" :value="f">{{ f }}</option>
         </select>
         <button class="btn" @click="clearFilters">Clear</button>
+      </div>
+
+      <div class="filter-row">
+        <span class="reg-filter-label">Registered:</span>
+        <button
+          class="btn" :class="{ 'btn-active': registeredFilter === 'today' }"
+          @click="registeredFilter = registeredFilter === 'today' ? '' : 'today'"
+        >Today ({{ fmtNum(registeredCounts.today) }})</button>
+        <button
+          class="btn" :class="{ 'btn-active': registeredFilter === 'week' }"
+          @click="registeredFilter = registeredFilter === 'week' ? '' : 'week'"
+        >Last 7 Days ({{ fmtNum(registeredCounts.week) }})</button>
+        <button
+          class="btn" :class="{ 'btn-active': registeredFilter === 'month' }"
+          @click="registeredFilter = registeredFilter === 'month' ? '' : 'month'"
+        >This Month ({{ fmtNum(registeredCounts.month) }})</button>
       </div>
 
       <div class="table-scroll">
@@ -293,6 +290,7 @@ const search       = ref('')
 const statusFilter = ref('')
 const typeFilter   = ref('')
 const fuelFilter   = ref('')
+const registeredFilter = ref<'' | 'today' | 'week' | 'month'>('')
 const expandedId   = ref<string | null>(null)
 
 const drillCache = reactive<Record<string, { loaded: boolean; inspections: VehicleInspection[]; adherence: RouteAdherence[]; behaviour: DriverBehaviorEvent[] }>>({})
@@ -345,6 +343,10 @@ function clearFilters() {
   search.value = ''; statusFilter.value = ''; typeFilter.value = ''; fuelFilter.value = ''
 }
 
+const REGISTERED_WINDOW_MS: Record<'today' | 'week' | 'month', number> = {
+  today: 86_400_000, week: 7 * 86_400_000, month: 30 * 86_400_000,
+}
+
 // ── Computed ─────────────────────────────────────────────────────────────
 const filteredVehicles = computed(() => vehicles.value.filter(v => {
   if (search.value) {
@@ -354,6 +356,11 @@ const filteredVehicles = computed(() => vehicles.value.filter(v => {
   if (statusFilter.value && v.status !== statusFilter.value) return false
   if (typeFilter.value && v.vehicle_type !== typeFilter.value) return false
   if (fuelFilter.value && v.fuel_type !== fuelFilter.value) return false
+  if (registeredFilter.value) {
+    if (!v.created_at) return false
+    const age = Date.now() - new Date(v.created_at).getTime()
+    if (age > REGISTERED_WINDOW_MS[registeredFilter.value]) return false
+  }
   return true
 }))
 
@@ -472,6 +479,8 @@ function severityBadge(s: string) {
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
+.reg-filter-label { font-size:12px; color:#64748b; font-weight:600; }
+.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .table-scroll { overflow-x:auto; }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:130px 1fr 40px; align-items:center; gap:8px; }

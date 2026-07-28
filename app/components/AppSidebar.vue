@@ -106,6 +106,7 @@
           <NuxtLink class="sidebar-link" to="/maritime/port-ops" :class="{ active: isActive('/maritime/port-ops') }">Port Operations</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/services" :class="{ active: isActive('/maritime/services') }">Port Services</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/cargo" :class="{ active: isActive('/maritime/cargo') }">Cargo Tracking</NuxtLink>
+          <NuxtLink class="sidebar-link" to="/maritime/imports-exports" :class="{ active: isActive('/maritime/imports-exports') }">Imports and Exports</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/waterways" :class="{ active: isActive('/maritime/waterways') }">Waterways</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/infrastructure" :class="{ active: isActive('/maritime/infrastructure') }">Maritime Infrastructure</NuxtLink>
           <NuxtLink class="sidebar-link" to="/maritime/accidents" :class="{ active: isActive('/maritime/accidents') }">Accidents & Safety</NuxtLink>

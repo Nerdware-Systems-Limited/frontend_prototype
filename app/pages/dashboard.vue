@@ -10,9 +10,6 @@
     title="Command Centre"
     subtitle="Unified oversight across transport agencies and modes"
   >
-    <template #actions>
-      <button class="btn-primary">Schedule Cabinet Report</button>
-    </template>
   </PageHeader>
 
   <!-- Global error banner (only shown when ALL calls fail) -->

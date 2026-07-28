@@ -193,13 +193,54 @@ export interface VesselMovement {
   agency: string | null
 }
 
+// `container-throughput/` and `yard-dwell/` don't support server-side
+// `port`/`direction`/`days` filtering despite older callers assuming
+// otherwise (confirmed live - the schema declares no filterset fields
+// for either viewset). Fetch a full page and aggregate/filter
+// client-side instead, same pattern as maritime/cargo's cargo-type
+// breakdown.
 export type ContainerDirection = 'import' | 'export' | 'transit' | 'empty'
+export interface ContainerThroughputRecord {
+  id: string
+  report_date: string
+  port: string
+  port_unlocode: string
+  direction: ContainerDirection
+  teu_count: number
+  boxes_count: number
+  weight_tons: number
+  agency: string | null
+  created_at: string
+  updated_at: string
+}
 export interface ContainerByPort {
   port__unlocode: string
   port__name: string
   teus: number
   boxes: number
   tons: number
+}
+export interface ContainerTrendPoint {
+  report_date: string
+  direction: ContainerDirection
+  teus: number
+}
+
+// `direction` here excludes 'empty' - empties aren't dwell-tracked.
+export type YardDwellDirection = 'import' | 'export' | 'transit'
+export interface YardDwellRecord {
+  id: string
+  port: string
+  port_unlocode: string
+  direction: YardDwellDirection
+  container_count: number
+  avg_dwell_days: number
+  p50_dwell_days: number
+  p95_dwell_days: number
+  max_dwell_days: number
+  report_date: string
+  created_at: string
+  updated_at: string
 }
 
 export type ConnectionType = 'port_to_rail' | 'port_to_road' | 'port_to_air' | 'air_to_road' | 'air_to_rail' | 'rail_to_road'
@@ -364,16 +405,19 @@ export function useAviationMaritime() {
       api<Paged<VesselMovement>>(`${MA}/vessel-movements/`, { query: cleanQuery(q as Record<string, unknown>) }),
     vesselMovementsLive: () =>
       api<VesselMovement[]>(`${MA}/vessel-movements/live/`),
-    containerThroughput: (q?: { port?: string; direction?: string; days?: number }) =>
-      api<Paged<any>>(`${MA}/container-throughput/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    /** No server-side filtering despite the query shape - fetch a full page (~100) and aggregate/filter client-side. */
+    containerThroughput: (q?: { port?: string; direction?: string; days?: number; page_size?: number }) =>
+      api<Paged<ContainerThroughputRecord>>(`${MA}/container-throughput/`, { query: cleanQuery(q as Record<string, unknown>) }),
     containerByPort: (q?: { days?: number }) =>
       api<{ results: ContainerByPort[] }>(`${MA}/container-throughput/by-port/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
+    /** Daily TEU totals per direction, last `days`. */
     containerTrend: (days = 60) =>
-      api<{ days: number; results: any[] }>(`${MA}/container-throughput/trend/?days=${days}`),
-    yardDwell: (q?: { port?: string; direction?: string; days?: number }) =>
-      api<Paged<any>>(`${MA}/yard-dwell/`, { query: cleanQuery(q as Record<string, unknown>) }),
+      api<{ days: number; results: ContainerTrendPoint[] }>(`${MA}/container-throughput/trend/?days=${days}`),
+    /** No server-side filtering despite the query shape - fetch a full page (~100) and aggregate/filter client-side. */
+    yardDwell: (q?: { port?: string; direction?: string; days?: number; page_size?: number }) =>
+      api<Paged<YardDwellRecord>>(`${MA}/yard-dwell/`, { query: cleanQuery(q as Record<string, unknown>) }),
     maritimeInspections: (q?: { port?: string; result?: string; days?: number }) =>
       api<Paged<any>>(`${MA}/maritime-inspections/`, { query: cleanQuery(q as Record<string, unknown>) }),
     maritimeIncidents: (q?: { port?: string; incident_type?: string; severity?: string; days?: number }) =>
