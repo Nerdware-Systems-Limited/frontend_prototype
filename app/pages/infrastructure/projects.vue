@@ -15,14 +15,14 @@
   <!-- Agency tabs -->
   <div class="agency-tabs">
     <button class="agency-tab" :class="{ active: selectedAgency === '' }" @click="selectAgency('')">
-      All Agencies <span class="agency-tab-count">{{ projects.length }}</span>
+      All Agencies <span class="agency-tab-count">{{ fmtNum(summary?.construction.total_projects ?? projects.length) }}</span>
     </button>
     <button
       v-for="a in agencyOptions" :key="a.code"
       class="agency-tab" :class="{ active: selectedAgency === a.code }"
       @click="selectAgency(a.code)"
     >
-      {{ a.name }} <span class="agency-tab-count">{{ a.count }}</span>
+      {{ a.name }} <span class="agency-tab-count">{{ fmtNum(a.count) }}</span>
     </button>
     <button v-if="krbHasFundingOnly" class="agency-tab" :class="{ active: selectedAgency === 'KRB' }" @click="selectAgency('KRB')">
       KRB (funding source) <span class="agency-tab-count">{{ agencyBudgets('KRB').length }}</span>
@@ -295,7 +295,7 @@
 definePageMeta({ layout: 'default' })
 useNavSubtitle('Road Infrastructure Status')
 
-import { useInfrastructure } from '~/composables/api'
+import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { ConstructionProject, MaintenanceOrder, RoadSegment, Bridge, TrafficSignal, MaintenanceBudget, InfrastructureSummary, RuralRoadStatus } from '~/composables/api'
 
 const route  = useRoute()
@@ -311,6 +311,7 @@ const signalFaults  = ref<TrafficSignal[]>([])
 const budgets       = ref<MaintenanceBudget[]>([])
 const summary       = ref<InfrastructureSummary | null>(null)
 const closures      = ref<RuralRoadStatus[]>([])
+const agencyNames   = ref<Record<string, string>>({})
 const loading       = ref(true)
 const error         = ref<string | null>(null)
 const statusFilter  = ref('')
@@ -334,8 +335,9 @@ async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
+  const agenciesApi = useAgencies()
 
-  const [projRes, delayRes, countyRes, ordRes, segRes, bridgeRes, sigRes, budRes, sumRes, closureRes] = await Promise.allSettled([
+  const [projRes, delayRes, countyRes, ordRes, segRes, bridgeRes, sigRes, budRes, sumRes, closureRes, agencyRes] = await Promise.allSettled([
     infra.projects({ page_size: 100 }),
     infra.delayedProjects(),
     infra.projectsByCounty(),
@@ -346,6 +348,7 @@ async function load() {
     infra.budgets({ page_size: 50 }),
     infra.summary(),
     infra.ruralRoadStatus({ page_size: 50 }),
+    agenciesApi.list({ page_size: 50 }),
   ])
 
   if (projRes.status   === 'fulfilled') projects.value  = (projRes.value as any).results ?? []
@@ -358,6 +361,10 @@ async function load() {
   if (budRes.status    === 'fulfilled') budgets.value   = (budRes.value as any).results ?? []
   if (sumRes.status    === 'fulfilled') summary.value   = sumRes.value
   if (closureRes.status === 'fulfilled') closures.value = (closureRes.value as any).results ?? []
+  if (agencyRes.status === 'fulfilled') {
+    const list = (agencyRes.value as any).results ?? []
+    agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
+  }
 
   if ([projRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -371,27 +378,45 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Agency tabs ──────────────────────────────────────────────────────────
+// `summary.construction.by_agency` is an exact server-side group-by - real
+// per-agency project counts, not derived from the (page_size:100-capped)
+// `projects` list. Falls back to counting the loaded list only while the
+// summary request hasn't resolved yet (or failed).
 const agencyOptions = computed(() => {
+  const byAgency = summary.value?.construction.by_agency
+  if (byAgency?.length) {
+    return byAgency
+      .filter(a => !!a.agency_code)
+      .map(a => ({ code: a.agency_code as string, count: a.total_projects, name: agencyNames.value[a.agency_code as string] ?? (a.agency_code as string) }))
+      .sort((a, b) => a.code.localeCompare(b.code))
+  }
   const m = new Map<string, number>()
   for (const p of projects.value) {
     if (!p.agency_code) continue
     m.set(p.agency_code, (m.get(p.agency_code) ?? 0) + 1)
   }
-  return [...m.entries()].map(([code, count]) => ({ code, count, name: code })).sort((a, b) => a.code.localeCompare(b.code))
+  return [...m.entries()]
+    .map(([code, count]) => ({ code, count, name: agencyNames.value[code] ?? code }))
+    .sort((a, b) => a.code.localeCompare(b.code))
 })
-const agencyLabel = computed(() => selectedAgency.value || 'All Agencies')
+const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
 const krbHasFundingOnly = computed(() => !agencyOptions.value.some(a => a.code === 'KRB') && agencyBudgets('KRB').length > 0)
 function agencyBudgets(code: string) { return budgets.value.filter(b => b.agency_code === code) }
 
 // ConstructionProjectFilter/MaintenanceOrderFilter's `agency` param matches
-// the Agency UUID, not its code - build the mapping from whatever loaded
-// rows carry both `agency` (uuid) and `agency_code`.
+// the Agency UUID, not its code - build the mapping from `construction.
+// by_agency` (covers every agency with a project, not just those in the
+// loaded page), falling back to whatever loaded rows carry both `agency`
+// (uuid) and `agency_code` for any code it doesn't have yet.
 const agencyCodeToId = computed(() => {
   const m: Record<string, string> = {}
-  for (const p of projects.value) if (p.agency_code && p.agency) m[p.agency_code] = p.agency
-  for (const b of bridges.value) if (b.agency_code && b.agency) m[b.agency_code] = b.agency
-  for (const b of budgets.value) if (b.agency_code && b.agency) m[b.agency_code] = b.agency
-  for (const s of segments.value) if (s.agency_code && s.agency) m[s.agency_code] = s.agency
+  for (const a of summary.value?.construction.by_agency ?? []) {
+    if (a.agency_code && a.agency_id) m[a.agency_code] = a.agency_id
+  }
+  for (const p of projects.value) if (p.agency_code && p.agency && !m[p.agency_code]) m[p.agency_code] = p.agency
+  for (const b of bridges.value) if (b.agency_code && b.agency && !m[b.agency_code]) m[b.agency_code] = b.agency
+  for (const b of budgets.value) if (b.agency_code && b.agency && !m[b.agency_code]) m[b.agency_code] = b.agency
+  for (const s of segments.value) if (s.agency_code && s.agency && !m[s.agency_code]) m[s.agency_code] = s.agency
   return m
 })
 

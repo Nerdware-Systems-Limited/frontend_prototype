@@ -22,10 +22,10 @@
       v-for="a in agencyOptions" :key="a.code"
       class="agency-tab" :class="{ active: selectedAgency === a.code }"
       @click="selectAgency(a.code)"
-      title="Approximate - based on a sample, not a full per-agency count"
+      :title="agencyCountsExact ? undefined : 'Approximate - based on a sample, not a full per-agency count'"
     >
       {{ a.name }}
-      <span class="agency-tab-count">~{{ fmtNum(a.count) }}</span>
+      <span class="agency-tab-count">{{ agencyCountsExact ? '' : '~' }}{{ fmtNum(a.count) }}</span>
     </button>
   </div>
 
@@ -75,8 +75,8 @@
       source="batch" source-title="Agency Survey"
     />
   </div>
-  <div v-if="!stats.usingAggregate" class="sample-caveat">
-    Network Length/IRI/PCI/Condition are only exact when "All Agencies" is selected - no per-agency aggregate exists on the backend, so {{ agencyLabel }}'s figures above are estimated from loaded records.
+  <div v-if="!stats.usingAggregate && !loading" class="sample-caveat">
+    The per-agency aggregate for {{ agencyLabel }} is unavailable right now, so Network Length/IRI/PCI/Condition above are estimated from loaded records instead.
   </div>
 
   <!-- Class / surface / condition distribution -->
@@ -113,7 +113,7 @@
 
     <div class="card">
       <div class="card-header">Condition Distribution</div>
-      <div v-if="!stats.usingAggregate" class="dist-caveat">Estimated - no per-agency breakdown exists on the backend.</div>
+      <div v-if="!stats.usingAggregate && !loading" class="dist-caveat">Estimated - the per-agency breakdown is unavailable right now.</div>
       <div class="card-body">
         <div v-if="stats.byCondition.length" class="dist-list">
           <div v-for="d in stats.byCondition" :key="d.key" class="dist-row">
@@ -389,7 +389,12 @@ type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtit
 const route  = useRoute()
 const router = useRouter()
 
+// Network-wide summary (always unscoped - backs the "All Agencies" tab badge
+// and the freshness pill regardless of which tab is selected).
 const summary      = ref<InfrastructureSummary | null>(null)
+// Per-agency summary (server-side `agency=`-scoped, via the same endpoint) -
+// populated whenever a specific agency tab is selected, null otherwise.
+const agencySummary = ref<InfrastructureSummary | null>(null)
 // Currently displayed segments - the full unfiltered sample when no agency is
 // selected, or a fresh server-side `agency=`-filtered fetch once one is picked.
 const segments      = ref<RoadSegment[]>([])
@@ -469,7 +474,12 @@ async function load() {
   // Re-apply the selected agency's own server-filtered fetch (e.g. deep link
   // landed on ?agency=KeNHA) - the unfiltered sample above may contain zero
   // rows for it, so it must never be derived by client-filtering that sample.
-  if (selectedAgency.value) await loadAgencySegments(selectedAgency.value)
+  if (selectedAgency.value) {
+    await Promise.all([
+      loadAgencySegments(selectedAgency.value),
+      loadAgencySummary(selectedAgency.value),
+    ])
+  }
 
   if ([sumRes, sampleRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -494,6 +504,20 @@ async function loadAgencySegments(code: string) {
   }
 }
 
+// The `/summary/` endpoint's `agency=` param scopes the network/bridges/
+// streetlights blocks to that agency - this is the exact per-agency
+// aggregate (not a sample), unlike `segments`/`loadAgencySegments` above.
+async function loadAgencySummary(code: string) {
+  const infra = useInfrastructure()
+  const agencyId = agencyCodeToId.value[code]
+  if (!agencyId) { agencySummary.value = null; return }
+  try {
+    agencySummary.value = await infra.summary({ agency: agencyId })
+  } catch {
+    agencySummary.value = null
+  }
+}
+
 // condition-map has no documented way to cap or filter its response and the
 // table it backs (588k+ rows) - fetch it once on load rather than on every
 // 120s refresh tick, and pass a defensive page_size in case the server does
@@ -508,10 +532,12 @@ async function loadConditionMap() {
 
 watch(selectedAgency, async (code) => {
   loading.value = true
-  if (code) await loadAgencySegments(code)
-  else {
+  if (code) {
+    await Promise.all([loadAgencySegments(code), loadAgencySummary(code)])
+  } else {
     segments.value = allAgencySample.value
     segmentsTotal.value = summary.value?.network.total_segments ?? allAgencySample.value.length
+    agencySummary.value = null
   }
   loading.value = false
   tablePage.value = 1
@@ -525,12 +551,20 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Agency tabs ──────────────────────────────────────────────────────────
-// Derived from the unfiltered baseline sample, not the currently displayed
-// (possibly agency-scoped) `segments` - so the tab list itself doesn't
-// collapse to one agency once a tab is selected. Counts are therefore only
-// approximate (a sample of 300 out of 588k+ rows), never a true per-agency
-// total - there's no backend endpoint for that.
+// `summary.network.by_agency` is an exact server-side group-by (independent
+// of any `agency=` scoping on that response) - real per-agency counts, not a
+// sample. Falls back to counting the unfiltered baseline sample only while
+// the summary request hasn't resolved yet (or failed), so the tab list still
+// renders something during initial load.
+const agencyCountsExact = computed(() => !!summary.value?.network.by_agency?.length)
 const agencyOptions = computed(() => {
+  const byAgency = summary.value?.network.by_agency
+  if (byAgency?.length) {
+    return byAgency
+      .filter(a => !!a.agency_code)
+      .map(a => ({ code: a.agency_code as string, count: a.total_segments, name: agencyNames.value[a.agency_code as string] ?? (a.agency_code as string) }))
+      .sort((a, b) => a.code.localeCompare(b.code))
+  }
   const m = new Map<string, number>()
   for (const s of allAgencySample.value) {
     if (!s.agency_code) continue
@@ -543,12 +577,16 @@ const agencyOptions = computed(() => {
 const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
 
 // RoadSegmentFilter's `agency` param matches on the Agency UUID, not its
-// code - build the mapping from the unfiltered baseline sample (each row
-// carries both `agency` (uuid) and `agency_code`).
+// code - build the mapping from `by_agency` (covers every agency, not just
+// whichever ones landed in the 300-row baseline sample), falling back to the
+// sample for any code it doesn't have yet (e.g. summary still loading).
 const agencyCodeToId = computed(() => {
   const m: Record<string, string> = {}
+  for (const a of summary.value?.network.by_agency ?? []) {
+    if (a.agency_code && a.agency_id) m[a.agency_code] = a.agency_id
+  }
   for (const s of allAgencySample.value) {
-    if (s.agency_code && s.agency) m[s.agency_code] = s.agency
+    if (s.agency_code && s.agency && !m[s.agency_code]) m[s.agency_code] = s.agency
   }
   return m
 })
@@ -579,12 +617,13 @@ const agencyBudget = computed(() => {
 })
 
 // ── Network / per-agency stats panel ─────────────────────────────────────
-// All-Agencies view: Network Length, Avg IRI/PCI, Asset Count and Condition
-// Distribution come from the real server-side aggregate (summary.network) -
-// exact, not a sample. There is no per-agency equivalent endpoint, so once a
-// specific agency is selected those same figures fall back to being computed
-// from the (now server-filtered, but still page-capped) loaded segments, and
-// are labelled as sample-based in the template via `isSample`/`totalSegmentsReal`.
+// Network Length, Avg IRI/PCI, Asset Count and Condition Distribution come
+// from the real server-side aggregate (`/summary/`, optionally `agency=`-
+// scoped) - exact, not a sample, in both the "All Agencies" and per-agency
+// views. Only falls back to computing from the (page-capped) loaded segments
+// if the relevant summary request hasn't resolved yet (e.g. still loading,
+// or the request failed) - labelled as sample-based in the template via
+// `isSample`/`totalSegmentsReal`.
 // Class/Surface distribution and Data Completeness have no aggregate at all
 // and are always sample-based, regardless of agency selection.
 const stats = computed(() => {
@@ -605,7 +644,8 @@ const stats = computed(() => {
   const byClass = countBy(list, r => r.road_class)
   const bySurface = countBy(list, r => r.surface_type)
 
-  const net = !selectedAgency.value ? summary.value?.network ?? null : null
+  const activeSummary = selectedAgency.value ? agencySummary.value : summary.value
+  const net = activeSummary?.network ?? null
   const usingAggregate = !!net
   const totalLength = net ? net.total_length_km : list.reduce((s, r) => s + (r.length_km ?? 0), 0)
   const avgIri = net ? net.iri_average : sampleAvgIri
@@ -617,7 +657,7 @@ const stats = computed(() => {
     : countBy(list, r => r.condition_class ?? 'unrecorded')
   const conditionBase = net ? net.total_segments : segmentCount
   const assetCount = net
-    ? net.total_segments + (summary.value?.bridges.total ?? 0) + (summary.value?.streetlights.total ?? 0)
+    ? net.total_segments + (activeSummary?.bridges.total ?? 0) + (activeSummary?.streetlights.total ?? 0)
     : list.reduce((s, r) => s + 1 + (r.bridge_count ?? 0) + (r.streetlight_count ?? 0), 0)
 
   return {

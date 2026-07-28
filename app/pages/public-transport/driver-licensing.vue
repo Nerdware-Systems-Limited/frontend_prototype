@@ -127,7 +127,7 @@
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Full Name</th><th>Phone</th><th>Date of Birth</th><th>Agency</th><th>Operator / SACCO</th><th>National ID</th></tr></thead>
+          <thead><tr><th>Full Name</th><th>Phone</th><th>Date of Birth</th><th>Agency</th><th>Operator</th><th>National ID</th></tr></thead>
           <tbody v-if="drivers.length">
             <tr v-for="d in drivers" :key="d.id">
               <td style="font-weight:600;font-size:12px">{{ d.full_name }}</td>

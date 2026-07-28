@@ -20,7 +20,7 @@
 
   <div class="kpi-grid">
     <KpiCard
-      label="Active SACCOs"
+      label="Active Operators"
       :value="summary ? fmtNum(summary.kpis.active_saccos) : '-'"
       :sub="`${summary ? fmtNum(summary.kpis.total_saccos) : '-'} total registered`"
       source="batch" source-title="NTSA PSV Registry"
@@ -149,7 +149,7 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>SACCO</th>
+              <th>Operator</th>
               <th>On-Time</th>
               <th>Revenue</th>
               <th>Util %</th>

@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Public Transport - PSV Compliance"
     title="PSV Compliance & Licensing"
-    subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and SACCO registration"
+    subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and operator registration"
   >
     <template #actions>
       <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Vehicle Inspections →</NuxtLink>
@@ -48,7 +48,7 @@
       source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
-      label="Active SACCOs"
+      label="Active Operators"
       :value="fmtNum(activeSaccos)"
       :sub="`${fmtNum(saccos.length)} total registered`"
       source="batch" source-title="NTSA"
@@ -65,7 +65,7 @@
           v-for="l in expiringLicenses.slice(0, 20)"
           :key="l.id"
           :severity="daysUntil(l.expiry_date) <= 30 ? 'critical' : daysUntil(l.expiry_date) <= 60 ? 'warning' : 'info'"
-          :title="`${l.license_number} - ${l.sacco_name ?? 'Unknown SACCO'}`"
+          :title="`${l.license_number} - ${l.sacco_name ?? 'Unknown operator'}`"
           :meta="`Route: ${l.route_name ?? '-'} · Expires: ${fmtDate(l.expiry_date)} · ${daysUntil(l.expiry_date)}d remaining · GPS: ${l.gps_compliance_pct.toFixed(0)}%`"
         />
       </div>
@@ -88,7 +88,7 @@
           <option value="suspended">Suspended</option>
           <option value="revoked">Revoked</option>
         </select>
-        <input v-model="saccoSearch" class="select-sm" placeholder="Search SACCO…" style="min-width:160px" />
+        <input v-model="saccoSearch" class="select-sm" placeholder="Search operator…" style="min-width:160px" />
         <button class="btn" @click="load">Apply</button>
         <button class="btn" @click="statusFilter = ''; saccoSearch = ''">Clear</button>
       </div>
@@ -96,7 +96,7 @@
         <thead>
           <tr>
             <th>Licence No.</th>
-            <th>SACCO</th>
+            <th>Operator</th>
             <th>Route</th>
             <th>Issued</th>
             <th>Expires</th>
@@ -142,14 +142,14 @@
   <!-- SACCO compliance status table -->
   <div class="card">
     <div class="card-header">
-      SACCO Registration Status
+      Operator Registration Status
       <NuxtLink to="/public-transport/operators" class="link-sm">Full operator registry →</NuxtLink>
     </div>
     <div class="card-body">
       <table>
         <thead>
           <tr>
-            <th>SACCO Name</th>
+            <th>Operator Name</th>
             <th>Status</th>
             <th>Fleet Size</th>
             <th>Routes</th>
@@ -173,7 +173,7 @@
         <tbody v-else>
           <tr>
             <td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">
-              {{ loading ? 'Loading…' : 'No SACCO data' }}
+              {{ loading ? 'Loading…' : 'No operator data' }}
             </td>
           </tr>
         </tbody>

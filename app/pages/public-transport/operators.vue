@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Public Transport - Public Operators"
     title="Public Operators"
-    subtitle="NaMATA · NTSA · NCTTCA - SACCO/operator registry, service quality, fleet & route compliance, revenue and complaint drill-down"
+    subtitle="NaMATA · NTSA · NCTTCA - Operator registry, service quality, fleet & route compliance, revenue and complaint drill-down"
   >
     <template #actions>
       <NuxtLink to="/public-transport/compliance" class="btn">PSV Compliance →</NuxtLink>
@@ -83,12 +83,12 @@
   </div>
 
   <!-- Registry -->
-  <SectionTitle pill="NaMATA / NTSA · Rolling">Operator / SACCO Registry</SectionTitle>
+  <SectionTitle pill="NaMATA / NTSA · Rolling">Operator Registry</SectionTitle>
 
   <div class="card">
     <div class="card-body">
       <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search SACCO name…" style="min-width:180px" />
+        <input v-model="search" class="select-sm" placeholder="Search operator name…" style="min-width:180px" />
         <select v-model="statusFilter" class="select-sm">
           <option value="">All statuses</option>
           <option value="active">Active</option>
@@ -135,7 +135,7 @@
           <thead>
             <tr>
               <th></th>
-              <th>SACCO / Operator</th>
+              <th>Operator</th>
               <th>Status</th>
               <th>Contact</th>
               <th>Routes</th>
@@ -443,7 +443,7 @@ const filteredOperators = computed(() => {
 
 // ── Export (current filtered view) ──────────────────────────────────────
 const exportColumns = [
-  { key: 'sacco_name', label: 'SACCO / Operator' },
+  { key: 'sacco_name', label: 'Operator' },
   { key: 'registration_status', label: 'Status' },
   { key: 'contact_phone', label: 'Contact' },
   { key: 'route_count', label: 'Routes' },

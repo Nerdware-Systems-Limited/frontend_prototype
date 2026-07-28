@@ -287,6 +287,14 @@ export interface InfrastructureSummary {
       total: number
       length: number
     }>
+    // Exact per-agency segment counts/lengths (independent of any `agency`
+    // scoping on this response) - powers the agency tab list.
+    by_agency: Array<{
+      agency_id: string | null
+      agency_code: string | null
+      total_segments: number
+      total_length_km: number
+    }>
   }
   bridges: {
     total: number
@@ -308,6 +316,13 @@ export interface InfrastructureSummary {
       disbursed: number
       avg_physical: number
     }>
+    // Exact per-agency project counts (independent of any `agency` scoping
+    // on this response) - powers agency tab lists.
+    by_agency: Array<{
+      agency_id: string | null
+      agency_code: string | null
+      total_projects: number
+    }>
   }
   budget: {
     fiscal_year: number
@@ -328,6 +343,10 @@ export interface InfrastructureSummary {
     open_orders: number
     open_value_kes: number
   }
+  // Echoes back the `agency` query param that scoped this response (null
+  // when unscoped / "All Agencies") - lets callers confirm the aggregate
+  // they got back actually matches the agency they asked for.
+  agency: string | null
   generated_at: string
 }
 
@@ -365,7 +384,11 @@ export function useInfrastructure() {
 
   return {
     // ── Dashboard / summary ────────────────────────────────────────
-    summary: () => api<InfrastructureSummary>(`${I}/summary/`),
+    // `agency` (Agency UUID, same as segments()' `agency` param) scopes the
+    // network/bridges/streetlights blocks to that agency instead of the
+    // whole network - omit for the network-wide aggregate.
+    summary: (q?: { agency?: string }) =>
+      api<InfrastructureSummary>(`${I}/summary/`, { query: cleanQuery(q as Record<string, unknown>) }),
 
     // ── Road segments ──────────────────────────────────────────────
     segments: (q?: InfrastructureQuery) =>
