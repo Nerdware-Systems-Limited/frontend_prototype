@@ -7,8 +7,8 @@
     Any single failure degrades that section gracefully; the rest keep rendering.
   -->
   <PageHeader
-    title="Executive Command Centre"
-    subtitle="Unified oversight across all transport agencies and modes"
+    title="Command Centre"
+    subtitle="Unified oversight across transport agencies and modes"
   >
     <template #actions>
       <button class="btn-primary">Schedule Cabinet Report</button>

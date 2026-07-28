@@ -22,7 +22,7 @@
       <template v-if="step === 'login'">
         <div class="form-heading">
           <h1 class="heading-main">Sign in to UAPTS</h1>
-          <p class="heading-sub">Use your work email or staff identification number.</p>
+          <p class="heading-sub">Use your email address to sign in.</p>
         </div>
 
         <form class="auth-form" @submit.prevent="handleLogin" novalidate>
