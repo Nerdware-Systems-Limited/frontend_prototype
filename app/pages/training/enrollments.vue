@@ -17,7 +17,7 @@
     <KpiCard label="Total Enrollments" :value="fmtNum(enrollments.length)" sub="This page" source="live" source-title="UAPTS Training API" />
     <KpiCard label="Confirmed" :value="fmtNum(byStatus('confirmed') + byStatus('attending'))" sub="Confirmed + Attending" source="live" source-title="UAPTS Training API" />
     <KpiCard label="Registered (Pending)" :value="fmtNum(byStatus('registered'))" sub="Awaiting confirmation" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Fully Paid" :value="fmtNum(byPayment('paid'))" sub="Payment status: paid" source="live" source-title="UAPTS Training API" />
+    <KpiCard label="Fully Paid" :value="fmtNum(byPayment('paid'))" sub="No outstanding balance" source="live" source-title="UAPTS Training API" />
     <KpiCard label="Unpaid" :value="fmtNum(byPayment('unpaid'))" sub="Action required" :trend-direction="byPayment('unpaid') === 0 ? 'up' : 'down'" source="live" source-title="UAPTS Training API" />
     <KpiCard label="Withdrawn" :value="fmtNum(byStatus('withdrawn'))" sub="Withdrawn / deferred" source="batch" source-title="UAPTS Training API" />
   </div>

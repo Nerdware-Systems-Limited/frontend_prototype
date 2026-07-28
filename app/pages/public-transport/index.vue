@@ -123,7 +123,7 @@
   </div>
 
   <!-- Revenue trend bar chart -->
-  <SectionTitle pill="BebaPay / NTSA · 24h">Revenue Trend (Last 24h)</SectionTitle>
+  <SectionTitle pill="BebaPay / NTSA · 7d">Revenue Trend (Last 7 Days)</SectionTitle>
 
   <div class="card">
     <div class="card-body">

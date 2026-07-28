@@ -37,7 +37,7 @@
     <KpiCard
       label="Critical Zones"
       :value="fmtNum(criticalCount)"
-      sub="Severity = critical"
+      sub="Highest-severity geofences"
       source="live" source-title="NTSA iTIMS"
     />
   </div>

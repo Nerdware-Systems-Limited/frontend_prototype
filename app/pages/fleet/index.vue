@@ -54,9 +54,9 @@
     />
     <KpiCard
       label="Governor Compliance"
-      :value="summary ? fmtPct(summary.governor_compliance.online_pct) : '-'"
-      :sub="`Tamper rate: ${summary ? fmtPct(summary.governor_compliance.tamper_rate_pct) : '-'}`"
-      :trend-direction="summary && summary.governor_compliance.tamper_rate_pct < 5 ? 'up' : 'down'"
+      :value="governorDetail ? fmtPct(governorDetail.online_pct) : '-'"
+      :sub="`Tamper rate: ${governorDetail ? fmtPct(governorDetail.tamper_rate_pct) : '-'}`"
+      :trend-direction="governorDetail && governorDetail.tamper_rate_pct < 5 ? 'up' : 'down'"
       source="live" source-title="NTSA iTIMS"
     />
   </div>
@@ -67,23 +67,23 @@
     <div class="card">
       <div class="card-header">Speed Governor Status</div>
       <div class="card-body">
-        <div v-if="summary">
+        <div v-if="governorDetail">
           <div class="gov-row">
             <span>Online / Compliant</span>
             <div class="gov-bar-wrap">
-              <div class="gov-bar" style="background:#22c55e" :style="{ width: `${summary.governor_compliance.online_pct}%` }" />
+              <div class="gov-bar" style="background:#22c55e" :style="{ width: `${governorDetail.online_pct}%` }" />
             </div>
-            <strong>{{ fmtPct(summary.governor_compliance.online_pct) }}</strong>
+            <strong>{{ fmtPct(governorDetail.online_pct) }}</strong>
           </div>
           <div class="gov-row">
             <span>Tampered / Fault</span>
             <div class="gov-bar-wrap">
-              <div class="gov-bar" style="background:#ef4444" :style="{ width: `${summary.governor_compliance.tamper_rate_pct}%` }" />
+              <div class="gov-bar" style="background:#ef4444" :style="{ width: `${governorDetail.tamper_rate_pct}%` }" />
             </div>
-            <strong style="color:#ef4444">{{ fmtPct(summary.governor_compliance.tamper_rate_pct) }}</strong>
+            <strong style="color:#ef4444">{{ fmtPct(governorDetail.tamper_rate_pct) }}</strong>
           </div>
 
-          <div v-if="governorDetail" class="gov-detail">
+          <div class="gov-detail">
             <div class="gov-detail-row">
               <span>Online</span><strong>{{ fmtNum(governorDetail.by_status?.online) }}</strong>
             </div>
@@ -153,7 +153,7 @@
             <td style="font-weight:600">{{ ev.plate_number }}</td>
             <td><BadgePill variant="warning">{{ ev.event_type.replace(/_/g,' ') }}</BadgePill></td>
             <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
-            <td>{{ ev.speed_kmh ?? '-' }}</td>
+            <td>{{ ev.speed_kmh != null ? ev.speed_kmh.toFixed(1) : '-' }}</td>
             <td style="white-space:nowrap;font-size:12px">{{ fmtTime(ev.detected_at) }}</td>
           </tr>
         </tbody>
@@ -218,12 +218,12 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Fleet Overview')
 
 import { useFleet } from '~/composables/api'
-import type { FleetSummary, DriverBehaviorEvent, FleetUtilization } from '~/composables/api'
+import type { FleetSummary, DriverBehaviorEvent, FleetUtilization, SpeedGovernorCompliance } from '~/composables/api'
 
 const summary       = ref<FleetSummary | null>(null)
 const criticalEvents = ref<DriverBehaviorEvent[]>([])
 const utilization   = ref<FleetUtilization[]>([])
-const governorDetail = ref<any>(null)
+const governorDetail = ref<SpeedGovernorCompliance | null>(null)
 const loading       = ref(true)
 const error         = ref<string | null>(null)
 const lastRefreshed = ref('-')

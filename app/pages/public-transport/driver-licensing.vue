@@ -15,11 +15,11 @@
   <!-- KPI strip (computed client-side - no dashboard summary endpoint exists for this module) -->
   <div class="kpi-grid">
     <KpiCard label="Licences (loaded)" :value="fmtNum(licences.length)" sub="Most recent records" source="live" source-title="NTSA Fleet Drivers" />
-    <KpiCard label="Active" :value="fmtNum(countByStatus('active'))" sub="Status: active" source="live" source-title="NTSA Fleet Drivers" />
-    <KpiCard label="Suspended" :value="fmtNum(countByStatus('suspended'))" sub="Status: suspended" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
-    <KpiCard label="Revoked" :value="fmtNum(countByStatus('revoked'))" sub="Status: revoked" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
-    <KpiCard label="Expired" :value="fmtNum(countByStatus('expired'))" sub="Status: expired" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
-    <KpiCard label="PSV Endorsed" :value="fmtNum(psvLicences.length)" sub="is_psv = true" source="live" source-title="NTSA Fleet Drivers" />
+    <KpiCard label="Active" :value="fmtNum(countByStatus('active'))" sub="Valid to drive" source="live" source-title="NTSA Fleet Drivers" />
+    <KpiCard label="Suspended" :value="fmtNum(countByStatus('suspended'))" sub="Driving privileges paused" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
+    <KpiCard label="Revoked" :value="fmtNum(countByStatus('revoked'))" sub="Permanently withdrawn" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
+    <KpiCard label="Expired" :value="fmtNum(countByStatus('expired'))" sub="Renewal overdue" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
+    <KpiCard label="PSV Endorsed" :value="fmtNum(psvLicences.length)" sub="Licensed to carry passengers" source="live" source-title="NTSA Fleet Drivers" />
     <KpiCard label="Avg Demerit Points" :value="avgDemerit != null ? avgDemerit.toFixed(1) : '-'" sub="Across loaded licences" source="live" source-title="NTSA Fleet Drivers" />
     <KpiCard label="High Demerit (≥8)" :value="fmtNum(highDemerit.length)" sub="Approaching suspension threshold" trend-direction="down" source="live" source-title="NTSA Fleet Drivers" />
     <KpiCard label="Expiring ≤30d" :value="fmtNum(expiring.length)" sub="Renewal due soon" trend-direction="down" source="batch" source-title="NTSA Fleet Drivers" />

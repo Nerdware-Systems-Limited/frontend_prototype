@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 /**
- * UAPTS Wireframe Palette (light theme - Kenya government green + gold)
+ * UAPTS Wireframe Palette (light theme - institutional blue + gold)
  *
  * Wireframes (theme.css) use raw CSS variables on :root; this Tailwind config
  * mirrors them so we can use utility classes while keeping the same tokens.
@@ -37,12 +37,12 @@ export default {
           hover: '#fafbfc',
           border: '#d1d5db',
         },
-        // Wireframe --primary (Kenya green)
+        // Wireframe --primary (institutional blue)
         primary: {
-          DEFAULT: '#006838',
-          lt: '#0b8a4c',
-          dk: '#004d28',
-          dkr: '#003a1e',
+          DEFAULT: '#0D4C8B',
+          lt: '#2E7BC4',
+          dk: '#093A6B',
+          dkr: '#06294D',
           fg: '#ffffff',
         },
         // Wireframe --accent (gold)

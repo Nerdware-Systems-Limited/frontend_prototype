@@ -262,6 +262,19 @@ export interface OnTimeStats {
   delayed: number
 }
 
+/**
+ * Shape nested at RailwaySummary.on_time_30d - confirmed live to be a
+ * trimmed-down OnTimeStats missing `days`, `cancellation_pct`, and
+ * `delayed`. Fetch the standalone onTimeStats() endpoint (full OnTimeStats)
+ * if you need those fields - see railway/index.vue.
+ */
+export interface OnTimeSummary {
+  total_operations: number
+  on_time_pct: number
+  avg_delay_min: number
+  cancelled: number
+}
+
 export interface FreightSummary {
   shipments: number
   total_tons: number
@@ -309,7 +322,7 @@ export interface RidershipSummary {
 export interface RailwaySummary {
   kpis: RailwayKpis
   live_operations: LiveOperation[]
-  on_time_30d: OnTimeStats
+  on_time_30d: OnTimeSummary
   freight_30d: FreightSummary
   incidents_90d: IncidentSummary
   ridership_30d: RidershipSummary

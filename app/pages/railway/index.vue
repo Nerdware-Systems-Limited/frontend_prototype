@@ -126,7 +126,7 @@
           </div>
           <div class="otp-stats">
             <div><span class="stat-label">Total Ops</span><span>{{ fmtNum(summary.on_time_30d.total_operations) }}</span></div>
-            <div><span class="stat-label">Delayed</span><span>{{ fmtNum(summary.on_time_30d.delayed) }}</span></div>
+            <div><span class="stat-label">Delayed</span><span>{{ otpStats ? fmtNum(otpStats.delayed) : '-' }}</span></div>
             <div><span class="stat-label">Cancelled</span><span>{{ fmtNum(summary.on_time_30d.cancelled) }}</span></div>
             <div><span class="stat-label">Avg Delay</span><span>{{ summary.on_time_30d.avg_delay_min.toFixed(0) }} min</span></div>
           </div>
@@ -280,9 +280,13 @@ definePageMeta({ layout: 'default' })
 useNavSubtitle('Railway')
 
 import { useRailway, useGis } from '~/composables/api'
-import type { RailwaySummary, LiveOperation } from '~/composables/api'
+import type { RailwaySummary, LiveOperation, OnTimeStats } from '~/composables/api'
 
 const summary  = ref<RailwaySummary | null>(null)
+// RailwaySummary.on_time_30d is a trimmed-down OnTimeStats (no `delayed` /
+// `cancellation_pct` on this backend) - fetch the full stats separately so
+// the "Delayed" stat below doesn't show a misleading dash.
+const otpStats = ref<OnTimeStats | null>(null)
 const liveOps  = ref<LiveOperation[]>([])
 const mapData  = ref<{ lines: any[]; markers: any[] }>({ lines: [], markers: [] })
 const loading  = ref(true)
@@ -294,16 +298,18 @@ async function load() {
   error.value = null
   const rail = useRailway()
 
-  const [sumRes, liveRes, mapRes] = await Promise.allSettled([
+  const [sumRes, liveRes, mapRes, otpRes] = await Promise.allSettled([
     rail.summary(),
     rail.liveOperations(),
     rail.mapData(),
+    rail.onTimeStats(30),
   ])
 
   if (sumRes.status  === 'fulfilled') {
     summary.value = sumRes.value
     liveOps.value = sumRes.value.live_operations ?? []
   }
+  if (otpRes.status === 'fulfilled') otpStats.value = otpRes.value
   if (liveRes.status === 'fulfilled') {
     const raw = Array.isArray(liveRes.value) ? liveRes.value : (liveRes.value as any).results ?? []
     if (raw.length) liveOps.value = raw

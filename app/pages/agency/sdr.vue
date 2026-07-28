@@ -300,5 +300,5 @@ tr:last-child td { border-bottom:none; }
 .mtd-value.warn { font-size:14px; color:#854d0e; }
 .mtd-sub { font-size:10px; color:#64748b; margin-top:2px; }
 button { padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:0.5px solid #e2e8f0; background:#fff; cursor:pointer; color:#334155; }
-.btn-primary { background:#006838; color:#fff; border-color:#006838; }
+.btn-primary { background:var(--primary); color:#fff; border-color:var(--primary); }
 </style>

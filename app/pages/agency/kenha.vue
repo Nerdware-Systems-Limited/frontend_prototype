@@ -282,5 +282,5 @@ th { text-align:left; font-size:10px; font-weight:600; text-transform:uppercase;
 td { padding:8px 10px; border-bottom:0.5px solid #f1f5f9; color:#334155; }
 tr:last-child td { border-bottom:none; }
 button { padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:0.5px solid #e2e8f0; background:#fff; cursor:pointer; color:#334155; }
-.btn-primary { background:#006838; color:#fff; border-color:#006838; }
+.btn-primary { background:var(--primary); color:#fff; border-color:var(--primary); }
 </style>

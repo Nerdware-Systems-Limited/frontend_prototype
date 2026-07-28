@@ -62,12 +62,12 @@
 
   <!-- 30-day fatality sparkline + severity/type breakdown -->
   <div class="three-col-stats">
-    <div v-if="summary?.fatality_trend_30d?.length" class="card">
+    <div v-if="hasFatalityTrend" class="card">
       <div class="card-header">30-Day Fatality Trend</div>
       <div class="card-body sparkline-wrap">
         <div class="sparkline-bars">
           <div
-            v-for="d in summary.fatality_trend_30d.slice(-30)"
+            v-for="d in summary!.fatality_trend_30d.slice(-30)"
             :key="d.day"
             class="spark-bar"
             :class="d.fatalities > 5 ? 'spark-red' : d.fatalities > 2 ? 'spark-amber' : 'spark-green'"
@@ -80,6 +80,14 @@
         <span class="hint-dot" style="background:#ef4444" /> &gt;5 fatal
         <span class="hint-dot" style="background:#f59e0b;margin-left:8px" /> 3–5
         <span class="hint-dot" style="background:#10b981;margin-left:8px" /> 0–2
+      </div>
+    </div>
+    <div v-else class="card">
+      <div class="card-header">30-Day Fatality Trend</div>
+      <div class="card-body" style="color:#94a3b8;font-size:13px">
+        {{ loading ? 'Loading…' : (summary?.fatality_trend_30d?.length
+          ? `Only ${summary.fatality_trend_30d.length} day-bucket(s) of trend data available - too sparse for a daily chart.`
+          : 'No fatality trend data for this period.') }}
       </div>
     </div>
 
@@ -354,6 +362,9 @@ function effectColor(v: number | null | undefined) {
 const maxFatalities = computed(() =>
   Math.max(1, ...(summary.value?.fatality_trend_30d ?? []).map(d => d.fatalities)),
 )
+// A single day-bucket (or very few) renders as one misleading full-width bar
+// under the flex layout below - require a minimum spread before charting it.
+const hasFatalityTrend = computed(() => (summary.value?.fatality_trend_30d?.length ?? 0) >= 5)
 
 const maxSevCount = computed(() => {
   if (!summary.value?.incidents_by_severity) return 1

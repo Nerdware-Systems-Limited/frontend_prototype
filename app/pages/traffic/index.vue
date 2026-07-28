@@ -88,16 +88,16 @@
       <div class="card">
         <div class="card-header">Congestion Distribution</div>
         <div class="card-body">
-          <div v-if="summary" class="cong-list">
-            <div v-for="(count, level) in summary.congestion_distribution" :key="level" class="cong-row">
-              <span class="cong-label">{{ String(level).replace(/_/g,' ') }}</span>
+          <div v-if="congestionEntries.length" class="cong-list">
+            <div v-for="[level, count] in congestionEntries" :key="level" class="cong-row">
+              <span class="cong-label">{{ level.replace(/_/g,' ') }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" :style="{ width: `${congPct(count)}%`, background: congColor(String(level)) }" />
+                <div class="cong-bar" :style="{ width: `${congPct(count)}%`, background: congColor(level) }" />
               </div>
               <span class="cong-val">{{ fmtNum(count) }}</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
+          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No congestion data for this window' }}</div>
         </div>
       </div>
 
@@ -325,6 +325,9 @@ const nextHourForecasts = computed(() => summary.value?.forecast_next_hour ?? []
 
 const totalCongestion = computed(() =>
   Object.values(summary.value?.congestion_distribution ?? {}).reduce((s, v) => s + v, 0) || 1,
+)
+const congestionEntries = computed(() =>
+  Object.entries(summary.value?.congestion_distribution ?? {}) as [string, number][],
 )
 
 // ── Helpers ────────────────────────────────────────────────────────────────

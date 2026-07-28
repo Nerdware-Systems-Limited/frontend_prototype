@@ -15,8 +15,8 @@
   <!-- KPI strip (computed from the loaded registry - real fields only) -->
   <div class="kpi-grid">
     <KpiCard label="Inspections (loaded)" :value="fmtNum(inspections.length)" sub="Most recent records" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Passed" :value="fmtNum(countByResult('pass'))" sub="Result: pass" trend-direction="up" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Failed" :value="fmtNum(countByResult('fail'))" sub="Result: fail" trend-direction="down" source="live" source-title="NTSA Fleet Inspections" />
+    <KpiCard label="Passed" :value="fmtNum(countByResult('pass'))" sub="Roadworthy" trend-direction="up" source="live" source-title="NTSA Fleet Inspections" />
+    <KpiCard label="Failed" :value="fmtNum(countByResult('fail'))" sub="Not roadworthy" trend-direction="down" source="live" source-title="NTSA Fleet Inspections" />
     <KpiCard label="Conditional Pass" :value="fmtNum(countByResult('conditional_pass'))" sub="Passed with conditions" source="live" source-title="NTSA Fleet Inspections" />
     <KpiCard label="Pass Rate" :value="passRate != null ? `${passRate.toFixed(1)}%` : '-'" sub="Pass / (pass + fail)" :trend-direction="(passRate ?? 0) >= 80 ? 'up' : 'down'" source="live" source-title="NTSA Fleet Inspections" />
     <KpiCard label="Re-inspections" :value="fmtNum(reinspectionCount)" sub="Follow-up records" source="live" source-title="NTSA Fleet Inspections" />

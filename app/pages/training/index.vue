@@ -23,7 +23,7 @@
     <KpiCard
       label="Cohorts Running"
       :value="fmtNum(ongoingCohorts.length)"
-      sub="Status: ongoing"
+      sub="In session now"
       source="live" source-title="UAPTS Training API"
     />
     <KpiCard

@@ -66,7 +66,7 @@
                 <td style="font-weight:600">{{ ev.plate_number }}</td>
                 <td><BadgePill variant="warning">{{ ev.event_type.replace(/_/g,' ') }}</BadgePill></td>
                 <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
-                <td>{{ ev.speed_kmh ?? '-' }}</td>
+                <td>{{ ev.speed_kmh != null ? ev.speed_kmh.toFixed(1) : '-' }}</td>
                 <td>{{ ev.speed_limit_kmh ?? '-' }}</td>
                 <td>{{ ev.duration_seconds ?? '-' }}</td>
                 <td style="white-space:nowrap;font-size:12px">{{ fmtTime(ev.detected_at) }}</td>

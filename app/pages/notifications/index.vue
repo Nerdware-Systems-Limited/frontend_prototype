@@ -24,11 +24,13 @@
     <span v-else>Connecting to live feed…</span>
   </div>
 
-  <!-- KPI strip -->
+  <!-- KPI strip - counts/filters apply to the most-recently-loaded page only;
+       the true platform-wide unread count is the "{{ liveUnread }} unread" pill above. -->
+  <div class="nkpi-caption">Showing your {{ notifications.length }} most recent notifications - counts and filters below apply to this set only.</div>
   <div class="nkpi-strip">
     <button class="nkpi" :class="{ 'nkpi--active': !severityFilter && !unreadOnly }" @click="severityFilter = ''; unreadOnly = false">
       <span class="nkpi-val">{{ notifications.length }}</span>
-      <span class="nkpi-lbl">Total</span>
+      <span class="nkpi-lbl">Loaded</span>
     </button>
     <button class="nkpi nkpi--unread" :class="{ 'nkpi--active': unreadOnly }" @click="unreadOnly = !unreadOnly; severityFilter = ''">
       <span class="nkpi-val">{{ unreadCount }}</span>
@@ -325,6 +327,7 @@ function relTime(iso: string) {
 }
 
 /* ── KPI strip ────────────────────────────────────────────────────── */
+.nkpi-caption { font-size: 11px; color: #94a3b8; margin: 4px 0 8px; }
 .nkpi-strip {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -342,7 +345,7 @@ function relTime(iso: string) {
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 .nkpi:hover { border-color: #94a3b8; box-shadow: 0 3px 8px rgba(0,0,0,.08); }
-.nkpi--active { border-color: #006838 !important; box-shadow: 0 0 0 2px rgba(0,104,56,.12) !important; }
+.nkpi--active { border-color: var(--primary) !important; box-shadow: 0 0 0 2px rgba(13,76,139,.12) !important; }
 .nkpi-val { font-size: 22px; font-weight: 800; color: #1e293b; line-height: 1; font-variant-numeric: tabular-nums; }
 .nkpi-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
 
@@ -383,7 +386,7 @@ function relTime(iso: string) {
   width: 16px; height: 16px; border-radius: 50%; background: #fff;
   transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
 }
-.pill-toggle.on { background: #006838; }
+.pill-toggle.on { background: var(--primary); }
 .pill-toggle.on::after { left: 18px; }
 .result-count { font-size: 12px; color: #94a3b8; white-space: nowrap; margin-left: auto; }
 

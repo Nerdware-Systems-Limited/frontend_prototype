@@ -275,7 +275,10 @@ const totalRunways        = computed(() => airports.value.reduce((s, a) => s + (
 const totalDesignCapacity = computed(() => airports.value.reduce((s, a) => s + (a.design_capacity_passengers ?? 0), 0))
 
 const openCapitalWorks  = computed(() => capitalWorks.value.filter(c => c.physical_progress_pct != null && c.physical_progress_pct < 100))
-const capitalWorksValue = computed(() => capitalWorks.value.reduce((s, c) => s + (c.value_kes ?? 0), 0) || null)
+// value_kes comes back as a string (Django DecimalField JSON serialization) -
+// Number() it explicitly, otherwise `0 + "123.45"` string-concatenates instead
+// of adding, and the garbled result renders as "KES NaN".
+const capitalWorksValue = computed(() => capitalWorks.value.reduce((s, c) => s + Number(c.value_kes ?? 0), 0) || null)
 
 // ── Capacity utilisation (real cross-reference) ─────────────────────────
 const capacityUtilisation = computed(() => pax.value.map(p => {

@@ -158,6 +158,19 @@ export interface SpeedGovernorStatus {
   reported_at: string
 }
 
+/**
+ * GET /fleet/speed-governor-status/compliance/ - confirmed live to be the
+ * accurate source for governor online/tamper rates. FleetSummary.governor_compliance
+ * (from /fleet/summary/) returns hardcoded zeros on this backend - use this
+ * endpoint instead (see fleet/index.vue).
+ */
+export interface SpeedGovernorCompliance {
+  total_tracked_vehicles: number
+  by_status: { online: number; tampered: number; fault: number; offline: number }
+  online_pct: number
+  tamper_rate_pct: number
+}
+
 // ── Trips / utilization ─────────────────────────────────────────────
 
 export interface TripPlayback {
@@ -351,7 +364,7 @@ export function useFleet() {
       api<Paged<SpeedGovernorStatus>>(`${F}/speed-governor-status/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    speedGovernorCompliance: () => api<unknown>(`${F}/speed-governor-status/compliance/`),
+    speedGovernorCompliance: () => api<SpeedGovernorCompliance>(`${F}/speed-governor-status/compliance/`),
 
     // ── Trips / utilization ────────────────────────────────────────
     tripPlaybacks: (q?: FleetQuery) =>

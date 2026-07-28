@@ -25,7 +25,7 @@ export {
   type Geofence, type GeofenceEvent, type GeofenceEventType,
   type DriverBehaviorEvent, type BehaviourEventType, type BehaviourSeverity,
   type RouteAdherence, type RouteAdherenceVerdict,
-  type SpeedGovernorStatus, type GovernorStatus,
+  type SpeedGovernorStatus, type GovernorStatus, type SpeedGovernorCompliance,
   type TripPlayback, type TripStatus, type FleetUtilization,
   type WeighbridgeStation, type WeighbridgeEvent, type GovernmentFleet,
   type DriverBehaviourSummary, type TripPath,
@@ -68,7 +68,7 @@ export { useIntegrations, type DataSource, type IngestedRecord, type Integration
 export { usePublicTransport, type PTSummary, type Sacco, type Route, type BRTStop, type Schedule, type ScheduleAdherence, type FareCollection, type DemandForecast, type ServiceQualityScore, type OperatorMetric, type PaymentTransaction, type FleetDeployment, type PTFeed, type PassengerFeedback, type PSVLicense, type PTQuery, type ComplianceSummary, type ComplianceCheckType } from './usePublicTransport'
 export { useVehicleInspections, type VehicleInspection, type InspectionResult, type InspectionQuery, type VehicleInspectionSummary } from './useVehicleInspections'
 export { useDriverLicensing, type Driver, type DriverLicence, type LicenceClass, type LicenceStatus, type DriverQuery, type DriverLicenceQuery, type RevealedDriverIdentity } from './useDriverLicensing'
-export { useRailway, type RailwaySummary, type RailwayKpis, type LiveOperation, type OnTimeStats, type FreightSummary, type IncidentSummary, type RailIncidentStats, type RidershipSummary, type RailLine, type RailStation, type Train, type TrainSchedule, type TrainOperation, type FreightManifest, type RailIncident, type RailTicket, type RailQuery, type RailNetwork, type RailGauge, type RailStatus, type StationType, type ServiceType, type TrainType, type TrainStatus, type ServiceClass, type DayType, type OpStatus, type DelayReason, type CargoType, type IncidentType, type IncidentSeverity, type TicketClass, type Channel } from './useRailway'
+export { useRailway, type RailwaySummary, type RailwayKpis, type LiveOperation, type OnTimeStats, type OnTimeSummary, type FreightSummary, type IncidentSummary, type RailIncidentStats, type RidershipSummary, type RailLine, type RailStation, type Train, type TrainSchedule, type TrainOperation, type FreightManifest, type RailIncident, type RailTicket, type RailQuery, type RailNetwork, type RailGauge, type RailStatus, type StationType, type ServiceType, type TrainType, type TrainStatus, type ServiceClass, type DayType, type OpStatus, type DelayReason, type CargoType, type IncidentType, type IncidentSeverity, type TicketClass, type Channel } from './useRailway'
 export {
   useRailInfrastructure,
   type TrackSection, type LevelCrossing, type RailCapitalWork, type RailCulvert, type RailSignal,

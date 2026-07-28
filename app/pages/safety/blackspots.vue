@@ -72,7 +72,7 @@
       <span class="mk-item"><span class="mk-dot" style="background:#ef4444" /> Critical black spot</span>
       <span class="mk-item"><span class="mk-dot" style="background:#f97316" /> High black spot</span>
       <span class="mk-item"><span class="mk-dot" style="background:#f59e0b" /> Medium / Low</span>
-      <span class="mk-item"><span class="mk-dot" style="background:#ef4444;opacity:.5" /> Predictive hotspot</span>
+      <span class="mk-item"><span class="mk-dot" style="background:#a855f7" /> Predictive hotspot</span>
     </div>
   </div>
 

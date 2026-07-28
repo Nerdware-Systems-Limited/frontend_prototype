@@ -112,7 +112,7 @@
           :key="b.id"
           :severity="b.condition_class === 'critical' ? 'critical' : 'warning'"
           :title="`${b.bridge_name} (${b.bridge_code})`"
-          :meta="`${b.bridge_type} · Span: ${b.span_length_m != null ? `${b.span_length_m}m` : '-'} · Load: ${b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes}t` : '-'} · Score: ${b.condition_score != null ? b.condition_score.toFixed(1) : '-'} · Last inspection: ${fmtDate(b.last_inspection_at)}`"
+          :meta="`${b.bridge_type} · Span: ${b.span_length_m != null ? `${b.span_length_m.toFixed(0)}m` : '-'} · Load: ${b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes.toFixed(1)}t` : '-'} · Score: ${b.condition_score != null ? b.condition_score.toFixed(1) : '-'} · Last inspection: ${fmtDate(b.last_inspection_at)}`"
         />
       </div>
       <div v-else style="color:#94a3b8;font-size:13px">
@@ -222,8 +222,8 @@
               <td style="font-family:monospace;font-size:12px">{{ b.bridge_code }}</td>
               <td><BadgePill variant="info">{{ b.agency_code ?? '-' }}</BadgePill></td>
               <td><BadgePill variant="info">{{ b.bridge_type.replace(/_/g,' ') }}</BadgePill></td>
-              <td>{{ b.span_length_m != null ? `${b.span_length_m}m` : '-' }}</td>
-              <td>{{ b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes}t` : '-' }}</td>
+              <td>{{ b.span_length_m != null ? `${b.span_length_m.toFixed(0)}m` : '-' }}</td>
+              <td>{{ b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes.toFixed(1)}t` : '-' }}</td>
               <td>
                 <div class="score-bar-wrap">
                   <div
