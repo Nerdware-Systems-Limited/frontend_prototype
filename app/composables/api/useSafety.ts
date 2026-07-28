@@ -65,6 +65,41 @@ export interface Incident {
   created_at: string
   updated_at: string
   dispatch_count: number
+  is_verified: boolean
+  verified_at: string | null
+  verified_by_email: string | null
+  reporter_count: number
+}
+
+/**
+ * An individual citizen's own submission — mobile app users post to and
+ * read "my reports" from `/incident-reports/`, never `/incidents/`
+ * directly, so multiple reports of the same real-world event can share
+ * one canonical Incident (see backend `apps.safety.matching`) without the
+ * reporter ever noticing their report was merged with someone else's.
+ * This is what `GET /incidents/{id}/reporters/` returns — the ops-side
+ * drilldown of who reported a given incident.
+ */
+export interface IncidentReport {
+  id: string
+  reference_code: string
+  incident: string
+  incident_status: IncidentStatus
+  incident_reference_code: string
+  incident_is_verified: boolean
+  reported_by: string | null
+  reported_by_email: string | null
+  incident_type: IncidentType
+  reporting_channel: ReportingChannel
+  severity: IncidentSeverity
+  title: string
+  description: string
+  latitude: number | null
+  longitude: number | null
+  casualties: number
+  vehicles_involved: number
+  created_at: string
+  updated_at: string
 }
 
 export interface Accident {
@@ -288,6 +323,12 @@ export function useSafety() {
     incidentDispatches: (id: string) =>
       api<Paged<EmergencyDispatch>>(`${S}/incidents/${id}/dispatches/`),
     incidentsByChannel: () => api<unknown>(`${S}/incidents/by-channel/`),
+    verifyIncident: (id: string) =>
+      api<Incident>(`${S}/incidents/${id}/verify/`, { method: 'POST' }),
+    unverifyIncident: (id: string) =>
+      api<Incident>(`${S}/incidents/${id}/unverify/`, { method: 'POST' }),
+    incidentReporters: (id: string) =>
+      api<IncidentReport[]>(`${S}/incidents/${id}/reporters/`),
 
     // ── Accidents ──────────────────────────────────────────────────
     accidents: (q?: SafetyQuery) =>

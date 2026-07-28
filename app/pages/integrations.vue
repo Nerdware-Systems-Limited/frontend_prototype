@@ -104,6 +104,12 @@
               <td>
                 <div style="display:flex;gap:4px">
                   <button
+                    v-if="src.mode === 'manual'"
+                    class="btn" style="font-size:12px"
+                    @click.stop="openUpload(src)"
+                  >⬆ Upload</button>
+                  <button
+                    v-else
                     class="btn" style="font-size:12px"
                     :disabled="actionId === src.source_id"
                     @click.stop="trigger(src.source_id)"
@@ -205,6 +211,13 @@
       </table>
     </div>
   </div>
+
+  <UploadModal
+    v-if="uploadTarget"
+    :source="uploadTarget"
+    @close="closeUpload"
+    @committed="handleUploadCommitted"
+  />
 </template>
 
 <script setup lang="ts">
@@ -221,6 +234,7 @@ const recordsLoading = ref(false)
 const error          = ref<string | null>(null)
 const expanded       = ref<string | null>(null)
 const actionId       = ref<string | null>(null)
+const uploadTarget   = ref<DataSource | null>(null)
 
 const searchFilter = ref('')
 const statusFilter = ref('')
@@ -249,7 +263,7 @@ async function loadRecords() {
       page_size: 50,
       ordering: '-event_at',
       search: recSearch.value || undefined,
-      source_id: recSource.value || undefined,
+      source: recSource.value || undefined,
     })
     records.value = (res as any).results ?? []
   } catch { /* leave existing records */ } finally {
@@ -305,6 +319,19 @@ async function resume(sourceId: string) {
     const idx = sources.value.findIndex(s => s.source_id === sourceId)
     if (idx !== -1) sources.value[idx] = { ...sources.value[idx], status: 'connected' }
   } catch {} finally { actionId.value = null }
+}
+
+function openUpload(src: DataSource) {
+  uploadTarget.value = src
+}
+
+function closeUpload() {
+  uploadTarget.value = null
+}
+
+function handleUploadCommitted() {
+  uploadTarget.value = null
+  load()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

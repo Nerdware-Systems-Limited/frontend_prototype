@@ -11,6 +11,7 @@
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="successMsg" class="success-banner">✓ {{ successMsg }}</div>
 
   <!-- KPI row -->
   <div class="kpi-grid">
@@ -59,8 +60,13 @@
       <option value="on_scene">On Scene</option>
       <option value="resolved">Resolved</option>
     </select>
+    <select v-model="verifiedFilter" class="select-sm">
+      <option value="">Verified + unverified</option>
+      <option value="true">Verified only</option>
+      <option value="false">Unverified only</option>
+    </select>
     <button class="btn" @click="load">Apply</button>
-    <button class="btn" @click="incidentSearch = ''; severityFilter = ''; statusFilter = ''; load()">Clear</button>
+    <button class="btn" @click="incidentSearch = ''; severityFilter = ''; statusFilter = ''; verifiedFilter = ''; load()">Clear</button>
     <ExportButton filename="uapts-incidents.csv" :rows="filteredIncidents" :columns="incidentExportColumns" style="margin-left:auto" />
   </div>
 
@@ -74,6 +80,8 @@
             <th>Type</th>
             <th>Severity</th>
             <th>Status</th>
+            <th>Verified</th>
+            <th>Reporters</th>
             <th>Casualties</th>
             <th>Vehicles</th>
             <th>Channel</th>
@@ -89,6 +97,10 @@
               <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
               <td><BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity }}</BadgePill></td>
               <td><BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill></td>
+              <td><BadgePill :variant="inc.is_verified ? 'success' : 'neutral'">{{ inc.is_verified ? 'Verified' : 'Unverified' }}</BadgePill></td>
+              <td>
+                <button class="link-btn" @click.stop="openReporters(inc)">{{ inc.reporter_count }}</button>
+              </td>
               <td>{{ inc.casualties }}</td>
               <td>{{ inc.vehicles_involved }}</td>
               <td style="font-size:12px">{{ inc.reporting_channel.replace(/_/g,' ') }}</td>
@@ -96,13 +108,22 @@
               <td>{{ inc.dispatch_count }}</td>
             </tr>
             <tr v-if="expanded === inc.id" class="detail-row">
-              <td :colspan="10">
+              <td :colspan="12">
                 <div class="drilldown">
                   <div class="dd-item" style="grid-column:1/-1"><span class="dd-label">Description</span><span>{{ inc.description || '-' }}</span></div>
                   <div class="dd-item"><span class="dd-label">Reporting Agency</span><span>{{ inc.reporting_agency_code ?? '-' }}</span></div>
                   <div class="dd-item"><span class="dd-label">Coordinates</span><span style="font-family:monospace">{{ inc.latitude != null && inc.longitude != null ? `${inc.latitude.toFixed(4)}, ${inc.longitude.toFixed(4)}` : '-' }}</span></div>
                   <div class="dd-item"><span class="dd-label">Triaged</span><span>{{ inc.triaged_at ? fmtTime(inc.triaged_at) : '-' }}</span></div>
                   <div class="dd-item"><span class="dd-label">Resolved</span><span>{{ inc.resolved_at ? fmtTime(inc.resolved_at) : '-' }}</span></div>
+                  <div class="dd-item"><span class="dd-label">Verified By</span><span>{{ inc.is_verified ? (inc.verified_by_email ?? '-') : '-' }}</span></div>
+                  <div v-if="hasMinRole('operator')" class="dd-item">
+                    <span class="dd-label">Verification</span>
+                    <button
+                      class="btn btn-sm"
+                      :disabled="acting === inc.id"
+                      @click.stop="inc.is_verified ? doUnverify(inc.id) : doVerify(inc.id)"
+                    >{{ inc.is_verified ? 'Remove verification' : 'Verify' }}</button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -110,7 +131,7 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="12" style="text-align:center;color:#94a3b8;padding:16px">
               {{ loading ? 'Loading…' : 'No incidents found' }}
             </td>
           </tr>
@@ -149,6 +170,7 @@
         >
           <div class="inc-header">
             <BadgePill :variant="sevBadge(inc.severity)">{{ inc.severity.toUpperCase() }}</BadgePill>
+            <BadgePill v-if="inc.is_verified" variant="success">VERIFIED</BadgePill>
             <span class="inc-ref">{{ inc.reference_code }}</span>
             <span class="inc-time">{{ fmtTime(inc.reported_at) }}</span>
           </div>
@@ -183,6 +205,13 @@
               :disabled="acting === inc.id"
               @click="doClose(inc.id)"
             >Close</button>
+            <button
+              v-if="hasMinRole('operator')"
+              class="btn btn-sm"
+              :disabled="acting === inc.id"
+              @click="inc.is_verified ? doUnverify(inc.id) : doVerify(inc.id)"
+            >{{ inc.is_verified ? 'Unverify' : 'Verify' }}</button>
+            <button class="link-btn" @click="openReporters(inc)">{{ inc.reporter_count }} reporter{{ inc.reporter_count === 1 ? '' : 's' }}</button>
             <BadgePill variant="neutral">{{ inc.status.replace(/_/g,' ') }}</BadgePill>
           </div>
         </div>
@@ -234,6 +263,31 @@
       </table>
     </div>
   </div>
+
+  <AppModal
+    v-model="reportersModalOpen"
+    title="Reporters"
+    :subtitle="reportersFor ? `${reportersFor.reference_code} · ${reportersFor.incident_type.replace(/_/g,' ')}` : ''"
+  >
+    <div v-if="reportersLoading" style="color:#94a3b8;font-size:13px;padding:8px 0">Loading…</div>
+    <div v-else-if="reporters.length === 0" style="color:#94a3b8;font-size:13px;padding:8px 0">
+      No individual reports found for this incident.
+    </div>
+    <div v-else class="reporters-list">
+      <div v-for="r in reporters" :key="r.id" class="reporter-item">
+        <div class="reporter-item-head">
+          <span class="reporter-email">{{ r.reported_by_email ?? 'Unknown reporter' }}</span>
+          <BadgePill :variant="sevBadge(r.severity)">{{ r.severity }}</BadgePill>
+        </div>
+        <div class="reporter-title">{{ r.title || '(no title)' }}</div>
+        <div v-if="r.description" class="reporter-desc">{{ r.description }}</div>
+        <div class="reporter-meta">
+          {{ r.reference_code }} · {{ fmtTime(r.created_at) }}
+          <span v-if="r.latitude != null && r.longitude != null"> · {{ r.latitude.toFixed(4) }}, {{ r.longitude.toFixed(4) }}</span>
+        </div>
+      </div>
+    </div>
+  </AppModal>
 </template>
 
 <script setup lang="ts">
@@ -243,6 +297,12 @@ useNavSubtitle('Incident Command')
 import { useSafety, useGis } from '~/composables/api'
 import type { SafetySummary, Incident, EmergencyDispatch } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
+// Imported from the module directly (not the `~/composables/api` barrel,
+// which re-exports Incident as `SafetyIncident` — pulling IncidentReport
+// the same way would hit the same alias, so this sidesteps it).
+import type { IncidentReport } from '~/composables/api/useSafety'
+
+const { hasMinRole } = usePermissions()
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green' | 'yellow' | 'red' | 'orange' | 'blue' | 'purple' | 'gray'; size?: 'sm' | 'md' | 'lg' }
 
@@ -257,8 +317,38 @@ const lastRefreshed = ref('-')
 
 const severityFilter = ref('')
 const statusFilter   = ref('')
+const verifiedFilter = ref('')
 const incidentSearch = ref('')
 const expanded       = ref<string | null>(null)
+const successMsg     = ref<string | null>(null)
+let successTimeout: ReturnType<typeof setTimeout> | null = null
+
+/** Brief self-clearing confirmation banner — same spirit as roles.vue's flash(). */
+function flash(msg: string) {
+  successMsg.value = msg
+  if (successTimeout) clearTimeout(successTimeout)
+  successTimeout = setTimeout(() => { successMsg.value = null }, 4000)
+}
+
+// ── Reporters drilldown ───────────────────────────────────────────────
+const reportersModalOpen = ref(false)
+const reportersLoading   = ref(false)
+const reporters          = ref<IncidentReport[]>([])
+const reportersFor       = ref<Incident | null>(null)
+
+async function openReporters(inc: Incident) {
+  reportersFor.value = inc
+  reportersModalOpen.value = true
+  reportersLoading.value = true
+  reporters.value = []
+  try {
+    reporters.value = await useSafety().incidentReporters(inc.id)
+  } catch (e: any) {
+    error.value = e?.data?.detail ?? e?.message ?? 'Failed to load reporters.'
+  } finally {
+    reportersLoading.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -272,6 +362,7 @@ async function load() {
       page_size: 50,
       ...(severityFilter.value ? { severity: severityFilter.value } : {}),
       ...(statusFilter.value   ? { status:   statusFilter.value }   : {}),
+      ...(verifiedFilter.value ? { verified: verifiedFilter.value } : {}),
     }),
     safety.dispatches({ page_size: 30 }),
     gis.roads({ limit: 300, simplify: 0.01 }),
@@ -294,26 +385,38 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // ── Actions ────────────────────────────────────────────────────────────
 async function doTriage(id: string) {
   acting.value = id
-  try { await useSafety().triageIncident(id); await load() }
-  catch { /* silent */ }
+  try { await useSafety().triageIncident(id); await load(); flash('Incident triaged.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to triage incident.' }
   finally { acting.value = null }
 }
 async function doDispatch(id: string) {
   acting.value = id
-  try { await useSafety().dispatchIncident(id); await load() }
-  catch { /* silent */ }
+  try { await useSafety().dispatchIncident(id); await load(); flash('Response dispatched.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to dispatch incident.' }
   finally { acting.value = null }
 }
 async function doResolve(id: string) {
   acting.value = id
-  try { await useSafety().resolveIncident(id); await load() }
-  catch { /* silent */ }
+  try { await useSafety().resolveIncident(id); await load(); flash('Incident resolved.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to resolve incident.' }
   finally { acting.value = null }
 }
 async function doClose(id: string) {
   acting.value = id
-  try { await useSafety().closeIncident(id); await load() }
-  catch { /* silent */ }
+  try { await useSafety().closeIncident(id); await load(); flash('Incident closed.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to close incident.' }
+  finally { acting.value = null }
+}
+async function doVerify(id: string) {
+  acting.value = id
+  try { await useSafety().verifyIncident(id); await load(); flash('Incident verified.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to verify incident.' }
+  finally { acting.value = null }
+}
+async function doUnverify(id: string) {
+  acting.value = id
+  try { await useSafety().unverifyIncident(id); await load(); flash('Verification removed.') }
+  catch (e: any) { error.value = e?.data?.detail ?? e?.message ?? 'Failed to unverify incident.' }
   finally { acting.value = null }
 }
 
@@ -380,6 +483,16 @@ function dispatchBadge(status: string) {
 .freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
 .freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+.success-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#f0fdf4; border:1px solid #86efac; color:#15803d; font-size:13px; }
+.link-btn { background:none; border:none; padding:0; color:#2563eb; font-size:12px; cursor:pointer; text-decoration:underline; }
+.link-btn:hover { color:#1d4ed8; }
+.reporters-list { display:flex; flex-direction:column; gap:12px; }
+.reporter-item { padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; }
+.reporter-item-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.reporter-email { font-size:12.5px; font-weight:600; color:#111827; }
+.reporter-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+.reporter-desc { font-size:12.5px; color:#4b5563; margin-bottom:6px; }
+.reporter-meta { font-size:11px; color:#94a3b8; font-family:monospace; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
