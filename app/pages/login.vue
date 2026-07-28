@@ -188,18 +188,52 @@
     <div class="hero-panel">
       <div class="hero-overlay"></div>
       <div class="hero-content">
-        <div class="hero-badge">Kenya State Department for Transport</div>
+        <div class="hero-badge">Ministry of Transport &amp; SDOT</div>
         <h2 class="hero-headline">Unified Analytics and Predictive Transport System</h2>
-        <p class="hero-body">Centralized data intelligence for roads, rail, and air across all transport agencies.</p>
+        <p class="hero-body">Centralized data intelligence for roads, rail, maritime and air in Kenya.</p>
+
+        <!-- The four modes named in the line above, made visible. -->
+        <ul class="hero-modes" aria-label="Transport modes covered">
+          <li class="mode-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="1" y="5" width="14" height="11" rx="1.5"/>
+              <path d="M15 9h4l3.5 3.5V16H15z"/>
+              <circle cx="5.5" cy="18.5" r="2.2"/>
+              <circle cx="18" cy="18.5" r="2.2"/>
+            </svg>
+            <span class="mode-label">Road</span>
+          </li>
+          <li class="mode-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4.5" y="2.5" width="15" height="16" rx="2.5"/>
+              <line x1="4.5" y1="10.5" x2="19.5" y2="10.5"/>
+              <circle cx="9" cy="14.5" r="1"/>
+              <circle cx="15" cy="14.5" r="1"/>
+              <line x1="8.5" y1="18.5" x2="6.5" y2="22"/>
+              <line x1="15.5" y1="18.5" x2="17.5" y2="22"/>
+            </svg>
+            <span class="mode-label">Rail</span>
+          </li>
+          <li class="mode-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 14h19l-2.2 6.5H4.7z"/>
+              <path d="M6.5 14V8.5h7V14"/>
+              <line x1="10" y1="8.5" x2="10" y2="5"/>
+            </svg>
+            <span class="mode-label">Maritime</span>
+          </li>
+          <li class="mode-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15.5v-2l-7.5-4.7V3.6a1.5 1.5 0 0 0-3 0v5.2L3 13.5v2l7.5-2.4v4.8l-2 1.5v1.4l3.5-1 3.5 1v-1.4l-2-1.5v-4.8z"/>
+            </svg>
+            <span class="mode-label">Air</span>
+          </li>
+        </ul>
+
         <div class="hero-stats">
           <div class="stat-item">
-            <span class="stat-num">16K+</span>
-            <span class="stat-label">Data Points Daily</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat-item">
             <span class="stat-num">15</span>
-            <span class="stat-label">agencies Connected</span>
+            <span class="stat-label">Agencies Connected</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
@@ -298,6 +332,22 @@ function onOTPPaste(e: ClipboardEvent) {
    ============================================================================ */
 
 .login-root {
+  /* ── Brand palette: institutional blue ──────────────────
+     Defined here so the whole login surface is driven by three
+     tokens. Promote these to theme.css :root to take the rest
+     of UAPTS blue as well. The gold accent is retained: it is
+     the focus-ring colour and carries the strongest contrast
+     against blue, which keyboard focus depends on.            */
+  --brand:        #0D4C8B;  /* primary actions, links, focus text */
+  --brand-dark:   #093A6B;  /* hover / pressed                    */
+  --brand-darker: #06294D;  /* wordmark                           */
+
+  /* Local override so any theme.css component rendered inside
+     the login surface inherits blue rather than green.          */
+  --primary: var(--brand);
+  --primary-dark: var(--brand-dark);
+  --primary-darker: var(--brand-darker);
+
   min-height: 100vh;
   height: 100vh;
   width: 100%;
@@ -342,13 +392,13 @@ function onOTPPaste(e: ClipboardEvent) {
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; border-radius: 8px; overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 104, 56, .15);
+  box-shadow: 0 2px 4px rgba(13, 76, 139, .18);
 }
 .logo-img { width: 40px; height: 40px; object-fit: contain; }
 .brand-text { line-height: 1.2; min-width: 0; }
 .brand-name {
   font-size: 18px; font-weight: 800; letter-spacing: 0.04em;
-  color: #003a1e; line-height: 1.1;
+  color: var(--brand-darker); line-height: 1.1;
 }
 .brand-tag {
   font-size: 10.5px; font-weight: 600; color: #6b7280;
@@ -365,7 +415,7 @@ function onOTPPaste(e: ClipboardEvent) {
 .form-heading { display: flex; flex-direction: column; gap: 6px; }
 .eyebrow {
   font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: #006838; margin-bottom: 2px;
+  text-transform: uppercase; color: var(--brand); margin-bottom: 2px;
 }
 .heading-main {
   font-size: clamp(1.625rem, 2vw, 1.875rem);
@@ -390,7 +440,7 @@ function onOTPPaste(e: ClipboardEvent) {
 .field-label-center { text-align: center; }
 
 .forgot-link {
-  font-size: 0.8125rem; font-weight: 600; color: #006838;
+  font-size: 0.8125rem; font-weight: 600; color: var(--brand);
   text-decoration: none; letter-spacing: 0.005em;
 }
 .forgot-link:hover { text-decoration: underline; }
@@ -401,7 +451,7 @@ function onOTPPaste(e: ClipboardEvent) {
   position: absolute; left: 14px; color: #9ca3af;
   pointer-events: none; transition: color .15s;
 }
-.field-input-wrap:focus-within .field-icon { color: #006838; }
+.field-input-wrap:focus-within .field-icon { color: var(--brand); }
 
 .field-input {
   width: 100%; padding: 12px 14px;
@@ -417,8 +467,8 @@ function onOTPPaste(e: ClipboardEvent) {
 .field-input:hover:not(:focus) { border-color: #9ca3af; }
 .field-input:focus,
 .field-input:focus-visible {
-  border-color: #006838;
-  box-shadow: 0 0 0 3px rgba(0, 104, 56, .16);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13, 76, 139, .16);
   outline: none;
 }
 .field-input:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
@@ -439,7 +489,7 @@ function onOTPPaste(e: ClipboardEvent) {
   cursor: pointer; padding: 2px 0; user-select: none;
 }
 .remember-check {
-  width: 17px; height: 17px; accent-color: #006838;
+  width: 17px; height: 17px; accent-color: var(--brand);
   margin: 0; flex-shrink: 0; cursor: pointer;
 }
 .remember-text { font-size: 0.8125rem; color: #6b7280; line-height: 1.4; }
@@ -468,17 +518,17 @@ function onOTPPaste(e: ClipboardEvent) {
 .submit-btn {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   width: 100%; padding: 14px 20px; border-radius: 6px;
-  background: #006838; color: #fff;
+  background: var(--brand); color: #fff;
   font-size: 0.9375rem; font-weight: 600; font-family: inherit;
-  border: 1px solid #006838; cursor: pointer;
+  border: 1px solid var(--brand); cursor: pointer;
   transition: background .15s, box-shadow .15s, transform .08s, opacity .15s;
   letter-spacing: 0.005em; min-height: 48px;
-  box-shadow: 0 1px 2px rgba(0,104,56,.18);
+  box-shadow: 0 1px 2px rgba(13, 76, 139, .18);
   margin-top: 4px;
 }
 .submit-btn:hover:not(:disabled) {
-  background: #004d29; border-color: #004d29;
-  box-shadow: 0 4px 14px rgba(0,104,56,.26);
+  background: var(--brand-dark); border-color: var(--brand-dark);
+  box-shadow: 0 4px 14px rgba(13, 76, 139, .28);
 }
 .submit-btn:active:not(:disabled) { transform: translateY(1px); }
 .submit-btn:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
@@ -494,14 +544,14 @@ function onOTPPaste(e: ClipboardEvent) {
   font-family: inherit; font-size: 0.8125rem; font-weight: 500;
   cursor: pointer; border-radius: 4px; transition: color .12s; margin-bottom: 4px;
 }
-.back-link:hover { color: #006838; }
+.back-link:hover { color: var(--brand); }
 .back-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
 /* ─── MFA: shield icon ring ──────────────────────────────── */
 .mfa-icon-ring {
   width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%;
-  background: rgba(0, 104, 56, .08); border: 1px solid rgba(0, 104, 56, .25);
-  color: #006838; display: flex; align-items: center; justify-content: center;
+  background: rgba(13, 76, 139, .08); border: 1px solid rgba(13, 76, 139, .30);
+  color: var(--brand); display: flex; align-items: center; justify-content: center;
 }
 
 /* ─── MFA: OTP row ───────────────────────────────────────── */
@@ -516,15 +566,15 @@ function onOTPPaste(e: ClipboardEvent) {
   font-variant-numeric: tabular-nums;
   border: 1.5px solid #d1d5db; border-radius: 6px;
   background: #fff; color: #111827; outline: none;
-  caret-color: #006838;
+  caret-color: var(--brand);
   transition: border-color .12s, box-shadow .12s, background .12s;
   min-height: 56px; padding: 0;
 }
 .otp-box:hover:not(:focus) { border-color: #9ca3af; }
 .otp-box:focus,
 .otp-box:focus-visible {
-  border-color: #006838; background: rgba(0, 104, 56, .03);
-  box-shadow: 0 0 0 3px rgba(0, 104, 56, .18); outline: none;
+  border-color: var(--brand); background: rgba(13, 76, 139, .04);
+  box-shadow: 0 0 0 3px rgba(13, 76, 139, .18); outline: none;
 }
 
 /* ─── MFA: skip block ────────────────────────────────────── */
@@ -551,10 +601,10 @@ function onOTPPaste(e: ClipboardEvent) {
 .resend-text { font-size: 0.8125rem; color: #6b7280; }
 .resend-link {
   background: transparent; border: none; padding: 4px 6px;
-  font-size: 0.8125rem; font-weight: 600; color: #006838;
+  font-size: 0.8125rem; font-weight: 600; color: var(--brand);
   font-family: inherit; cursor: pointer; border-radius: 4px; transition: color .12s;
 }
-.resend-link:hover { color: #004d29; text-decoration: underline; }
+.resend-link:hover { color: var(--brand-dark); text-decoration: underline; }
 .resend-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
 /* ─── Footer ─────────────────────────────────────────────── */
@@ -587,7 +637,7 @@ function onOTPPaste(e: ClipboardEvent) {
   font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.005em;
   transition: color .12s, background .12s;
 }
-.footer-meta-links a:hover { color: #006838; background: #f3f4f6; }
+.footer-meta-links a:hover { color: var(--brand); background: #f3f4f6; }
 .footer-meta-links a:focus-visible { outline: 2px solid #FDB913; outline-offset: 1px; }
 .footer-meta-sep {
   display: inline-block; width: 1px; height: 12px;
@@ -597,20 +647,28 @@ function onOTPPaste(e: ClipboardEvent) {
 /* ─── Hero panel ─────────────────────────────────────────── */
 .hero-panel {
   flex: 1; height: 100vh;
+  /* Multimodal transport photograph, served locally from /public.
+     Drop the asset in as public/hero-multimodal.jpg — a frame that
+     carries more than one mode reads best here (e.g. the SGR
+     alongside the Mombasa port cranes, or an apron with freight).
+     Hotlinking a stock CDN was removed deliberately: it leaks
+     traffic off-network and breaks on restricted deployments.
+     Until the file is added, the gradient below stands on its own. */
   background:
-    linear-gradient(160deg, rgba(5, 46, 22, 0.82) 0%, rgba(6, 95, 70, 0.65) 50%, rgba(16, 185, 129, 0.3) 100%),
-    url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80') center/cover no-repeat;
+    linear-gradient(160deg, rgba(6, 28, 54, 0.88) 0%, rgba(13, 76, 139, 0.70) 52%, rgba(59, 130, 200, 0.34) 100%),
+    url('/hero-multimodal.jpg') center/cover no-repeat,
+    linear-gradient(160deg, var(--brand-darker) 0%, var(--brand) 100%);
   display: flex; align-items: center; justify-content: center; padding: 48px;
   position: relative; overflow: hidden;
 }
 .hero-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(2, 44, 26, 0.6) 0%, transparent 60%);
+  background: linear-gradient(to top, rgba(4, 22, 44, 0.62) 0%, transparent 60%);
 }
 .hero-content { position: relative; z-index: 1; color: #fff; }
 .hero-badge {
   display: inline-block; padding: 6px 16px; border-radius: 9999px;
-  background: rgba(0, 104, 56, .6); border: 1px solid rgba(253, 185, 19, .6);
+  background: rgba(13, 76, 139, .62); border: 1px solid rgba(253, 185, 19, .6);
   font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.14em;
   text-transform: uppercase; margin-bottom: 16px; backdrop-filter: blur(8px);
 }
@@ -621,7 +679,25 @@ function onOTPPaste(e: ClipboardEvent) {
 }
 .hero-body {
   font-size: 0.9375rem; color: rgba(255,255,255,.8); line-height: 1.7;
-  max-width: 380px; margin-bottom: 32px; text-shadow: 0 1px 6px rgba(0,0,0,.4);
+  max-width: 380px; margin-bottom: 24px; text-shadow: 0 1px 6px rgba(0,0,0,.4);
+}
+
+/* ─── Hero: transport modes strip ────────────────────────── */
+.hero-modes {
+  display: flex; list-style: none; margin: 0 0 28px; padding: 0;
+  max-width: 400px;
+  border-top: 1px solid rgba(255,255,255,.18);
+  border-bottom: 1px solid rgba(255,255,255,.18);
+}
+.mode-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 7px; padding: 14px 4px; color: rgba(255,255,255,.92);
+}
+.mode-item + .mode-item { border-left: 1px solid rgba(255,255,255,.14); }
+.mode-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+.mode-label {
+  font-size: 0.625rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: rgba(255,255,255,.72); line-height: 1;
 }
 .hero-stats { display: flex; align-items: center; gap: 20px; }
 .stat-item { display: flex; flex-direction: column; gap: 2px; }
