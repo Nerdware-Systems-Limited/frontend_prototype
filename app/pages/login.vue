@@ -229,18 +229,6 @@
             <span class="mode-label">Air</span>
           </li>
         </ul>
-
-        <div class="hero-stats">
-          <div class="stat-item">
-            <span class="stat-num">15</span>
-            <span class="stat-label">Agencies Connected</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat-item">
-            <span class="stat-num">99.8%</span>
-            <span class="stat-label">Uptime SLA</span>
-          </div>
-        </div>
       </div>
     </div>
 
