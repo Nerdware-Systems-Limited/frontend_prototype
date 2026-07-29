@@ -22,7 +22,7 @@
       class="agency-tab" :class="{ active: selectedAgency === a.code }"
       @click="selectAgency(a.code)"
     >
-      {{ a.code }} <span class="agency-tab-count">{{ a.count }}</span>
+      {{ a.name }} <span class="agency-tab-count">{{ a.count }}</span>
     </button>
   </div>
 
@@ -43,6 +43,8 @@
   <SectionTitle pill="National Treasury · Batch">Budget Allocations by Fiscal Year ({{ agencyLabel }})</SectionTitle>
   <div class="card">
     <div class="card-body">
+      <!-- Quick agency switch - duplicates the page-level tabs so you don't
+           have to scroll back up to change which agency this table shows. -->
       <div class="filter-row">
         <ExportButton filename="uapts-funding-allocations.csv" :href="budgetExportHref" style="margin-left:auto" />
       </div>
@@ -153,7 +155,7 @@
 definePageMeta({ layout: 'default' })
 useNavSubtitle('Funding Allocations')
 
-import { useInfrastructure } from '~/composables/api'
+import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { MaintenanceBudget, RoadSegment, ConstructionProject, DeteriorationForecast, InfrastructureSummary } from '~/composables/api'
 
 const route  = useRoute()
@@ -164,6 +166,7 @@ const segments = ref<RoadSegment[]>([])
 const projects = ref<ConstructionProject[]>([])
 const atRisk   = ref<DeteriorationForecast[]>([])
 const summary  = ref<InfrastructureSummary | null>(null)
+const agencyNames = ref<Record<string, string>>({})
 const loading  = ref(true)
 const error    = ref<string | null>(null)
 
@@ -181,13 +184,15 @@ async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
+  const agenciesApi = useAgencies()
 
-  const [budRes, segRes, projRes, riskRes, sumRes] = await Promise.allSettled([
+  const [budRes, segRes, projRes, riskRes, sumRes, agencyRes] = await Promise.allSettled([
     infra.budgets({ page_size: 50 }),
     infra.segments({ page_size: 200 }),
     infra.projects({ page_size: 100 }),
     infra.atRiskForecasts(),
     infra.summary(),
+    agenciesApi.list({ page_size: 50 }),
   ])
 
   if (budRes.status  === 'fulfilled') budgets.value  = (budRes.value as any).results ?? []
@@ -195,6 +200,10 @@ async function load() {
   if (projRes.status === 'fulfilled') projects.value = (projRes.value as any).results ?? []
   if (riskRes.status === 'fulfilled') atRisk.value   = (riskRes.value as any).results ?? []
   if (sumRes.status  === 'fulfilled') summary.value  = sumRes.value
+  if (agencyRes.status === 'fulfilled') {
+    const list = (agencyRes.value as any).results ?? []
+    agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
+  }
 
   if (budRes.status === 'rejected') error.value = 'Unable to reach the UAPTS Infrastructure API.'
 
@@ -213,9 +222,11 @@ const agencyOptions = computed(() => {
     if (!b.agency_code) continue
     m.set(b.agency_code, (m.get(b.agency_code) ?? 0) + 1)
   }
-  return [...m.entries()].map(([code, count]) => ({ code, count })).sort((a, b) => a.code.localeCompare(b.code))
+  return [...m.entries()]
+    .map(([code, count]) => ({ code, count, name: agencyNames.value[code] ?? code }))
+    .sort((a, b) => a.code.localeCompare(b.code))
 })
-const agencyLabel = computed(() => selectedAgency.value || 'All Agencies')
+const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
 
 const agencyBudgetsScoped = computed(() =>
   selectedAgency.value ? budgets.value.filter(b => b.agency_code === selectedAgency.value) : budgets.value,
@@ -331,6 +342,7 @@ const budgetExportHref = computed(() => {
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.table-agency-switch { margin-bottom:12px; }
 .agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
 .agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
 .agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }

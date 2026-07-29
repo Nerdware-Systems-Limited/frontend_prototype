@@ -10,8 +10,7 @@
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
-  <div class="privacy-note">🔒 National ID is masked server-side by default. Unmasking is an admin-only, audit-logged action and is not exposed in this UI.</div>
-
+  
   <!-- KPI strip (computed client-side - no dashboard summary endpoint exists for this module) -->
   <div class="kpi-grid">
     <KpiCard label="Licences (loaded)" :value="fmtNum(licences.length)" sub="Most recent records" source="live" source-title="NTSA Fleet Drivers" />
@@ -62,60 +61,6 @@
             </tr>
           </tbody>
           <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No PSV-endorsed licences in the loaded registry.' }}</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Licence registry -->
-  <SectionTitle pill="NTSA Fleet Drivers · Rolling">Driver Licence Registry</SectionTitle>
-  <div class="card">
-    <div class="card-body">
-      <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search licence no / driver…" style="min-width:180px" @keyup.enter="load" />
-        <select v-model="statusFilter" class="select-sm">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-          <option value="revoked">Revoked</option>
-          <option value="expired">Expired</option>
-        </select>
-        <label class="checkbox-label">
-          <input v-model="psvOnly" type="checkbox" />
-          PSV only
-        </label>
-        <button class="btn" @click="load">Apply</button>
-        <button class="btn" @click="clearFilters">Clear</button>
-      </div>
-
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Licence No.</th><th>Driver</th><th>Class</th><th>Endorsements</th><th>Issued</th><th>Expires</th>
-              <th>Demerit Pts</th><th>PSV</th><th>Status</th><th>Expired Flag</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredLicences.length">
-            <tr v-for="d in filteredLicences" :key="d.id">
-              <td style="font-family:monospace;font-size:11px">{{ d.license_number }}</td>
-              <td style="font-size:12px">{{ d.driver_name }}</td>
-              <td>{{ formatClass(d.license_class) }}</td>
-              <td style="font-size:11px">{{ (d.endorsements ?? []).join(', ') || '-' }}</td>
-              <td style="font-size:11px">{{ fmtDate(d.issue_date) }}</td>
-              <td style="font-size:11px">{{ fmtDate(d.expiry_date) }}</td>
-              <td>
-                <span :style="{ color: d.demerit_points >= 8 ? '#ef4444' : d.demerit_points >= 4 ? '#f59e0b' : '#22c55e' }">{{ d.demerit_points }}</span>
-              </td>
-              <td style="text-align:center">{{ d.is_psv ? '✓' : '-' }}</td>
-              <td><BadgePill :variant="statusBadge(d.status)">{{ d.status }}</BadgePill></td>
-              <td style="text-align:center">
-                <span v-if="d.is_expired" style="color:#ef4444">⚠</span>
-                <span v-else>-</span>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading licences…' : 'No driver licence records match the current filters.' }}</td></tr></tbody>
         </table>
       </div>
     </div>

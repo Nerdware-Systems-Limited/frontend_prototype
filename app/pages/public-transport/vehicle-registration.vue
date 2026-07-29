@@ -5,6 +5,13 @@
     subtitle="NTSA - Vehicle registry, compliance linkage (inspection, insurance, tracking), search by plate/chassis, and drill-down"
   >
     <template #actions>
+      <div class="day-filter">
+        <button
+          v-for="d in [7, 14, 30]" :key="d"
+          class="btn" :class="{ 'btn-active': registeredDays === d }"
+          @click="registeredDays = registeredDays === d ? null : d"
+        >{{ d }}d</button>
+      </div>
       <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
     </template>
   </PageHeader>
@@ -15,47 +22,47 @@
   <div class="kpi-grid">
     <KpiCard
       label="Total Registered Vehicles"
-      :value="fmtNum(summary?.kpis.total_vehicles)"
-      sub="Cumulative to date"
+      :value="fmtNum(registeredDays ? scopedVehicles.length : summary?.kpis.total_vehicles)"
+      :sub="registeredDays ? `Registered in last ${registeredDays}d · loaded page` : 'Cumulative to date'"
       source="batch" source-title="NTSA VREG"
     />
     <KpiCard
       label="Operational"
       :value="fmtNum(byStatus.operational)"
-      sub="Currently in service"
-      source="live" source-title="NTSA VREG"
+      :sub="registeredDays ? `Currently in service · last ${registeredDays}d` : 'Currently in service'"
+      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
     />
     <KpiCard
       label="In Maintenance"
       :value="fmtNum(byStatus.maintenance)"
-      sub="Off-road for service"
-      source="live" source-title="NTSA VREG"
+      :sub="registeredDays ? `Off-road for service · last ${registeredDays}d` : 'Off-road for service'"
+      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
     />
     <KpiCard
       label="Impounded"
       :value="fmtNum(byStatus.impounded)"
-      sub="Held by enforcement"
+      :sub="registeredDays ? `Held by enforcement · last ${registeredDays}d` : 'Held by enforcement'"
       trend-direction="down"
-      source="live" source-title="NTSA VREG"
+      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
     />
     <KpiCard
       label="Speed Governor Online"
       :value="summary?.governor_compliance.online_pct != null ? summary.governor_compliance.online_pct.toFixed(1) + '%' : '-'"
-      sub="Fleet-wide compliance"
+      sub="Fleet-wide compliance · not affected by the registration-date filter"
       :trend-direction="(summary?.governor_compliance.online_pct ?? 0) >= 90 ? 'up' : 'down'"
       source="live" source-title="NTSA iTIMS"
     />
     <KpiCard
       label="Inspection Expiring ≤30d"
       :value="fmtNum(expiring.inspection)"
-      sub="Loaded page · needs renewal"
+      :sub="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
       trend-direction="down"
       source="batch" source-title="NTSA VREG"
     />
     <KpiCard
       label="Insurance Expiring ≤30d"
       :value="fmtNum(expiring.insurance)"
-      sub="Loaded page · needs renewal"
+      :sub="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
       trend-direction="down"
       source="batch" source-title="NTSA VREG"
     />
@@ -145,23 +152,8 @@
           <option value="">All fuel types</option>
           <option v-for="f in fuelTypes" :key="f" :value="f">{{ f }}</option>
         </select>
+        <span v-if="registeredDays" class="reg-filter-label">Registered ≤{{ registeredDays }}d · {{ fmtNum(filteredVehicles.length) }} match</span>
         <button class="btn" @click="clearFilters">Clear</button>
-      </div>
-
-      <div class="filter-row">
-        <span class="reg-filter-label">Registered:</span>
-        <button
-          class="btn" :class="{ 'btn-active': registeredFilter === 'today' }"
-          @click="registeredFilter = registeredFilter === 'today' ? '' : 'today'"
-        >Today ({{ fmtNum(registeredCounts.today) }})</button>
-        <button
-          class="btn" :class="{ 'btn-active': registeredFilter === 'week' }"
-          @click="registeredFilter = registeredFilter === 'week' ? '' : 'week'"
-        >Last 7 Days ({{ fmtNum(registeredCounts.week) }})</button>
-        <button
-          class="btn" :class="{ 'btn-active': registeredFilter === 'month' }"
-          @click="registeredFilter = registeredFilter === 'month' ? '' : 'month'"
-        >This Month ({{ fmtNum(registeredCounts.month) }})</button>
       </div>
 
       <div class="table-scroll">
@@ -290,7 +282,7 @@ const search       = ref('')
 const statusFilter = ref('')
 const typeFilter   = ref('')
 const fuelFilter   = ref('')
-const registeredFilter = ref<'' | 'today' | 'week' | 'month'>('')
+const registeredDays = ref<number | null>(null)
 const expandedId   = ref<string | null>(null)
 
 const drillCache = reactive<Record<string, { loaded: boolean; inspections: VehicleInspection[]; adherence: RouteAdherence[]; behaviour: DriverBehaviorEvent[] }>>({})
@@ -340,15 +332,13 @@ async function toggleExpand(v: Vehicle) {
   }
 }
 function clearFilters() {
-  search.value = ''; statusFilter.value = ''; typeFilter.value = ''; fuelFilter.value = ''
-}
-
-const REGISTERED_WINDOW_MS: Record<'today' | 'week' | 'month', number> = {
-  today: 86_400_000, week: 7 * 86_400_000, month: 30 * 86_400_000,
+  search.value = ''; statusFilter.value = ''; typeFilter.value = ''; fuelFilter.value = ''; registeredDays.value = null
 }
 
 // ── Computed ─────────────────────────────────────────────────────────────
-const filteredVehicles = computed(() => vehicles.value.filter(v => {
+// Built on top of scopedVehicles (below) so the registry table and every
+// KPI/chart on the page apply the 7d/14d/30d window consistently.
+const filteredVehicles = computed(() => scopedVehicles.value.filter(v => {
   if (search.value) {
     const q = search.value.toLowerCase()
     if (!v.plate_number.toLowerCase().includes(q) && !v.chassis_no.toLowerCase().includes(q)) return false
@@ -356,24 +346,43 @@ const filteredVehicles = computed(() => vehicles.value.filter(v => {
   if (statusFilter.value && v.status !== statusFilter.value) return false
   if (typeFilter.value && v.vehicle_type !== typeFilter.value) return false
   if (fuelFilter.value && v.fuel_type !== fuelFilter.value) return false
-  if (registeredFilter.value) {
-    if (!v.created_at) return false
-    const age = Date.now() - new Date(v.created_at).getTime()
-    if (age > REGISTERED_WINDOW_MS[registeredFilter.value]) return false
-  }
   return true
 }))
 
 const vehicleTypes = computed(() => [...new Set(vehicles.value.map(v => v.vehicle_type))].sort())
 const fuelTypes    = computed(() => [...new Set(vehicles.value.map(v => v.fuel_type))].sort())
 
-const byStatus = computed(() => summary.value?.vehicles_by_status ?? {})
-const byType   = computed(() => summary.value?.vehicles_by_type ?? [])
+// Vehicles registered within the selected 7d/14d/30d window - the source
+// every KPI/chart below switches to once a window is picked, instead of
+// only the registry table filtering while everything above it stays static.
+const scopedVehicles = computed(() => {
+  if (!registeredDays.value) return vehicles.value
+  const horizon = registeredDays.value * 86_400_000
+  return vehicles.value.filter(v => v.created_at && (Date.now() - new Date(v.created_at).getTime()) <= horizon)
+})
+
+// Unscoped: real backend-wide aggregate (summary.vehicles_by_status).
+// Scoped: no backend endpoint computes status counts for a registration-date
+// window, so derive it from the loaded (page_size:100-capped) vehicle page -
+// same "exact unscoped / computed-from-loaded-page when scoped" pattern used
+// for agency filtering elsewhere in this app.
+const byStatus = computed(() => {
+  if (!registeredDays.value) return summary.value?.vehicles_by_status ?? {}
+  const m: Record<string, number> = {}
+  for (const v of scopedVehicles.value) m[v.status] = (m[v.status] ?? 0) + 1
+  return m
+})
+const byType = computed(() => {
+  if (!registeredDays.value) return summary.value?.vehicles_by_type ?? []
+  const m = new Map<string, number>()
+  for (const v of scopedVehicles.value) m.set(v.vehicle_type, (m.get(v.vehicle_type) ?? 0) + 1)
+  return [...m.entries()].map(([vehicle_type, total]) => ({ vehicle_type, total })).sort((a, b) => b.total - a.total)
+})
 const maxType  = computed(() => Math.max(1, ...byType.value.map(t => t.total ?? 0)))
 
 const byFuel = computed(() => {
   const m = new Map<string, number>()
-  for (const v of vehicles.value) m.set(v.fuel_type, (m.get(v.fuel_type) ?? 0) + 1)
+  for (const v of scopedVehicles.value) m.set(v.fuel_type, (m.get(v.fuel_type) ?? 0) + 1)
   return [...m.entries()].map(([fuel_type, count]) => ({ fuel_type, count })).sort((a, b) => b.count - a.count)
 })
 const maxFuel = computed(() => Math.max(1, ...byFuel.value.map(f => f.count)))
@@ -381,7 +390,7 @@ const maxFuel = computed(() => Math.max(1, ...byFuel.value.map(f => f.count)))
 const byAgeBand = computed(() => {
   const bands = { '0-3 yrs': 0, '4-7 yrs': 0, '8-15 yrs': 0, '16+ yrs': 0, Unknown: 0 }
   const thisYear = new Date().getFullYear()
-  for (const v of vehicles.value) {
+  for (const v of scopedVehicles.value) {
     if (!v.year_of_manufacture) { bands.Unknown++; continue }
     const age = thisYear - v.year_of_manufacture
     if (age <= 3) bands['0-3 yrs']++
@@ -395,7 +404,7 @@ const maxAge = computed(() => Math.max(1, ...byAgeBand.value.map(a => a.count)))
 
 const byOperator = computed(() => {
   const m = new Map<string, number>()
-  for (const v of vehicles.value) {
+  for (const v of scopedVehicles.value) {
     const key = v.operator_name ?? v.agency_code ?? 'Unassigned'
     m.set(key, (m.get(key) ?? 0) + 1)
   }
@@ -403,23 +412,9 @@ const byOperator = computed(() => {
 })
 const maxOperator = computed(() => Math.max(1, ...byOperator.value.map(o => o.count)))
 
-const registeredCounts = computed(() => {
-  const now = Date.now()
-  const day = 86_400_000
-  let today = 0, week = 0, month = 0
-  for (const v of vehicles.value) {
-    if (!v.created_at) continue
-    const age = now - new Date(v.created_at).getTime()
-    if (age <= day) today++
-    if (age <= 7 * day) week++
-    if (age <= 30 * day) month++
-  }
-  return { today, week, month }
-})
-
 const expiring = computed(() => {
   let inspection = 0, insurance = 0
-  for (const v of vehicles.value) {
+  for (const v of scopedVehicles.value) {
     if (v.inspection_expiry && daysUntil(v.inspection_expiry) <= 30 && daysUntil(v.inspection_expiry) >= 0) inspection++
     if (v.insurance_expiry && daysUntil(v.insurance_expiry) <= 30 && daysUntil(v.insurance_expiry) >= 0) insurance++
   }
@@ -481,6 +476,7 @@ function severityBadge(s: string) {
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .reg-filter-label { font-size:12px; color:#64748b; font-weight:600; }
 .btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+.day-filter { display:flex; gap:4px; }
 .table-scroll { overflow-x:auto; }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:130px 1fr 40px; align-items:center; gap:8px; }

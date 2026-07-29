@@ -27,32 +27,17 @@
   </div>
 
   <!-- Analytics -->
-  <div class="two-col">
-    <div class="card">
-      <div class="card-header">Inspections by Centre</div>
-      <div class="card-body">
-        <div v-if="byCentre.length" class="bar-list">
-          <div v-for="c in byCentre" :key="c.centre" class="bar-row">
-            <span class="bar-label">{{ c.centre }}</span>
-            <div class="bar-wrap"><div class="bar-fill" :style="{ width: `${maxCentre > 0 ? (c.count / maxCentre) * 100 : 0}%` }" /></div>
-            <span class="bar-val">{{ c.count }} · {{ c.passRate.toFixed(0) }}% pass</span>
-          </div>
+  <SectionTitle pill="Computed · Rolling">Inspections by Centre</SectionTitle>
+  <div class="card">
+    <div class="card-body">
+      <div v-if="byCentre.length" class="bar-list bar-list-wide">
+        <div v-for="c in byCentre" :key="c.centre" class="bar-row bar-row-wide">
+          <span class="bar-label">{{ c.centre }}</span>
+          <div class="bar-wrap"><div class="bar-fill" :style="{ width: `${maxCentre > 0 ? (c.count / maxCentre) * 100 : 0}%` }" /></div>
+          <span class="bar-val">{{ c.count }} · {{ c.passRate.toFixed(0) }}% pass</span>
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No inspection records.' }}</div>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-header">Inspector Workload</div>
-      <div class="card-body">
-        <div v-if="byInspector.length" class="bar-list">
-          <div v-for="i in byInspector" :key="i.inspector" class="bar-row">
-            <span class="bar-label">{{ i.inspector }}</span>
-            <div class="bar-wrap"><div class="bar-fill" style="background:#8b5cf6" :style="{ width: `${maxInspector > 0 ? (i.count / maxInspector) * 100 : 0}%` }" /></div>
-            <span class="bar-val">{{ i.count }}</span>
-          </div>
-        </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No inspector data.' }}</div>
-      </div>
+      <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No inspection records.' }}</div>
     </div>
   </div>
 
@@ -263,7 +248,6 @@ const byInspector = computed(() => {
   }
   return [...m.entries()].map(([inspector, count]) => ({ inspector, count })).sort((a, b) => b.count - a.count)
 })
-const maxInspector = computed(() => Math.max(1, ...byInspector.value.map(i => i.count)))
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -284,8 +268,6 @@ function resultBadge(r: string) {
 <style scoped>
 .error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
-.two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
-@media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
@@ -296,6 +278,11 @@ function resultBadge(r: string) {
 .bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
 .bar-fill { height:100%; background:#3b82f6; border-radius:4px; transition:width .4s; }
 .bar-val { font-size:11px; text-align:right; }
+.bar-list-wide { gap:12px; }
+.bar-row-wide { grid-template-columns:240px 1fr 130px; gap:14px; }
+.bar-row-wide .bar-label { font-size:13px; font-weight:600; overflow:visible; white-space:normal; }
+.bar-row-wide .bar-wrap { height:16px; }
+.bar-row-wide .bar-val { font-size:12.5px; font-weight:600; }
 .insp-row { cursor:pointer; }
 .expand-cell { width:18px; color:#94a3b8; font-size:11px; }
 .insp-detail-row td { background:#fafbfc; padding:12px 18px; border-bottom:1px solid #f1f5f9; }

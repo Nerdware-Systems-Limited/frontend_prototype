@@ -189,15 +189,38 @@
               </tr>
               <tr v-if="expandedProject === p.id" class="detail-row">
                 <td :colspan="11">
+                  <div class="dd-group-title">Overview</div>
                   <div class="drilldown">
+                    <div class="dd-item"><span class="dd-label">Project Code</span><span>{{ p.project_code }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Agency</span><span>{{ p.agency_code ?? '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Status</span><span>{{ p.status.replace(/_/g,' ') }}</span></div>
                     <div class="dd-item"><span class="dd-label">Project Type</span><span>{{ p.project_type.replace(/_/g,' ') }}</span></div>
+                    <div class="dd-item"><span class="dd-label">County</span><span>{{ p.county || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Corridor</span><span>{{ p.corridor || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Contractor</span><span>{{ p.contractor || '-' }}</span></div>
                     <div class="dd-item"><span class="dd-label">Length</span><span>{{ p.length_km != null ? `${p.length_km} km` : '-' }}</span></div>
+                  </div>
+
+                  <div class="dd-group-title">Progress &amp; Financials</div>
+                  <div class="drilldown">
+                    <div class="dd-item"><span class="dd-label">Physical Progress</span><span>{{ p.physical_progress_pct != null ? `${p.physical_progress_pct.toFixed(1)}%` : '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Financial Progress</span><span>{{ p.financial_progress_pct != null ? `${p.financial_progress_pct.toFixed(1)}%` : '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Budget Utilization</span><span>{{ p.budget_utilization_pct.toFixed(1) }}%</span></div>
+                    <div class="dd-item"><span class="dd-label">Contract Sum</span><span>{{ p.contract_sum_kes != null ? `KES ${fmtKESExact(p.contract_sum_kes)}` : '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Disbursed</span><span>{{ p.disbursed_kes != null ? `KES ${fmtKESExact(p.disbursed_kes)}` : '-' }}</span></div>
+                  </div>
+
+                  <div class="dd-group-title">Timeline</div>
+                  <div class="drilldown">
                     <div class="dd-item"><span class="dd-label">Planned Start</span><span>{{ fmtDate(p.planned_start) }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Planned End</span><span>{{ fmtDate(p.planned_end) }}</span></div>
                     <div class="dd-item"><span class="dd-label">Actual Start</span><span>{{ fmtDate(p.actual_start) }}</span></div>
                     <div class="dd-item"><span class="dd-label">Actual End</span><span>{{ fmtDate(p.actual_end) }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Budget Utilization</span><span>{{ p.budget_utilization_pct.toFixed(0) }}%</span></div>
-                    <div class="dd-item" style="grid-column:1/-1"><span class="dd-label">Description</span><span>{{ p.description || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Last Updated</span><span>{{ fmtDate(p.updated_at) }}</span></div>
                   </div>
+
+                  <div class="dd-group-title">Description</div>
+                  <div class="dd-description">{{ p.description || 'No description on file.' }}</div>
                 </td>
               </tr>
             </template>
@@ -532,6 +555,11 @@ function fmtKES(v: number | string | null | undefined) {
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
   return Math.round(n).toLocaleString()
 }
+function fmtKESExact(v: number | string | null | undefined) {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (n == null || isNaN(n)) return '-'
+  return Math.round(n).toLocaleString()
+}
 function fmtDate(s: string | null | undefined) {
   if (!s) return '-'
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
@@ -575,9 +603,12 @@ function progColor(pct: number | null | undefined) {
 .expand-row { cursor:pointer; }
 .expand-cell { width:18px; color:#94a3b8; font-size:11px; }
 .detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
-.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
 .dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-group-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin-bottom:8px; }
+.dd-group-title:not(:first-child) { margin-top:4px; }
+.dd-description { font-size:12.5px; line-height:1.5; color:#334155; white-space:pre-wrap; }
 .county-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
 .county-card { border:1px solid #f1f5f9; border-radius:6px; padding:10px 12px; }
 .cc-name { font-size:13px; font-weight:600; margin-bottom:2px; }
