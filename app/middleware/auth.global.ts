@@ -1,5 +1,5 @@
 /**
- * Global route middleware - auth guard.
+ * Global route middleware - auth guard, then agency-scope guard.
  *
  * Every navigation goes through here (defineNuxtRouteMiddleware is global
  * because the file is placed in middleware/ and named with no `.client`/`.server` suffix).
@@ -12,14 +12,21 @@
  *      - Refresh succeeds → let through
  *      - Refresh fails    → redirect to /login
  *   4. Nothing at all → redirect to /login
+ *
+ * Once authenticated, step 5 resolves the agency-scope axis
+ * (useAccessControl.ts, RBAC spec section 7/8.1) and redirects to the
+ * safe space on denial - closing gap #3 (no client-side route gating on
+ * /roles, /users, /audit, /integrations) and gap #8 (the post-login
+ * `?redirect=` target was never re-validated against scope). This is the
+ * "clean experience" layer only; the real gate is the server (spec 2.1).
  */
 
 import { useAuthStore } from '~/stores/auth'
 
-const PUBLIC_ROUTES = ['/login']
+const PUBLIC_ROUTES = ['/login', '/forgot-password']
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (PUBLIC_ROUTES.includes(to.path)) return
+  if (PUBLIC_ROUTES.includes(to.path) || to.path.startsWith('/reset-password/')) return
 
   const auth = useAuthStore()
 
@@ -29,14 +36,24 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // Already have a live access token
-  if (auth.isAuthenticated) return
+  if (auth.isAuthenticated) return resolveScope(to.path)
 
   // Try a silent refresh using the stored refresh token
   if (auth.refreshToken) {
     const newToken = await auth.refreshAccessToken()
-    if (newToken) return
+    if (newToken) return resolveScope(to.path)
   }
 
   // Nothing worked - go to login, preserving the intended destination
   return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
 })
+
+function resolveScope(path: string) {
+  const access = useAccessControl()
+  const resolution = access.resolveRoute(path)
+  if (resolution.allowed) return
+
+  const safeSpace = access.safeSpace.value.route
+  if (path === safeSpace) return // already there - nothing to redirect to
+  return navigateTo(safeSpace)
+}

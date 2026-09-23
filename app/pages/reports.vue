@@ -50,7 +50,7 @@
           <label>Date To</label>
           <input type="date" v-model="genForm.params.date_to" class="select-full" />
         </div>
-        <div v-if="genError" style="font-size:12px;color:#ef4444">⚠ {{ genError }}</div>
+        <div v-if="genError" style="font-size:12px;color:var(--danger-fg)">⚠ {{ genError }}</div>
       </div>
       <div class="modal-footer">
         <button class="btn" @click="showGenerateModal = false">Cancel</button>
@@ -87,6 +87,40 @@
     <div class="card-body empty-row">{{ loading ? 'Loading templates…' : 'No report templates found.' }}</div>
   </div>
 
+  <!-- Saved query distributions (from the Query Builder) -->
+  <SectionTitle pill="Query Builder · Distribution">Saved Query Templates</SectionTitle>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <div v-if="savedError" class="query-error" style="margin-bottom:8px">⚠ {{ savedError }}</div>
+      <div v-if="savedQueries.length" class="saved-list">
+        <div v-for="sq in savedQueries" :key="sq.id" class="saved-row">
+          <div class="saved-main">
+            <div class="saved-name">
+              {{ sq.name }}
+              <BadgePill :variant="sq.query_type === 'join' ? 'info' : 'neutral'">{{ sq.query_type === 'join' ? 'Cross-module' : 'Single dataset' }}</BadgePill>
+            </div>
+            <div class="saved-desc">{{ sq.description || 'No description' }}</div>
+            <div class="saved-meta">
+              <span class="saved-meta-chip">{{ scheduleLabel(sq.schedule_frequency) }}</span>
+              <span class="saved-meta-chip">{{ sq.export_format.toUpperCase() }}</span>
+              <span class="saved-meta-chip">{{ sq.recipients.length }} recipient{{ sq.recipients.length === 1 ? '' : 's' }}</span>
+              <span class="saved-meta-chip">Last run: {{ sq.last_run_at ? fmtTime(sq.last_run_at) : 'never' }}</span>
+            </div>
+          </div>
+          <div class="saved-actions">
+            <button class="btn-primary" :disabled="runningSavedId === sq.id" @click="runSavedNow(sq)">
+              {{ runningSavedId === sq.id ? 'Running…' : '▶ Run Now' }}
+            </button>
+            <button class="remove-btn" title="Delete" @click="deleteSaved(sq.id)">×</button>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-row">
+        No saved query templates yet - build one in the <NuxtLink to="/query-builder">Query Builder</NuxtLink> and click "Save as Template".
+      </div>
+    </div>
+  </div>
+
   <!-- Recent runs -->
   <SectionTitle pill="Recent Activity">Recent Report Runs</SectionTitle>
 
@@ -105,7 +139,7 @@
           </tr>
         </thead>
         <tbody v-if="runs.length">
-          <tr v-for="r in runs" :key="r.id" :class="{ 'run-row-active': r.id === pollingRunId }">
+          <tr v-for="r in runsPageRows" :key="r.id" :class="{ 'run-row-active': r.id === pollingRunId }">
             <td class="run-name">{{ (r as any).template_name ?? r.template_id }}</td>
             <td><BadgePill variant="info">{{ r.format.toUpperCase() }}</BadgePill></td>
             <td>
@@ -125,24 +159,30 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading runs…' : 'No recent report runs.' }}</td></tr>
+          <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading runs…' : 'No recent report runs.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="runsPage" :total-pages="runsTotalPages" :total="runsTotal"
+        @prev="runsPrev" @next="runsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Reports')
-
-import { useReports } from '~/composables/api'
-import type { ReportTemplate, ReportRun } from '~/composables/api'
+import { useReports, useQuery } from '~/composables/api'
+import type { ReportTemplate, ReportRun, SavedQuery, ScheduleFrequency, SavedQueryFormat } from '~/composables/api'
 
 const catalog = ref<ReportTemplate[]>([])
 const runs    = ref<ReportRun[]>([])
 const loading = ref(true)
 const error   = ref<string | null>(null)
+
+const savedQueries   = ref<SavedQuery[]>([])
+const savedError     = ref<string | null>(null)
+const runningSavedId = ref<string | null>(null)
 
 const showGenerateModal = ref(false)
 const generating = ref(false)
@@ -177,7 +217,65 @@ async function load() {
   loading.value = false
 }
 
+async function loadSavedQueries() {
+  try {
+    const res = await useQuery().savedList()
+    savedQueries.value = res.results ?? []
+  } catch (e: any) {
+    savedError.value = e?.data?.detail ?? e?.message ?? 'Unable to load saved query templates.'
+  }
+}
+
+async function runSavedNow(sq: SavedQuery) {
+  runningSavedId.value = sq.id
+  savedError.value = null
+  try {
+    const res = await useQuery().savedRun(sq.id)
+    downloadRows(res.rows as Record<string, unknown>[], sq.export_format, sq.name)
+    await loadSavedQueries()
+  } catch (e: any) {
+    savedError.value = e?.data?.detail ?? e?.message ?? 'Failed to run saved query.'
+  } finally {
+    runningSavedId.value = null
+  }
+}
+
+async function deleteSaved(id: string) {
+  try {
+    await useQuery().savedDelete(id)
+    savedQueries.value = savedQueries.value.filter(sq => sq.id !== id)
+  } catch (e: any) {
+    savedError.value = e?.data?.detail ?? e?.message ?? 'Failed to delete saved query.'
+  }
+}
+
+function downloadRows(rows: Record<string, unknown>[], format: SavedQueryFormat, name: string) {
+  if (typeof window === 'undefined') return
+  const safe = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'saved-query'
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' })
+    triggerDownload(blob, `uapts-saved-${safe}.json`)
+  } else {
+    const cols = rows.length ? Object.keys(rows[0]!) : []
+    const body = [cols.join(','), ...rows.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','))]
+    const blob = new Blob([body.join('\n')], { type: 'text/csv' })
+    triggerDownload(blob, `uapts-saved-${safe}.csv`)
+  }
+}
+function triggerDownload(blob: Blob, name: string) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+function scheduleLabel(f: ScheduleFrequency) {
+  const m: Record<ScheduleFrequency, string> = { manual: 'Manual', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
+  return m[f] ?? f
+}
+
 onMounted(load)
+onMounted(loadSavedQueries)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 60_000) })
 onUnmounted(() => { if (t) clearInterval(t); stopPolling() })
@@ -188,6 +286,12 @@ const selectedTemplate = computed(() =>
 const availableFormats = computed(() =>
   selectedTemplate.value?.formats.length ? selectedTemplate.value.formats : ['pdf', 'xlsx'],
 )
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: runsPageRows, page: runsPage, totalPages: runsTotalPages,
+  total: runsTotal, next: runsNext, prev: runsPrev,
+} = usePagination(runs, 15)
 
 function quickGenerate(tmpl: ReportTemplate) {
   genForm.value.template_id = tmpl.id
@@ -262,8 +366,6 @@ function fmtBytes(b: number) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 
 /* ── Template card grid ── */
 .template-grid {
@@ -273,61 +375,74 @@ function fmtBytes(b: number) {
   margin-bottom: 16px;
 }
 .template-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04);
-  transition: box-shadow .15s, border-color .15s;
+  transition: border-color .15s;
 }
-.template-card:hover { border-color:#bfdbfe; box-shadow:0 4px 14px rgba(59,130,246,.08); }
+.template-card:hover { border-color:var(--border-interactive); }
 .tc-top { flex:1; display:flex; flex-direction:column; gap:6px; }
 .tc-head { display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
-.tc-name { font-size:14px; font-weight:700; color:#1e293b; flex:1; line-height:1.3; }
-.tc-module { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#94a3b8; }
-.tc-desc { font-size:12px; color:#64748b; line-height:1.5; margin:0; }
-.tc-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid #f1f5f9; padding-top:10px; }
+.tc-name { font-size:14px; font-weight:700; color:var(--fg-1); flex:1; line-height:1.3; }
+.tc-module { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
+.tc-desc { font-size:12px; color:var(--fg-2); line-height:1.5; margin:0; }
+.tc-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--border-subtle); padding-top:10px; }
 .tc-formats { display:flex; gap:4px; flex-wrap:wrap; }
-.tc-fmt { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+.tc-fmt { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); border:1px solid color-mix(in srgb, var(--info-fg) 30%, transparent); }
 .tc-btn { font-size:12px; }
 
 /* ── Recent runs table ── */
 .run-name { font-weight:600; min-width:160px; }
-.run-ts   { font-size:12px; white-space:nowrap; color:#64748b; }
-.run-by   { font-size:12px; color:#64748b; }
-.run-size { font-size:12px; color:#94a3b8; font-variant-numeric:tabular-nums; }
+.run-ts   { font-size:12px; white-space:nowrap; color:var(--fg-2); }
+.run-by   { font-size:12px; color:var(--fg-2); }
+.run-size { font-size:12px; color:var(--fg-3); font-variant-numeric:tabular-nums; }
 .run-dl   { font-size:12px; text-decoration:none; }
-.run-progress { font-size:12px; color:#3b82f6; font-weight:500; }
-.run-queued   { font-size:12px; color:#f59e0b; font-weight:500; }
-.run-failed   { font-size:12px; color:#ef4444; font-weight:500; cursor:help; }
-.run-na       { font-size:12px; color:#cbd5e1; }
-.run-row-active td { background:#fffbeb !important; }
+.run-progress { font-size:12px; color:var(--info-fg); font-weight:500; }
+.run-queued   { font-size:12px; color:var(--warning-fg); font-weight:500; }
+.run-failed   { font-size:12px; color:var(--danger-fg); font-weight:500; cursor:help; }
+.run-na       { font-size:12px; color:var(--fg-3); }
+.run-row-active td { background:var(--warning-bg) !important; }
 .poll-dot {
   display:inline-block; width:7px; height:7px; border-radius:50%;
-  background:#3b82f6; margin-left:6px; vertical-align:middle;
+  background:var(--info-fg); margin-left:6px; vertical-align:middle;
   animation:poll-pulse 1s ease-in-out infinite;
 }
 @keyframes poll-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
-.empty-row { text-align:center; color:#94a3b8; padding:20px; }
+.empty-row { text-align:center; color:var(--fg-3); padding:20px; }
+.query-error { font-size:12px; color:var(--danger-fg); display:flex; align-items:center; gap:4px; }
+
+/* ── Saved query templates ── */
+.saved-list { display:flex; flex-direction:column; gap:10px; }
+.saved-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-subtle); border-radius:8px; }
+.saved-row:hover { background:var(--surface-1); }
+.saved-main { flex:1; min-width:0; }
+.saved-name { font-size:13px; font-weight:700; color:var(--fg-1); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.saved-desc { font-size:12px; color:var(--fg-2); margin-top:2px; }
+.saved-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.saved-meta-chip { font-size:10px; padding:2px 8px; border-radius:10px; background:var(--surface-sunken); color:var(--fg-2); font-weight:600; white-space:nowrap; }
+.saved-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.remove-btn { background:none; border:none; font-size:16px; color:var(--fg-3); cursor:pointer; line-height:1; padding:0; text-align:center; }
+.remove-btn:hover { color:var(--danger-fg); }
 
 /* ── Modal ── */
-.select-full { width:100%; padding:7px 10px; border:1px solid #e2e8f0; border-radius:7px; font-size:13px; background:#fff; color:#374151; }
-.select-full:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.1); }
+.select-full { width:100%; padding:7px 10px; border:1px solid var(--border-interactive); border-radius:7px; font-size:13px; background:var(--surface-2); color:var(--fg-2); }
+.select-full:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-wash); }
 .format-select { display:flex; gap:16px; }
 .radio-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; font-weight:500; }
-.radio-label input[type="radio"] { accent-color:#3b82f6; cursor:pointer; }
-.tmpl-preview-desc { font-size:12px; color:#64748b; margin-bottom:6px; line-height:1.5; }
+.radio-label input[type="radio"] { accent-color:var(--primary-fill); cursor:pointer; }
+.tmpl-preview-desc { font-size:12px; color:var(--fg-2); margin-bottom:6px; line-height:1.5; }
 .tmpl-preview-formats { display:flex; gap:4px; flex-wrap:wrap; }
-.modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:1000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
-.modal { background:#fff; border-radius:12px; width:460px; max-width:95vw; box-shadow:0 24px 64px rgba(0,0,0,.22); }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 16px; font-weight:700; font-size:15px; border-bottom:1px solid #f1f5f9; color:#1e293b; }
-.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; line-height:1; padding:0 2px; }
-.modal-close:hover { color:#374151; }
+.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.modal { background:var(--surface-2); border-radius:12px; width:460px; max-width:95vw; box-shadow:var(--elev-3); }
+.modal-header { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 16px; font-weight:700; font-size:15px; border-bottom:1px solid var(--border-subtle); color:var(--fg-1); }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--fg-3); line-height:1; padding:0 2px; }
+.modal-close:hover { color:var(--fg-2); }
 .modal-body { padding:16px 20px; display:flex; flex-direction:column; gap:14px; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid #f1f5f9; }
+.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border-subtle); }
 .form-group { display:flex; flex-direction:column; gap:5px; }
-.form-group label { font-size:12px; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:.04em; }
+.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); text-transform:uppercase; letter-spacing:.04em; }
 </style>

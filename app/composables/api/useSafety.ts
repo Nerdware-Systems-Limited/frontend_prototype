@@ -42,6 +42,9 @@ export type InterventionType =
 export interface Incident {
   id: string
   reference_code: string
+  /** County the incident occurred in. Present on the list serializer; kept
+   *  optional because older API builds omit it (see MissingApis notes). */
+  county?: string | null
   segment: string | null
   segment_code: string | null
   reporting_agency: string | null
@@ -72,12 +75,12 @@ export interface Incident {
 }
 
 /**
- * An individual citizen's own submission — mobile app users post to and
+ * An individual citizen's own submission - mobile app users post to and
  * read "my reports" from `/incident-reports/`, never `/incidents/`
  * directly, so multiple reports of the same real-world event can share
  * one canonical Incident (see backend `apps.safety.matching`) without the
  * reporter ever noticing their report was merged with someone else's.
- * This is what `GET /incidents/{id}/reporters/` returns — the ops-side
+ * This is what `GET /incidents/{id}/reporters/` returns - the ops-side
  * drilldown of who reported a given incident.
  */
 export interface IncidentReport {
@@ -260,7 +263,7 @@ export interface SafetySummary {
 
 // ── Custom rollup payloads (non-paginated, non-Paged<T> shapes) ──────
 
-/** GET /predictive-hotspots/heatmap/ — reduced points, not a Paged<PredictiveHotspot>. */
+/** GET /predictive-hotspots/heatmap/ - reduced points, not a Paged<PredictiveHotspot>. */
 export interface PredictiveHotspotHeatmapPoint {
   lat: number
   lon: number
@@ -272,7 +275,7 @@ export interface PredictiveHotspotHeatmap {
   results: PredictiveHotspotHeatmapPoint[]
 }
 
-/** GET /interventions/effectiveness/ — aggregated by intervention_type, not individual records. */
+/** GET /interventions/effectiveness/ - aggregated by intervention_type, not individual records. */
 export interface InterventionEffectivenessRow {
   intervention_type: InterventionType
   count: number

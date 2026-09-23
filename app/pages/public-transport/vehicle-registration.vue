@@ -5,13 +5,7 @@
     subtitle="NTSA - Vehicle registry, compliance linkage (inspection, insurance, tracking), search by plate/chassis, and drill-down"
   >
     <template #actions>
-      <div class="day-filter">
-        <button
-          v-for="d in [7, 14, 30]" :key="d"
-          class="btn" :class="{ 'btn-active': registeredDays === d }"
-          @click="registeredDays = registeredDays === d ? null : d"
-        >{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="registeredDays" :options="[7, 14, 30]" deselectable />
       <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
     </template>
   </PageHeader>
@@ -23,48 +17,60 @@
     <KpiCard
       label="Total Registered Vehicles"
       :value="fmtNum(registeredDays ? scopedVehicles.length : summary?.kpis.total_vehicles)"
-      :sub="registeredDays ? `Registered in last ${registeredDays}d · loaded page` : 'Cumulative to date'"
-      source="batch" source-title="NTSA VREG"
+      :unavailable="registeredDays ? (loading || vehiclesError) : (loading || summaryError)"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'ALL'"
+      :description="registeredDays ? `Registered in last ${registeredDays}d · loaded page` : 'Cumulative to date'"
+      to="#vehicle-registry"
     />
     <KpiCard
       label="Operational"
       :value="fmtNum(byStatus.operational)"
-      :sub="registeredDays ? `Currently in service · last ${registeredDays}d` : 'Currently in service'"
-      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
+      :unavailable="registeredDays ? (loading || vehiclesError) : (loading || summaryError)"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'LIVE'"
+      :description="registeredDays ? `Currently in service · last ${registeredDays}d` : 'Currently in service'"
     />
     <KpiCard
       label="In Maintenance"
       :value="fmtNum(byStatus.maintenance)"
-      :sub="registeredDays ? `Off-road for service · last ${registeredDays}d` : 'Off-road for service'"
-      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
+      :unavailable="registeredDays ? (loading || vehiclesError) : (loading || summaryError)"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'LIVE'"
+      :description="registeredDays ? `Off-road for service · last ${registeredDays}d` : 'Off-road for service'"
     />
     <KpiCard
       label="Impounded"
       :value="fmtNum(byStatus.impounded)"
-      :sub="registeredDays ? `Held by enforcement · last ${registeredDays}d` : 'Held by enforcement'"
-      trend-direction="down"
-      :source="registeredDays ? 'batch' : 'live'" source-title="NTSA VREG"
+      :unavailable="registeredDays ? (loading || vehiclesError) : (loading || summaryError)"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'LIVE'"
+      :description="registeredDays ? `Held by enforcement · last ${registeredDays}d` : 'Held by enforcement'"
     />
     <KpiCard
       label="Speed Governor Online"
       :value="summary?.governor_compliance.online_pct != null ? summary.governor_compliance.online_pct.toFixed(1) + '%' : '-'"
-      sub="Fleet-wide compliance · not affected by the registration-date filter"
-      :trend-direction="(summary?.governor_compliance.online_pct ?? 0) >= 90 ? 'up' : 'down'"
-      source="live" source-title="NTSA iTIMS"
+      :unavailable="loading || summaryError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE"
+      description="Fleet-wide compliance · not affected by the registration-date filter"
+      :status="summary?.governor_compliance.online_pct == null ? undefined : summary.governor_compliance.online_pct >= 90 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Inspection Expiring ≤30d"
       :value="fmtNum(expiring.inspection)"
-      :sub="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
-      trend-direction="down"
-      source="batch" source-title="NTSA VREG"
+      :unavailable="loading || vehiclesError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'LIVE'"
+      :description="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
     />
     <KpiCard
       label="Insurance Expiring ≤30d"
       :value="fmtNum(expiring.insurance)"
-      :sub="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
-      trend-direction="down"
-      source="batch" source-title="NTSA VREG"
+      :unavailable="loading || vehiclesError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA VREG feed unavailable'"
+      :period="registeredDays ? `${registeredDays}D` : 'LIVE'"
+      :description="registeredDays ? `Loaded page · last ${registeredDays}d · needs renewal` : 'Loaded page · needs renewal'"
     />
   </div>
 
@@ -76,11 +82,11 @@
         <div v-if="byType.length" class="bar-list">
           <div v-for="t in byType" :key="t.vehicle_type" class="bar-row">
             <span class="bar-label">{{ t.vehicle_type.replace(/_/g,' ') }}</span>
-            <div class="bar-wrap"><div class="bar-fill" :style="{ width: `${maxType > 0 ? (t.total / maxType) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxType > 0 ? t.total / maxType : 0})` }" /></div>
             <span class="bar-val">{{ fmtNum(t.total) }}</span>
           </div>
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No data' }}</div>
       </div>
     </div>
 
@@ -91,11 +97,11 @@
         <div v-if="byFuel.length" class="bar-list">
           <div v-for="f in byFuel" :key="f.fuel_type" class="bar-row">
             <span class="bar-label">{{ f.fuel_type }}</span>
-            <div class="bar-wrap"><div class="bar-fill" style="background:#22c55e" :style="{ width: `${maxFuel > 0 ? (f.count / maxFuel) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxFuel > 0 ? f.count / maxFuel : 0})`, background: 'var(--success)' }" /></div>
             <span class="bar-val">{{ fmtNum(f.count) }}</span>
           </div>
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No data' }}</div>
       </div>
     </div>
   </div>
@@ -108,11 +114,11 @@
         <div v-if="byAgeBand.length" class="bar-list">
           <div v-for="a in byAgeBand" :key="a.band" class="bar-row">
             <span class="bar-label">{{ a.band }}</span>
-            <div class="bar-wrap"><div class="bar-fill" style="background:#f59e0b" :style="{ width: `${maxAge > 0 ? (a.count / maxAge) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxAge > 0 ? a.count / maxAge : 0})`, background: 'var(--warning)' }" /></div>
             <span class="bar-val">{{ fmtNum(a.count) }}</span>
           </div>
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No data' }}</div>
       </div>
     </div>
 
@@ -123,18 +129,18 @@
         <div v-if="byOperator.length" class="bar-list">
           <div v-for="o in byOperator" :key="o.operator" class="bar-row">
             <span class="bar-label">{{ o.operator }}</span>
-            <div class="bar-wrap"><div class="bar-fill" style="background:#8b5cf6" :style="{ width: `${maxOperator > 0 ? (o.count / maxOperator) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxOperator > 0 ? o.count / maxOperator : 0})`, background: 'var(--accent-purple)' }" /></div>
             <span class="bar-val">{{ fmtNum(o.count) }}</span>
           </div>
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No data' }}</div>
       </div>
     </div>
   </div>
 
   <!-- Registry table -->
   <SectionTitle pill="NTSA VREG · Rolling">Vehicle Registry</SectionTitle>
-  <div class="card">
+  <div id="vehicle-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search plate or chassis no…" style="min-width:200px" />
@@ -177,7 +183,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredVehicles.length">
-            <template v-for="v in filteredVehicles" :key="v.id">
+            <template v-for="v in vehiclesPageRows" :key="v.id">
               <tr class="veh-row" @click="toggleExpand(v)">
                 <td class="expand-cell">{{ expandedId === v.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:700;font-family:monospace">{{ v.plate_number }}</td>
@@ -195,7 +201,7 @@
                   <BadgePill :variant="expiryBadge(v.insurance_expiry)">{{ expiryLabel(v.insurance_expiry) }}</BadgePill>
                 </td>
                 <td style="text-align:center">
-                  <span :style="{ color: v.has_recent_track ? '#22c55e' : '#94a3b8' }">{{ v.has_recent_track ? '● live' : '○ none' }}</span>
+                  <span :style="{ color: v.has_recent_track ? 'var(--success-fg)' : 'var(--fg-3)' }">{{ v.has_recent_track ? '● live' : '○ none' }}</span>
                 </td>
                 <td><BadgePill :variant="statusBadge(v.status)">{{ v.status }}</BadgePill></td>
                 <td style="font-size:11px">{{ fmtDate(v.updated_at) }}</td>
@@ -206,18 +212,18 @@
                     <div class="dd-col">
                       <div class="dd-title">Vehicle / Operator Link</div>
                       <div class="dd-list">
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Engine no.</span><span>{{ v.engine_no || '-' }}</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Seating / Load</span><span>{{ v.seating_capacity ?? '-' }} seats · {{ fmtNum(v.load_capacity_kg) }} kg</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Operator / Agency</span><span>{{ v.operator_name ?? '-' }} ({{ v.agency_code ?? '-' }})</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Assigned route</span><span>{{ v.route_name ?? 'Unassigned' }}</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Speed governor</span><span>{{ v.has_speed_governor ? `Fitted · cap ${v.speed_limit_kmh} km/h` : 'Not fitted' }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Engine no.</span><span>{{ v.engine_no || '-' }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Seating / Load</span><span>{{ v.seating_capacity ?? '-' }} seats · {{ fmtNum(v.load_capacity_kg) }} kg</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Operator / Agency</span><span>{{ v.operator_name ?? '-' }} ({{ v.agency_code ?? '-' }})</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Assigned route</span><span>{{ v.route_name ?? 'Unassigned' }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Speed governor</span><span>{{ v.has_speed_governor ? `Fitted · cap ${v.speed_limit_kmh} km/h` : 'Not fitted' }}</span></div>
                       </div>
                     </div>
 
                     <div class="dd-col">
                       <div class="dd-title">Inspection History</div>
                       <div v-if="drillCache[v.id]?.inspections?.length" class="dd-list">
-                        <div v-for="ins in drillCache[v.id].inspections" :key="ins.id" class="dd-item">
+                        <div v-for="ins in drillCache[v.id]?.inspections ?? []" :key="ins.id" class="dd-item">
                           <BadgePill :variant="resultBadge(ins.result)">{{ ins.result }}</BadgePill>
                           <span>{{ fmtDate(ins.inspected_at) }} · {{ ins.inspection_centre }}</span>
                         </div>
@@ -228,7 +234,7 @@
                     <div class="dd-col">
                       <div class="dd-title">Route Adherence</div>
                       <div v-if="drillCache[v.id]?.adherence?.length" class="dd-list">
-                        <div v-for="a in drillCache[v.id].adherence" :key="a.id" class="dd-item">
+                        <div v-for="a in drillCache[v.id]?.adherence ?? []" :key="a.id" class="dd-item">
                           <BadgePill :variant="adherenceBadge(a.verdict)">{{ a.verdict.replace(/_/g,' ') }}</BadgePill>
                           <span>{{ fmtDate(a.sampled_at) }} · {{ a.deviation_m != null ? a.deviation_m + 'm' : '-' }}</span>
                         </div>
@@ -239,7 +245,7 @@
                     <div class="dd-col">
                       <div class="dd-title">Behaviour / Incident Events</div>
                       <div v-if="drillCache[v.id]?.behaviour?.length" class="dd-list">
-                        <div v-for="b in drillCache[v.id].behaviour" :key="b.id" class="dd-item">
+                        <div v-for="b in drillCache[v.id]?.behaviour ?? []" :key="b.id" class="dd-item">
                           <BadgePill :variant="severityBadge(b.severity)">{{ b.severity }}</BadgePill>
                           <span>{{ b.event_type.replace(/_/g,' ') }} · {{ fmtDate(b.detected_at) }}</span>
                         </div>
@@ -253,12 +259,16 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="14" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="14" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ loading ? 'Loading vehicles…' : 'No vehicles match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="vehiclesPage" :total-pages="vehiclesTotalPages" :total="vehiclesTotal"
+          @prev="vehiclesPrev" @next="vehiclesNext"
+        />
       </div>
     </div>
   </div>
@@ -266,8 +276,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Vehicle Registration')
-
 import { useFleet, useVehicleInspections } from '~/composables/api'
 import type { Vehicle, FleetSummary, VehicleType, DriverBehaviorEvent, RouteAdherence } from '~/composables/api'
 import type { VehicleInspection } from '~/composables/api'
@@ -276,6 +284,8 @@ const summary   = ref<FleetSummary | null>(null)
 const vehicles  = ref<Vehicle[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const summaryError = ref(false)
+const vehiclesError = ref(false)
 const lastRefreshed = ref('-')
 
 const search       = ref('')
@@ -299,6 +309,9 @@ async function load() {
 
   if (sumRes.status === 'fulfilled') summary.value = sumRes.value
   if (vehRes.status === 'fulfilled') vehicles.value = (vehRes.value as any).results ?? []
+
+  summaryError.value = sumRes.status === 'rejected'
+  vehiclesError.value = vehRes.status === 'rejected'
 
   if ([sumRes, vehRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Fleet / NTSA VREG API.'
@@ -348,6 +361,12 @@ const filteredVehicles = computed(() => scopedVehicles.value.filter(v => {
   if (fuelFilter.value && v.fuel_type !== fuelFilter.value) return false
   return true
 }))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: vehiclesPageRows, page: vehiclesPage, totalPages: vehiclesTotalPages,
+  total: vehiclesTotal, next: vehiclesNext, prev: vehiclesPrev,
+} = usePagination(filteredVehicles, 15)
 
 const vehicleTypes = computed(() => [...new Set(vehicles.value.map(v => v.vehicle_type))].sort())
 const fuelTypes    = computed(() => [...new Set(vehicles.value.map(v => v.fuel_type))].sort())
@@ -468,29 +487,25 @@ function severityBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
-.reg-filter-label { font-size:12px; color:#64748b; font-weight:600; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
-.day-filter { display:flex; gap:4px; }
+.reg-filter-label { font-size:12px; color:var(--fg-2); font-weight:600; }
 .table-scroll { overflow-x:auto; }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:130px 1fr 40px; align-items:center; gap:8px; }
-.bar-label { font-size:12px; color:#475569; text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.bar-fill { height:100%; background:#3b82f6; border-radius:4px; transition:width .4s; }
-.bar-val { font-size:12px; color:#64748b; text-align:right; }
+.bar-label { font-size:12px; color:var(--fg-2); text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.bar-fill { height:100%; width:100%; background:var(--primary-fill); border-radius:4px; transform-origin:left; transition:transform .4s; }
+.bar-val { font-size:12px; color:var(--fg-2); text-align:right; }
 .veh-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.veh-detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.veh-detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:8px; }
+.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
 .dd-list { display:flex; flex-direction:column; gap:6px; }
 .dd-item { display:flex; align-items:center; gap:8px; font-size:12px; flex-wrap:wrap; }
 .dd-item-block { flex-direction:column; align-items:flex-start; gap:2px; }
-.dd-empty { font-size:12px; color:#94a3b8; }
+.dd-empty { font-size:12px; color:var(--fg-3); }
 </style>

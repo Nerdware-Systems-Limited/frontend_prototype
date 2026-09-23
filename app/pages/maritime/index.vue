@@ -5,10 +5,7 @@
     subtitle="KPA · KMA · KenTrade · NCTTCA - Real-time AIS vessel traffic, port performance, KenTrade cargo single-window, and NCTTCA corridor transit KPIs"
   >
     <template #actions>
-      
-      <div class="day-filter">
-        <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink to="/maritime/services" class="btn">Port Services →</NuxtLink>
       <NuxtLink to="/maritime/performance" class="btn">Performance →</NuxtLink>
       <NuxtLink to="/maritime/port-ops" class="btn-primary">Port Ops →</NuxtLink>
@@ -18,45 +15,46 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- KPIs -->
-  <div class="kpi-grid">
+  <div class="kpi-grid kpi-grid-primary">
     <KpiCard
-      label="Active Ports"
+      label="Active Ports" prominent subtle-period
       :value="ops ? fmtNum(ops.kpis.active_ports) : '-'"
-      sub="KPA/KMA managed"
-      source="live" source-title="KPA VTMS"
+      :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KPA VTMS feed unavailable'"
+      period="LIVE" description="KPA/KMA managed" to="#port-cards"
     />
     <KpiCard
-      label="Vessels in Port"
+      label="Vessels in Port" prominent subtle-period
       :value="ops ? fmtNum(ops.kpis.live_vessels) : '-'"
-      sub="Currently in Kenyan waters"
-      trend-direction="up"
-      source="live" source-title="KMA AIS"
+      :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      period="LIVE" description="Currently in Kenyan waters" to="#vessel-movements-live"
     />
     <KpiCard
-      label="Incidents (30d)"
+      label="Incidents" prominent subtle-period
       :value="incidentStats ? fmtNum(incidentStats.total_incidents) : '-'"
-      :sub="incidentStats ? `${fmtNum(incidentStats.fatal_incidents)} fatal · ${fmtNum(incidentStats.casualties)} casualties` : '-'"
-      :trend-direction="incidentStats && incidentStats.fatal_incidents === 0 ? 'up' : 'down'"
-      source="batch" source-title="KMA"
+      :unavailable="!incidentStats" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="30D" :description="incidentStats ? `${fmtNum(incidentStats.fatal_incidents)} fatal · ${fmtNum(incidentStats.casualties)} casualties` : ''"
+      :status="!incidentStats ? undefined : incidentStats.fatal_incidents === 0 ? 'healthy' : 'critical'"
+      to="/maritime/accidents"
     />
     <KpiCard
-      label="Inspections (30d)"
+      label="Inspections" prominent subtle-period
       :value="ops ? fmtNum(ops.kpis.inspections_30d) : '-'"
-      sub="Port State Control"
-      source="batch" source-title="KMA PSC"
+      :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KMA PSC feed unavailable'"
+      period="30D" description="Port State Control"
     />
     <KpiCard
-      label="Detentions (30d)"
+      label="Detentions" prominent subtle-period
       :value="ops ? fmtNum(ops.kpis.detentions_30d) : '-'"
-      sub="Vessels detained"
-      :trend-direction="ops && ops.kpis.detentions_30d === 0 ? 'up' : 'down'"
-      source="batch" source-title="KMA PSC"
+      :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KMA PSC feed unavailable'"
+      period="30D" description="Vessels detained"
+      :status="!ops ? undefined : ops.kpis.detentions_30d === 0 ? 'healthy' : 'warning'"
     />
     <KpiCard
-      label="Pollution Incidents"
+      label="Pollution Incidents" prominent subtle-period
       :value="incidentStats ? fmtNum(incidentStats.pollution_tons) : '-'"
-      sub="Tonnes spilled (90d)"
-      source="batch" source-title="KMA"
+      :unavailable="!incidentStats" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="90D" description="Tonnes spilled"
+      to="/maritime/accidents"
     />
   </div>
 
@@ -84,7 +82,7 @@
 
     <div class="right-col">
       <!-- Port performance cards -->
-      <div v-if="ops?.ports.length">
+      <div v-if="ops?.ports.length" id="port-cards" class="drill-target">
         <div
           v-for="p in ops.ports"
           :key="p.port_unlocode"
@@ -99,12 +97,12 @@
             <div><span class="ps-label">Arrivals (30d)</span><span>{{ fmtNum(p.arrivals_30d) }}</span></div>
             <div><span class="ps-label">Departures (30d)</span><span>{{ fmtNum(p.departures_30d) }}</span></div>
             <div><span class="ps-label">TEU Throughput</span><span>{{ fmtNum(p.teu_throughput_30d) }}</span></div>
-            <div><span class="ps-label">Avg Dwell (days)</span><span :style="{ color: p.avg_yard_dwell_days > 7 ? '#ef4444' : '#22c55e', fontWeight:'600' }">{{ p.avg_yard_dwell_days.toFixed(1) }}</span></div>
+            <div><span class="ps-label">Avg Dwell (days)</span><span :style="{ color: p.avg_yard_dwell_days > 7 ? 'var(--danger-fg)' : 'var(--success-fg)', fontWeight:'600' }">{{ p.avg_yard_dwell_days.toFixed(1) }}</span></div>
           </div>
         </div>
       </div>
-      <div v-else class="card" style="padding:12px 16px;color:#94a3b8;font-size:13px">
-        {{ loading ? 'Loading port data…' : 'No port operations data.' }}
+      <div v-else id="port-cards" class="card drill-target">
+        <EmptyState :loading="loading" message="No port operations data." compact />
       </div>
 
       <!-- Container by port -->
@@ -115,13 +113,12 @@
             <div v-for="c in containers" :key="c.port__unlocode" class="cong-row">
               <span class="cong-label">{{ c.port__name.split(' ')[0] }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" style="background:#3b82f6"
-                  :style="{ width: `${maxTEU > 0 ? (c.teus / maxTEU) * 100 : 0}%` }" />
+                <div class="cong-bar" :style="{ transform: `scaleX(${maxTEU > 0 ? c.teus / maxTEU : 0})`, background: 'var(--primary-fill)' }" />
               </div>
               <span class="cong-val">{{ fmtNum(c.teus) }} TEU</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No container data' }}</div>
+          <EmptyState v-else :loading="loading" message="No container data" compact />
         </div>
       </div>
     </div>
@@ -130,7 +127,7 @@
   <!-- Live vessel movements preview -->
   <SectionTitle pill="KMA AIS · Live">Vessel Movements - In Port</SectionTitle>
 
-  <div class="card">
+  <div id="vessel-movements-live" class="card drill-target">
     <div class="card-header">
       Recent Movements
       <NuxtLink to="/maritime/vessels" class="link-sm">Full movement log →</NuxtLink>
@@ -147,7 +144,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredMovements.length">
-          <tr v-for="m in filteredMovements.slice(0, 8)" :key="m.id">
+          <tr v-for="m in movementsPageRows" :key="m.id">
             <td style="font-weight:600">{{ m.vessel_name }}</td>
             <td style="font-family:monospace;font-size:12px">{{ m.port_unlocode }}</td>
             <td><BadgePill variant="neutral">{{ m.movement_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -159,9 +156,13 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements.' }}</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="movementsPage" :total-pages="movementsTotalPages" :total="movementsTotal"
+        @prev="movementsPrev" @next="movementsNext"
+      />
     </div>
   </div>
 
@@ -185,7 +186,7 @@
             </tr>
           </thead>
           <tbody v-if="vessels.length">
-            <tr v-for="v in vessels.slice(0, 8)" :key="v.id">
+            <tr v-for="v in vesselsPageRows" :key="v.id">
               <td style="font-weight:600;font-size:13px">{{ v.vessel_name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ v.imo_number }}</td>
               <td><BadgePill variant="info">{{ v.vessel_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -195,9 +196,13 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:12px">{{ loading ? 'Loading…' : 'No vessels.' }}</td></tr>
+            <tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:12px">{{ loading ? 'Loading…' : 'No vessels.' }}</td></tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="vesselsPage" :total-pages="vesselsTotalPages" :total="vesselsTotal"
+          @prev="vesselsPrev" @next="vesselsNext"
+        />
       </div>
     </div>
 
@@ -217,7 +222,7 @@
             </tr>
           </thead>
           <tbody v-if="berths.length">
-            <tr v-for="b in berths.slice(0, 15)" :key="b.id">
+            <tr v-for="b in berthsPageRows" :key="b.id">
               <td style="font-family:monospace;font-weight:600">{{ b.berth_code }}</td>
               <td><BadgePill variant="neutral">{{ b.berth_type.replace(/_/g,' ') }}</BadgePill></td>
               <td style="font-family:monospace;font-size:12px">{{ b.port_unlocode }}</td>
@@ -228,9 +233,13 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:12px">{{ loading ? 'Loading…' : 'No berths.' }}</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:12px">{{ loading ? 'Loading…' : 'No berths.' }}</td></tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="berthsPage" :total-pages="berthsTotalPages" :total="berthsTotal"
+          @prev="berthsPrev" @next="berthsNext"
+        />
       </div>
     </div>
   </div>
@@ -238,8 +247,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Maritime')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Port, Berth, Vessel, VesselMovement, ContainerByPort } from '~/composables/api'
 
@@ -255,7 +262,11 @@ const incidentStats  = ref<{ total_incidents: number; fatal_incidents: number; c
 const loading        = ref(true)
 const error          = ref<string | null>(null)
 const lastRefreshed  = ref('-')
-const days           = ref(30)
+
+const route = useRoute()
+const queryWindow = Number.parseInt(String(route.query.window ?? ''), 10)
+const days = ref([7, 30, 90].includes(queryWindow) ? queryWindow : 30)
+
 const portFilter     = ref('')
 const vesselTypeFilter = ref('')
 
@@ -303,12 +314,28 @@ const filteredMovements = computed(() =>
   }),
 )
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: movementsPageRows, page: movementsPage, totalPages: movementsTotalPages,
+  total: movementsTotal, next: movementsNext, prev: movementsPrev,
+} = usePagination(filteredMovements, 15)
+
+const {
+  pageRows: vesselsPageRows, page: vesselsPage, totalPages: vesselsTotalPages,
+  total: vesselsTotal, next: vesselsNext, prev: vesselsPrev,
+} = usePagination(vessels, 15)
+
+const {
+  pageRows: berthsPageRows, page: berthsPage, totalPages: berthsTotalPages,
+  total: berthsTotal, next: berthsNext, prev: berthsPrev,
+} = usePagination(berths, 15)
+
 const vesselMarkers = computed((): MarkerSpec[] => {
   const portCoords: Record<string, [number, number]> = {
     KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92],
   }
-  return ops?.ports
-    ? ops.ports.map((p, i) => {
+  return ops.value?.ports
+    ? ops.value.ports.map((p, i) => {
         const coords = portCoords[p.port_unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
         return {
           id: `port-${p.port_unlocode}`,
@@ -345,33 +372,27 @@ function certBadge(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }
-.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+.kpi-grid { margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1100px) { .two-col-map, .two-col { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .right-col { display:flex; flex-direction:column; overflow-y:auto; max-height:520px; gap:12px; }
-.port-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; }
+.port-card { background:var(--surface-1); border:1px solid var(--border-subtle); border-radius:8px; padding:10px 14px; }
 .port-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.port-count { margin-left:auto; font-size:12px; color:#64748b; font-weight:600; }
+.port-count { margin-left:auto; font-size:12px; color:var(--fg-2); font-weight:600; }
 .port-stats { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
-.ps-label { display:block; font-size:10px; color:#94a3b8; }
+.ps-label { display:block; font-size:10px; color:var(--fg-3); }
 .cong-list { display:flex; flex-direction:column; gap:7px; }
 .cong-row { display:grid; grid-template-columns:80px 1fr 70px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; }
-.cong-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.cong-bar { height:100%; border-radius:4px; transition:width .4s; }
+.cong-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.cong-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .cong-val { font-size:11px; text-align:right; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 </style>

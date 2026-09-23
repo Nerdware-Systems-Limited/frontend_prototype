@@ -23,23 +23,24 @@
 
   <!-- Filter bar -->
   <div class="filter-bar">
-    <input v-model="filters.user_id" class="select-sm" placeholder="User ID (UUID)…" style="min-width:200px" @change="reload" />
-    <select v-model="filters.action" class="select-sm" @change="reload">
+    <input v-model="filters.user_id" class="select-sm filter-input" placeholder="User ID (UUID)…" @change="reload" />
+    <select v-model="filters.action" class="select-sm filter-select" @change="reload">
       <option value="">All actions</option>
       <option v-for="a in actionOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
     </select>
-    <input v-model="filters.resource_type" class="select-sm" placeholder="Resource type…" @change="reload" />
-    <input type="date" v-model="filters.since" class="select-sm" @change="reload" />
-    <input type="date" v-model="filters.until" class="select-sm" @change="reload" />
-    <select v-model.number="pageSize" class="select-sm" @change="reload">
-      <option :value="25">25 / page</option>
-      <option :value="50">50 / page</option>
-      <option :value="100">100 / page</option>
-      <option :value="200">200 / page</option>
+    <input v-model="filters.resource_type" class="select-sm filter-input" placeholder="Resource type…" @change="reload" />
+    <select v-model="filters.severity" class="select-sm filter-select" @change="reload">
+      <option value="">All severities</option>
+      <option v-for="s in severityOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
     </select>
+    <select v-model="filters.outcome" class="select-sm filter-select" @change="reload">
+      <option value="">All outcomes</option>
+      <option v-for="o in outcomeOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+    </select>
+    <input type="date" v-model="filters.since" class="select-sm filter-date" @change="reload" />
+    <input type="date" v-model="filters.until" class="select-sm filter-date" @change="reload" />
     <button class="btn" @click="resetFilters">Reset</button>
-    <span style="flex:1" />
-    <span style="font-size:12px;color:#64748b">Showing {{ entries.length }} of {{ fmtNum(total) }}</span>
+    <span class="result-count">Showing {{ entries.length }} of {{ fmtNum(total) }}</span>
   </div>
 
   <!-- Audit table -->
@@ -63,7 +64,14 @@
             <td style="font-size:12px;white-space:nowrap;font-family:monospace">{{ fmtTime(entryField(e, 'created_at') ?? e.timestamp) }}</td>
             <!-- User: username (nullable) → user_id → 'System' -->
             <td style="font-size:12px">{{ entryUser(e) }}</td>
-            <td><BadgePill :variant="actionBadge(e.action)">{{ e.action }}</BadgePill></td>
+            <td>
+              <BadgePill :variant="actionBadge(e.action)">{{ e.action }}</BadgePill>
+              <span v-if="entryField(e,'severity') && !['info','debug'].includes(entryField(e,'severity'))"
+                    :style="{ color: severityColor(entryField(e,'severity')) }"
+                    style="margin-left:6px;font-size:11px;font-weight:600;text-transform:uppercase">
+                {{ entryField(e, 'severity') }}
+              </span>
+            </td>
             <!-- Resource type + id; fall back to request_path when both are blank -->
             <td style="font-family:monospace;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                 :title="entryResource(e)">{{ entryResource(e) }}</td>
@@ -74,15 +82,15 @@
               </span>
               <span v-if="entryField(e,'status_code')" :style="{ color: statusColor(entryField(e,'status_code')) }"
                     style="margin-left:4px">{{ entryField(e, 'status_code') }}</span>
-              <span v-if="!entryField(e,'request_method') && !entryField(e,'status_code')" style="color:#94a3b8">-</span>
+              <span v-if="!entryField(e,'request_method') && !entryField(e,'status_code')" style="color:var(--fg-3)">-</span>
             </td>
-            <td style="font-size:12px;font-family:monospace;color:#64748b">{{ entryField(e, 'ip_address') ?? '-' }}</td>
+            <td style="font-size:12px;font-family:monospace;color:var(--fg-2)">{{ entryField(e, 'ip_address') ?? '-' }}</td>
             <!-- Changes: built from old_values / new_values diff -->
             <td style="font-size:12px">
               <template v-if="entryDiffKeys(e).length">
-                <span style="color:#3b82f6;cursor:pointer">{{ expanded === e.id ? '▾' : '▸' }} {{ entryDiffKeys(e).length }} fields</span>
+                <span style="color:var(--link);cursor:pointer">{{ expanded === e.id ? '▾' : '▸' }} {{ entryDiffKeys(e).length }} fields</span>
               </template>
-              <span v-else style="color:#94a3b8">-</span>
+              <span v-else style="color:var(--fg-3)">-</span>
             </td>
           </tr>
           <template v-for="e in entries" :key="`${e.id}-expanded`">
@@ -93,8 +101,8 @@
                   <tbody>
                     <tr v-for="field in entryDiffKeys(e)" :key="field">
                       <td style="font-family:monospace;font-size:11px">{{ field }}</td>
-                      <td style="font-size:11px;color:#dc2626">{{ JSON.stringify(entryField(e,'old_values')?.[field] ?? null) }}</td>
-                      <td style="font-size:11px;color:#16a34a">{{ JSON.stringify(entryField(e,'new_values')?.[field] ?? null) }}</td>
+                      <td style="font-size:11px;color:var(--danger-fg)">{{ JSON.stringify(entryField(e,'old_values')?.[field] ?? null) }}</td>
+                      <td style="font-size:11px;color:var(--success-fg)">{{ JSON.stringify(entryField(e,'new_values')?.[field] ?? null) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -103,7 +111,7 @@
           </template>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">{{ loading ? 'Loading audit log…' : 'No audit entries match the current filters.' }}</td></tr>
+          <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:20px">{{ loading ? 'Loading audit log…' : 'No audit entries match the current filters.' }}</td></tr>
         </tbody>
       </table>
 
@@ -111,7 +119,7 @@
            No client-side page_size math: the server controls page size. -->
       <div v-if="prevUrl || nextUrl" class="pagination">
         <button class="btn" :disabled="!prevUrl || loading" @click="loadUrl(prevUrl!)">← Prev</button>
-        <span style="font-size:13px;color:#64748b">Page {{ page }} · {{ fmtNum(total) }} total</span>
+        <span style="font-size:13px;color:var(--fg-2)">Page {{ page }} · {{ fmtNum(total) }} total</span>
         <button class="btn" :disabled="!nextUrl || loading" @click="loadUrl(nextUrl!)">Next →</button>
       </div>
     </div>
@@ -120,8 +128,18 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Audit Trail')
-
+// Known gap, not fixed here: unlike /users.vue and /roles.vue, this page is
+// NOT scoped to the viewer's own agency - every admin sees the full
+// platform-wide audit log. Scoping it properly needs backend support that
+// doesn't exist yet: `AuditQuery` (useAudit.ts) has no `agency`/`agency_code`
+// filter param (confirmed against the real `_build_queryset()` params), and
+// `AuditEntry` carries no agency field per row to filter by client-side
+// either - only `user_id`/`username`. A client-side "filter by whether
+// user_id belongs to my agency's roster" approximation was considered and
+// rejected: it would silently misattribute system/anonymous events and any
+// user who has since changed agencies, which is worse than the honest
+// platform-wide view this page already shows. Revisit once the backend adds
+// per-entry agency attribution or an `agency` query param.
 import { useAudit } from '~/composables/api'
 import type { AuditEntry, AuditQuery } from '~/composables/api'
 import { useAuditSocket } from '~/composables/useAuditSocket'
@@ -147,12 +165,32 @@ const filters = ref({
   user_id:       '',
   action:        '',
   resource_type: '',
+  severity:      '',
+  outcome:       '',
   since:         '',
   until:         '',
 })
+
+// AuditLog.Severity / AuditLog.Outcome choices (apps/audit/models.py) - no
+// backend "choices" endpoint exists for these (only /audit/actions/ does),
+// so mirrored here directly. Order matches the model's TextChoices order.
+const severityOptions = [
+  { value: 'debug',    label: 'Debug' },
+  { value: 'info',     label: 'Info' },
+  { value: 'notice',   label: 'Notice' },
+  { value: 'warning',  label: 'Warning' },
+  { value: 'critical', label: 'Critical' },
+]
+const outcomeOptions = [
+  { value: 'success', label: 'Success' },
+  { value: 'failure', label: 'Failure' },
+  { value: 'denied',  label: 'Denied' },
+  { value: 'error',   label: 'Error' },
+  { value: 'unknown', label: 'Unknown' },
+]
 // Server default page size is small (10-20 rows) unless `limit` is passed
 // explicitly - this is what was making the log feel like it was missing entries.
-const pageSize = ref(100)
+const pageSize = ref(15)
 
 /** Apply a page response envelope to local state. */
 function applyPage(data: { count: number; next: string | null; previous: string | null; results: AuditEntry[] }) {
@@ -172,6 +210,8 @@ async function load() {
   if (filters.value.user_id)       q.user_id       = filters.value.user_id
   if (filters.value.action)        q.action        = filters.value.action
   if (filters.value.resource_type) q.resource_type = filters.value.resource_type
+  if (filters.value.severity)      q.severity      = filters.value.severity
+  if (filters.value.outcome)       q.outcome       = filters.value.outcome
   if (filters.value.since)         q.since         = filters.value.since
   if (filters.value.until)         q.until         = filters.value.until
 
@@ -203,7 +243,7 @@ async function loadUrl(absoluteUrl: string) {
 function reload() { load() }
 
 function resetFilters() {
-  filters.value = { user_id: '', action: '', resource_type: '', since: '', until: '' }
+  filters.value = { user_id: '', action: '', resource_type: '', severity: '', outcome: '', since: '', until: '' }
   reload()
 }
 
@@ -239,14 +279,15 @@ onUnmounted(disconnect)
 const isDefaultView = computed(() =>
   page.value === 1 &&
   !filters.value.user_id && !filters.value.action &&
-  !filters.value.resource_type && !filters.value.since && !filters.value.until,
+  !filters.value.resource_type && !filters.value.severity && !filters.value.outcome &&
+  !filters.value.since && !filters.value.until,
 )
 
 watch(
   () => liveLogs.value[0],
   (latest) => {
     if (!latest || !isDefaultView.value) return
-    if (entries.value.some((e) => e.id === latest.id)) return
+    if (entries.value.some((e) => e.id === String(latest.id))) return
 
     // Reconcile the WS AuditLog shape with the REST AuditEntry shape.
     // The API uses created_at (not timestamp) and username/user_id (not user_email).
@@ -254,7 +295,7 @@ watch(
     entries.value.unshift({
       ...latest,
       id:         String(latest.id),
-      created_at: latest.created_at ?? latest.timestamp,
+      created_at: latest.created_at,
       username:   latest.username,
       user_id:    latest.user_id,
       // Keep user_email as fallback for any REST-side AuditEntry code paths
@@ -338,12 +379,16 @@ function methodColor(method: string): string {
   const m: Record<string,string> = { GET:'#0284c7', POST:'#16a34a', PUT:'#d97706', PATCH:'#9333ea', DELETE:'#dc2626' }
   return m[method?.toUpperCase()] ?? '#64748b'
 }
+function severityColor(sev: string): string {
+  const m: Record<string,string> = { notice:'var(--info-fg)', warning:'var(--warning-fg)', critical:'var(--danger-fg)' }
+  return m[sev] ?? 'var(--fg-2)'
+}
 function statusColor(code: number | string): string {
   const n = Number(code)
-  if (n >= 500) return '#dc2626'
-  if (n >= 400) return '#d97706'
-  if (n >= 300) return '#0284c7'
-  return '#16a34a'
+  if (n >= 500) return 'var(--danger-fg)'
+  if (n >= 400) return 'var(--warning-fg)'
+  if (n >= 300) return 'var(--info-fg)'
+  return 'var(--success-fg)'
 }
 
 function actionBadge(a: string) {
@@ -361,17 +406,25 @@ function fmtNum(v: number) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.ws-banner { margin-bottom:8px; padding:6px 12px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; font-size:12px; color:#dc2626; }
-.ws-connected { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f0fdf4; border:1px solid #bbf7d0; font-size:11px; color:#15803d; }
-.ws-paused { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; font-size:11px; color:#64748b; }
+/* Filter bar - every control gets min-width:0 so it can actually shrink
+   below its content's natural width (the flexbox default is min-width:auto,
+   which silently blocks shrinking and forces the row to wrap awkwardly
+   instead, leaving a ragged trailing control or the result text on its own
+   line). The result-count text is pinned right and never wraps. */
+.filter-bar > * { min-width:0; }
+.filter-input  { flex:0 1 170px; width:170px; }
+.filter-select { flex:0 1 140px; max-width:140px; }
+.filter-date   { flex:0 1 150px; max-width:150px; }
+.result-count  { font-size:12px; color:var(--fg-2); white-space:nowrap; margin-left:auto; }
+
+.ws-banner { margin-bottom:8px; padding:6px 12px; border-radius:6px; background:var(--danger-bg); border:1px solid color-mix(in srgb, var(--danger-fg) 30%, transparent); font-size:12px; color:var(--danger-fg); }
+.ws-connected { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:var(--success-bg); border:1px solid color-mix(in srgb, var(--success-fg) 30%, transparent); font-size:11px; color:var(--success-fg); }
+.ws-paused { margin-bottom:8px; padding:4px 10px; display:inline-block; border-radius:6px; background:var(--surface-1); border:1px solid var(--border-subtle); font-size:11px; color:var(--fg-2); }
 .audit-row { cursor:pointer; }
-.audit-row:hover { background:#f8fafc; }
-.change-detail { background:#f8fafc; padding:12px !important; }
+.audit-row:hover { background:var(--primary-wash); }
+.change-detail { background:var(--surface-1); padding:12px !important; }
 .diff-table { width:100%; border-collapse:collapse; }
-.diff-table th, .diff-table td { padding:4px 8px; border:1px solid #e2e8f0; text-align:left; }
-.diff-table th { background:#f1f5f9; font-size:11px; font-weight:600; }
-.pagination { display:flex; justify-content:center; align-items:center; gap:16px; padding-top:12px; border-top:1px solid #f1f5f9; margin-top:8px; }
+.diff-table th, .diff-table td { padding:4px 8px; border:1px solid var(--border-subtle); text-align:left; }
+.diff-table th { background:var(--surface-sunken); font-size:11px; font-weight:600; }
+.pagination { display:flex; justify-content:center; align-items:center; gap:16px; padding-top:12px; border-top:1px solid var(--border-subtle); margin-top:8px; }
 </style>

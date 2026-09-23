@@ -22,42 +22,55 @@
     <KpiCard
       label="Active Operators"
       :value="summary ? fmtNum(summary.kpis.active_saccos) : '-'"
-      :sub="`${summary ? fmtNum(summary.kpis.total_saccos) : '-'} total registered`"
-      source="batch" source-title="NTSA PSV Registry"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE"
+      :description="`${summary ? fmtNum(summary.kpis.total_saccos) : '-'} total registered`"
+      to="#operator-leaderboard"
     />
     <KpiCard
       label="Active Routes"
       :value="summary ? fmtNum(summary.kpis.active_routes) : '-'"
-      :sub="`${summary?.kpis.brt_routes ?? '-'} BRT · ${summary?.kpis.matatu_routes ?? '-'} matatu`"
-      source="batch" source-title="Digital Matatus GTFS"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'Digital Matatus GTFS feed unavailable'"
+      period="LIVE"
+      :description="`${summary?.kpis.brt_routes ?? '-'} BRT · ${summary?.kpis.matatu_routes ?? '-'} matatu`"
     />
     <KpiCard
       label="Departures (24h)"
       :value="summary ? fmtNum(summary.kpis.scheduled_departures_24h) : '-'"
-      sub="Scheduled dispatches"
-      trend-direction="up"
-      source="live" source-title="NaMATA GTFS-RT"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA GTFS-RT feed unavailable'"
+      period="24H"
+      description="Scheduled dispatches"
     />
     <KpiCard
       label="Revenue (24h)"
       :value="summary ? fmtKES(summary.kpis.revenue_24h_kes) : '-'"
-      sub="All payment channels"
-      trend-direction="up"
-      source="live" source-title="BebaPay / NTSA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'BebaPay / NTSA feed unavailable'"
+      period="24H"
+      description="All payment channels"
+      :series="revenueSeries"
+      to="#revenue-trend"
     />
     <KpiCard
       label="Passenger Trips (24h)"
       :value="summary ? fmtNum(summary.kpis.passenger_trips_24h) : '-'"
-      sub="Total boardings"
-      trend-direction="up"
-      source="live" source-title="NaMATA GTFS-RT"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA GTFS-RT feed unavailable'"
+      period="24H"
+      description="Total boardings"
     />
     <KpiCard
       label="On-Time Performance"
       :value="summary ? `${summary.on_time_pct.toFixed(1)}%` : '-'"
-      sub="±3 min · 7-day window"
-      :trend-direction="summary && summary.on_time_pct >= 80 ? 'up' : 'down'"
-      source="live" source-title="NaMATA Schedule"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA Schedule feed unavailable'"
+      period="7D"
+      description="±3 min · 7-day window"
+      :status="!summary ? undefined : summary.on_time_pct >= 80 ? 'healthy' : 'warning'"
+      to="#schedule-adherence"
     />
   </div>
 
@@ -91,16 +104,16 @@
           <div v-for="c in fareChannels" :key="c.payment_channel" class="chan-row">
             <span class="chan-label">{{ c.payment_channel }}</span>
             <div class="chan-bar-wrap">
-              <div class="chan-bar" :style="{ width: `${c.share_pct}%`, background: chanColor(c.payment_channel) }" />
+              <div class="chan-bar" :style="{ transform: `scaleX(${c.share_pct / 100})`, background: chanColor(c.payment_channel) }" />
             </div>
             <span class="chan-val">{{ c.share_pct.toFixed(1) }}%</span>
           </div>
-          <div v-if="!fareChannels.length && !loading" style="font-size:13px;color:#94a3b8">No channel data.</div>
+          <EmptyState v-if="!fareChannels.length" :loading="loading" message="No channel data." compact />
         </div>
       </div>
 
       <!-- On-time by route -->
-      <div class="card" style="margin-top:12px">
+      <div id="schedule-adherence" class="card drill-target" style="margin-top:12px">
         <div class="card-header">Schedule Adherence by Route</div>
         <div class="card-body">
           <div v-for="ot in onTime" :key="ot.route__route_name ?? ot.route_id" class="chan-row">
@@ -109,14 +122,14 @@
               <div
                 class="chan-bar"
                 :style="{
-                  width: `${ot.on_time_pct}%`,
-                  background: ot.on_time_pct >= 85 ? '#22c55e' : ot.on_time_pct >= 70 ? '#f59e0b' : '#ef4444',
+                  transform: `scaleX(${ot.on_time_pct / 100})`,
+                  background: ot.on_time_pct >= 85 ? 'var(--success)' : ot.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)',
                 }"
               />
             </div>
             <span class="chan-val">{{ ot.on_time_pct.toFixed(1) }}%</span>
           </div>
-          <div v-if="!onTime.length && !loading" style="font-size:13px;color:#94a3b8">No adherence data.</div>
+          <EmptyState v-if="!onTime.length" :loading="loading" message="No adherence data." compact />
         </div>
       </div>
     </div>
@@ -125,7 +138,7 @@
   <!-- Revenue trend bar chart -->
   <SectionTitle pill="BebaPay / NTSA · 7d">Revenue Trend (Last 7 Days)</SectionTitle>
 
-  <div class="card">
+  <div id="revenue-trend" class="card drill-target">
     <div class="card-body">
       <TrendLineChart
         :points="fareTrendPoints"
@@ -139,7 +152,7 @@
 
   <!-- Operator leaderboard + Expiring licenses -->
   <div class="two-col">
-    <div class="card">
+    <div id="operator-leaderboard" class="card drill-target">
       <div class="card-header">
         Operator Leaderboard
         <NuxtLink to="/public-transport/operators" class="link-sm">View all →</NuxtLink>
@@ -156,11 +169,11 @@
             </tr>
           </thead>
           <tbody v-if="leaderboard.length">
-            <tr v-for="op in leaderboard.slice(0,8)" :key="op.id">
-              <td style="font-weight:700;color:#94a3b8">#{{ op.rank_position }}</td>
+            <tr v-for="op in leaderboardPageRows" :key="op.id">
+              <td style="font-weight:700;color:var(--fg-3)">#{{ op.rank_position }}</td>
               <td style="font-weight:600">{{ op.sacco_name ?? op.sacco }}</td>
               <td>
-                <span :style="{ color: op.on_time_pct >= 80 ? '#22c55e' : '#f59e0b' }">
+                <span :style="{ color: op.on_time_pct >= 80 ? 'var(--success-fg)' : 'var(--warning-fg)' }">
                   {{ op.on_time_pct.toFixed(1) }}%
                 </span>
               </td>
@@ -170,10 +183,14 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No data' }}</td>
+              <td colspan="5" style="text-align:center;color:var(--fg-3);padding:14px">{{ loading ? 'Loading…' : 'No data' }}</td>
             </tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="leaderboardPage" :total-pages="leaderboardTotalPages" :total="leaderboardTotal"
+          @prev="leaderboardPrev" @next="leaderboardNext"
+        />
       </div>
     </div>
 
@@ -192,7 +209,7 @@
             :meta="`Expires ${fmtDate(l.expiry_date)} · ${daysUntil(l.expiry_date)}d remaining`"
           />
         </div>
-        <div v-else style="font-size:13px;color:#94a3b8">
+        <div v-else style="font-size:13px;color:var(--fg-3)">
           {{ loading ? 'Loading…' : 'No licences expiring in the next 90 days.' }}
         </div>
       </div>
@@ -213,7 +230,7 @@
           <span class="fb-meta">{{ fmtNum(f.total) }} · {{ f.avg_rating?.toFixed(1) ?? '-' }}★</span>
         </div>
       </div>
-      <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No feedback data' }}</div>
+      <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No feedback data' }}</div>
     </div>
   </div>
 
@@ -235,8 +252,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Public Transport')
-
 import { usePublicTransport, useGis } from '~/composables/api'
 import type { PTSummary, OperatorMetric } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -305,6 +320,10 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // ── Computed ─────────────────────────────────────────────────────────────
 const maxFeedback = computed(() => Math.max(1, ...feedbackByCategory.value.map(f => f.total ?? 0)))
 const demandForecast = computed(() => summary.value?.demand_forecast_24h ?? [])
+const revenueSeries = computed(() => {
+  const t = fareTrend.value
+  return t.length > 1 ? t.map(f => f.total_kes ?? 0) : undefined
+})
 
 const fareTrendPoints = computed(() =>
   fareTrend.value.map(f => ({ label: fmtHour(f.collected_hour), value: f.total_kes ?? 0 })),
@@ -312,6 +331,12 @@ const fareTrendPoints = computed(() =>
 const demandForecastPoints = computed(() =>
   demandForecast.value.map(d => ({ label: fmtHour(d.target_at), value: d.total_predicted ?? 0 })),
 )
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: leaderboardPageRows, page: leaderboardPage, totalPages: leaderboardTotalPages,
+  total: leaderboardTotal, next: leaderboardNext, prev: leaderboardPrev,
+} = usePagination(leaderboard, 15)
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -349,28 +374,25 @@ function chanColor(ch: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col, .two-col-map { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .side-col { display:flex; flex-direction:column; overflow-y:auto; max-height:508px; gap:0; }
 .chan-row { display:grid; grid-template-columns:110px 1fr 50px; align-items:center; gap:8px; padding:4px 0; }
 .chan-label { font-size:12px; text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.chan-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.chan-bar { height:100%; border-radius:4px; transition:width .4s; }
+.chan-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.chan-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .chan-val { font-size:11px; text-align:right; }
 .feedback-grid { display:flex; flex-direction:column; gap:8px; }
 .fb-row { display:grid; grid-template-columns:160px 1fr 100px; align-items:center; gap:8px; }
 .fb-label { font-size:13px; }
-.fb-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.fb-bar { height:100%; background:#3b82f6; border-radius:4px; }
+.fb-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.fb-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
 .fb-meta { font-size:12px; text-align:right; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; }
 </style>

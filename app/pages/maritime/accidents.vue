@@ -14,10 +14,42 @@
 
   <!-- KPIs (live) -->
   <div class="kpi-grid">
-    <KpiCard label="Incidents (90d)" :value="stats ? fmtNum(stats.total_incidents) : '-'" sub="All severities" source="batch" source-title="KMA" />
-    <KpiCard label="Fatal Incidents" :value="stats ? fmtNum(stats.fatal_incidents) : '-'" :trend-direction="stats && stats.fatal_incidents === 0 ? 'up' : 'down'" sub="Loss of life recorded" source="batch" source-title="KMA Investigation Dept" />
-    <KpiCard label="Casualties" :value="stats ? fmtNum(stats.casualties) : '-'" sub="Total across incidents" source="batch" source-title="KMA" />
-    <KpiCard label="Pollution (tonnes)" :value="stats ? fmtNum(stats.pollution_tons) : '-'" sub="Oil/fuel spilled, 90d" source="batch" source-title="NEMA / KMA" />
+    <KpiCard
+      label="Incidents (90d)"
+      :value="stats ? fmtNum(stats.total_incidents) : '-'"
+      :unavailable="!stats"
+      :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="90D"
+      description="All severities"
+      to="#incident-log"
+    />
+    <KpiCard
+      label="Fatal Incidents"
+      :value="stats ? fmtNum(stats.fatal_incidents) : '-'"
+      :unavailable="!stats"
+      :unavailable-note="loading ? 'Loading…' : 'KMA Investigation Dept feed unavailable'"
+      period="90D"
+      description="Loss of life recorded"
+      :status="!stats ? undefined : stats.fatal_incidents === 0 ? 'healthy' : 'critical'"
+      to="#incident-log"
+    />
+    <KpiCard
+      label="Casualties"
+      :value="stats ? fmtNum(stats.casualties) : '-'"
+      :unavailable="!stats"
+      :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="90D"
+      description="Total across incidents"
+      to="#incident-log"
+    />
+    <KpiCard
+      label="Pollution (tonnes)"
+      :value="stats ? fmtNum(stats.pollution_tons) : '-'"
+      :unavailable="!stats"
+      :unavailable-note="loading ? 'Loading…' : 'NEMA / KMA feed unavailable'"
+      period="90D"
+      description="Oil/fuel spilled, 90d"
+    />
   </div>
 
   <!-- Incident map -->
@@ -26,14 +58,12 @@
     <ClientOnly>
       <UaptsMap :markers="incidentMarkers" :center="[-3.5, 40.0]" :zoom="6" height="380px" show-legend />
     </ClientOnly>
-    <div v-if="!incidentMarkers.length" class="card-body" style="color:#94a3b8;font-size:13px">
-      {{ loading ? 'Loading…' : 'No incident could be matched to a known port position.' }}
-    </div>
+    <EmptyState v-if="!incidentMarkers.length" :loading="loading" message="No incident could be matched to a known port position." compact />
   </div>
 
   <!-- Incident log -->
   <SectionTitle pill="KMA · Live">Incident Log</SectionTitle>
-  <div class="card">
+  <div id="incident-log" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="severityFilter" class="select-sm">
@@ -52,7 +82,7 @@
             <tr><th></th><th>Reference</th><th>Port</th><th>Incident Type</th><th>Vessel</th><th>Severity</th><th>Status</th><th>Casualties</th><th>Pollution</th></tr>
           </thead>
           <tbody v-if="filteredIncidents.length">
-            <template v-for="inc in filteredIncidents" :key="inc.id">
+            <template v-for="inc in incidentsPageRows" :key="inc.id">
               <tr class="expand-row" @click="expanded = expanded === inc.id ? null : inc.id">
                 <td class="expand-cell">{{ expanded === inc.id ? '▾' : '▸' }}</td>
                 <td style="font-family:monospace;font-size:12px">{{ inc.incident_ref || '-' }}</td>
@@ -76,8 +106,12 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No maritime incidents match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No maritime incidents match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="incidentsPage" :total-pages="incidentsTotalPages" :total="incidentsTotal"
+          @prev="incidentsPrev" @next="incidentsNext"
+        />
       </div>
     </div>
   </div>
@@ -85,8 +119,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Maritime Accidents & Safety')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { Port } from '~/composables/api'
 
@@ -153,6 +185,13 @@ function portLabel(unlocode: string) {
 }
 
 const filteredIncidents = computed(() => incidents.value.filter(i => !severityFilter.value || i.severity === severityFilter.value))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: incidentsPageRows, page: incidentsPage, totalPages: incidentsTotalPages,
+  total: incidentsTotal, next: incidentsNext, prev: incidentsPrev,
+} = usePagination(filteredIncidents, 15)
+
 const incidentExportColumns = [
   { key: 'incident_ref', label: 'Reference' },
   { key: 'incident_type', label: 'Incident Type' },
@@ -175,7 +214,7 @@ const incidentMarkers = computed((): MarkerSpec[] => {
   for (const [unlocode, list] of byPort) {
     const port = portByUnlocode.value.get(unlocode)
     if (!port || port.latitude == null || port.longitude == null) continue
-    const worst = list.reduce((w, i) => severityRank(i.severity) > severityRank(w.severity) ? i : w, list[0])
+    const worst = list.reduce((w, i) => severityRank(i.severity) > severityRank(w.severity) ? i : w, list[0]!)
     markers.push({
       id: `port-incidents-${unlocode}`,
       lat: port.latitude, lon: port.longitude,
@@ -216,16 +255,14 @@ function fmtNum(v: number | null | undefined, d = 0) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

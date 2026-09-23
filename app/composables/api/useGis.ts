@@ -48,7 +48,7 @@ export interface MapOverviewBundle {
 // single session. This is a small in-memory cache keyed by endpoint +
 // params, module-scoped so it's shared across every useGis() call site
 // (the dashboard overlays and the dedicated map page alike). It holds
-// nothing sensitive — these are all public GIS endpoints — and simply
+// nothing sensitive - these are all public GIS endpoints - and simply
 // resets on a full page reload; nothing is persisted to disk/storage.
 interface CacheEntry<T> { data: T; expires: number }
 const _cache = new Map<string, CacheEntry<unknown>>()
@@ -93,7 +93,7 @@ export function useGis() {
 
   /**
    * Static URL to the pre-tiled road network (PMTiles archive), served by
-   * a dedicated `pmtiles serve` process (go-pmtiles) — NOT through Django.
+   * a dedicated `pmtiles serve` process (go-pmtiles) - NOT through Django.
    *
    * Django (running here under Daphne/ASGI) doesn't honor HTTP Range
    * requests for /media/, which PMTiles absolutely requires (it seeks into
@@ -113,7 +113,7 @@ export function useGis() {
   }
 
   /**
-   * Static URL to the pre-tiled rail network (PMTiles archive) — same
+   * Static URL to the pre-tiled rail network (PMTiles archive) - same
    * deal as roadsPmtilesUrl above: served by the dedicated `pmtiles serve`
    * process (go-pmtiles), NOT through Django, since Django/Daphne doesn't
    * honor Range requests for /media/ and PMTiles requires them.

@@ -33,7 +33,7 @@
   <div v-if="selectedTrip" class="card map-card" style="margin-bottom:16px">
     <div class="card-header">
       Replay: {{ selectedTrip.plate_number }} - {{ selectedTrip.origin_label }} → {{ selectedTrip.destination_label }}
-      <button class="btn" style="margin-left:auto;font-size:12px" @click="selectedTrip = null; tripPath = []">✕ Close</button>
+      <button class="btn" style="margin-left:auto" @click="selectedTrip = null; tripPath = []">✕ Close</button>
     </div>
     <ClientOnly>
       <UaptsMap
@@ -83,7 +83,7 @@
         </thead>
         <tbody v-if="trips.length">
           <tr
-            v-for="trip in trips"
+            v-for="trip in tripsPageRows"
             :key="trip.id"
             :class="{ 'row-selected': selectedTrip?.id === trip.id }"
           >
@@ -109,20 +109,22 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading trip records…' : 'No trips found. Try adjusting the filters.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="tripsPage" :total-pages="tripsTotalPages" :total="tripsTotal"
+        @prev="tripsPrev" @next="tripsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Trip Playback')
-
 import { useFleet } from '~/composables/api'
 import type { TripPlayback } from '~/composables/api'
 
@@ -179,8 +181,8 @@ async function replayTrip(trip: TripPlayback) {
 
   loadingPath.value = trip.id
   try {
-    // GET /trip-playbacks/{id}/path/ returns an object with a `path` key —
-    // [lon, lat] pairs (GeoJSON order), same as TripPlayback.path — not a
+    // GET /trip-playbacks/{id}/path/ returns an object with a `path` key -
+    // [lon, lat] pairs (GeoJSON order), same as TripPlayback.path - not a
     // bare array, `.points`, or a paginated `.results`.
     const res = await useFleet().tripPath(trip.id)
     if (Array.isArray(res?.path)) {
@@ -199,6 +201,12 @@ async function replayTrip(trip: TripPlayback) {
 
 onMounted(load)
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: tripsPageRows, page: tripsPage, totalPages: tripsTotalPages,
+  total: tripsTotal, next: tripsNext, prev: tripsPrev,
+} = usePagination(trips, 15)
+
 // ── Computed ─────────────────────────────────────────────────────────────
 const tripLines = computed((): LineSpec[] => {
   if (!tripPath.value.length) return []
@@ -215,8 +223,8 @@ const tripEndpoints = computed((): MarkerSpec[] => {
   if (!tripPath.value.length || !selectedTrip.value) return []
   const pts = tripPath.value
   const markers: MarkerSpec[] = []
-  markers.push({ id: 'start', lat: pts[0][0], lon: pts[0][1], title: 'Start', color: 'green', size: 'md' })
-  if (pts.length > 1) markers.push({ id: 'end', lat: pts[pts.length-1][0], lon: pts[pts.length-1][1], title: 'End', color: 'red', size: 'md' })
+  markers.push({ id: 'start', lat: pts[0]![0], lon: pts[0]![1], title: 'Start', color: 'green', size: 'md' })
+  if (pts.length > 1) markers.push({ id: 'end', lat: pts[pts.length-1]![0], lon: pts[pts.length-1]![1], title: 'End', color: 'red', size: 'md' })
   return markers
 })
 
@@ -242,16 +250,11 @@ function tripStatusBadge(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .map-card { overflow:hidden; }
-.trip-stats { display:flex; flex-wrap:wrap; gap:0; border-top:1px solid #f1f5f9; }
-.ts-item { display:flex; flex-direction:column; gap:2px; padding:10px 16px; border-right:1px solid #f1f5f9; min-width:90px; }
-.ts-item span { font-size:11px; color:#94a3b8; }
+.trip-stats { display:flex; flex-wrap:wrap; gap:0; border-top:1px solid var(--border-subtle); }
+.ts-item { display:flex; flex-direction:column; gap:2px; padding:10px 16px; border-right:1px solid var(--border-subtle); min-width:90px; }
+.ts-item span { font-size:11px; color:var(--fg-3); }
 .ts-item strong { font-size:14px; }
-.row-selected { background:#eff6ff; }
-.btn-sm { padding:3px 10px; font-size:12px; }
+.row-selected { background:var(--primary-wash); }
 </style>

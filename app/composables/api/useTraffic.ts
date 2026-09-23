@@ -73,6 +73,7 @@ export interface CongestionEvent {
   id: string
   segment: string
   segment_id?: string
+  segment_road_code?: string | null
   severity: TrafficSeverity
   status: 'active' | 'cleared' | 'scheduled'
   avg_speed_kmh: number
@@ -101,7 +102,8 @@ export interface TrafficForecast {
   id: string
   segment: string
   segment_id?: string
-  model_name: 'arima' | 'prophet' | 'lstm' | 'gradient_boost'
+  segment_road_code?: string | null
+  model_name: 'arima' | 'lstm' | 'gradient_boost' | 'timesfm'
   model_version: string
   target_at: string
   horizon_hours: number
@@ -148,6 +150,7 @@ export interface TrafficAlert {
   severity: 'info' | 'warning' | 'critical'
   segment: string
   segment_id?: string
+  segment_road_code?: string | null
   event?: string | null
   title: string
   message: string
@@ -183,7 +186,7 @@ export interface TrafficQuery {
   congestion?: CongestionLevel
   vehicle_class?: string
   // NB: TrafficCountViewSet.get_queryset() reads these as `from`/`to`
-  // (not `date_from`/`date_to`) — see apps/traffic/views.py.
+  // (not `date_from`/`date_to`) - see apps/traffic/views.py.
   from?: string
   to?: string
 }
@@ -264,7 +267,7 @@ export function useTraffic() {
       }
       for (const e of (events as any).results ?? []) {
         if (e.segment_id == null) continue
-        // Pull a single traffic count for the segment if we have it — its
+        // Pull a single traffic count for the segment if we have it - its
         // `station` field is just the station id, so resolve coords via
         // the station lookup built above rather than a nested object.
         const tc = await api<Paged<TrafficCount>>(
@@ -273,19 +276,26 @@ export function useTraffic() {
         const tcRow = (tc as any).results?.[0]
         const coords = tcRow?.station ? stationCoords.get(tcRow.station) : undefined
         if (!coords) continue
+        // Color by the event's own live speed vs its free-flow speed - the
+        // same relative-speed banding Google's traffic layer uses - rather
+        // than only the coarser severity enum, so the map reflects the
+        // actual recorded numbers.
+        const speedRatio = e.free_flow_speed_kmh > 0 ? e.avg_speed_kmh / e.free_flow_speed_kmh : null
         const colour =
-          e.severity === 'critical' ? 'red'
-          : e.severity === 'high' ? 'orange'
-          : e.severity === 'medium' ? 'yellow'
-          : 'blue'
+          speedRatio == null ? (e.severity === 'critical' ? 'red' : e.severity === 'high' ? 'orange' : e.severity === 'medium' ? 'yellow' : 'blue')
+          : speedRatio < 0.4 ? 'red'
+          : speedRatio < 0.6 ? 'orange'
+          : speedRatio < 0.85 ? 'yellow'
+          : 'green'
         markers.push({
           id: `event-${e.id}`,
           lat: coords.latitude,
           lon: coords.longitude,
           title: `[${e.severity.toUpperCase()}] Congestion`,
-          subtitle: `Delay ${e.delay_minutes} min · Impact radius ${e.impact_radius_km.toFixed(1)} km`,
+          subtitle: `${e.avg_speed_kmh.toFixed(0)} km/h (free flow ${e.free_flow_speed_kmh.toFixed(0)} km/h) · Delay ${e.delay_minutes} min`,
           color: colour,
           size: 'lg',
+          radiusKm: e.impact_radius_km,
         })
       }
       return { markers }

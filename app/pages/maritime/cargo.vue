@@ -16,34 +16,61 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Cargo Tonnes (30d)" :value="cargoTonnesTotal != null ? `${fmtNum(cargoTonnesTotal)}t` : '-'" :sub="cargoTeuTotal != null ? `${fmtNum(cargoTeuTotal)} TEU` : 'All cargo types'" source="live" source-title="KPA" />
-    <KpiCard label="Imports (sampled)" :value="fmtNum(importsSampled)" sub="Of sampled pipeline page" source="live" source-title="KenTrade" />
-    <KpiCard label="Exports (sampled)" :value="fmtNum(exportsSampled)" sub="Of sampled pipeline page" source="live" source-title="KenTrade" />
-    <KpiCard label="FCL Share" :value="pct(fclSharePct)" sub="Of containerised cargo tonnage" source="live" source-title="KPA" />
-    <KpiCard label="Reefer Shipments (30d)" :value="fmtNum(reeferShipments)" sub="Cold-chain cargo" source="live" source-title="KPA" />
-    <KpiCard label="Avg Gate Processing" :value="gateProcessingMin != null ? `${gateProcessingMin.toFixed(0)} min` : '-'" sub="Target: <20 min" :trend-direction="gateProcessingMin != null && gateProcessingMin <= 20 ? 'up' : 'down'" source="live" source-title="KPA Gate System" />
+    <KpiCard
+      label="Cargo Tonnes (30d)" :value="cargoTonnesTotal != null ? `${fmtNum(cargoTonnesTotal)}t` : '-'"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="30D" :description="cargoTeuTotal != null ? `${fmtNum(cargoTeuTotal)} TEU` : 'All cargo types'"
+      to="#cargo-type-breakdown"
+    />
+    <KpiCard
+      label="Imports (sampled)" :value="fmtNum(importsSampled)"
+      :unavailable="loading || plError" :unavailable-note="loading ? 'Loading…' : 'KenTrade feed unavailable'"
+      period="LIVE" description="Of sampled pipeline page" to="#pipeline-table"
+    />
+    <KpiCard
+      label="Exports (sampled)" :value="fmtNum(exportsSampled)"
+      :unavailable="loading || plError" :unavailable-note="loading ? 'Loading…' : 'KenTrade feed unavailable'"
+      period="LIVE" description="Of sampled pipeline page" to="#pipeline-table"
+    />
+    <KpiCard
+      label="FCL Share" :value="pct(fclSharePct)"
+      :unavailable="loading || btError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="30D" description="Of containerised cargo tonnage" to="#cargo-type-breakdown"
+    />
+    <KpiCard
+      label="Reefer Shipments (30d)" :value="fmtNum(reeferShipments)"
+      :unavailable="loading || btError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="30D" description="Cold-chain cargo" to="#cargo-type-breakdown"
+    />
+    <KpiCard
+      label="Avg Gate Processing" :value="gateProcessingMin != null ? `${gateProcessingMin.toFixed(0)} min` : '-'"
+      :unavailable="loading || skError" :unavailable-note="loading ? 'Loading…' : 'KPA Gate System feed unavailable'"
+      period="LIVE" description="Target: &lt;20 min"
+      :status="gateProcessingMin == null ? undefined : gateProcessingMin <= 20 ? 'healthy' : 'warning'"
+      to="#stage-kpi-table"
+    />
   </div>
 
   <!-- Cargo type breakdown -->
   <SectionTitle pill="KPA · Live">Cargo Type Breakdown (30d)</SectionTitle>
-  <div class="card">
+  <div id="cargo-type-breakdown" class="card drill-target">
     <div class="card-body">
       <div v-if="cargoByType.length" class="cong-list">
         <div v-for="c in cargoByType" :key="c.cargo_type" class="cong-row">
           <span class="cong-label">{{ cargoTypeLabel(c.cargo_type) }}</span>
           <div class="cong-bar-wrap">
-            <div class="cong-bar" style="background:#3b82f6" :style="{ width: `${maxTonnage > 0 ? (c.tonnes / maxTonnage) * 100 : 0}%` }" />
+            <div class="cong-bar" :style="{ transform: `scaleX(${maxTonnage > 0 ? c.tonnes / maxTonnage : 0})`, background: 'var(--primary-fill)' }" />
           </div>
           <span class="cong-val">{{ fmtNum(c.tonnes) }} t{{ c.teu ? ` · ${fmtNum(c.teu)} TEU` : '' }} · {{ fmtNum(c.count) }} records</span>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No cargo-type records in the current window.' }}</div>
+      <EmptyState v-else :loading="loading" message="No cargo-type records in the current window." compact />
     </div>
   </div>
 
   <!-- Import / Export pipeline -->
   <SectionTitle pill="KenTrade · Live">Import &amp; Export Pipeline</SectionTitle>
-  <div class="card">
+  <div id="pipeline-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="pipelineDirectionFilter" class="select-sm">
@@ -52,7 +79,7 @@
           <option value="export">Export</option>
         </select>
         <button class="btn" @click="pipelineDirectionFilter=''">Clear</button>
-        <ExportButton filename="uapts-cargo-pipeline.csv" :rows="filteredPipeline" :columns="pipelineExportColumns" style="margin-left:auto" />
+        <ExportButton filename="uapts-cargo-pipeline.csv" :rows="(filteredPipeline as unknown as Record<string, unknown>[])" :columns="pipelineExportColumns" style="margin-left:auto" />
       </div>
       <div class="table-scroll">
         <table>
@@ -60,20 +87,24 @@
             <tr><th>Reference</th><th>Direction</th><th>Vessel</th><th>Port</th><th>Stage</th><th>Consignee</th><th>Dest. Mode</th><th>Booked</th><th>Transit Time</th></tr>
           </thead>
           <tbody v-if="filteredPipeline.length">
-            <tr v-for="p in filteredPipeline" :key="p.id">
+            <tr v-for="p in pipelinePageRows" :key="p.id">
               <td style="font-family:monospace;font-size:12px">{{ p.reference }}</td>
               <td><BadgePill :variant="p.direction === 'import' ? 'info' : 'success'">{{ p.direction }}</BadgePill></td>
               <td style="font-size:12px">{{ p.vessel_name ?? '-' }}</td>
               <td style="font-family:monospace;font-size:12px">{{ p.port_unlocode }}</td>
               <td><BadgePill :variant="stageBadge(p)">{{ stageLabel(p) }}</BadgePill></td>
-              <td style="font-size:12px">{{ p.consignee || '-' }}</td>
+              <td style="font-size:12px" :style="consigneeMasked ? 'color:var(--fg-3);font-style:italic' : ''" :title="consigneeMasked ? consigneeMaskReason : undefined">{{ p.consignee || '-' }}</td>
               <td style="font-size:12px">{{ p.final_destination_mode || '-' }}</td>
               <td style="font-size:11px">{{ p.booked_at ? fmtDate(p.booked_at) : '-' }}</td>
               <td style="font-size:12px">{{ p.total_transit_hours != null ? `${(p.total_transit_hours / 24).toFixed(1)}d` : 'in transit' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No pipeline shipments in the current view.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No pipeline shipments in the current view.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="pipelinePage" :total-pages="pipelineTotalPages" :total="pipelineTotal"
+          @prev="pipelinePrev" @next="pipelineNext"
+        />
       </div>
       <div class="source-note">"Stage" is derived from the shipment's real milestone timestamps (booked → Kenya waters arrival → customs cleared → final delivery) - this backend doesn't track cargo type on a pipeline record (see the breakdown above for that).</div>
     </div>
@@ -81,24 +112,28 @@
 
   <!-- Cargo handling stage KPIs -->
   <SectionTitle pill="KPA · Live">Cargo Handling at Port - Stage KPIs</SectionTitle>
-  <div class="card">
+  <div id="stage-kpi-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead><tr><th>Stage</th><th>Who Does It</th><th>KPI</th><th>Value</th><th>Target</th></tr></thead>
         <tbody v-if="stageKpiRows.length">
-          <tr v-for="k in stageKpiRows" :key="k.stage">
+          <tr v-for="k in stageKpiPageRows" :key="k.stage">
             <td style="font-weight:600;font-size:12px">{{ k.stage }}</td>
             <td style="font-size:12px">{{ k.who }}</td>
             <td style="font-size:12px">{{ k.kpiLabel }}</td>
-            <td v-if="k.tracked" :style="{ fontWeight:'600', color: k.meetsTarget === false ? '#ef4444' : '#22c55e' }">
+            <td v-if="k.tracked" :style="{ fontWeight:'600', color: k.meetsTarget === false ? 'var(--danger-fg)' : 'var(--success-fg)' }">
               {{ k.displayValue }}
             </td>
-            <td v-else style="color:#94a3b8;font-style:italic" :title="k.reason">not tracked</td>
+            <td v-else style="color:var(--fg-3);font-style:italic" :title="k.reason">not tracked</td>
             <td style="font-size:12px">{{ k.targetLabel ?? '-' }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">Loading…</td></tr></tbody>
+        <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">Loading…</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="stageKpiPage" :total-pages="stageKpiTotalPages" :total="stageKpiTotal"
+        @prev="stageKpiPrev" @next="stageKpiNext"
+      />
       <div class="source-note">"Stacking accuracy" and "ICD transit time/damage" have no data source on this backend yet - shown as not tracked rather than a guessed figure.</div>
     </div>
   </div>
@@ -110,7 +145,7 @@
       <table>
         <thead><tr><th>Mode</th><th>Containers (30d)</th><th>Tonnes</th><th>Avg Delivery Time</th><th>Green Flag</th></tr></thead>
         <tbody v-if="onwardTransport.length">
-          <tr v-for="o in onwardTransport" :key="o.mode">
+          <tr v-for="o in onwardTransportPageRows" :key="o.mode">
             <td style="font-weight:600;font-size:12px">{{ modeLabel(o.mode) }}</td>
             <td>{{ fmtNum(o.container_count) }}</td>
             <td>{{ fmtNum(o.tonnes) }}t</td>
@@ -118,18 +153,20 @@
             <td><BadgePill :variant="greenBadge(o.green_transport_flag)">{{ o.green_transport_flag }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No onward transport records in the current window.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No onward transport records in the current window.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="onwardTransportPage" :total-pages="onwardTransportTotalPages" :total="onwardTransportTotal"
+        @prev="onwardTransportPrev" @next="onwardTransportNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Cargo Tracking')
-
 import { useMaritimeCargo } from '~/composables/api'
-import type { MaritimeCargoSummary, CargoTypeStat, PipelineShipment, HandlingStageKpis, OnwardTransportStat, MaritimeCargoType, PipelineDirection, GreenFlag as CargoGreenFlag, OnwardTransportMode } from '~/composables/api'
+import type { MaritimeCargoSummary, CargoTypeStat, PipelineShipment, HandlingStageKpis, OnwardTransportStat, MaritimeCargoType, PipelineDirection, CargoGreenFlag, OnwardTransportMode } from '~/composables/api'
 
 const summary         = ref<MaritimeCargoSummary | null>(null)
 const cargoByType     = ref<CargoTypeStat[]>([])
@@ -138,8 +175,19 @@ const stageKpis       = ref<HandlingStageKpis | null>(null)
 const onwardTransport = ref<OnwardTransportStat[]>([])
 const loading         = ref(true)
 const error           = ref<string | null>(null)
+const btError = ref(false)
+const plError = ref(false)
+const skError = ref(false)
 
 const pipelineDirectionFilter = ref<'' | PipelineDirection>('')
+
+// ── Field-level masking (RBAC spec section 6) ──────────────────────────
+// cargo_commercial covers consignee identity; enforcement is
+// field_mask_export_query_exclude, so the mask applies before the value
+// reaches either the table or the CSV export, not just the display cell.
+const { isMasked: isCargoCategoryMasked, categoryLabel: cargoCategoryLabel } = useFieldMask('/maritime/cargo')
+const consigneeMasked = computed(() => isCargoCategoryMasked('cargo_commercial'))
+const consigneeMaskReason = computed(() => `${cargoCategoryLabel('cargo_commercial')} - restricted to KPA's own Agency Admin tier`)
 
 async function load() {
   loading.value = true
@@ -160,6 +208,10 @@ async function load() {
   if (skRes.status  === 'fulfilled') stageKpis.value = skRes.value
   if (otRes.status  === 'fulfilled') onwardTransport.value = otRes.value.modes ?? []
 
+  btError.value = btRes.status === 'rejected'
+  plError.value = plRes.status === 'rejected'
+  skError.value = skRes.status === 'rejected'
+
   if ([sumRes, btRes, plRes, skRes, otRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime Cargo API.'
 
@@ -169,7 +221,22 @@ async function load() {
 onMounted(load)
 
 const maxTonnage = computed(() => Math.max(1, ...cargoByType.value.map(c => c.tonnes)))
-const filteredPipeline = computed(() => pipeline.value.filter(p => !pipelineDirectionFilter.value || p.direction === pipelineDirectionFilter.value))
+const maskedPipeline = computed<PipelineShipment[]>(() =>
+  consigneeMasked.value ? pipeline.value.map(p => ({ ...p, consignee: 'Restricted' })) : pipeline.value,
+)
+const filteredPipeline = computed(() => maskedPipeline.value.filter(p => !pipelineDirectionFilter.value || p.direction === pipelineDirectionFilter.value))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: pipelinePageRows, page: pipelinePage, totalPages: pipelineTotalPages,
+  total: pipelineTotal, next: pipelineNext, prev: pipelinePrev,
+} = usePagination(filteredPipeline, 15)
+
+const {
+  pageRows: onwardTransportPageRows, page: onwardTransportPage, totalPages: onwardTransportTotalPages,
+  total: onwardTransportTotal, next: onwardTransportNext, prev: onwardTransportPrev,
+} = usePagination(onwardTransport, 15)
+
 const pipelineExportColumns = [
   { key: 'reference', label: 'Reference' },
   { key: 'direction', label: 'Direction' },
@@ -262,6 +329,12 @@ const stageKpiRows = computed(() => {
   ]
 })
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: stageKpiPageRows, page: stageKpiPage, totalPages: stageKpiTotalPages,
+  total: stageKpiTotal, next: stageKpiNext, prev: stageKpiPrev,
+} = usePagination(stageKpiRows, 15)
+
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
@@ -292,15 +365,13 @@ function greenBadge(f: CargoGreenFlag) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .cong-list { display:flex; flex-direction:column; gap:7px; }
 .cong-row { display:grid; grid-template-columns:170px 1fr 150px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; }
-.cong-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.cong-bar { height:100%; border-radius:4px; transition:width .4s; }
+.cong-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.cong-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .cong-val { font-size:11px; text-align:right; }
 </style>

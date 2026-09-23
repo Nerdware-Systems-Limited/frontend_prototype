@@ -48,10 +48,10 @@
         />
       </ClientOnly>
       <div class="map-key">
-        <span class="mk"><span class="dot" style="background:#22c55e" /> Operational</span>
-        <span class="mk"><span class="dot" style="background:#f59e0b" /> Maintenance</span>
-        <span class="mk"><span class="dot" style="background:#ef4444" /> Impounded</span>
-        <span class="mk"><span class="dot" style="background:#94a3b8" /> Unknown</span>
+        <span class="mk"><span class="dot" style="background:var(--success)" /> Operational</span>
+        <span class="mk"><span class="dot" style="background:var(--warning)" /> Maintenance</span>
+        <span class="mk"><span class="dot" style="background:var(--destructive)" /> Impounded</span>
+        <span class="mk"><span class="dot" style="background:var(--border-strong)" /> Unknown</span>
       </div>
     </div>
 
@@ -67,9 +67,7 @@
           <BadgePill :variant="eventBadge(b.event_type)">{{ b.event_type }}</BadgePill>
           <div class="breach-time">{{ fmtTime(b.detected_at) }}</div>
         </div>
-        <div v-if="!loading && breaches.length === 0" style="color:#94a3b8;font-size:13px;padding:12px">
-          No recent geofence breaches.
-        </div>
+        <EmptyState v-if="breaches.length === 0" :loading="loading" message="No recent geofence breaches." compact />
       </div>
     </div>
   </div>
@@ -92,7 +90,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredVehicles.length">
-          <tr v-for="v in filteredVehicles.slice(0, 100)" :key="v.id">
+          <tr v-for="v in vehiclesPageRows" :key="v.id">
             <td style="font-weight:600">{{ v.plate_number }}</td>
             <td style="font-size:12px">{{ v.vehicle_type.replace(/_/g,' ') }}</td>
             <td><BadgePill :variant="statusBadge(v.status)">{{ v.status }}</BadgePill></td>
@@ -104,23 +102,22 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading live vehicles…' : 'No vehicles match current filters.' }}
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="filteredVehicles.length > 100" style="font-size:12px;color:#94a3b8;padding:8px 0">
-        Showing first 100 of {{ fmtNum(filteredVehicles.length) }} vehicles.
-      </div>
+      <TablePagination
+        :page="vehiclesPage" :total-pages="vehiclesTotalPages" :total="vehiclesTotal"
+        @prev="vehiclesPrev" @next="vehiclesNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Live Positions')
-
 import { useFleet, useGis } from '~/composables/api'
 import type { Vehicle, GeofenceEvent } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -174,6 +171,12 @@ const filteredVehicles = computed(() =>
   }),
 )
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: vehiclesPageRows, page: vehiclesPage, totalPages: vehiclesTotalPages,
+  total: vehiclesTotal, next: vehiclesNext, prev: vehiclesPrev,
+} = usePagination(filteredVehicles, 15)
+
 const mapMarkers = computed((): MarkerSpec[] =>
   filteredVehicles.value
     .filter(v => v.last_latitude && v.last_longitude)
@@ -189,10 +192,6 @@ const mapMarkers = computed((): MarkerSpec[] =>
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-function fmtNum(v: number | null | undefined, d = 0) {
-  if (v == null) return '-'
-  return v.toLocaleString(undefined, { maximumFractionDigits: d })
-}
 function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
   catch { return iso }
@@ -207,22 +206,18 @@ function eventBadge(e: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .map-layout { display:grid; grid-template-columns:3fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .map-layout { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .sidebar-pane { display:flex; flex-direction:column; overflow:hidden; }
-.count-badge { font-size:11px; background:#f1f5f9; border-radius:10px; padding:1px 7px; margin-left:6px; }
+.count-badge { font-size:11px; background:var(--surface-sunken); border-radius:10px; padding:1px 7px; margin-left:6px; }
 .scroll-body { flex:1; overflow-y:auto; max-height:520px; }
-.breach-row { padding:10px 14px; border-bottom:1px solid #f8fafc; display:flex; flex-direction:column; gap:3px; }
+.breach-row { padding:10px 14px; border-bottom:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:3px; }
 .breach-plate { font-size:13px; font-weight:700; }
-.breach-zone { font-size:12px; color:#475569; }
-.breach-time { font-size:11px; color:#94a3b8; }
+.breach-zone { font-size:12px; color:var(--fg-2); }
+.breach-time { font-size:11px; color:var(--fg-3); }
 </style>

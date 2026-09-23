@@ -9,7 +9,7 @@
         {{ copyLinkStatus === 'copied' ? '✓ Link copied' : copyLinkStatus === 'error' ? 'Copy failed' : '⚲ Copy link' }}
       </button>
       <button class="btn" :disabled="loading" @click="load({ force: true })">
-        <span class="btn-icon" :class="{ spinning: loading }">↻</span> Reload Layers
+        <span class="reload-icon" :class="{ spinning: loading }">↻</span> Reload Layers
       </button>
     </template>
   </PageHeader>
@@ -146,14 +146,14 @@
         <div class="panel-section-title">Road Class</div>
         <select v-model="roadClassFilter" class="panel-select" aria-label="Filter roads by Road Class">
           <option value="">All classes</option>
-          <option value="A">A — International trunk</option>
-          <option value="B">B — National trunk</option>
-          <option value="C">C — Primary</option>
-          <option value="D">D — Secondary</option>
-          <option value="E">E — Minor</option>
+          <option value="A">A - International trunk</option>
+          <option value="B">B - National trunk</option>
+          <option value="C">C - Primary</option>
+          <option value="D">D - Secondary</option>
+          <option value="E">E - Minor</option>
           <option value="F">F</option>
-          <option value="G">G — Unclassified</option>
-          <option value="S">S — Special purpose</option>
+          <option value="G">G - Unclassified</option>
+          <option value="S">S - Special purpose</option>
         </select>
       </div>
 
@@ -384,10 +384,9 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('GIS Explorer')
-
 import { useGis } from '~/composables/api'
-import type { GeoJSONFeatureCollection, LineSpec, MarkerSpec, MarkerColor } from '~/composables/api'
+import type { GeoJSONFeatureCollection } from '~/composables/api'
+import type { LineSpec, MarkerSpec, MarkerColor } from '~/components/UaptsMap.vue'
 
 type LayerKey = 'boundary' | 'roads' | 'routes' | 'stations' | 'events' | 'railway'
 
@@ -416,9 +415,9 @@ const error      = ref<string | null>(null)
 const layerErrors = ref<Record<string, string>>({})
 
 const simplify          = ref(0.01)
-const roadClassFilter   = ref('')   // Road Class, e.g. "A" / "D" — see UaptsMap's roadsClassFilter prop
-const conditionFilter   = ref('')   // Surface Condition, e.g. "Poor" — see roadsConditionFilter prop
-// Road Agency, e.g. "KeNHA" — see roadsAgencyFilter prop (substring match).
+const roadClassFilter   = ref('')   // Road Class, e.g. "A" / "D" - see UaptsMap's roadsClassFilter prop
+const conditionFilter   = ref('')   // Surface Condition, e.g. "Poor" - see roadsConditionFilter prop
+// Road Agency, e.g. "KeNHA" - see roadsAgencyFilter prop (substring match).
 // roadAgencyFilterInput is what the text box binds to, updating on every
 // keystroke; roadAgencyFilter is the debounced value that actually drives
 // the map + URL, so typing doesn't tear down/rebuild the whole roads tile
@@ -430,7 +429,7 @@ watch(roadAgencyFilterInput, (v) => {
   if (agencyFilterTimer) clearTimeout(agencyFilterTimer)
   agencyFilterTimer = setTimeout(() => { roadAgencyFilter.value = v.trim() }, 300)
 })
-// County, e.g. "Nairobi" — see roadsCountyFilter prop. Deliberately named
+// County, e.g. "Nairobi" - see roadsCountyFilter prop. Deliberately named
 // apart from selectedCounty below - that one's the boundary-click
 // highlight (a different feature, unrelated to this road filter).
 const roadCountyFilter  = ref('')
@@ -579,7 +578,7 @@ async function load(opts: { force?: boolean } = {}) {
   if (myToken !== requestToken) { loading.value = false; return } // superseded by a newer load
 
   settled.forEach((result, i) => {
-    const key = keys[i]
+    const key = keys[i]!
     if (result.status === 'fulfilled') {
       clearLayerError(key)
       if (key === 'boundary') boundary.value = result.value
@@ -706,7 +705,7 @@ async function refreshViewportData() {
   if (myToken !== requestToken) return // a newer viewport change (or manual load) superseded this
 
   settled.forEach((result, i) => {
-    const key = keys[i]
+    const key = keys[i]!
     if (result.status === 'fulfilled') {
       clearLayerError(key)
       if (key === 'routes') gisRoutes.value = result.value
@@ -953,10 +952,10 @@ function onSearchKeydown(e: KeyboardEvent) {
   display: grid;
   grid-template-columns: 272px 1fr;
   gap: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
 }
 @media (max-width: 900px) {
@@ -965,8 +964,8 @@ function onSearchKeydown(e: KeyboardEvent) {
 
 /* ── Left panel ──────────────────────────────────────────────────── */
 .gis-panel {
-  background: #f8fafc;
-  border-right: 1px solid #e2e8f0;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -975,7 +974,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 
 .panel-section {
   padding: 14px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .panel-section-title {
@@ -983,7 +982,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: var(--fg-3);
   margin-bottom: 10px;
   display: flex;
   align-items: center;
@@ -1008,7 +1007,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   margin-bottom: 2px;
   user-select: none;
 }
-.layer-row:hover { background: #f1f5f9; }
+.layer-row:hover { background: var(--surface-quiet); }
 .layer-row:focus-visible { outline: 2px solid #6366f1; outline-offset: 1px; }
 
 .layer-swatch {
@@ -1023,18 +1022,18 @@ function onSearchKeydown(e: KeyboardEvent) {
 .layer-name {
   flex: 1;
   font-size: 13px;
-  color: #1e293b;
+  color: var(--fg-1);
   font-weight: 500;
   transition: color 0.15s;
 }
-.layer-dim { color: #94a3b8; }
+.layer-dim { color: var(--fg-3); }
 
 .layer-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 8px;
-  background: #e2e8f0;
-  color: #64748b;
+  background: var(--surface-sunken);
+  color: var(--fg-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1043,15 +1042,15 @@ function onSearchKeydown(e: KeyboardEvent) {
   width: 32px;
   height: 18px;
   border-radius: 9px;
-  background: #e2e8f0;
-  border: 1.5px solid #cbd5e1;
+  background: var(--surface-sunken);
+  border: 1.5px solid var(--border-interactive);
   position: relative;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
 }
 .layer-switch.on {
-  background: #2563eb;
-  border-color: #3b82f6;
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
 }
 .layer-thumb {
   position: absolute;
@@ -1060,7 +1059,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--fg-3);
   transition: transform 0.15s, background 0.15s;
 }
 .layer-switch.on .layer-thumb {
@@ -1072,11 +1071,11 @@ function onSearchKeydown(e: KeyboardEvent) {
 .panel-select {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   font-size: 12px;
-  background: #fff;
-  color: #374151;
+  background: var(--surface-2);
+  color: var(--fg-2);
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -1085,28 +1084,28 @@ function onSearchKeydown(e: KeyboardEvent) {
   cursor: pointer;
   transition: border-color 0.12s;
 }
-.panel-select:hover { border-color: #cbd5e1; }
-.panel-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
+.panel-select:hover { border-color: var(--border-interactive); }
+.panel-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-wash); }
 
 .panel-text-input {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   font-size: 12px;
-  background: #fff;
-  color: #374151;
+  background: var(--surface-2);
+  color: var(--fg-2);
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.panel-text-input::placeholder { color: #94a3b8; }
-.panel-text-input:hover { border-color: #cbd5e1; }
-.panel-text-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
+.panel-text-input::placeholder { color: var(--fg-3); }
+.panel-text-input:hover { border-color: var(--border-interactive); }
+.panel-text-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-wash); }
 
 /* ── Detail slider ───────────────────────────────────────────────── */
 .detail-label {
   font-size: 10px;
   font-weight: 600;
-  color: #2563eb;
+  color: var(--primary);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -1116,7 +1115,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   appearance: none;
   height: 4px;
   border-radius: 2px;
-  background: #e2e8f0;
+  background: var(--surface-sunken);
   outline: none;
   margin: 6px 0 4px;
   cursor: pointer;
@@ -1126,8 +1125,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
-  border: 2.5px solid #3b82f6;
+  background: var(--surface-2);
+  border: 2.5px solid var(--primary);
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0,0,0,.15);
 }
@@ -1135,8 +1134,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
-  border: 2.5px solid #3b82f6;
+  background: var(--surface-2);
+  border: 2.5px solid var(--primary);
   cursor: pointer;
 }
 
@@ -1144,7 +1143,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  color: #cbd5e1;
+  color: var(--fg-3);
   margin-top: 2px;
 }
 
@@ -1175,8 +1174,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   background: currentColor;
 }
 
-.legend-text { font-size: 12px; color: #475569; flex: 1; }
-.legend-agency { font-size: 10px; color: #cbd5e1; white-space: nowrap; }
+.legend-text { font-size: 12px; color: var(--fg-2); flex: 1; }
+.legend-agency { font-size: 10px; color: var(--fg-3); white-space: nowrap; }
 
 /* ── Stats ───────────────────────────────────────────────────────── */
 .panel-stats { flex: 1; }
@@ -1186,7 +1185,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   align-items: center;
   gap: 8px;
   padding: 5px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .stat-dot {
@@ -1197,21 +1196,21 @@ function onSearchKeydown(e: KeyboardEvent) {
   transition: background 0.15s;
 }
 
-.stat-label { flex: 1; font-size: 12px; color: #64748b; }
+.stat-label { flex: 1; font-size: 12px; color: var(--fg-2); }
 
 .stat-val {
   font-size: 12px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--fg-3);
   font-variant-numeric: tabular-nums;
 }
-.stat-ok  { color: #16a34a; }
-.stat-off { color: #cbd5e1; }
+.stat-ok  { color: var(--success-fg); }
+.stat-off { color: var(--fg-3); }
 
 .stat-total {
   margin-top: 8px;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--fg-3);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -1219,9 +1218,9 @@ function onSearchKeydown(e: KeyboardEvent) {
 /* ── Agency footer ───────────────────────────────────────────────── */
 .panel-footer {
   padding: 12px 16px 16px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--border-subtle);
   margin-top: auto;
-  background: #f8fafc;
+  background: var(--surface-1);
 }
 
 .panel-footer-title {
@@ -1229,7 +1228,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #cbd5e1;
+  color: var(--fg-3);
   margin-bottom: 8px;
 }
 
@@ -1243,9 +1242,9 @@ function onSearchKeydown(e: KeyboardEvent) {
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 4px;
-  background: #fff;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-2);
+  color: var(--fg-2);
+  border: 1px solid var(--border-subtle);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -1254,7 +1253,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 .gis-map-col {
   display: flex;
   flex-direction: column;
-  background: #f1f5f9;
+  background: var(--surface-sunken);
 }
 
 .gis-map-wrap {
@@ -1266,16 +1265,16 @@ function onSearchKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f5f9;
+  background: var(--surface-sunken);
 }
 .map-placeholder-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  color: #94a3b8;
+  color: var(--fg-3);
 }
-.map-placeholder-inner svg { color: #cbd5e1; }
+.map-placeholder-inner svg { color: var(--fg-3); }
 .map-placeholder-inner span { font-size: 13px; }
 
 /* Loading overlay - stays dark for contrast against map tiles */
@@ -1319,16 +1318,16 @@ function onSearchKeydown(e: KeyboardEvent) {
   gap: 0;
   padding: 0 14px;
   height: 30px;
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
+  background: var(--surface-1);
+  border-top: 1px solid var(--border-subtle);
   font-size: 11px;
-  color: #64748b;
+  color: var(--fg-2);
   flex-shrink: 0;
 }
 
 .statusbar-item { white-space: nowrap; }
-.statusbar-dim  { color: #94a3b8; }
-.statusbar-sep  { width: 1px; height: 12px; background: #e2e8f0; margin: 0 10px; flex-shrink: 0; }
+.statusbar-dim  { color: var(--fg-3); }
+.statusbar-sep  { width: 1px; height: 12px; background: var(--border-subtle); margin: 0 10px; flex-shrink: 0; }
 .statusbar-spacer { flex: 1; }
 
 .statusbar-dot {
@@ -1339,9 +1338,9 @@ function onSearchKeydown(e: KeyboardEvent) {
   margin-right: 5px;
   vertical-align: middle;
 }
-.statusbar-dot.ready   { background: #22c55e; }
+.statusbar-dot.ready   { background: var(--success); }
 .statusbar-dot.loading {
-  background: #f59e0b;
+  background: var(--warning);
   animation: pulse 1s ease-in-out infinite;
 }
 @keyframes pulse {
@@ -1361,10 +1360,10 @@ function onSearchKeydown(e: KeyboardEvent) {
   padding: 5px 0;
   font-size: 11px;
   font-weight: 600;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--border-subtle);
   border-radius: 6px;
-  background: #fff;
-  color: #64748b;
+  background: var(--surface-2);
+  color: var(--fg-2);
   cursor: pointer;
   transition: all 0.12s;
   text-align: center;
@@ -1405,22 +1404,22 @@ function onSearchKeydown(e: KeyboardEvent) {
   left: 9px;
   width: 14px;
   height: 14px;
-  color: #94a3b8;
+  color: var(--fg-3);
   pointer-events: none;
 }
 
 .search-input {
   width: 100%;
   padding: 7px 28px 7px 30px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   font-size: 12.5px;
-  background: #fff;
-  color: #1e293b;
+  background: var(--surface-2);
+  color: var(--fg-1);
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.search-input::placeholder { color: #94a3b8; }
-.search-input:hover { border-color: #cbd5e1; }
+.search-input::placeholder { color: var(--fg-3); }
+.search-input:hover { border-color: var(--border-interactive); }
 .search-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, .12); }
 
 .search-clear {
@@ -1434,12 +1433,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #94a3b8;
+  color: var(--fg-3);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
 }
-.search-clear:hover { background: #f1f5f9; color: #475569; }
+.search-clear:hover { background: var(--surface-quiet); color: var(--fg-2); }
 
 .search-results {
   position: absolute;
@@ -1450,8 +1449,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   max-height: 240px;
@@ -1475,18 +1474,18 @@ function onSearchKeydown(e: KeyboardEvent) {
   color: #a5b4fc;
   flex-shrink: 0;
 }
-.search-result-name { font-size: 12.5px; color: #1e293b; }
-.search-empty { margin-top: 6px; font-size: 11.5px; color: #94a3b8; padding: 0 2px; }
+.search-result-name { font-size: 12.5px; color: var(--fg-1); }
+.search-empty { margin-top: 6px; font-size: 11.5px; color: var(--fg-3); padding: 0 2px; }
 
 /* ── Section hint / inline layer error ──────────────────────────────── */
-.section-hint { margin: 6px 0 0; font-size: 11px; color: #94a3b8; line-height: 1.4; }
+.section-hint { margin: 6px 0 0; font-size: 11px; color: var(--fg-3); line-height: 1.4; }
 .layer-error {
   margin: 2px 0 6px;
   padding: 5px 8px;
   border-radius: 6px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  border: 1px solid color-mix(in srgb, var(--danger-fg) 28%, transparent);
+  color: var(--danger-fg);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -1494,21 +1493,15 @@ function onSearchKeydown(e: KeyboardEvent) {
 /* ── Header actions ──────────────────────────────────────────────────── */
 .btn-ghost {
   background: transparent;
-  border: 1px solid #e2e8f0;
-  color: #475569;
+  border: 1px solid var(--border-subtle);
+  color: var(--fg-2);
 }
-.btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; }
-.btn-icon { display: inline-block; }
-.btn-icon.spinning { animation: spin 0.7s linear infinite; }
+.btn-ghost:hover { background: var(--surface-1); border-color: var(--border-interactive); }
+.reload-icon { display: inline-block; }
+.reload-icon.spinning { animation: spin 0.7s linear infinite; }
 
 /* ── Misc ────────────────────────────────────────────────────────── */
 .error-banner {
-  margin: 0 0 12px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  background: #fef9c3;
-  border: 1px solid #ca8a04;
-  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1524,7 +1517,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #92400e;
+  color: var(--warning-fg);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;

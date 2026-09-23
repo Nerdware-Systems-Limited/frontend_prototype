@@ -58,6 +58,20 @@ describe('useAuthStore', () => {
     expect(JSON.parse(localStorage.getItem('uapts_user')!).email).toBe('a@ntsa.go.ke')
   })
 
+  it('login() sends a bare identifier as `username`, not `email`', async () => {
+    $fetchMock.mockResolvedValueOnce({
+      access: 'A', refresh: 'R', user: { id: 'u2', email: 'a@ntsa.go.ke', username: 'jdoe', role_type: 'admin' },
+    })
+    const s = useAuthStore()
+    await s.login('jdoe', 'pw', true)
+
+    expect($fetchMock).toHaveBeenCalledWith('/api/v1/auth/login/', expect.objectContaining({
+      method: 'POST',
+      body: { username: 'jdoe', password: 'pw' },
+    }))
+    expect(s.isAuthenticated).toBe(true)
+  })
+
   it('login() with remember=false persists to sessionStorage', async () => {
     $fetchMock.mockResolvedValueOnce({
       access: 'A', refresh: 'R', user: { id: 'u', email: 'x@x.x', role_type: 'public' },

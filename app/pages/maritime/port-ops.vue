@@ -25,54 +25,58 @@
     <KpiCard
       label="Active Ports"
       :value="opsData ? fmtNum(opsData.kpis.active_ports) : '-'"
-      sub="KPA operational"
-      source="live" source-title="KPA"
+      :unavailable="!opsData" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" description="KPA operational" to="#port-performance"
     />
     <KpiCard
       label="Live Vessels"
       :value="opsData ? fmtNum(opsData.kpis.live_vessels) : '-'"
-      sub="Currently in port"
-      source="live" source-title="KMA AIS"
+      :unavailable="!opsData" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      period="LIVE" description="Currently in port" to="#port-performance"
     />
     <KpiCard
       label="Avg Yard Dwell"
       :value="avgDwell ? `${avgDwell.toFixed(1)} days` : '-'"
-      sub="Network-wide average"
-      :trend-direction="avgDwell && avgDwell <= 5 ? 'up' : 'down'"
-      source="batch" source-title="KPA"
+      :unavailable="!opsData" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="30D" description="Network-wide average"
+      :status="avgDwell == null ? undefined : avgDwell <= 5 ? 'healthy' : 'warning'"
+      to="#yard-dwell-table"
     />
     <KpiCard
       label="Total TEU (30d)"
       :value="fmtNum(totalTEU)"
-      sub="All ports"
-      trend-direction="up"
-      source="batch" source-title="KPA"
+      :unavailable="!opsData" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="30D" description="All ports"
+      :series="teuSeries"
+      to="#container-trend"
     />
     <KpiCard
       label="Berths (Total)"
       :value="fmtNum(berths.length)"
-      sub="Across all ports"
-      source="batch" source-title="KPA"
+      :unavailable="loading || berthsError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" description="Across all ports" to="#berth-directory"
     />
     <KpiCard
       label="Active Berths"
       :value="fmtNum(berths.filter(b => b.active).length)"
-      :sub="`${berths.length > 0 ? ((berths.filter(b => b.active).length / berths.length) * 100).toFixed(0) : 0}% operational`"
-      source="batch" source-title="KPA"
+      :unavailable="loading || berthsError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE"
+      :description="`${berths.length > 0 ? ((berths.filter(b => b.active).length / berths.length) * 100).toFixed(0) : 0}% operational`"
+      to="#berth-directory"
     />
   </div>
 
   <!-- Per-port performance cards -->
   <SectionTitle pill="KPA · 30d">Port Performance Dashboard</SectionTitle>
 
-  <div class="port-grid">
+  <div id="port-performance" class="port-grid drill-target">
     <div v-for="p in (opsData?.ports ?? [])" :key="p.port_unlocode" class="port-perf-card">
       <div class="ppc-header">
         <div>
           <div style="font-size:15px;font-weight:800">{{ p.port_name }}</div>
-          <div style="font-size:12px;color:#64748b">{{ p.port_unlocode }} · {{ p.port_type }}</div>
+          <div style="font-size:12px;color:var(--fg-2)">{{ p.port_unlocode }} · {{ p.port_type }}</div>
         </div>
-        <div class="ppc-vessels">{{ p.currently_in_port }}<span style="font-size:11px;color:#94a3b8"> vessels</span></div>
+        <div class="ppc-vessels">{{ p.currently_in_port }}<span style="font-size:11px;color:var(--fg-3)"> vessels</span></div>
       </div>
       <div class="ppc-kpis">
         <div class="ppc-kpi">
@@ -84,29 +88,29 @@
           <div class="ppc-label">Departures (30d)</div>
         </div>
         <div class="ppc-kpi">
-          <div class="ppc-val" style="color:#3b82f6">{{ fmtNum(p.teu_throughput_30d) }}</div>
+          <div class="ppc-val" style="color:var(--primary)">{{ fmtNum(p.teu_throughput_30d) }}</div>
           <div class="ppc-label">TEU (30d)</div>
         </div>
         <div class="ppc-kpi">
-          <div class="ppc-val" :style="{ color: p.avg_yard_dwell_days > 7 ? '#ef4444' : p.avg_yard_dwell_days > 4 ? '#f59e0b' : '#22c55e' }">
+          <div class="ppc-val" :style="{ color: p.avg_yard_dwell_days > 7 ? 'var(--danger-fg)' : p.avg_yard_dwell_days > 4 ? 'var(--warning-fg)' : 'var(--success-fg)' }">
             {{ p.avg_yard_dwell_days.toFixed(1) }}d
           </div>
           <div class="ppc-label">Avg Dwell</div>
         </div>
       </div>
       <div class="dwell-indicator">
-        <span style="font-size:11px;color:#64748b">Dwell vs 5-day target</span>
+        <span style="font-size:11px;color:var(--fg-2)">Dwell vs 5-day target</span>
         <div class="di-bar-wrap">
           <div class="di-bar"
             :style="{
-              width: `${Math.min(100, (p.avg_yard_dwell_days / 5) * 100)}%`,
-              background: p.avg_yard_dwell_days > 7 ? '#ef4444' : p.avg_yard_dwell_days > 4 ? '#f59e0b' : '#22c55e'
+              transform: `scaleX(${Math.min(100, (p.avg_yard_dwell_days / 5) * 100) / 100})`,
+              background: p.avg_yard_dwell_days > 7 ? 'var(--destructive)' : p.avg_yard_dwell_days > 4 ? 'var(--warning)' : 'var(--success)'
             }"
           />
         </div>
       </div>
     </div>
-    <div v-if="!opsData?.ports.length" class="card" style="padding:16px;color:#94a3b8">
+    <div v-if="!opsData?.ports.length" class="card" style="padding:16px;color:var(--fg-3)">
       {{ loading ? 'Loading port data…' : 'No port performance data.' }}
     </div>
   </div>
@@ -114,7 +118,7 @@
   <!-- Container 60-day trend -->
   <SectionTitle pill="KPA · 60d trend">Container Throughput Trend</SectionTitle>
 
-  <div class="card">
+  <div id="container-trend" class="card drill-target">
     <div class="card-body">
       <div v-if="containerTrend.length" class="trend-chart">
         <div v-for="(t, i) in containerTrend" :key="i" class="tc-col">
@@ -124,7 +128,7 @@
             class="tc-bar"
             :style="{
               height: `${maxTrendTEU > 0 ? ((t.teus ?? t.count ?? 0) / maxTrendTEU) * 100 : 0}%`,
-              background: '#3b82f6',
+              background: 'var(--primary-fill)',
             }"
             :title="`${t.date ?? t.period}: ${fmtNum(t.teus ?? t.count ?? 0)} TEU`"
           />
@@ -132,7 +136,7 @@
           <div class="tc-label" v-else />
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading trend…' : 'No container trend data.' }}</div>
+      <EmptyState v-else :loading="loading" message="No container trend data." compact />
     </div>
   </div>
 
@@ -152,7 +156,7 @@
 
   <SectionTitle pill="KPA · Berth Registry">Berth Directory & Status</SectionTitle>
 
-  <div class="card">
+  <div id="berth-directory" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="berthTypeFilter" class="select-sm">
@@ -181,7 +185,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredBerths.length">
-          <tr v-for="b in filteredBerths" :key="b.id">
+          <tr v-for="b in berthsPageRows" :key="b.id">
             <td style="font-family:monospace;font-weight:700">{{ b.berth_code }}</td>
             <td style="font-size:13px">{{ b.name }}</td>
             <td><BadgePill variant="info">{{ b.berth_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -194,16 +198,20 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading berths…' : 'No berths match filters.' }}</td></tr>
+          <tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading berths…' : 'No berths match filters.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="berthsPage" :total-pages="berthsTotalPages" :total="berthsTotal"
+        @prev="berthsPrev" @next="berthsNext"
+      />
     </div>
   </div>
 
   <!-- Yard dwell breakdown -->
   <SectionTitle pill="KPA · Dwell Analysis">Yard Dwell by Direction</SectionTitle>
 
-  <div class="card">
+  <div id="yard-dwell-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -217,11 +225,11 @@
           </tr>
         </thead>
         <tbody v-if="yardDwell.length">
-          <tr v-for="d in yardDwell.slice(0, 30)" :key="d.id ?? `${d.port}${d.direction}`">
+          <tr v-for="d in dwellPageRows" :key="d.id ?? `${d.port}${d.direction}`">
             <td style="font-size:12px;font-weight:600">{{ d.port_name ?? d.port }}</td>
             <td><BadgePill :variant="dirBadge(d.direction)">{{ d.direction }}</BadgePill></td>
             <td>{{ fmtNum(d.container_count) }}</td>
-            <td :style="{ color: d.avg_dwell_days > 7 ? '#ef4444' : d.avg_dwell_days > 4 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+            <td :style="{ color: d.avg_dwell_days > 7 ? 'var(--danger-fg)' : d.avg_dwell_days > 4 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ d.avg_dwell_days?.toFixed(1) }}
             </td>
             <td>{{ d.max_dwell_days?.toFixed(1) ?? '-' }}</td>
@@ -229,17 +237,19 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No dwell data.' }}</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No dwell data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="dwellPage" :total-pages="dwellTotalPages" :total="dwellTotal"
+        @prev="dwellPrev" @next="dwellNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Port Operations')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Berth } from '~/composables/api'
 
@@ -253,6 +263,7 @@ const containerTrend = ref<any[]>([])
 const yardDwell      = ref<any[]>([])
 const loading        = ref(true)
 const error          = ref<string | null>(null)
+const berthsError    = ref(false)
 const lastRefreshed  = ref('-')
 const portFilter     = ref('')
 const berthTypeFilter = ref('')
@@ -274,6 +285,8 @@ async function load() {
   if (trendRes.status === 'fulfilled') containerTrend.value = (trendRes.value as any).results ?? []
   if (dwellRes.status === 'fulfilled') yardDwell.value      = (dwellRes.value as any).results ?? []
 
+  berthsError.value = beRes.status === 'rejected'
+
   if ([opRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime API.'
 
@@ -294,9 +307,24 @@ const avgDwell = computed(() => {
   return ports.reduce((s, p) => s + p.avg_yard_dwell_days, 0) / ports.length
 })
 const maxTrendTEU    = computed(() => Math.max(1, ...containerTrend.value.map(t => t.teus ?? t.count ?? 0)))
+const teuSeries = computed(() => {
+  const t = containerTrend.value.map(x => x.teus ?? x.count ?? 0)
+  return t.length > 1 ? t : undefined
+})
 const filteredBerths = computed(() =>
   berths.value.filter(b => !berthTypeFilter.value || b.berth_type === berthTypeFilter.value),
 )
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: berthsPageRows, page: berthsPage, totalPages: berthsTotalPages,
+  total: berthsTotal, next: berthsNext, prev: berthsPrev,
+} = usePagination(filteredBerths, 15)
+
+const {
+  pageRows: dwellPageRows, page: dwellPage, totalPages: dwellTotalPages,
+  total: dwellTotal, next: dwellNext, prev: dwellPrev,
+} = usePagination(yardDwell, 15)
 
 const portMarkers = computed((): MarkerSpec[] =>
   (opsData.value?.ports ?? []).map((p, i) => {
@@ -334,27 +362,23 @@ function dirBadge(d: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .port-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin-bottom:16px; }
-.port-perf-card { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.port-perf-card { background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:8px; padding:14px 16px; }
 .ppc-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
-.ppc-vessels { font-size:22px; font-weight:800; color:#1e293b; text-align:right; }
+.ppc-vessels { font-size:22px; font-weight:800; color:var(--fg-1); text-align:right; }
 .ppc-kpis { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
 .ppc-kpi { text-align:center; }
 .ppc-val { font-size:14px; font-weight:700; }
-.ppc-label { font-size:10px; color:#94a3b8; margin-top:1px; }
+.ppc-label { font-size:10px; color:var(--fg-3); margin-top:1px; }
 .dwell-indicator { }
-.di-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-top:3px; }
-.di-bar { height:100%; border-radius:4px; transition:width .5s; }
+.di-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-top:3px; }
+.di-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .5s; }
 .trend-chart { display:flex; align-items:flex-end; gap:2px; height:120px; overflow-x:auto; }
 .tc-col { display:flex; flex-direction:column; align-items:center; min-width:10px; flex:1; }
-.tc-tip { font-size:7px; color:#64748b; height:12px; }
+.tc-tip { font-size:7px; color:var(--fg-2); height:12px; }
 .tc-bar { width:80%; border-radius:2px 2px 0 0; min-height:2px; }
-.tc-label { font-size:7px; color:#94a3b8; margin-top:2px; white-space:nowrap; }
+.tc-label { height:9px; line-height:9px; font-size:7px; color:var(--fg-3); margin-top:2px; white-space:nowrap; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 </style>

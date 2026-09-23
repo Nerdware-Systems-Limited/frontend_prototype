@@ -114,7 +114,7 @@ export interface TrainingEnrollment {
   updated_at: string
 }
 
-// Serialized via TrainingEnrollmentListSerializer (lightweight — no cohort_detail nesting).
+// Serialized via TrainingEnrollmentListSerializer (lightweight - no cohort_detail nesting).
 export interface TrainingEnrollmentSummary {
   id: string
   cohort: string
@@ -210,7 +210,7 @@ export interface TrainingQuery {
   ordering?: string
 }
 
-// GET /cohorts/{id}/stats/ — custom rollup, not a TrainingCohort.
+// GET /cohorts/{id}/stats/ - custom rollup, not a TrainingCohort.
 export interface TrainingCohortStats {
   cohort_id: string
   cohort_code: string
@@ -226,7 +226,7 @@ export interface TrainingCohortStats {
   revenue_total_kes: number | string
 }
 
-// GET /revenue/summary/ — monthly aggregation, not a TrainingRevenue row.
+// GET /revenue/summary/ - monthly aggregation, not a TrainingRevenue row.
 export interface TrainingRevenueAggregate {
   period: string
   revenue_stream: RevenueStream
@@ -247,7 +247,7 @@ export function useTraining() {
       is_active?: boolean
       name?: string
     }) =>
-      $api<Paged<TrainingCourse>>('/api/v1/training/courses/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingCourse>>('/api/v1/training/courses/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     course: (id: string) =>
       $api<TrainingCourse>(`/api/v1/training/courses/${id}/`),
@@ -257,7 +257,7 @@ export function useTraining() {
       start_date_to?: string
       facilitator?: number
     }) =>
-      $api<Paged<TrainingCohort>>('/api/v1/training/cohorts/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingCohort>>('/api/v1/training/cohorts/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     cohort: (id: string) =>
       $api<TrainingCohort>(`/api/v1/training/cohorts/${id}/`),
@@ -265,11 +265,11 @@ export function useTraining() {
     cohortStats: (id: string) =>
       $api<TrainingCohortStats>(`/api/v1/training/cohorts/${id}/stats/`),
 
-    // Custom @action — returns a bare array, not a paginated envelope.
+    // Custom @action - returns a bare array, not a paginated envelope.
     cohortEnrollments: (id: string) =>
       $api<TrainingEnrollment[]>(`/api/v1/training/cohorts/${id}/enrollments/`),
 
-    // Custom @action — returns a bare array, not a paginated envelope.
+    // Custom @action - returns a bare array, not a paginated envelope.
     cohortSessions: (id: string) =>
       $api<TrainingSession[]>(`/api/v1/training/cohorts/${id}/sessions/`),
 
@@ -280,7 +280,7 @@ export function useTraining() {
       enrolled_at_from?: string
       enrolled_at_to?: string
     }) =>
-      $api<Paged<TrainingEnrollment>>('/api/v1/training/enrollments/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingEnrollment>>('/api/v1/training/enrollments/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     sessions: (q?: TrainingQuery & {
       session_type?: string
@@ -288,7 +288,7 @@ export function useTraining() {
       scheduled_from?: string
       scheduled_to?: string
     }) =>
-      $api<Paged<TrainingSession>>('/api/v1/training/sessions/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingSession>>('/api/v1/training/sessions/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     attendance: (q?: TrainingQuery & {
       session?: string
@@ -296,17 +296,17 @@ export function useTraining() {
       national_id?: string
     }) =>
       // Note: filter param is `status` (already on TrainingQuery), not `attendance_status`.
-      $api<Paged<TrainingAttendance>>('/api/v1/training/attendance/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingAttendance>>('/api/v1/training/attendance/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     completions: (q?: TrainingQuery & { outcome?: string }) =>
-      $api<Paged<TrainingCompletion>>('/api/v1/training/completions/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingCompletion>>('/api/v1/training/completions/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     revenue: (q?: TrainingQuery & {
       revenue_stream?: string
       received_at_from?: string
       received_at_to?: string
     }) =>
-      $api<Paged<TrainingRevenue>>('/api/v1/training/revenue/', { query: cleanQuery(q) }),
+      $api<Paged<TrainingRevenue>>('/api/v1/training/revenue/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     revenueSummary: (q?: {
       institute?: number
@@ -316,6 +316,6 @@ export function useTraining() {
       received_at_to?: string
     }) =>
       // Monthly aggregation rows, not TrainingRevenue ledger entries.
-      $api<TrainingRevenueAggregate[]>('/api/v1/training/revenue/summary/', { query: cleanQuery(q) }),
+      $api<TrainingRevenueAggregate[]>('/api/v1/training/revenue/summary/', { query: cleanQuery(q as Record<string, unknown>) }),
   }
 }

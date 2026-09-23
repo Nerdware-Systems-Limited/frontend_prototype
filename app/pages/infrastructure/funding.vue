@@ -29,19 +29,58 @@
   <!-- KPI ribbon -->
   <SectionTitle :pill="agencyLabel">Funding KPIs</SectionTitle>
   <div class="kpi-grid">
-    <KpiCard label="Total Allocated" :value="kpi.allocated ? `KES ${fmtKES(kpi.allocated)}` : '-'" :sub="`Latest FY per agency · ${agencyLabel}`" source="batch" source-title="National Treasury" />
-    <KpiCard label="Disbursed" :value="kpi.disbursed ? `KES ${fmtKES(kpi.disbursed)}` : '-'" :sub="kpi.allocated ? `${((kpi.disbursed / kpi.allocated) * 100).toFixed(1)}% of allocation` : '-'" trend-direction="up" source="batch" source-title="National Treasury" />
-    <KpiCard label="Committed" :value="kpi.committed ? `KES ${fmtKES(kpi.committed)}` : '-'" sub="Contractually obligated" source="batch" source-title="Agency PMU" />
-    <KpiCard label="Balance" :value="kpi.balance != null ? `KES ${fmtKES(kpi.balance)}` : '-'" sub="Allocated minus disbursed" :trend-direction="kpi.balance != null && kpi.balance >= 0 ? 'up' : 'down'" source="batch" source-title="National Treasury" />
-    <KpiCard label="Absorption Rate" :value="kpi.absorptionPct != null ? `${kpi.absorptionPct.toFixed(1)}%` : '-'" sub="Disbursed / allocated" :trend-direction="kpi.absorptionPct != null && kpi.absorptionPct >= 70 ? 'up' : 'down'" source="batch" source-title="National Treasury" />
-    <KpiCard label="Allocation / km" :value="kpi.perKm != null ? `KES ${fmtKES(kpi.perKm)}` : '-'" :sub="`Across ${fmtNum(kpi.networkKm,0)} km network`" source="batch" source-title="Computed" />
-    <KpiCard label="AI-Flagged Critical Needs" :value="fmtNum(atRisk.length)" sub="At-risk segments (12mo) - proxy for unfunded need" trend-direction="down" source="batch" source-title="ML Model" />
-    <KpiCard label="Avg Utilization" :value="kpi.avgUtilization != null ? `${kpi.avgUtilization.toFixed(1)}%` : '-'" :sub="`${agencyBudgetsScoped.length} budget line(s)`" source="batch" source-title="Agency PMU" />
+    <KpiCard
+      label="Total Allocated" :value="kpi.allocated ? `KES ${fmtKES(kpi.allocated)}` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" :description="`Latest FY per agency · ${agencyLabel}`" to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="Disbursed" :value="kpi.disbursed ? `KES ${fmtKES(kpi.disbursed)}` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" :description="kpi.allocated ? `${((kpi.disbursed / kpi.allocated) * 100).toFixed(1)}% of allocation` : ''"
+      to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="Committed" :value="kpi.committed ? `KES ${fmtKES(kpi.committed)}` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" description="Contractually obligated" to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="Balance" :value="kpi.balance != null ? `KES ${fmtKES(kpi.balance)}` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" description="Allocated minus disbursed"
+      :status="loading || budgetsError || kpi.balance == null ? undefined : kpi.balance >= 0 ? 'healthy' : 'warning'"
+      to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="Absorption Rate" :value="kpi.absorptionPct != null ? `${kpi.absorptionPct.toFixed(1)}%` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" description="Disbursed / allocated"
+      :status="loading || budgetsError || kpi.absorptionPct == null ? undefined : kpi.absorptionPct >= 70 ? 'healthy' : 'warning'"
+      to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="Allocation / km" :value="kpi.perKm != null ? `KES ${fmtKES(kpi.perKm)}` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'Computed feed unavailable'"
+      period="LIVE" :description="`Across ${fmtNum(kpi.networkKm,0)} km network`" to="#budget-allocations-list"
+    />
+    <KpiCard
+      label="AI-Flagged Critical Needs" :value="fmtNum(atRisk.length)"
+      :unavailable="loading || atRiskError" :unavailable-note="loading ? 'Loading…' : 'ML Model feed unavailable'"
+      period="12MO" description="At-risk segments (12mo) - proxy for unfunded need"
+      :status="loading || atRiskError ? undefined : atRisk.length > 0 ? 'warning' : 'healthy'"
+      to="/infrastructure/maintenance"
+    />
+    <KpiCard
+      label="Avg Utilization" :value="kpi.avgUtilization != null ? `${kpi.avgUtilization.toFixed(1)}%` : '-'"
+      :unavailable="loading || budgetsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" :description="`${agencyBudgetsScoped.length} budget line(s)`" to="#budget-allocations-list"
+    />
   </div>
 
   <!-- Budget allocations by fiscal year and agency -->
   <SectionTitle pill="National Treasury · Batch">Budget Allocations by Fiscal Year ({{ agencyLabel }})</SectionTitle>
-  <div class="card">
+  <div id="budget-allocations-list" class="card drill-target">
     <div class="card-body">
       <!-- Quick agency switch - duplicates the page-level tabs so you don't
            have to scroll back up to change which agency this table shows. -->
@@ -60,24 +99,24 @@
           <div class="bi-bars">
             <div class="bi-bar-row">
               <span>Allocated</span>
-              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#3b82f6;width:100%" /></div>
+              <div class="bi-bar-wrap"><div class="bi-bar" :style="{ background: 'var(--primary-fill)', transform: 'scaleX(1)' }" /></div>
               <span class="bi-val">KES {{ fmtKES(b.allocated_kes) }}</span>
             </div>
             <div class="bi-bar-row">
               <span>Disbursed</span>
-              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#22c55e" :style="{ width: `${budgetPct(b.disbursed_kes, b.allocated_kes)}%` }" /></div>
+              <div class="bi-bar-wrap"><div class="bi-bar" :style="{ background: 'var(--success)', transform: `scaleX(${budgetPct(b.disbursed_kes, b.allocated_kes) / 100})` }" /></div>
               <span class="bi-val">KES {{ fmtKES(b.disbursed_kes) }}</span>
             </div>
             <div class="bi-bar-row">
               <span>Committed</span>
-              <div class="bi-bar-wrap"><div class="bi-bar" style="background:#f59e0b" :style="{ width: `${budgetPct(b.committed_kes, b.allocated_kes)}%` }" /></div>
+              <div class="bi-bar-wrap"><div class="bi-bar" :style="{ background: 'var(--warning)', transform: `scaleX(${budgetPct(b.committed_kes, b.allocated_kes) / 100})` }" /></div>
               <span class="bi-val">KES {{ fmtKES(b.committed_kes) }}</span>
             </div>
           </div>
           <div v-if="b.notes" class="bi-notes">{{ b.notes }}</div>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading budget data…' : 'No funding allocation data available.' }}</div>
+      <EmptyState v-else :loading="loading" message="No funding allocation data available." compact />
     </div>
   </div>
 
@@ -94,7 +133,7 @@
             <BadgePill :variant="r.flag ? 'warning' : 'success'">{{ r.flag ? 'low PCI, low spend' : 'aligned' }}</BadgePill>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'Not enough agency-linked data to compute.' }}</div>
+        <EmptyState v-else :loading="loading" message="Not enough agency-linked data to compute." compact />
       </div>
     </div>
 
@@ -108,7 +147,7 @@
             <BadgePill :variant="r.flag ? 'danger' : 'success'">{{ r.flag ? 'funding ahead of work' : 'aligned' }}</BadgePill>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'Not enough agency-linked data to compute.' }}</div>
+        <EmptyState v-else :loading="loading" message="Not enough agency-linked data to compute." compact />
       </div>
     </div>
   </div>
@@ -120,7 +159,7 @@
         <div v-if="lowDisbursement.length">
           <AlertItem v-for="b in lowDisbursement" :key="b.id" severity="warning" :title="`${b.agency_code ?? 'Unknown'} - FY${b.fiscal_year}`" :meta="`Utilization ${b.utilization_pct.toFixed(1)}% · Allocated KES ${fmtKES(b.allocated_kes)}`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No budget lines with utilization below 30%.' }}</div>
+        <EmptyState v-else :loading="loading" message="No budget lines with utilization below 30%." icon="search" compact />
       </div>
     </div>
 
@@ -130,7 +169,7 @@
         <div v-if="overUnderUtilized.length">
           <AlertItem v-for="b in overUnderUtilized" :key="b.id" :severity="b.utilization_pct > 100 ? 'critical' : 'info'" :title="`${b.agency_code ?? 'Unknown'} - FY${b.fiscal_year}`" :meta="`${b.utilization_pct > 100 ? 'Committed beyond allocation' : 'Under-utilized'} · ${b.utilization_pct.toFixed(1)}%`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No over- or severely under-utilized allocations.' }}</div>
+        <EmptyState v-else :loading="loading" message="No over- or severely under-utilized allocations." icon="search" compact />
       </div>
     </div>
   </div>
@@ -146,15 +185,13 @@
           :meta="`${p.agency_code ?? '-'} · ${p.contractor || 'contractor n/a'} · Financial ${p.financial_progress_pct?.toFixed(0)}% vs physical ${p.physical_progress_pct?.toFixed(0)}%`"
         />
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No high-risk contractor funding gaps detected.' }}</div>
+      <EmptyState v-else :loading="loading" message="No high-risk contractor funding gaps detected." icon="search" compact />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Funding Allocations')
-
 import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { MaintenanceBudget, RoadSegment, ConstructionProject, DeteriorationForecast, InfrastructureSummary } from '~/composables/api'
 
@@ -169,6 +206,8 @@ const summary  = ref<InfrastructureSummary | null>(null)
 const agencyNames = ref<Record<string, string>>({})
 const loading  = ref(true)
 const error    = ref<string | null>(null)
+const budgetsError = ref(false)
+const atRiskError  = ref(false)
 
 const selectedAgency = ref(typeof route.query.agency === 'string' ? route.query.agency : '')
 
@@ -204,6 +243,9 @@ async function load() {
     const list = (agencyRes.value as any).results ?? []
     agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
   }
+
+  budgetsError.value = budRes.status  === 'rejected'
+  atRiskError.value  = riskRes.status === 'rejected'
 
   if (budRes.status === 'rejected') error.value = 'Unable to reach the UAPTS Infrastructure API.'
 
@@ -340,12 +382,11 @@ const budgetExportHref = computed(() => {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
 .table-agency-switch { margin-bottom:12px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
-.agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
-.agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab:hover { border-color:var(--primary); color:var(--primary); }
+.agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
@@ -353,18 +394,18 @@ const budgetExportHref = computed(() => {
 .scroll-body { max-height:280px; overflow-y:auto; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .budget-list { display:flex; flex-direction:column; gap:16px; }
-.budget-item { border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; }
+.budget-item { border:1px solid var(--border-subtle); border-radius:8px; padding:14px 16px; }
 .bi-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-.bi-fy { font-size:15px; font-weight:700; color:#1e293b; }
-.bi-agency { font-size:12px; color:#64748b; flex:1; }
+.bi-fy { font-size:15px; font-weight:700; color:var(--fg-1); }
+.bi-agency { font-size:12px; color:var(--fg-2); flex:1; }
 .bi-bars { display:flex; flex-direction:column; gap:7px; }
-.bi-bar-row { display:grid; grid-template-columns:70px 1fr 90px; align-items:center; gap:8px; font-size:12px; color:#64748b; }
-.bi-bar-wrap { background:#f1f5f9; border-radius:4px; height:8px; overflow:hidden; }
-.bi-bar { height:100%; border-radius:4px; transition:width .4s; }
-.bi-val { font-size:11px; font-weight:600; text-align:right; color:#374151; }
-.bi-notes { margin-top:8px; font-size:12px; color:#94a3b8; }
-.link-sm { font-size:11px; color:#3b82f6; text-decoration:none; }
+.bi-bar-row { display:grid; grid-template-columns:70px 1fr 90px; align-items:center; gap:8px; font-size:12px; color:var(--fg-2); }
+.bi-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:8px; overflow:hidden; }
+.bi-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.bi-val { font-size:11px; font-weight:600; text-align:right; color:var(--fg-2); }
+.bi-notes { margin-top:8px; font-size:12px; color:var(--fg-3); }
+.link-sm { font-size:11px; color:var(--link); text-decoration:none; }
 .variance-list { display:flex; flex-direction:column; gap:8px; }
-.variance-row { display:grid; grid-template-columns:70px 1fr auto; align-items:center; gap:8px; font-size:12px; padding:4px 0; border-bottom:1px solid #f8fafc; }
+.variance-row { display:grid; grid-template-columns:70px 1fr auto; align-items:center; gap:8px; font-size:12px; padding:4px 0; border-bottom:1px solid var(--border-subtle); }
 .variance-agency { font-weight:700; }
 </style>

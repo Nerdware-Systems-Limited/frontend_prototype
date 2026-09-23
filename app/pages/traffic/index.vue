@@ -22,42 +22,56 @@
     <KpiCard
       label="Active Stations"
       :value="summary ? `${fmtNum(summary.kpis.active_stations)} / ${fmtNum(summary.kpis.total_stations)}` : '-'"
-      sub="ATC · WIM · Video counting"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="LIVE"
+      description="ATC · WIM · Video counting"
+      :status="!summary ? undefined : summary.kpis.active_stations >= summary.kpis.total_stations ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Active Congestion"
       :value="summary ? fmtNum(summary.kpis.active_congestion_events) : '-'"
-      sub="Live events on network"
-      trend-direction="down"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Live events on network"
+      to="#congestion-events"
     />
     <KpiCard
       label="Avg Speed (24h)"
       :value="summary?.kpis.avg_speed_24h_kmh != null ? `${summary.kpis.avg_speed_24h_kmh.toFixed(0)} km/h` : '-'"
-      sub="Network average"
-      :trend-direction="summary?.kpis.avg_speed_24h_kmh && summary.kpis.avg_speed_24h_kmh >= 40 ? 'up' : 'down'"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="24H"
+      description="Network average"
+      :status="!summary?.kpis.avg_speed_24h_kmh ? undefined : summary.kpis.avg_speed_24h_kmh >= 40 ? 'healthy' : 'warning'"
+      :series="speedSeries"
     />
     <KpiCard
       label="Total Volume (24h)"
       :value="summary ? fmtNum(summary.kpis.total_volume_24h) : '-'"
-      sub="Vehicles counted"
-      trend-direction="up"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="24H"
+      description="Vehicles counted"
+      :series="volumeSeries"
+      to="#volume-trend"
     />
     <KpiCard
       label="Speed Compliance"
       :value="summary ? `${summary.speed_compliance.avg_compliance_pct.toFixed(1)}%` : '-'"
-      :sub="summary ? `${fmtNum(summary.speed_compliance.observation_count)} observations` : '-'"
-      :trend-direction="summary && summary.speed_compliance.avg_compliance_pct >= 80 ? 'up' : 'down'"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      :description="summary ? `${fmtNum(summary.speed_compliance.observation_count)} observations` : ''"
+      :status="!summary ? undefined : summary.speed_compliance.avg_compliance_pct >= 80 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Segments Observed"
       :value="summary ? fmtNum(summary.kpis.total_segments_observed) : '-'"
-      sub="Road segments with data"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Road segments with data"
     />
   </div>
 
@@ -73,14 +87,21 @@
           :zoom="10"
           height="500px"
           show-legend
+          show-map-toolbar
         />
       </ClientOnly>
       <div class="map-key">
         <span class="mk"><span class="dot" style="background:#22c55e" /> Station operational</span>
         <span class="mk"><span class="dot" style="background:#eab308" /> Station degraded</span>
         <span class="mk"><span class="dot" style="background:#94a3b8" /> Station offline</span>
-        <span class="mk"><span class="dot" style="background:#ef4444" /> Congestion event</span>
       </div>
+      <div class="map-key">
+        <span class="mk"><span class="dot" style="background:#10b981" /> Free flow</span>
+        <span class="mk"><span class="dot" style="background:#eab308" /> Moderate</span>
+        <span class="mk"><span class="dot" style="background:#f97316" /> Heavy</span>
+        <span class="mk"><span class="dot" style="background:#ef4444" /> Severe</span>
+      </div>
+      <p class="map-key-note">Congestion events (large dots) are colored by live speed vs. free-flow speed; the shaded circle around one is its reported impact radius.</p>
     </div>
 
     <div class="right-col">
@@ -92,12 +113,12 @@
             <div v-for="[level, count] in congestionEntries" :key="level" class="cong-row">
               <span class="cong-label">{{ level.replace(/_/g,' ') }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" :style="{ width: `${congPct(count)}%`, background: congColor(level) }" />
+                <div class="cong-bar" :style="{ transform: `scaleX(${congPct(count) / 100})`, background: congColor(level) }" />
               </div>
               <span class="cong-val">{{ fmtNum(count) }}</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No congestion data for this window' }}</div>
+          <EmptyState v-else :loading="loading" message="No congestion data for this window" compact />
         </div>
       </div>
 
@@ -109,12 +130,12 @@
             <div v-for="c in classShare" :key="c.vehicle_class" class="cong-row">
               <span class="cong-label">{{ c.vehicle_class.replace(/_/g,' ') }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" :style="{ width: `${c.share_pct}%`, background: classColor(c.vehicle_class) }" />
+                <div class="cong-bar" :style="{ transform: `scaleX(${c.share_pct / 100})`, background: classColor(c.vehicle_class) }" />
               </div>
               <span class="cong-val">{{ c.share_pct.toFixed(1) }}%</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No class data' }}</div>
+          <EmptyState v-else :loading="loading" message="No class data" compact />
         </div>
       </div>
 
@@ -127,7 +148,7 @@
               <span class="weather-icon">{{ wxIcon(w.condition) }}</span>
               <div>
                 <div style="font-size:13px;font-weight:600">{{ w.condition.replace(/_/g,' ') }}</div>
-                <div style="font-size:11px;color:#64748b">
+                <div style="font-size:11px;color:var(--fg-2)">
                   {{ w.temperature_c != null ? `${w.temperature_c.toFixed(0)}°C` : '' }}
                   {{ w.rainfall_mm > 0 ? `· ${w.rainfall_mm.toFixed(1)}mm rain` : '' }}
                   {{ w.visibility_km != null ? `· ${w.visibility_km.toFixed(1)}km vis` : '' }}
@@ -138,7 +159,7 @@
               </div>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No weather data' }}</div>
+          <EmptyState v-else :loading="loading" message="No weather data" compact />
         </div>
       </div>
     </div>
@@ -147,11 +168,10 @@
   <!-- Volume trend -->
   <SectionTitle pill="KeNHA ATC · 24h">Traffic Volume (Last 24h)</SectionTitle>
 
-  <div class="card">
+  <div id="volume-trend" class="card drill-target">
     <div class="card-body">
       <TrendLineChart
         :points="volumeChartPoints"
-        color="#3b82f6"
         :height="180"
         :format-value="v => fmtNum(v)"
         :empty-text="loading ? 'Loading volume…' : 'No 24h volume data'"
@@ -162,7 +182,7 @@
   <!-- Active congestion events -->
   <SectionTitle pill="KeNHA RTMS · Live">Active Congestion Events</SectionTitle>
 
-  <div class="card">
+  <div id="congestion-events" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -178,14 +198,14 @@
           </tr>
         </thead>
         <tbody v-if="congestionEvents.length">
-          <tr v-for="ev in congestionEvents" :key="ev.id">
+          <tr v-for="ev in congestionEventsPageRows" :key="ev.id">
             <td>
-              <div style="font-weight:600;font-size:13px">{{ ev.segment }}</div>
-              <div v-if="ev.description" style="font-size:11px;color:#94a3b8">{{ ev.description.slice(0,60) }}…</div>
+              <div style="font-weight:600;font-size:13px">{{ ev.segment_road_code ?? ev.segment }}</div>
+              <div v-if="ev.description" style="font-size:11px;color:var(--fg-3)">{{ ev.description.slice(0,60) }}…</div>
             </td>
             <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
             <td><BadgePill :variant="ev.status === 'active' ? 'danger' : 'success'">{{ ev.status }}</BadgePill></td>
-            <td :style="{ color: ev.avg_speed_kmh < 20 ? '#ef4444' : ev.avg_speed_kmh < 40 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+            <td :style="{ color: ev.avg_speed_kmh < 20 ? 'var(--danger-fg)' : ev.avg_speed_kmh < 40 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ ev.avg_speed_kmh.toFixed(0) }}
             </td>
             <td style="font-weight:600">{{ ev.delay_minutes.toFixed(0) }}</td>
@@ -196,12 +216,16 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading events…' : 'No active congestion events.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="congestionEventsPage" :total-pages="congestionEventsTotalPages" :total="congestionEventsTotal"
+        @prev="congestionEventsPrev" @next="congestionEventsNext"
+      />
     </div>
   </div>
 
@@ -223,7 +247,7 @@
             </div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No forecast data' }}</div>
+        <EmptyState v-else :loading="loading" message="No forecast data" compact />
       </div>
     </div>
 
@@ -243,9 +267,7 @@
             :meta="`${al.alert_type.replace(/_/g,' ')} · ${fmtTime(al.issued_at)}`"
           />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">
-          {{ loading ? 'Loading…' : 'No active alerts.' }}
-        </div>
+        <EmptyState v-else :loading="loading" message="No active alerts." icon="search" compact />
       </div>
     </div>
   </div>
@@ -253,8 +275,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Live Traffic')
-
 import { useTraffic, useGis } from '~/composables/api'
 import type { TrafficSummary, CongestionEvent, TrafficAlert, WeatherObservation } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -323,12 +343,28 @@ const volumeChartPoints = computed(() =>
 
 const nextHourForecasts = computed(() => summary.value?.forecast_next_hour ?? [])
 
+const volumeSeries = computed(() => {
+  const h = summary.value?.volume_24h ?? []
+  return h.length > 1 ? h.map(x => x.volume) : undefined
+})
+const speedSeries = computed(() => {
+  const h = summary.value?.volume_24h ?? []
+  const vals = h.map(x => x.avg_speed).filter((v): v is number => v != null)
+  return vals.length > 1 ? vals : undefined
+})
+
 const totalCongestion = computed(() =>
   Object.values(summary.value?.congestion_distribution ?? {}).reduce((s, v) => s + v, 0) || 1,
 )
 const congestionEntries = computed(() =>
   Object.entries(summary.value?.congestion_distribution ?? {}) as [string, number][],
 )
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: congestionEventsPageRows, page: congestionEventsPage, totalPages: congestionEventsTotalPages,
+  total: congestionEventsTotal, next: congestionEventsNext, prev: congestionEventsPrev,
+} = usePagination(congestionEvents, 15)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -358,38 +394,34 @@ function classColor(cls: string) {
   const m: Record<string,string> = { car:'#3b82f6', motorcycle:'#a855f7', light_truck:'#f59e0b', heavy_truck:'#ef4444', bus:'#22c55e', other:'#94a3b8' }
   return m[cls] ?? '#64748b'
 }
-function sevBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'success' }
-  return m[s] ?? 'neutral'
-}
+const { riskBadge: sevBadge } = useSeverityBadge()
 function wxIcon(c: string) {
   const m: Record<string,string> = { clear:'☀️', cloudy:'☁️', rain:'🌧️', heavy_rain:'⛈️', fog:'🌫️', storm:'⛈️' }
   return m[c] ?? '🌤️'
 }
 function impactColor(score: number) {
   // traffic_impact_score is a 0..1 fraction from the backend, not 0..100.
-  return score >= 0.7 ? '#ef4444' : score >= 0.4 ? '#f59e0b' : '#22c55e'
+  return score >= 0.7 ? 'var(--danger-fg)' : score >= 0.4 ? 'var(--warning-fg)' : 'var(--success-fg)'
 }
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1100px) { .two-col, .two-col-map { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px 0; }
+.map-key:first-of-type { border-top:1px solid var(--border-subtle); padding-top:8px; }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+.map-key-note { font-size:10.5px; color:var(--fg-3); padding:6px 14px 10px; margin:0; }
 .right-col { display:flex; flex-direction:column; gap:12px; overflow-y:auto; max-height:540px; }
 .cong-list { display:flex; flex-direction:column; gap:8px; }
 .cong-row { display:grid; grid-template-columns:90px 1fr 44px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; text-transform:capitalize; }
-.cong-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.cong-bar { height:100%; border-radius:4px; transition:width .4s; }
+.cong-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.cong-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .cong-val { font-size:11px; text-align:right; }
 .weather-list { display:flex; flex-direction:column; gap:8px; }
 .weather-row { display:flex; align-items:center; gap:10px; padding:4px 0; }
@@ -397,6 +429,6 @@ function impactColor(score: number) {
 .weather-impact { margin-left:auto; font-size:12px; font-weight:600; }
 .forecast-list { display:flex; flex-direction:column; gap:8px; }
 .fc-row { display:flex; align-items:center; gap:10px; }
-.fc-detail { display:flex; gap:16px; font-size:12px; color:#64748b; margin-left:auto; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; }
+.fc-detail { display:flex; gap:16px; font-size:12px; color:var(--fg-2); margin-left:auto; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; }
 </style>

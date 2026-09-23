@@ -33,8 +33,8 @@
             <template v-for="s in seriesPoints" :key="'hp'+s.name">
               <circle
                 v-if="s.points[hoverIndex]"
-                :cx="s.points[hoverIndex].x" :cy="s.points[hoverIndex].y"
-                r="4" :fill="s.color" stroke="#fff" stroke-width="1.5"
+                :cx="s.points[hoverIndex]!.x" :cy="s.points[hoverIndex]!.y"
+                r="4" :fill="s.color" class="mlc-marker-ring" stroke-width="1.5"
               />
             </template>
           </g>
@@ -56,7 +56,7 @@
           <div v-for="s in seriesPoints" :key="'tt'+s.name" class="mlc-tooltip-row">
             <span class="mlc-tooltip-key" :style="{ background: s.color }" />
             <span class="mlc-tooltip-name">{{ s.name }}</span>
-            <span class="mlc-tooltip-value">{{ s.points[hoverIndex] ? formatValue(s.points[hoverIndex].value) : '-' }}</span>
+            <span class="mlc-tooltip-value">{{ s.points[hoverIndex] ? formatValue(s.points[hoverIndex]!.value) : '-' }}</span>
           </div>
         </div>
       </template>
@@ -86,13 +86,27 @@ const pad = { left: 42, right: 10, top: 14, bottom: 20 }
 const hasData = computed(() => props.series.some(s => s.points.length))
 const pointCount = computed(() => Math.max(0, ...props.series.map(s => s.points.length)))
 const xLabels = computed(() => {
-  const withMost = props.series.reduce((a, b) => (a.points.length >= b.points.length ? a : b), props.series[0])
+  const withMost = props.series.reduce((a, b) => (a.points.length >= b.points.length ? a : b), props.series[0]!)
   return (withMost?.points ?? []).map(p => p.label)
 })
 
 const allValues = computed(() => props.series.flatMap(s => s.points.map(p => p.value)))
-const maxV = computed(() => Math.max(...allValues.value, 0))
-const minV = computed(() => Math.min(...allValues.value, 0))
+const rawMax = computed(() => Math.max(...allValues.value, 0))
+const rawMin = computed(() => Math.min(...allValues.value, 0))
+
+// "Nice" axis domain/step (clean round numbers, not raw fractions of
+// whatever the data happens to span) - kept in sync with TrendLineChart's
+// niceStep() so every trend chart in the app ticks the same way.
+function niceStep(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 1
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const norm = raw / mag
+  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10
+  return niceNorm * mag
+}
+const niceStepV = computed(() => niceStep((rawMax.value - rawMin.value || 1) / 3))
+const maxV = computed(() => Math.ceil(rawMax.value / niceStepV.value) * niceStepV.value)
+const minV = computed(() => Math.min(0, Math.floor(rawMin.value / niceStepV.value) * niceStepV.value))
 
 function xFor(i: number) {
   const n = pointCount.value
@@ -111,12 +125,12 @@ const seriesPoints = computed(() => props.series.map(s => {
 }))
 
 const yTicks = computed(() => {
-  const steps = 3
-  const range = maxV.value - minV.value || 1
-  return Array.from({ length: steps + 1 }, (_, i) => {
-    const value = minV.value + (range * i) / steps
-    return { value, y: yFor(value) }
-  }).reverse()
+  const step = niceStepV.value
+  const ticks: { value: number; y: number }[] = []
+  for (let v = minV.value; v <= maxV.value + step * 0.5; v += step) {
+    ticks.push({ value: v, y: yFor(v) })
+  }
+  return ticks.reverse()
 })
 
 const xLabelPoints = computed(() => {
@@ -153,24 +167,26 @@ const tooltipStyle = computed(() => {
 <style scoped>
 .mlc-root { width:100%; }
 .mlc-legend { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
-.mlc-legend-item { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#4b5563; }
+.mlc-legend-item { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--fg-2); }
 .mlc-legend-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; }
 .mlc-wrap { position:relative; width:100%; }
-.mlc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8; font-size:13px; }
+.mlc-empty { display:flex; align-items:center; justify-content:center; height:100%; color:var(--fg-3); font-size:13px; }
 .mlc-svg { display:block; overflow:visible; }
-.mlc-grid { stroke:#eef1f4; stroke-width:1; }
-.mlc-crosshair { stroke:#cbd5e1; stroke-width:1; }
-.mlc-ytick { font-size:9px; fill:#94a3b8; }
-.mlc-xtick { font-size:9px; fill:#94a3b8; }
+.mlc-grid { stroke:var(--border-subtle); stroke-width:1; }
+.mlc-crosshair { stroke:var(--border-interactive); stroke-width:1; }
+.mlc-marker-ring { stroke:var(--surface-2); }
+.mlc-ytick { font-size:9px; fill:var(--fg-3); font-variant-numeric:tabular-nums; }
+.mlc-xtick { font-size:9px; fill:var(--fg-3); }
 .mlc-tooltip {
   position:absolute; transform:translateX(-50%);
-  background:#1e293b; color:#fff; border-radius:6px; padding:7px 10px;
+  background:var(--surface-2); color:var(--fg-1); border:1px solid var(--border-subtle);
+  border-radius:6px; padding:7px 10px;
   font-size:11px; line-height:1.5; white-space:nowrap; pointer-events:none;
-  box-shadow:0 4px 12px rgba(15,23,42,.18); z-index:5;
+  box-shadow:var(--elev-2); z-index:5;
 }
-.mlc-tooltip-label { color:#cbd5e1; font-size:10px; margin-bottom:3px; font-weight:600; }
+.mlc-tooltip-label { color:var(--fg-2); font-size:10px; margin-bottom:3px; font-weight:600; }
 .mlc-tooltip-row { display:flex; align-items:center; gap:6px; }
 .mlc-tooltip-key { width:8px; height:2px; border-radius:1px; display:inline-block; }
-.mlc-tooltip-name { color:#cbd5e1; flex:1; }
-.mlc-tooltip-value { font-weight:700; }
+.mlc-tooltip-name { color:var(--fg-2); flex:1; }
+.mlc-tooltip-value { font-weight:700; color:var(--fg-1); }
 </style>

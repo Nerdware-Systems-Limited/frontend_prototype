@@ -17,7 +17,16 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { defineStore } from 'pinia'
-import type { AuthUser, LoginResponse, TokenRefreshResponse, User } from '~/types/uapts'
+import type {
+  AuthUser,
+  DetailResponse,
+  LoginResponse,
+  LoginResult,
+  MfaIssuedResponse,
+  MfaVerifyResponse,
+  TokenRefreshResponse,
+  User,
+} from '~/types/uapts'
 
 // ── Safe browser-storage helpers (no-ops on SSR) ────────────────────────────
 function getItem(key: string): string | null {
@@ -61,6 +70,8 @@ function normaliseUser(raw: Partial<User> & { email?: string }): AuthUser {
     agency_code: raw.agency_code ?? null,
     department: raw.department ?? null,
     mfa_active: raw.mfa_active ?? false,
+    mfa_channel: raw.mfa_channel ?? '',
+    phone_number: raw.phone_number ?? '',
     is_active: raw.is_active ?? true,
     is_staff: raw.is_staff ?? false,
     created_at: raw.created_at,
@@ -78,6 +89,12 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string | null>(null)
   const user         = ref<AuthUser | null>(null)
   const isLoading    = ref(false)
+
+  // "Remember me" as chosen on the login form - captured when a login comes
+  // back as an MFA challenge (no tokens yet) so mfaVerify() can honour the
+  // same persistence choice once the code is confirmed and tokens actually
+  // arrive.
+  let pendingRemember = false
 
   // ── Getters ────────────────────────────────────────────────────────────────
   const isAuthenticated = computed(() => !!accessToken.value)
@@ -99,18 +116,141 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // ── Login ──────────────────────────────────────────────────────────────────
-  async function login(email: string, password: string, remember = false): Promise<void> {
+  /**
+   * `identifier` is either an email or the user's self-service username
+   * (see profile.vue) - the backend's LoginSerializer accepts either, but
+   * expects them under different body keys, so decide here rather than
+   * pushing that heuristic onto every caller.
+   *
+   * Returns `{ mfaRequired: false }` once tokens are stored, or
+   * `{ mfaRequired: true, otpId, channel }` when the account has MFA
+   * enabled - the caller (useAuth/login.vue) is responsible for prompting
+   * for the code and calling `mfaVerify()`.
+   */
+  async function login(
+    identifier: string, password: string, remember = false,
+  ): Promise<{ mfaRequired: false } | { mfaRequired: true; otpId: string; channel: 'email' | 'sms' }> {
     isLoading.value = true
     try {
-      const res = await $fetch<LoginResponse>('/api/v1/auth/login/', {
+      const body = identifier.includes('@')
+        ? { email: identifier, password }
+        : { username: identifier, password }
+      const res = await $fetch<LoginResult>('/api/v1/auth/login/', {
         baseURL: BASE_URL,
         method: 'POST',
-        body: { email, password },
+        body,
       })
+      if ('mfa_required' in res) {
+        pendingRemember = remember
+        return { mfaRequired: true, otpId: res.otp_id, channel: res.channel }
+      }
       _storeTokens(res.access, res.refresh ?? '', normaliseUser(res.user), remember)
+      return { mfaRequired: false }
     } finally {
       isLoading.value = false
     }
+  }
+
+  // ── MFA: login challenge ─────────────────────────────────────────────────
+  /** Confirms the code sent at login and stores the tokens it returns. */
+  async function mfaVerify(otpId: string, code: string): Promise<void> {
+    isLoading.value = true
+    try {
+      const res = await $fetch<LoginResponse>('/api/v1/auth/mfa/verify/', {
+        baseURL: BASE_URL,
+        method: 'POST',
+        body: { otp_id: otpId, code },
+      })
+      _storeTokens(res.access, res.refresh ?? '', normaliseUser(res.user), pendingRemember)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /** Resends a login-challenge or enrollment code; returns the new otp_id. */
+  async function mfaResend(otpId: string): Promise<MfaIssuedResponse> {
+    return $fetch<MfaIssuedResponse>('/api/v1/auth/mfa/resend/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      body: { otp_id: otpId },
+    })
+  }
+
+  // ── MFA: enrollment (authenticated) ──────────────────────────────────────
+  function _authHeaders(): Record<string, string> {
+    return accessToken.value ? { Authorization: `Bearer ${accessToken.value}` } : {}
+  }
+
+  async function mfaEnroll(channel: 'email' | 'sms'): Promise<MfaIssuedResponse> {
+    return $fetch<MfaIssuedResponse>('/api/v1/auth/mfa/enroll/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      headers: _authHeaders(),
+      body: { channel },
+    })
+  }
+
+  /** Confirms the enrollment code - activates MFA and updates the cached user. */
+  async function mfaEnrollVerify(otpId: string, code: string): Promise<void> {
+    const res = await $fetch<MfaVerifyResponse>('/api/v1/auth/mfa/verify/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      body: { otp_id: otpId, code },
+    })
+    if ('user' in res && res.user) {
+      user.value = normaliseUser(res.user)
+      setItem('uapts_user', JSON.stringify(user.value), preferLocal())
+    }
+  }
+
+  async function mfaDisable(password: string): Promise<void> {
+    await $fetch<DetailResponse>('/api/v1/auth/mfa/disable/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      headers: _authHeaders(),
+      body: { password },
+    })
+    if (user.value) {
+      user.value = { ...user.value, mfa_active: false, mfa_channel: '' }
+      setItem('uapts_user', JSON.stringify(user.value), preferLocal())
+    }
+  }
+
+  // ── Password reset (forgot password) ─────────────────────────────────────
+  async function requestPasswordReset(email: string): Promise<void> {
+    await $fetch<DetailResponse>('/api/v1/auth/password/reset/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      body: { email },
+    })
+  }
+
+  async function confirmPasswordReset(
+    uid: string, token: string, newPassword1: string, newPassword2: string,
+  ): Promise<void> {
+    await $fetch<DetailResponse>('/api/v1/auth/password/reset/confirm/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      body: { uid, token, new_password1: newPassword1, new_password2: newPassword2 },
+    })
+  }
+
+  // ── Password change (authenticated) ──────────────────────────────────────
+  /**
+   * The backend blacklists every outstanding refresh token on a successful
+   * change (logout-on-change) - the current access token still works until
+   * its natural ~15min expiry, but the next silent refresh will fail. Clear
+   * locally right away rather than let that surface as a confusing error
+   * later.
+   */
+  async function changePassword(oldPassword: string, newPassword1: string, newPassword2: string): Promise<void> {
+    await $fetch<DetailResponse>('/api/v1/auth/password/change/', {
+      baseURL: BASE_URL,
+      method: 'POST',
+      headers: _authHeaders(),
+      body: { old_password: oldPassword, new_password1: newPassword1, new_password2: newPassword2 },
+    })
+    _clearTokens()
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────
@@ -141,7 +281,7 @@ export const useAuthStore = defineStore('auth', () => {
   function isAccessTokenFresh(bufferMs = 60_000): boolean {
     if (!accessToken.value) return false
     try {
-      const payload = JSON.parse(atob(accessToken.value.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      const payload = JSON.parse(atob(accessToken.value.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/')))
       if (typeof payload.exp !== 'number') return false
       return Date.now() < payload.exp * 1000 - bufferMs
     } catch {
@@ -220,5 +360,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken, refreshToken, user, isLoading,
     isAuthenticated, userInitials,
     hydrate, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
+    mfaVerify, mfaResend, mfaEnroll, mfaEnrollVerify, mfaDisable,
+    requestPasswordReset, confirmPasswordReset, changePassword,
   }
 })

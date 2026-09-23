@@ -23,7 +23,7 @@ const _env: any = (typeof process !== 'undefined' && process.env) ? process.env 
 const BASE = _env.UAPTS_API_BASE ?? 'http://127.0.0.1:8000'
 const SKIP = _env.UAPTS_SKIP_LIVE === '1' || _env.VITEST_SKIP_LIVE === '1'
 
-const EMAIL    = _env.UAPTS_TEST_EMAIL    ?? 'admin@uapts.go.ke'
+const EMAIL    = _env.UAPTS_TEST_EMAIL    ?? 'tricrck@gmail.com'
 // Default password matches the superuser seeded by `seed_admin.py`.
 // Override via env var `UAPTS_TEST_PASSWORD` for CI / staging.
 const PASSWORD = _env.UAPTS_TEST_PASSWORD ?? 'devpass123'

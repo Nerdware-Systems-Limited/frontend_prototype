@@ -31,7 +31,7 @@ export type NotificationDoc = {
   user_id: string
   event_type: string
   rule_id: string | null
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+  severity: 'critical' | 'high' | 'warning' | 'info'
   title: string
   body: string
   context: Record<string, unknown>

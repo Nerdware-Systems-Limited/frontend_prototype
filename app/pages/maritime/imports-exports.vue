@@ -14,28 +14,54 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Throughput" :value="totalTeu != null ? `${fmtNum(totalTeu)} TEU` : '-'" sub="Sampled window, both ports" source="live" source-title="KPA" />
-    <KpiCard label="Unloaded (Imports)" :value="importTeu != null ? `${fmtNum(importTeu)} TEU` : '-'" :sub="importSharePct != null ? `${importSharePct.toFixed(0)}% of throughput` : 'Discharged from vessel'" source="live" source-title="KPA" />
-    <KpiCard label="Loaded (Exports)" :value="exportTeu != null ? `${fmtNum(exportTeu)} TEU` : '-'" :sub="exportSharePct != null ? `${exportSharePct.toFixed(0)}% of throughput` : 'Loaded onto vessel'" source="live" source-title="KPA" />
-    <KpiCard label="Transhipment" :value="transitTeu != null ? `${fmtNum(transitTeu)} TEU` : '-'" sub="In transit, no port exit" source="live" source-title="KPA" />
-    <KpiCard label="Avg Yard Dwell - Import" :value="avgImportDwell != null ? `${avgImportDwell.toFixed(1)}d` : '-'" sub="Unloaded containers awaiting gate-out" source="live" source-title="KPA Yard System" />
-    <KpiCard label="Avg Yard Dwell - Export" :value="avgExportDwell != null ? `${avgExportDwell.toFixed(1)}d` : '-'" sub="Loaded containers awaiting vessel" source="live" source-title="KPA Yard System" />
+    <KpiCard
+      label="Total Throughput" :value="totalTeu != null ? `${fmtNum(totalTeu)} TEU` : '-'"
+      :unavailable="loading || tpError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" description="Sampled window, both ports" :series="totalThroughputSeries" to="#by-port-direction"
+    />
+    <KpiCard
+      label="Unloaded (Imports)" :value="importTeu != null ? `${fmtNum(importTeu)} TEU` : '-'"
+      :unavailable="loading || tpError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" :description="importSharePct != null ? `${importSharePct.toFixed(0)}% of throughput` : 'Discharged from vessel'"
+      to="#by-port-direction"
+    />
+    <KpiCard
+      label="Loaded (Exports)" :value="exportTeu != null ? `${fmtNum(exportTeu)} TEU` : '-'"
+      :unavailable="loading || tpError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" :description="exportSharePct != null ? `${exportSharePct.toFixed(0)}% of throughput` : 'Loaded onto vessel'"
+      to="#by-port-direction"
+    />
+    <KpiCard
+      label="Transhipment" :value="transitTeu != null ? `${fmtNum(transitTeu)} TEU` : '-'"
+      :unavailable="loading || tpError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" description="In transit, no port exit" to="#by-port-direction"
+    />
+    <KpiCard
+      label="Avg Yard Dwell - Import" :value="avgImportDwell != null ? `${avgImportDwell.toFixed(1)}d` : '-'"
+      :unavailable="loading || dwellError" :unavailable-note="loading ? 'Loading…' : 'KPA Yard System feed unavailable'"
+      period="LIVE" description="Unloaded containers awaiting gate-out" to="#yard-dwell-table"
+    />
+    <KpiCard
+      label="Avg Yard Dwell - Export" :value="avgExportDwell != null ? `${avgExportDwell.toFixed(1)}d` : '-'"
+      :unavailable="loading || dwellError" :unavailable-note="loading ? 'Loading…' : 'KPA Yard System feed unavailable'"
+      period="LIVE" description="Loaded containers awaiting vessel" to="#yard-dwell-table"
+    />
   </div>
 
   <!-- Loaded vs Unloaded by port -->
   <SectionTitle pill="KPA · Live">Loaded &amp; Unloaded Containers by Port</SectionTitle>
-  <div class="card">
+  <div id="by-port-direction" class="card drill-target">
     <div class="card-body">
       <div v-if="portDirectionRows.length" class="cong-list">
         <div v-for="r in portDirectionRows" :key="`${r.port}-${r.direction}`" class="cong-row">
           <span class="cong-label">{{ r.portName }} <BadgePill :variant="directionBadge(r.direction)" size="sm">{{ directionLabel(r.direction) }}</BadgePill></span>
           <div class="cong-bar-wrap">
-            <div class="cong-bar" :style="{ width: `${maxPortDirTeu > 0 ? (r.teu / maxPortDirTeu) * 100 : 0}%`, background: directionColor(r.direction) }" />
+            <div class="cong-bar" :style="{ transform: `scaleX(${maxPortDirTeu > 0 ? r.teu / maxPortDirTeu : 0})`, background: directionColor(r.direction) }" />
           </div>
           <span class="cong-val">{{ fmtNum(r.teu) }} TEU · {{ fmtNum(r.boxes) }} boxes · {{ fmtNum(r.tons) }}t</span>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No container throughput records in the sampled window.' }}</div>
+      <EmptyState v-else :loading="loading" message="No container throughput records in the sampled window." compact />
     </div>
   </div>
 
@@ -49,26 +75,30 @@
 
   <!-- Yard dwell -->
   <SectionTitle pill="KPA Yard System · Live">Yard Dwell Time by Port &amp; Direction</SectionTitle>
-  <div class="card">
+  <div id="yard-dwell-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
           <tr><th>Port</th><th>Direction</th><th>Containers</th><th>Avg Dwell</th><th>P50</th><th>P95</th><th>Max</th><th>As of</th></tr>
         </thead>
         <tbody v-if="dwellRows.length">
-          <tr v-for="d in dwellRows" :key="`${d.port_unlocode}-${d.direction}`">
+          <tr v-for="d in dwellRowsPageRows" :key="`${d.port_unlocode}-${d.direction}`">
             <td style="font-family:monospace;font-size:12px">{{ d.port_unlocode }}</td>
             <td><BadgePill :variant="directionBadge(d.direction)" size="sm">{{ directionLabel(d.direction) }}</BadgePill></td>
             <td>{{ fmtNum(d.container_count) }}</td>
-            <td style="font-weight:600" :style="{ color: d.avg_dwell_days > 5 ? '#ef4444' : '#1e293b' }">{{ d.avg_dwell_days.toFixed(1) }}d</td>
+            <td style="font-weight:600" :style="{ color: d.avg_dwell_days > 5 ? 'var(--danger-fg)' : 'var(--fg-1)' }">{{ d.avg_dwell_days.toFixed(1) }}d</td>
             <td style="font-size:12px">{{ d.p50_dwell_days.toFixed(1) }}d</td>
             <td style="font-size:12px">{{ d.p95_dwell_days.toFixed(1) }}d</td>
             <td style="font-size:12px">{{ d.max_dwell_days.toFixed(1) }}d</td>
-            <td style="font-size:11px;color:#64748b;white-space:nowrap">{{ fmtDate(d.report_date) }}</td>
+            <td style="font-size:11px;color:var(--fg-2);white-space:nowrap">{{ fmtDate(d.report_date) }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No yard dwell records in the sampled window.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No yard dwell records in the sampled window.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="dwellRowsPage" :total-pages="dwellRowsTotalPages" :total="dwellRowsTotal"
+        @prev="dwellRowsPrev" @next="dwellRowsNext"
+      />
     </div>
   </div>
 
@@ -86,9 +116,9 @@
             <tr><th>Manifest Ref</th><th>Customs Ref (KPA)</th><th>Port of Origin</th><th>Cargo Type</th><th>Tonnage</th><th>Route</th><th>Dispatched</th><th>Arrived</th></tr>
           </thead>
           <tbody v-if="portRailManifests.length">
-            <tr v-for="m in portRailManifests.slice(0, 20)" :key="m.id">
+            <tr v-for="m in portRailManifestsPageRows" :key="m.id">
               <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
-              <td style="font-family:monospace;font-size:12px;color:#3b82f6">{{ m.customs_clearance_ref ?? '-' }}</td>
+              <td style="font-family:monospace;font-size:12px;color:var(--link)">{{ m.customs_clearance_ref ?? '-' }}</td>
               <td style="font-family:monospace;font-size:12px">{{ m.port_origin ?? '-' }}</td>
               <td><BadgePill variant="info" size="sm">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
               <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
@@ -96,12 +126,16 @@
               <td style="font-size:11px;white-space:nowrap">{{ fmtDate(m.dispatched_at) }}</td>
               <td style="font-size:11px;white-space:nowrap">
                 <span v-if="m.arrived_at">{{ fmtDate(m.arrived_at) }}</span>
-                <span v-else style="color:#f59e0b">Pending</span>
+                <span v-else style="color:var(--warning-fg)">Pending</span>
               </td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading reconciliation data…' : 'No port-rail manifests found in the sampled window.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading reconciliation data…' : 'No port-rail manifests found in the sampled window.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="portRailManifestsPage" :total-pages="portRailManifestsTotalPages" :total="portRailManifestsTotal"
+          @prev="portRailManifestsPrev" @next="portRailManifestsNext"
+        />
       </div>
     </div>
   </div>
@@ -109,8 +143,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Imports/Exports')
-
 import { useAviationMaritime, useRailway } from '~/composables/api'
 import type { ContainerThroughputRecord, ContainerByPort, ContainerTrendPoint, YardDwellRecord, ContainerDirection, FreightManifest } from '~/composables/api'
 
@@ -121,6 +153,8 @@ const dwell          = ref<YardDwellRecord[]>([])
 const railManifests  = ref<FreightManifest[]>([])
 const loading        = ref(true)
 const error          = ref<string | null>(null)
+const tpError        = ref(false)
+const dwellError     = ref(false)
 
 async function load() {
   loading.value = true
@@ -144,6 +178,9 @@ async function load() {
     railManifests.value = ((rmRes.value as any).results ?? [])
       .sort((a: FreightManifest, b: FreightManifest) => b.dispatched_at.localeCompare(a.dispatched_at))
   }
+
+  tpError.value    = tpRes.status === 'rejected'
+  dwellError.value = dwRes.status === 'rejected'
 
   if ([tpRes, bpRes, trRes, dwRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime API.'
@@ -182,15 +219,37 @@ const portDirectionRows = computed(() => {
 })
 const maxPortDirTeu = computed(() => Math.max(1, ...portDirectionRows.value.map(r => r.teu)))
 
+const totalThroughputSeries = computed(() => {
+  const dates = [...new Set(trend.value.map(t => t.report_date))].sort()
+  if (dates.length < 2) return undefined
+  return dates.map(d => trend.value.filter(t => t.report_date === d).reduce((s, t) => s + t.teus, 0))
+})
+
 // ── Trend series, one line per direction ───────────────────────────────
-const DIRECTION_COLORS: Record<ContainerDirection, string> = { import: '#3b82f6', export: '#22c55e', transit: '#f59e0b', empty: '#94a3b8' }
+// import/export/transit are validated as a categorical trio (dataviz skill's
+// validate_palette.js: CVD ΔE >= 8 adjacent, normal-vision >= 15, both light
+// and dark against this app's surfaces) - the previous amber/green pair sat
+// at CVD ΔE 5.7, a real fail under protanopia. "empty" is a null/residual
+// state rather than a true trade-flow category, so it stays a de-emphasized
+// neutral instead of taking a fourth competing hue.
+const theme = useTheme()
+const DIRECTION_COLORS: Record<ContainerDirection, { light: string; dark: string }> = {
+  import:  { light: '#2a78d6', dark: '#3987e5' },
+  export:  { light: '#1baf7a', dark: '#199e70' },
+  transit: { light: '#eda100', dark: '#c98500' },
+  empty:   { light: '#5B6773', dark: '#8B9AAD' },
+}
+function directionColor(dir: ContainerDirection) {
+  const pair = DIRECTION_COLORS[dir]
+  return theme.resolved.value === 'dark' ? pair.dark : pair.light
+}
 const trendSeries = computed(() => {
   const dates = [...new Set(trend.value.map(t => t.report_date))].sort()
   const directions: ContainerDirection[] = ['import', 'export', 'transit', 'empty']
   return directions
     .map(dir => ({
       name: directionLabel(dir),
-      color: DIRECTION_COLORS[dir],
+      color: directionColor(dir),
       points: dates.map(d => ({
         label: fmtDateShort(d),
         value: trend.value.find(t => t.report_date === d && t.direction === dir)?.teus ?? 0,
@@ -209,6 +268,13 @@ const dwellRows = computed(() => {
   }
   return [...m.values()].sort((a, b) => a.port_unlocode.localeCompare(b.port_unlocode) || a.direction.localeCompare(b.direction))
 })
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: dwellRowsPageRows, page: dwellRowsPage, totalPages: dwellRowsTotalPages,
+  total: dwellRowsTotal, next: dwellRowsNext, prev: dwellRowsPrev,
+} = usePagination(dwellRows, 15)
+
 const avgImportDwell = computed(() => weightedAvgDwell('import'))
 const avgExportDwell = computed(() => weightedAvgDwell('export'))
 function weightedAvgDwell(direction: 'import' | 'export'): number | null {
@@ -220,6 +286,10 @@ function weightedAvgDwell(direction: 'import' | 'export'): number | null {
 
 // ── Port-Rail reconciliation, same rail-nominated logic as railway/freight.vue ─
 const portRailManifests = computed(() => railManifests.value.filter(m => m.customs_clearance_ref || m.port_origin))
+const {
+  pageRows: portRailManifestsPageRows, page: portRailManifestsPage, totalPages: portRailManifestsTotalPages,
+  total: portRailManifestsTotal, next: portRailManifestsNext, prev: portRailManifestsPrev,
+} = usePagination(portRailManifests, 15)
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -238,7 +308,6 @@ function directionLabel(d: ContainerDirection): string {
   const m: Record<ContainerDirection, string> = { import: 'Unloaded (Import)', export: 'Loaded (Export)', transit: 'Transhipment', empty: 'Empty' }
   return m[d] ?? d
 }
-function directionColor(d: ContainerDirection) { return DIRECTION_COLORS[d] ?? '#6b7280' }
 function directionBadge(d: ContainerDirection) {
   const m: Record<ContainerDirection, string> = { import: 'info', export: 'success', transit: 'warning', empty: 'neutral' }
   return m[d] ?? 'neutral'
@@ -246,14 +315,13 @@ function directionBadge(d: ContainerDirection) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .table-scroll { overflow-x:auto; }
 .cong-list { display:flex; flex-direction:column; gap:9px; }
 .cong-row { display:grid; grid-template-columns:220px 1fr 190px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; display:flex; align-items:center; gap:6px; }
-.cong-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.cong-bar { height:100%; border-radius:4px; transition:width .4s; }
-.cong-val { font-size:11px; text-align:right; color:#64748b; }
-.recon-note { font-size:12px; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
+.cong-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.cong-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.cong-val { font-size:11px; text-align:right; color:var(--fg-2); }
+.recon-note { font-size:12px; color:var(--info-fg); background:var(--info-bg); border:1px solid var(--info-fg); border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
 </style>

@@ -18,39 +18,58 @@
     <KpiCard
       label="Active Alerts"
       :value="fmtNum(activeAlerts.length)"
-      sub="Unresolved right now"
-      trend-direction="down"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="loading || alertsError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Unresolved right now"
+      to="#active-alerts-list"
     />
     <KpiCard
       label="Critical"
       :value="fmtNum(bySeverity('critical'))"
-      sub="Immediate action needed"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="loading || alertsError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Immediate action needed"
+      :status="loading || alertsError ? undefined : bySeverity('critical') > 0 ? 'critical' : 'healthy'"
+      to="#active-alerts-list"
     />
     <KpiCard
       label="Warning"
       :value="fmtNum(bySeverity('warning'))"
-      sub="Monitor closely"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="loading || alertsError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Monitor closely"
+      :status="loading || alertsError ? undefined : bySeverity('warning') > 0 ? 'warning' : 'healthy'"
+      to="#active-alerts-list"
     />
     <KpiCard
       label="Active Congestion Events"
       :value="fmtNum(congestion.length)"
-      sub="Network congestion live"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="loading || congestionError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="LIVE"
+      description="Network congestion live"
+      to="#congestion-events-table"
     />
     <KpiCard
       label="Forecast Risk Events"
       :value="fmtNum(riskForecasts.length)"
-      sub="Predicted congestion in 12h"
-      source="batch" source-title="AI Model"
+      :unavailable="loading || forecastsError"
+      :unavailable-note="loading ? 'Loading…' : 'AI model feed unavailable'"
+      period="12H"
+      description="Predicted congestion in 12h"
+      :status="loading || forecastsError ? undefined : riskForecasts.length > 0 ? 'warning' : 'healthy'"
+      to="#risk-forecast-table"
     />
     <KpiCard
       label="Resolved (all)"
       :value="fmtNum(alerts.filter(a => !a.is_active).length)"
-      sub="Cleared alerts in log"
-      source="live" source-title="KeNHA RTMS"
+      :unavailable="loading || alertsError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA RTMS feed unavailable'"
+      period="ALL"
+      description="Cleared alerts in log"
     />
   </div>
 
@@ -79,7 +98,7 @@
   <!-- Active alert cards -->
   <SectionTitle pill="KeNHA RTMS · Live">Active Alerts</SectionTitle>
 
-  <div class="card">
+  <div id="active-alerts-list" class="card drill-target">
     <div class="card-body">
       <div v-if="filteredAlerts.filter(a => a.is_active).length">
         <AlertItem
@@ -87,15 +106,13 @@
           :key="al.id"
           :severity="al.severity === 'critical' ? 'critical' : al.severity === 'warning' ? 'warning' : 'info'"
           :title="al.title"
-          :meta="`${al.alert_type.replace(/_/g,' ')} · Segment: ${al.segment} · Issued: ${fmtTime(al.issued_at)}`"
+          :meta="`${al.alert_type.replace(/_/g,' ')} · Segment: ${al.segment_road_code ?? al.segment} · Issued: ${fmtTime(al.issued_at)}`"
           ackable
           :acked="resolving === al.id"
           @ack="resolveAlert(al.id)"
         />
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px;padding:8px 0">
-        {{ loading ? 'Loading alerts…' : 'No active alerts match the current filters.' }}
-      </div>
+      <EmptyState v-else :loading="loading" message="No active alerts match the current filters." icon="search" compact />
     </div>
   </div>
 
@@ -118,16 +135,16 @@
           </tr>
         </thead>
         <tbody v-if="filteredAlerts.length">
-          <tr v-for="al in filteredAlerts" :key="al.id">
+          <tr v-for="al in filteredAlertsPageRows" :key="al.id">
             <td style="font-weight:600;max-width:200px">
               <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ al.title }}</div>
-              <div v-if="al.message" style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              <div v-if="al.message" style="font-size:11px;color:var(--fg-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                 {{ al.message.slice(0, 80) }}
               </div>
             </td>
             <td><BadgePill variant="info">{{ al.alert_type.replace(/_/g,' ') }}</BadgePill></td>
             <td><BadgePill :variant="sevBadge(al.severity)">{{ al.severity }}</BadgePill></td>
-            <td style="font-size:12px;font-family:monospace">{{ al.segment }}</td>
+            <td style="font-size:12px;font-family:monospace">{{ al.segment_road_code ?? al.segment }}</td>
             <td>
               <BadgePill :variant="al.is_active ? 'danger' : 'success'">
                 {{ al.is_active ? 'Active' : 'Resolved' }}
@@ -149,19 +166,23 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading alerts…' : 'No alerts found.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="filteredAlertsPage" :total-pages="filteredAlertsTotalPages" :total="filteredAlertsTotal"
+        @prev="filteredAlertsPrev" @next="filteredAlertsNext"
+      />
     </div>
   </div>
 
   <!-- Active congestion events -->
   <SectionTitle pill="KeNHA RTMS · Live">Active Congestion Events</SectionTitle>
 
-  <div class="card">
+  <div id="congestion-events-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -176,13 +197,13 @@
           </tr>
         </thead>
         <tbody v-if="congestion.length">
-          <tr v-for="ev in congestion" :key="ev.id">
+          <tr v-for="ev in congestionPageRows" :key="ev.id">
             <td>
-              <div style="font-weight:600">{{ ev.segment }}</div>
-              <div v-if="ev.description" style="font-size:11px;color:#94a3b8">{{ ev.description.slice(0, 60) }}</div>
+              <div style="font-weight:600">{{ ev.segment_road_code ?? ev.segment }}</div>
+              <div v-if="ev.description" style="font-size:11px;color:var(--fg-3)">{{ ev.description.slice(0, 60) }}</div>
             </td>
             <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
-            <td :style="{ color: ev.avg_speed_kmh < 20 ? '#ef4444' : ev.avg_speed_kmh < 40 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+            <td :style="{ color: ev.avg_speed_kmh < 20 ? 'var(--danger-fg)' : ev.avg_speed_kmh < 40 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ ev.avg_speed_kmh.toFixed(0) }}
             </td>
             <td style="font-weight:700">{{ ev.delay_minutes.toFixed(0) }}</td>
@@ -193,19 +214,23 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading…' : 'No active congestion events.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="congestionPage" :total-pages="congestionTotalPages" :total="congestionTotal"
+        @prev="congestionPrev" @next="congestionNext"
+      />
     </div>
   </div>
 
   <!-- Forecast risk events -->
   <SectionTitle pill="AI Model · Next 12h">Upcoming Congestion Risk</SectionTitle>
 
-  <div class="card">
+  <div id="risk-forecast-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -220,8 +245,8 @@
           </tr>
         </thead>
         <tbody v-if="riskForecasts.length">
-          <tr v-for="f in riskForecasts" :key="f.id">
-            <td style="font-family:monospace;font-size:12px;font-weight:600">{{ f.segment }}</td>
+          <tr v-for="f in riskForecastsPageRows" :key="f.id">
+            <td style="font-family:monospace;font-size:12px;font-weight:600">{{ f.segment_road_code ?? f.segment }}</td>
             <td><BadgePill variant="info">{{ f.model_name }}</BadgePill></td>
             <td style="font-size:12px;white-space:nowrap">{{ fmtTime(f.target_at) }}</td>
             <td><BadgePill :variant="congBadge(f.predicted_congestion)">{{ f.predicted_congestion.replace(/_/g,' ') }}</BadgePill></td>
@@ -232,20 +257,22 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading forecast…' : 'No congestion risk events predicted.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="riskForecastsPage" :total-pages="riskForecastsTotalPages" :total="riskForecastsTotal"
+        @prev="riskForecastsPrev" @next="riskForecastsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Traffic Alerts')
-
 import { useTraffic } from '~/composables/api'
 import type { TrafficAlert, CongestionEvent, TrafficForecast } from '~/composables/api'
 
@@ -254,6 +281,9 @@ const congestion  = ref<CongestionEvent[]>([])
 const forecasts   = ref<TrafficForecast[]>([])
 const loading     = ref(true)
 const error       = ref<string | null>(null)
+const alertsError = ref(false)
+const congestionError = ref(false)
+const forecastsError = ref(false)
 const resolving   = ref<string | null>(null)
 const lastRefreshed = ref('-')
 const sevFilter   = ref('')
@@ -274,6 +304,10 @@ async function load() {
   if (alertRes.status === 'fulfilled') alerts.value     = (alertRes.value as any).results ?? []
   if (congRes.status  === 'fulfilled') congestion.value = (congRes.value as any).results ?? []
   if (fcRes.status    === 'fulfilled') forecasts.value  = (fcRes.value as any).results ?? []
+
+  alertsError.value     = alertRes.status === 'rejected'
+  congestionError.value = congRes.status  === 'rejected'
+  forecastsError.value  = fcRes.status    === 'rejected'
 
   if ([alertRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Traffic API.'
@@ -317,6 +351,22 @@ const riskForecasts = computed(() =>
 
 function bySeverity(s: string) { return activeAlerts.value.filter(a => a.severity === s).length }
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: filteredAlertsPageRows, page: filteredAlertsPage, totalPages: filteredAlertsTotalPages,
+  total: filteredAlertsTotal, next: filteredAlertsNext, prev: filteredAlertsPrev,
+} = usePagination(filteredAlerts, 15)
+
+const {
+  pageRows: congestionPageRows, page: congestionPage, totalPages: congestionTotalPages,
+  total: congestionTotal, next: congestionNext, prev: congestionPrev,
+} = usePagination(congestion, 15)
+
+const {
+  pageRows: riskForecastsPageRows, page: riskForecastsPage, totalPages: riskForecastsTotalPages,
+  total: riskForecastsTotal, next: riskForecastsNext, prev: riskForecastsPrev,
+} = usePagination(riskForecasts, 15)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -326,23 +376,11 @@ function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
   catch { return iso }
 }
-function sevBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', warning:'warning', medium:'fair', low:'success', info:'info' }
-  return m[s] ?? 'neutral'
-}
-function congBadge(s: string) {
-  const m: Record<string,string> = { free_flow:'success', moderate:'fair', heavy:'warning', severe:'danger' }
-  return m[s] ?? 'neutral'
-}
+const { riskBadge: sevBadge, congestionBadge: congBadge } = useSeverityBadge()
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .checkbox-label { display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; }
-.btn-sm { padding:3px 10px; font-size:12px; }
 </style>

@@ -16,42 +16,46 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Certificates" :value="summary ? fmtNum(summary.kpis.total_licences) : '-'" sub="All categories" source="batch" source-title="KCAA" />
-    <KpiCard label="Valid" :value="summary ? pct(summary.kpis.valid_pct) : '-'" sub="Of tracked certificates" :trend-direction="summary && summary.kpis.valid_pct >= 90 ? 'up' : 'down'" source="batch" source-title="KCAA" />
-    <KpiCard label="Expiring (30d)" :value="summary ? fmtNum(summary.kpis.expiring_30d) : '-'" sub="Renewal due soon" :trend-direction="summary && summary.kpis.expiring_30d === 0 ? 'up' : 'down'" source="batch" source-title="KCAA" />
-    <KpiCard label="Expired" :value="summary ? fmtNum(summary.kpis.expired) : '-'" sub="Lapsed, not renewed" :trend-direction="summary && summary.kpis.expired === 0 ? 'up' : 'down'" source="batch" source-title="KCAA" />
-    <KpiCard label="Aircraft Without Valid CofA" :value="summary ? fmtNum(summary.kpis.aircraft_without_valid_cofa) : '-'" sub="Grounded / non-airworthy risk" :trend-direction="summary && summary.kpis.aircraft_without_valid_cofa === 0 ? 'up' : 'down'" source="batch" source-title="KCAA" />
-    <KpiCard label="Registered Aircraft" :value="fmtNum(aircraft.length)" sub="Live registry" source="live" source-title="KCAA" />
+    <KpiCard label="Total Certificates" :value="summary ? fmtNum(summary.kpis.total_licences) : '-'" :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="All categories" to="#certificate-register" />
+    <KpiCard label="Valid" :value="summary ? pct(summary.kpis.valid_pct) : '-'" :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Of tracked certificates" :status="!summary ? undefined : summary.kpis.valid_pct >= 90 ? 'healthy' : 'warning'" to="#certificate-register" />
+    <KpiCard label="Expiring (30d)" :value="summary ? fmtNum(summary.kpis.expiring_30d) : '-'" :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="30D" description="Renewal due soon" :status="!summary ? undefined : summary.kpis.expiring_30d === 0 ? 'healthy' : 'warning'" to="#renewals-due" />
+    <KpiCard label="Expired" :value="summary ? fmtNum(summary.kpis.expired) : '-'" :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Lapsed, not renewed" :status="!summary ? undefined : summary.kpis.expired === 0 ? 'healthy' : 'critical'" to="#certificate-register" />
+    <KpiCard label="Aircraft Without Valid CofA" :value="summary ? fmtNum(summary.kpis.aircraft_without_valid_cofa) : '-'" :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Grounded / non-airworthy risk" :status="!summary ? undefined : summary.kpis.aircraft_without_valid_cofa === 0 ? 'healthy' : 'critical'" to="#aircraft-registry" />
+    <KpiCard label="Registered Aircraft" :value="fmtNum(aircraft.length)" :unavailable="loading || acError" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Live registry" to="#aircraft-registry" />
   </div>
 
   <!-- Renewals due -->
   <SectionTitle pill="KCAA · Pending Integration">Renewals Due (Next 90 Days)</SectionTitle>
-  <div class="card">
+  <div id="renewals-due" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
           <tr><th>Holder</th><th>Category</th><th>Certificate No.</th><th>Expiry</th><th>Days Left</th><th>Status</th></tr>
         </thead>
         <tbody v-if="renewalsDue.length">
-          <tr v-for="l in renewalsDue" :key="l.id">
+          <tr v-for="l in renewalsPageRows" :key="l.id">
             <td style="font-weight:600;font-size:12px">{{ holderLabel(l) }}</td>
             <td><BadgePill variant="info">{{ categoryLabel(l.category) }}</BadgePill></td>
             <td style="font-family:monospace;font-size:12px">{{ l.certificate_number }}</td>
             <td style="font-size:12px">{{ fmtDay(l.expiry_date) }}</td>
-            <td :style="{ fontWeight:'700', color: daysLeft(l.expiry_date) <= 14 ? '#ef4444' : daysLeft(l.expiry_date) <= 30 ? '#f59e0b' : '#22c55e' }">
+            <td :style="{ fontWeight:'700', color: daysLeft(l.expiry_date) <= 14 ? 'var(--danger-fg)' : daysLeft(l.expiry_date) <= 30 ? 'var(--warning-fg)' : 'var(--success-fg)' }">
               {{ daysLeft(l.expiry_date) }}d
             </td>
             <td><BadgePill :variant="statusBadge(l.status)">{{ l.status.replace(/_/g,' ') }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Renewal tracking has not been integrated from KCAA yet.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Renewal tracking has not been integrated from KCAA yet.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="renewalsPage" :total-pages="renewalsTotalPages" :total="renewalsTotal"
+        @prev="renewalsPrev" @next="renewalsNext"
+      />
     </div>
   </div>
 
   <!-- Full certificate register -->
   <SectionTitle pill="KCAA · Pending Integration">Certificate / Licence Register</SectionTitle>
-  <div class="card">
+  <div id="certificate-register" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="categoryFilter" class="select-sm">
@@ -88,7 +92,7 @@
             <tr><th>Holder</th><th>Category</th><th>Certificate No.</th><th>Issuing Authority</th><th>Issued</th><th>Expiry</th><th>Status</th></tr>
           </thead>
           <tbody v-if="filteredLicences.length">
-            <tr v-for="l in filteredLicences" :key="l.id">
+            <tr v-for="l in licencesPageRows" :key="l.id">
               <td style="font-weight:600;font-size:12px">{{ holderLabel(l) }}</td>
               <td><BadgePill variant="info">{{ categoryLabel(l.category) }}</BadgePill></td>
               <td style="font-family:monospace;font-size:12px">{{ l.certificate_number }}</td>
@@ -98,15 +102,19 @@
               <td><BadgePill :variant="statusBadge(l.status)">{{ l.status.replace(/_/g,' ') }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'The certificate/licence register has not been integrated from KCAA yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'The certificate/licence register has not been integrated from KCAA yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="licencesPage" :total-pages="licencesTotalPages" :total="licencesTotal"
+          @prev="licencesPrev" @next="licencesNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Live aircraft registry + AOC status cross-reference -->
   <SectionTitle pill="Live Registry">Aircraft Registry &amp; Airworthiness</SectionTitle>
-  <div class="card">
+  <div id="aircraft-registry" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -114,7 +122,7 @@
             <tr><th>Registration</th><th>Type</th><th>Manufacturer / Model</th><th>Airline</th><th>In Service</th><th>Valid CofA</th></tr>
           </thead>
           <tbody v-if="aircraft.length">
-            <tr v-for="a in aircraft" :key="a.id">
+            <tr v-for="a in aircraftPageRows" :key="a.id">
               <td style="font-family:monospace;font-weight:700">{{ a.registration }}</td>
               <td><BadgePill variant="neutral">{{ a.aircraft_type.replace(/_/g,' ') }}</BadgePill></td>
               <td style="font-size:12px">{{ a.manufacturer }} {{ a.model }}</td>
@@ -122,12 +130,16 @@
               <td><BadgePill :variant="a.in_service ? 'success' : 'neutral'">{{ a.in_service ? 'Yes' : 'No' }}</BadgePill></td>
               <td>
                 <BadgePill v-if="cofaStatusFor(a.registration)" :variant="statusBadge(cofaStatusFor(a.registration)!)">{{ cofaStatusFor(a.registration)!.replace(/_/g,' ') }}</BadgePill>
-                <span v-else style="font-size:12px;color:#94a3b8">Not tracked</span>
+                <span v-else style="font-size:12px;color:var(--fg-3)">Not tracked</span>
               </td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No aircraft in the registry.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No aircraft in the registry.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="aircraftPage" :total-pages="aircraftTotalPages" :total="aircraftTotal"
+          @prev="aircraftPrev" @next="aircraftNext"
+        />
       </div>
     </div>
   </div>
@@ -139,7 +151,7 @@
       <table>
         <thead><tr><th>Airline</th><th>IATA</th><th>AOC Status</th><th>Cargo Only</th><th>Fleet Size</th></tr></thead>
         <tbody v-if="airlines.length">
-          <tr v-for="al in airlines" :key="al.id">
+          <tr v-for="al in airlinesPageRows" :key="al.id">
             <td style="font-weight:600;font-size:12px">{{ al.name }}</td>
             <td style="font-family:monospace;font-size:12px">{{ al.iata_code }}</td>
             <td><BadgePill :variant="aocBadge(al.aoc_status)">{{ al.aoc_status }}</BadgePill></td>
@@ -147,16 +159,18 @@
             <td>{{ fmtNum(al.fleet_size) }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No airlines in the registry.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No airlines in the registry.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="airlinesPage" :total-pages="airlinesTotalPages" :total="airlinesTotal"
+        @prev="airlinesPrev" @next="airlinesNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Aircraft & Operator Licensing')
-
 import { useAviationMaritime, useAviationLicensing } from '~/composables/api'
 import type { Aircraft, Airline, AviationLicensingSummary, AviationLicence, AviationLicenceCategory, AviationLicenceHolderType, AviationLicenceStatus } from '~/composables/api'
 
@@ -167,6 +181,7 @@ const aircraft  = ref<Aircraft[]>([])
 const airlines  = ref<Airline[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const acError   = ref(false)
 
 const categoryFilter   = ref<'' | AviationLicenceCategory>('')
 const holderTypeFilter = ref<'' | AviationLicenceHolderType>('')
@@ -192,6 +207,8 @@ async function load() {
   if (acRes.status   === 'fulfilled') aircraft.value = (acRes.value as any).results ?? []
   if (alRes.status   === 'fulfilled') airlines.value = (alRes.value as any).results ?? []
 
+  acError.value = acRes.status === 'rejected'
+
   if ([sumRes, listRes, expRes].every(r => r.status === 'rejected') && acRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Aviation API.'
 
@@ -208,6 +225,27 @@ const filteredLicences = computed(() => licences.value.filter(l => {
   if (statusFilter.value && l.status !== statusFilter.value) return false
   return true
 }))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: renewalsPageRows, page: renewalsPage, totalPages: renewalsTotalPages,
+  total: renewalsTotal, next: renewalsNext, prev: renewalsPrev,
+} = usePagination(renewalsDue, 15)
+
+const {
+  pageRows: licencesPageRows, page: licencesPage, totalPages: licencesTotalPages,
+  total: licencesTotal, next: licencesNext, prev: licencesPrev,
+} = usePagination(filteredLicences, 15)
+
+const {
+  pageRows: aircraftPageRows, page: aircraftPage, totalPages: aircraftTotalPages,
+  total: aircraftTotal, next: aircraftNext, prev: aircraftPrev,
+} = usePagination(aircraft, 15)
+
+const {
+  pageRows: airlinesPageRows, page: airlinesPage, totalPages: airlinesTotalPages,
+  total: airlinesTotal, next: airlinesNext, prev: airlinesPrev,
+} = usePagination(airlines, 15)
 const licenceExportColumns = [
   { key: 'holder_type', label: 'Holder Type' },
   { key: 'aircraft_registration', label: 'Aircraft' },
@@ -276,9 +314,7 @@ function pct(v: number | null | undefined) { return v == null ? '-' : `${v.toFix
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 </style>

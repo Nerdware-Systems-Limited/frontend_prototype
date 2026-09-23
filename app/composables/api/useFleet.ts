@@ -253,7 +253,7 @@ export interface GovernmentFleet {
 }
 
 // ── Behaviour summary / trip path payloads ────────────────────────────
-// Real shape of GET /driver-behavior-events/summary/ — a pivot of
+// Real shape of GET /driver-behavior-events/summary/ - a pivot of
 // event_type -> {severity: count, total}, plus a worst-offenders list.
 // (NOT a paginated `{results}` envelope.)
 export interface DriverBehaviourSummary {
@@ -263,7 +263,7 @@ export interface DriverBehaviourSummary {
   since: string
 }
 
-// Real shape of GET /trip-playbacks/{id}/path/ — a single object keyed
+// Real shape of GET /trip-playbacks/{id}/path/ - a single object keyed
 // by `path` (NOT a bare array, `.points`, or a paginated `.results`).
 export interface TripPath {
   id: string

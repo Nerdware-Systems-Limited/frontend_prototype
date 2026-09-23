@@ -17,46 +17,92 @@
 
   <!-- Real registry KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Registered Ports" :value="fmtNum(ports.length)" :sub="`${fmtNum(activePorts.length)} active`" source="live" source-title="KPA Registry" />
-    <KpiCard label="Registered Berths" :value="fmtNum(berths.length)" :sub="`${fmtNum(activeBerths.length)} active`" source="live" source-title="KPA Registry" />
-    <KpiCard label="Design Throughput" :value="`${fmtNum(totalDesignThroughput)} TEU/yr`" sub="Sum across registered ports" source="live" source-title="KPA Registry" />
-    <KpiCard label="Avg Cranes / Berth" :value="avgCranes != null ? avgCranes.toFixed(1) : '-'" sub="Container-handling capacity proxy" source="live" source-title="KPA Registry" />
+    <KpiCard
+      label="Registered Ports" :value="fmtNum(ports.length)"
+      :unavailable="loading || portsError" :unavailable-note="loading ? 'Loading…' : 'KPA Registry feed unavailable'"
+      period="LIVE" :description="`${fmtNum(activePorts.length)} active`" to="#port-registry"
+    />
+    <KpiCard
+      label="Registered Berths" :value="fmtNum(berths.length)"
+      :unavailable="loading || berthsError" :unavailable-note="loading ? 'Loading…' : 'KPA Registry feed unavailable'"
+      period="LIVE" :description="`${fmtNum(activeBerths.length)} active`" to="#berth-registry"
+    />
+    <KpiCard
+      label="Design Throughput" :value="`${fmtNum(totalDesignThroughput)} TEU/yr`"
+      :unavailable="loading || portsError" :unavailable-note="loading ? 'Loading…' : 'KPA Registry feed unavailable'"
+      period="LIVE" description="Sum across registered ports" to="#capacity-utilisation"
+    />
+    <KpiCard
+      label="Avg Cranes / Berth" :value="avgCranes != null ? avgCranes.toFixed(1) : '-'"
+      :unavailable="loading || berthsError" :unavailable-note="loading ? 'Loading…' : 'KPA Registry feed unavailable'"
+      period="LIVE" description="Container-handling capacity proxy" to="#berth-registry"
+    />
   </div>
 
   <!-- Infra KPIs (computed from the live channel/navaid/dry-dock/capital-works catalogues) -->
   <div class="kpi-grid">
-    <KpiCard label="Channel Depth Compliance" :value="pct(channelDepthCompliancePct)" sub="Dredged vs target depth" :trend-direction="(channelDepthCompliancePct ?? 0) >= 90 ? 'up' : 'down'" source="live" source-title="KMA Hydrographic" />
-    <KpiCard label="Navaid Availability" :value="pct(navaidOperationalPct)" sub="Buoys / lighthouses / radar / VHF" source="live" source-title="KMA" />
-    <KpiCard label="Dry Docks Operational" :value="fmtNum(dryDocksOperational)" :sub="`of ${fmtNum(dryDocks.length)} registered`" source="live" source-title="KPA" />
-    <KpiCard label="Registered ICDs" :value="fmtNum(icds.length)" sub="Inland container depots" source="live" source-title="KPA Registry" />
-    <KpiCard label="Active Capital Works" :value="fmtNum(activeCapitalWorks.length)" :sub="`of ${fmtNum(capitalWorks.length)} projects`" source="live" source-title="KPA / National Treasury" />
-    <KpiCard label="Active Capital Works Value" :value="activeCapitalWorksValue ? `KES ${fmtKES(activeCapitalWorksValue)}` : '-'" sub="In-progress projects" source="live" source-title="KPA / National Treasury" />
+    <KpiCard
+      label="Channel Depth Compliance" :value="pct(channelDepthCompliancePct)"
+      :unavailable="loading || channelsError" :unavailable-note="loading ? 'Loading…' : 'KMA Hydrographic feed unavailable'"
+      period="LIVE" description="Dredged vs target depth"
+      :status="channelDepthCompliancePct == null ? undefined : channelDepthCompliancePct >= 90 ? 'healthy' : 'warning'"
+      to="#channel-depth"
+    />
+    <KpiCard
+      label="Navaid Availability" :value="pct(navaidOperationalPct)"
+      :unavailable="loading || navaidsError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Buoys / lighthouses / radar / VHF" to="#navigational-aids"
+    />
+    <KpiCard
+      label="Dry Docks Operational" :value="fmtNum(dryDocksOperational)"
+      :unavailable="loading || dryDocksError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" :description="`of ${fmtNum(dryDocks.length)} registered`" to="#dry-docks"
+    />
+    <KpiCard
+      label="Registered ICDs" :value="fmtNum(icds.length)"
+      :unavailable="loading || icdsError" :unavailable-note="loading ? 'Loading…' : 'KPA Registry feed unavailable'"
+      period="LIVE" description="Inland container depots" to="#icds"
+    />
+    <KpiCard
+      label="Active Capital Works" :value="fmtNum(activeCapitalWorks.length)"
+      :unavailable="loading || capitalWorksError" :unavailable-note="loading ? 'Loading…' : 'KPA / National Treasury feed unavailable'"
+      period="LIVE" :description="`of ${fmtNum(capitalWorks.length)} projects`" to="#capital-works-table"
+    />
+    <KpiCard
+      label="Active Capital Works Value" :value="activeCapitalWorksValue ? `KES ${fmtKES(activeCapitalWorksValue)}` : '-'"
+      :unavailable="loading || capitalWorksError" :unavailable-note="loading ? 'Loading…' : 'KPA / National Treasury feed unavailable'"
+      period="LIVE" description="In-progress projects" to="#capital-works-table"
+    />
   </div>
 
   <!-- Capacity utilisation -->
   <SectionTitle pill="Computed · Live Registry × Container Throughput">Port Capacity Utilisation</SectionTitle>
-  <div class="card">
+  <div id="capacity-utilisation" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Port</th><th>UNLOCODE</th><th>Design Throughput/yr (TEU)</th><th>Annualised Actual (est.)</th><th>Utilisation</th><th>Berth Availability</th></tr></thead>
           <tbody v-if="capacityUtilisation.length">
-            <tr v-for="c in capacityUtilisation" :key="c.unlocode">
+            <tr v-for="c in capacityPageRows" :key="c.unlocode">
               <td style="font-weight:600">{{ c.name }}</td>
               <td style="font-family:monospace">{{ c.unlocode }}</td>
               <td>{{ fmtNum(c.designThroughput) }}</td>
               <td>{{ c.annualisedActual != null ? fmtNum(c.annualisedActual) : '-' }}</td>
               <td>
                 <div v-if="c.utilizationPct != null" class="util-bar-wrap">
-                  <div class="util-bar" :style="{ width: `${Math.min(100, c.utilizationPct)}%`, background: c.utilizationPct > 100 ? '#ef4444' : c.utilizationPct >= 70 ? '#f59e0b' : '#22c55e' }" />
+                  <div class="util-bar" :style="{ transform: `scaleX(${Math.min(100, c.utilizationPct) / 100})`, background: c.utilizationPct > 100 ? 'var(--destructive)' : c.utilizationPct >= 70 ? 'var(--warning)' : 'var(--success)' }" />
                 </div>
                 <span style="font-size:11px">{{ c.utilizationPct != null ? `${c.utilizationPct.toFixed(0)}%` : '-' }}</span>
               </td>
               <td style="font-size:12px">{{ berthAvailabilityByPort[c.unlocode] != null ? `${berthAvailabilityByPort[c.unlocode]!.toFixed(0)}%` : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No container-throughput data available to estimate utilisation.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No container-throughput data available to estimate utilisation.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="capacityPage" :total-pages="capacityTotalPages" :total="capacityTotal"
+          @prev="capacityPrev" @next="capacityNext"
+        />
       </div>
       <div class="source-note">Annualised actual is estimated by scaling the {{ throughputDays }}-day container throughput to a full year - directional only, not a reported annual figure. Berth availability is from <code>infrastructure/summary/</code>.</div>
     </div>
@@ -78,13 +124,13 @@
 
   <!-- Port registry -->
   <SectionTitle pill="Live Registry">Port Registry</SectionTitle>
-  <div class="card">
+  <div id="port-registry" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Port</th><th>UNLOCODE</th><th>Type</th><th>Operator</th><th>Design Throughput (TEU/yr)</th><th>Agency</th><th>Status</th></tr></thead>
           <tbody v-if="ports.length">
-            <tr v-for="p in ports" :key="p.id">
+            <tr v-for="p in portRegistryPageRows" :key="p.id">
               <td style="font-weight:600">{{ p.name }}</td>
               <td style="font-family:monospace">{{ p.unlocode }}</td>
               <td><BadgePill variant="info">{{ p.port_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -94,15 +140,19 @@
               <td><BadgePill :variant="p.active ? 'success' : 'neutral'">{{ p.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading ports…' : 'No ports available.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading ports…' : 'No ports available.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="portRegistryPage" :total-pages="portRegistryTotalPages" :total="portRegistryTotal"
+          @prev="portRegistryPrev" @next="portRegistryNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Berth registry -->
   <SectionTitle pill="Live Registry">Berth Registry</SectionTitle>
-  <div class="card">
+  <div id="berth-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="portFilter" class="select-sm">
@@ -125,7 +175,7 @@
         <table>
           <thead><tr><th>Berth</th><th>Name</th><th>Port</th><th>Type</th><th>Length (m)</th><th>Max Draft (m)</th><th>Max Vessel LOA</th><th>Cranes</th><th>Status</th></tr></thead>
           <tbody v-if="filteredBerths.length">
-            <tr v-for="b in filteredBerths" :key="b.id">
+            <tr v-for="b in berthRegistryPageRows" :key="b.id">
               <td style="font-family:monospace;font-weight:700">{{ b.berth_code }}</td>
               <td style="font-size:12px">{{ b.name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ b.port_unlocode }}</td>
@@ -137,21 +187,25 @@
               <td><BadgePill :variant="b.active ? 'success' : 'danger'">{{ b.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading berths…' : 'No berths match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading berths…' : 'No berths match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="berthRegistryPage" :total-pages="berthRegistryTotalPages" :total="berthRegistryTotal"
+          @prev="berthRegistryPrev" @next="berthRegistryNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Channel depth & dredging -->
   <SectionTitle pill="KMA Hydrographic · Live">Channel Depth &amp; Dredging</SectionTitle>
-  <div class="card">
+  <div id="channel-depth" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Port</th><th>Channel</th><th>Waterway</th><th>Dredged Depth (m)</th><th>Target Depth (m)</th><th>vs Target</th><th>Last Dredged</th></tr></thead>
           <tbody v-if="channels.length">
-            <tr v-for="c in channels" :key="c.id">
+            <tr v-for="c in channelsPageRows" :key="c.id">
               <td style="font-family:monospace;font-weight:600">{{ c.port_unlocode ?? '-' }}</td>
               <td style="font-size:12px">{{ c.name }}</td>
               <td style="font-size:12px">{{ c.waterway_name ?? '-' }}</td>
@@ -166,21 +220,25 @@
               <td style="font-size:11px">{{ fmtDate(c.last_dredged_date) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No channels registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No channels registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="channelsPage" :total-pages="channelsTotalPages" :total="channelsTotal"
+          @prev="channelsPrev" @next="channelsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Navaids -->
   <SectionTitle pill="KMA · Live">Navigational Aids</SectionTitle>
-  <div class="card">
+  <div id="navigational-aids" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Port</th><th>Name</th><th>Type</th><th>Waterway</th><th>Status</th><th>Uptime</th></tr></thead>
           <tbody v-if="navaids.length">
-            <tr v-for="n in navaids" :key="n.id">
+            <tr v-for="n in navaidsPageRows" :key="n.id">
               <td style="font-family:monospace;font-weight:600">{{ n.port_unlocode ?? '-' }}</td>
               <td style="font-size:12px">{{ n.name }}</td>
               <td><BadgePill variant="info">{{ n.aid_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -189,21 +247,25 @@
               <td style="font-size:12px">{{ n.uptime_pct != null ? `${n.uptime_pct.toFixed(1)}%` : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No navigation aids registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No navigation aids registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="navaidsPage" :total-pages="navaidsTotalPages" :total="navaidsTotal"
+          @prev="navaidsPrev" @next="navaidsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Dry docks + ICDs -->
   <div class="two-col">
-    <div class="card">
+    <div id="dry-docks" class="card drill-target">
       <div class="card-header">Dry Docks &amp; Ship Repair</div>
       <div class="card-body">
         <table>
           <thead><tr><th>Facility</th><th>Port</th><th>Type</th><th>Capacity (DWT)</th><th>Operator</th><th>Status</th></tr></thead>
           <tbody v-if="dryDocks.length">
-            <tr v-for="d in dryDocks" :key="d.id">
+            <tr v-for="d in dryDocksPageRows" :key="d.id">
               <td style="font-weight:600;font-size:12px">{{ d.name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ d.port_unlocode }}</td>
               <td style="font-size:12px">{{ d.dock_type.replace(/_/g,' ') }}</td>
@@ -212,17 +274,21 @@
               <td><BadgePill :variant="dryDockBadge(d.operational_status)">{{ d.operational_status.replace(/_/g,' ') }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No dry docks registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:14px">{{ loading ? 'Loading…' : 'No dry docks registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="dryDocksPage" :total-pages="dryDocksTotalPages" :total="dryDocksTotal"
+          @prev="dryDocksPrev" @next="dryDocksNext"
+        />
       </div>
     </div>
-    <div class="card">
+    <div id="icds" class="card drill-target">
       <div class="card-header">Inland Container Depots</div>
       <div class="card-body">
         <table>
           <thead><tr><th>ICD</th><th>UNLOCODE</th><th>Operator</th><th>Design Throughput (TEU/yr)</th><th>Status</th></tr></thead>
           <tbody v-if="icds.length">
-            <tr v-for="i in icds" :key="i.id">
+            <tr v-for="i in icdsPageRows" :key="i.id">
               <td style="font-weight:600;font-size:12px">{{ i.name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ i.unlocode }}</td>
               <td style="font-size:12px">{{ i.operator || '-' }}</td>
@@ -230,8 +296,12 @@
               <td><BadgePill :variant="i.active ? 'success' : 'neutral'">{{ i.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">{{ loading ? 'Loading…' : 'No ports currently classified as ICDs (port_type=inland_dry).' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:14px">{{ loading ? 'Loading…' : 'No ports currently classified as ICDs (port_type=inland_dry).' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="icdsPage" :total-pages="icdsTotalPages" :total="icdsTotal"
+          @prev="icdsPrev" @next="icdsNext"
+        />
       </div>
     </div>
   </div>
@@ -243,7 +313,7 @@
       <table>
         <thead><tr><th>Vessel</th><th>Port</th><th>Result</th><th>Deficiencies</th><th>Date</th></tr></thead>
         <tbody v-if="inspections.length">
-          <tr v-for="ins in inspections" :key="ins.id">
+          <tr v-for="ins in inspectionsPageRows" :key="ins.id">
             <td style="font-weight:600;font-size:12px">{{ ins.vessel_name ?? ins.vessel ?? '-' }}</td>
             <td style="font-family:monospace;font-size:12px">{{ ins.port_unlocode ?? ins.port ?? '-' }}</td>
             <td><BadgePill :variant="inspectionBadge(ins.result)">{{ ins.result ?? '-' }}</BadgePill></td>
@@ -251,20 +321,24 @@
             <td style="font-size:11px">{{ fmtDate(ins.inspected_at) }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No port-state-control inspections in the current view.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No port-state-control inspections in the current view.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="inspectionsPage" :total-pages="inspectionsTotalPages" :total="inspectionsTotal"
+        @prev="inspectionsPrev" @next="inspectionsNext"
+      />
     </div>
   </div>
 
   <!-- Capital works -->
   <SectionTitle pill="KPA / National Treasury · Live">Capital Works Pipeline</SectionTitle>
-  <div class="card">
+  <div id="capital-works-table" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
       <table>
         <thead><tr><th>Ref</th><th>Project</th><th>Port</th><th>Type</th><th>Contractor</th><th>Funding</th><th>Budget (KES)</th><th>Financial Progress</th><th>Status</th></tr></thead>
         <tbody v-if="capitalWorks.length">
-          <tr v-for="c in capitalWorks" :key="c.id">
+          <tr v-for="c in capitalWorksPageRows" :key="c.id">
             <td style="font-family:monospace;font-size:11px">{{ c.project_ref }}</td>
             <td style="font-weight:600;font-size:12px">{{ c.project_name }}</td>
             <td style="font-family:monospace">{{ c.port_unlocode ?? '-' }}</td>
@@ -276,8 +350,12 @@
             <td><BadgePill :variant="capitalWorkBadge(c.status)">{{ c.status.replace(/_/g,' ') }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No capital works projects registered.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No capital works projects registered.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="capitalWorksPage" :total-pages="capitalWorksTotalPages" :total="capitalWorksTotal"
+        @prev="capitalWorksPrev" @next="capitalWorksNext"
+      />
       </div>
     </div>
   </div>
@@ -285,8 +363,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Maritime Infrastructure')
-
 import { useAviationMaritime, useMaritimeInfrastructure } from '~/composables/api'
 import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary, CapitalWorkStatus } from '~/composables/api'
 
@@ -307,6 +383,13 @@ const infra         = ref<MaritimeInfraSummary | null>(null)
 const loading       = ref(true)
 const error         = ref<string | null>(null)
 const throughputDays = ref(30)
+const portsError        = ref(false)
+const berthsError       = ref(false)
+const channelsError     = ref(false)
+const navaidsError      = ref(false)
+const dryDocksError     = ref(false)
+const icdsError         = ref(false)
+const capitalWorksError = ref(false)
 
 const portFilter      = ref('')
 const berthTypeFilter = ref('')
@@ -340,6 +423,14 @@ async function load() {
   if (cwRes.status  === 'fulfilled') capitalWorks.value = (cwRes.value as any).results ?? []
   if (insRes.status === 'fulfilled') inspections.value = (insRes.value as any).results ?? []
   if (sumRes.status === 'fulfilled') infra.value       = sumRes.value
+
+  portsError.value        = poRes.status === 'rejected'
+  berthsError.value       = beRes.status === 'rejected'
+  channelsError.value     = chRes.status === 'rejected'
+  navaidsError.value      = ndRes.status === 'rejected'
+  dryDocksError.value     = ddRes.status === 'rejected'
+  icdsError.value         = icRes.status === 'rejected'
+  capitalWorksError.value = cwRes.status === 'rejected'
 
   if (poRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Maritime API.'
@@ -420,6 +511,52 @@ const filteredBerths = computed(() => berths.value.filter(b => {
   return true
 }))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: capacityPageRows, page: capacityPage, totalPages: capacityTotalPages,
+  total: capacityTotal, next: capacityNext, prev: capacityPrev,
+} = usePagination(capacityUtilisation, 15)
+
+const {
+  pageRows: portRegistryPageRows, page: portRegistryPage, totalPages: portRegistryTotalPages,
+  total: portRegistryTotal, next: portRegistryNext, prev: portRegistryPrev,
+} = usePagination(ports, 15)
+
+const {
+  pageRows: berthRegistryPageRows, page: berthRegistryPage, totalPages: berthRegistryTotalPages,
+  total: berthRegistryTotal, next: berthRegistryNext, prev: berthRegistryPrev,
+} = usePagination(filteredBerths, 15)
+
+const {
+  pageRows: channelsPageRows, page: channelsPage, totalPages: channelsTotalPages,
+  total: channelsTotal, next: channelsNext, prev: channelsPrev,
+} = usePagination(channels, 15)
+
+const {
+  pageRows: navaidsPageRows, page: navaidsPage, totalPages: navaidsTotalPages,
+  total: navaidsTotal, next: navaidsNext, prev: navaidsPrev,
+} = usePagination(navaids, 15)
+
+const {
+  pageRows: dryDocksPageRows, page: dryDocksPage, totalPages: dryDocksTotalPages,
+  total: dryDocksTotal, next: dryDocksNext, prev: dryDocksPrev,
+} = usePagination(dryDocks, 15)
+
+const {
+  pageRows: icdsPageRows, page: icdsPage, totalPages: icdsTotalPages,
+  total: icdsTotal, next: icdsNext, prev: icdsPrev,
+} = usePagination(icds, 15)
+
+const {
+  pageRows: inspectionsPageRows, page: inspectionsPage, totalPages: inspectionsTotalPages,
+  total: inspectionsTotal, next: inspectionsNext, prev: inspectionsPrev,
+} = usePagination(inspections, 15)
+
+const {
+  pageRows: capitalWorksPageRows, page: capitalWorksPage, totalPages: capitalWorksTotalPages,
+  total: capitalWorksTotal, next: capitalWorksNext, prev: capitalWorksPrev,
+} = usePagination(capitalWorks, 15)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -457,15 +594,13 @@ function inspectionBadge(s: string | undefined) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.util-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.util-bar { height:100%; border-radius:4px; transition:width .4s; }
-.source-note { margin-top:10px; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px; }
+.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.util-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }
 </style>

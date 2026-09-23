@@ -36,13 +36,19 @@ export interface Role {
 export interface User {
   id: string
   email: string
-  role_type: 'admin' | 'analyst' | 'operator' | 'public' | string
+  /** Optional self-service alternate login identifier. Null means email-only login. */
+  username?: string | null
+  role_type: 'super_admin' | 'admin' | 'analyst' | 'operator' | 'public' | string
   role?: string | null
   role_name?: string | null
   agency?: string | null
   agency_code?: string | null
   department?: string | null
   mfa_active?: boolean
+  /** Delivery channel for MFA codes - set once enrollment completes. */
+  mfa_channel?: 'email' | 'sms' | ''
+  /** E.164 format, e.g. +254712345678. Required for the SMS MFA channel. */
+  phone_number?: string
   is_active?: boolean
   is_staff?: boolean
   created_at?: string
@@ -71,6 +77,39 @@ export interface LoginResponse {
 export interface TokenRefreshResponse {
   access: string
   refresh?: string
+}
+
+/**
+ * `POST /api/v1/auth/login/` returns this instead of `LoginResponse` when
+ * the account has MFA enabled - no tokens until `POST /auth/mfa/verify/`
+ * confirms the emailed/texted code.
+ */
+export interface MfaChallenge {
+  mfa_required: true
+  otp_id: string
+  channel: 'email' | 'sms'
+}
+
+export type LoginResult = LoginResponse | MfaChallenge
+
+/** `POST /api/v1/auth/mfa/enroll/` and `.../mfa/resend/` response shape. */
+export interface MfaIssuedResponse {
+  otp_id: string
+  channel: 'email' | 'sms'
+}
+
+/** `POST /api/v1/auth/mfa/verify/` when the code was an enrollment code. */
+export interface MfaEnrollVerifyResponse {
+  detail: string
+  user: AuthUser
+}
+
+/** `POST /api/v1/auth/mfa/verify/` - shape depends on the code's purpose. */
+export type MfaVerifyResponse = LoginResponse | MfaEnrollVerifyResponse
+
+/** Generic `{detail}` envelope used by several auth endpoints. */
+export interface DetailResponse {
+  detail: string
 }
 
 /** Paginated list envelope used by every list endpoint. */

@@ -55,6 +55,13 @@ export interface MarkerSpec {
   rows?: Array<{ label: string; value: string }>
   color?: MarkerColor
   size?: MarkerSize
+  /**
+   * Optional impact-zone radius in kilometres, drawn as a translucent
+   * circle under the marker (same `color`). Used for a live-conditions
+   * read (e.g. a congestion event's real impact_radius_km) - never a
+   * decorative halo, and never drawn without a real backend radius.
+   */
+  radiusKm?: number
 }
 
 export interface LineSpec {
@@ -241,7 +248,7 @@ async function getLeaflet(): Promise<any> {
   return null
 }
 
-// protomaps-leaflet resolution — same rationale as getLeaflet(): it touches
+// protomaps-leaflet resolution - same rationale as getLeaflet(): it touches
 // `window`/Leaflet at import time, so it must be a client-only dynamic
 // import, loaded once and cached for the component's lifetime.
 let PM: any = null
@@ -269,8 +276,10 @@ const mapWrapperEl = ref<HTMLDivElement | null>(null)   // fullscreen target - t
 // as a plain one-shot initial value. See setBasemap()/cycleBasemap().
 const currentBasemap = ref<'light' | 'dark' | 'satellite'>(props.basemap)
 const isFullscreen = ref(false)
+const legendExpanded = ref(false)   // legend defaults to a small chip so it never sits on top of map content
 const locateStatus = ref<'idle' | 'locating' | 'found' | 'error'>('idle')
 let baseLayer: any = null            // active Lc.tileLayer instance, tracked separately from layerStates
+let resizeObserver: ResizeObserver | null = null
 let locateMarkerGroup: any = null    // "you are here" dot + accuracy circle
 let homeView: { bbox: [number, number, number, number] } | { center: [number, number]; zoom: number } | null = null
 
@@ -412,7 +421,7 @@ function renderBoundary(Lc: any) {
   layerStates.value.push({ key: 'boundary', label: 'Kenya Outline', color: '#3b82f6', count: props.boundary.features?.length ?? 0, visible: true, instance: layer })
 }
 
-// Road color/weight by OSM `highway` tag — used only by the GeoJSON-mode
+// Road color/weight by OSM `highway` tag - used only by the GeoJSON-mode
 // roadStyle() below, for the small ad-hoc `props.roads` shapes that come
 // from the separate /api/v1/gis/roads/ REST endpoint (still OSM-based).
 // The PMTiles roads layer no longer uses these - see conditionColorFor()/
@@ -511,7 +520,7 @@ let roadsTileLayer: any = null
 
 async function renderRoadsTiles() {
   if (!props.roadsTilesUrl || !mapRef.value) {
-    console.debug('[UaptsMap] renderRoadsTiles skipped — url:', props.roadsTilesUrl, 'map ready:', !!mapRef.value)
+    console.debug('[UaptsMap] renderRoadsTiles skipped - url:', props.roadsTilesUrl, 'map ready:', !!mapRef.value)
     return
   }
   console.debug('[UaptsMap] loading roads PMTiles from', props.roadsTilesUrl)
@@ -603,7 +612,7 @@ const RAIL_COLOR = '#ec4899'
 
 async function renderRailsTiles() {
   if (!props.railsTilesUrl || !mapRef.value) {
-    console.debug('[UaptsMap] renderRailsTiles skipped — url:', props.railsTilesUrl, 'map ready:', !!mapRef.value)
+    console.debug('[UaptsMap] renderRailsTiles skipped - url:', props.railsTilesUrl, 'map ready:', !!mapRef.value)
     return
   }
   console.debug('[UaptsMap] loading rail PMTiles from', props.railsTilesUrl)
@@ -712,6 +721,17 @@ function renderMarkers(Lc: any) {
     if (m.lat == null || m.lon == null) continue
     const radius = markerRadius(m.size)
     const fill = markerColorMap[m.color ?? 'blue']
+    // Real impact-zone radius (e.g. a congestion event's own
+    // impact_radius_km) drawn as a soft tinted zone under the marker -
+    // never shown without a genuine backend radius.
+    if (m.radiusKm != null && m.radiusKm > 0) {
+      Lc.circle([m.lat, m.lon], {
+        radius: m.radiusKm * 1000,
+        color: fill, weight: 1, opacity: 0.5,
+        fillColor: fill, fillOpacity: 0.12,
+        interactive: false,
+      }).addTo(group)
+    }
     const marker = Lc.circleMarker([m.lat, m.lon], {
       radius, color: '#fff', weight: 1.5, fillColor: fill, fillOpacity: 0.9,
     })
@@ -970,7 +990,7 @@ function handleRoadsTileClick(e: any) {
     .setLatLng(e.latlng)
     .setContent(buildRoadsTilePopup(picked))
     .openOn(mapRef.value)
-  emit('feature-click', { layer: 'roads-tiles', feature: picked[0].feature })
+  emit('feature-click', { layer: 'roads-tiles', feature: picked[0]!.feature })
 }
 
 // ── Rail-tile click-to-inspect ───────────────────────────────────────
@@ -1032,7 +1052,7 @@ function handleRailsTileClick(e: any) {
     .setLatLng(e.latlng)
     .setContent(buildRailsTilePopup(picked))
     .openOn(mapRef.value)
-  emit('feature-click', { layer: 'rails-tiles', feature: picked[0].feature })
+  emit('feature-click', { layer: 'rails-tiles', feature: picked[0]!.feature })
 }
 
 // ── Catalogue layer toggles ─────────────────────────────────────────
@@ -1060,7 +1080,7 @@ function setBasemap(Lc: any, key: 'light' | 'dark' | 'satellite') {
 
 async function cycleBasemap() {
   const order: Array<'light' | 'dark' | 'satellite'> = ['light', 'dark', 'satellite']
-  const next = order[(order.indexOf(currentBasemap.value) + 1) % order.length]
+  const next = order[(order.indexOf(currentBasemap.value) + 1) % order.length]!
   const Lc = await getLeaflet()
   if (Lc) setBasemap(Lc, next)
   emit('update:basemap', next) // lets a v-model-bound parent (e.g. for URL-state sync) stay in sync
@@ -1167,6 +1187,15 @@ onMounted(async () => {
   const map = Lc.map(mapEl.value, {
     zoomControl: true,
     preferCanvas: true,
+    // Every one of this map's call sites sits inside an ordinarily-
+    // scrolling page. Leaflet's default scrollWheelZoom:true hijacks the
+    // page's wheel scroll the instant the cursor crosses the map - so
+    // scrolling past it zooms the map instead of moving the page, and the
+    // view silently drifts to whatever zoom level the scroll happened to
+    // land on. Starts disabled; click-to-activate below re-enables it only
+    // while the cursor is actually inside, same pattern Google Maps embeds
+    // use so the map never fights the page for scroll.
+    scrollWheelZoom: false,
   })
   mapRef.value = map
 
@@ -1187,6 +1216,12 @@ onMounted(async () => {
   map.on('moveend', emitBoundsChange)
   map.on('locationfound', onLocationFound)
   map.on('locationerror', onLocationError)
+  // Click-to-activate scroll zoom (see scrollWheelZoom:false above) - the
+  // page can keep scrolling normally over the map until the user commits
+  // to interacting with it, then wheel zoom works for as long as the
+  // cursor stays inside.
+  map.on('click', () => map.scrollWheelZoom.enable())
+  mapEl.value?.addEventListener('mouseleave', () => map.scrollWheelZoom.disable())
   map.on('click', handleRoadsTileClick) // no-op until the roads PMTiles layer exists; see handleRoadsTileClick
   // NOTE: two independent canvas-hit-test handlers means that at a point
   // where a road and a rail line coincide (a level crossing, essentially
@@ -1210,11 +1245,25 @@ onMounted(async () => {
   renderLines(Lc)
   renderMarkers(Lc)
   renderArrows(Lc)
+
+  // The container's real size can still change after this point - a
+  // staggered entrance animation elsewhere on the page finishing, the
+  // sidebar collapsing, a parent grid reflowing - and Leaflet has no way
+  // to know that happened on its own. Without this it keeps painting
+  // tiles for whatever size it was at mount, leaving grey gaps around a
+  // stale-sized map. One invalidateSize() per observed resize keeps it
+  // in sync for the component's whole lifetime, not just at mount.
+  if (mapWrapperEl.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => mapRef.value?.invalidateSize())
+    resizeObserver.observe(mapWrapperEl.value)
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   if (mapRef.value) {
     mapRef.value.remove()
     mapRef.value = null
@@ -1347,13 +1396,27 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
       </div>
     </div>
 
-    <!-- Data-props legend overlay -->
-    <div v-if="props.showLegend && layerStates.length" class="uapts-legend">
-      <div class="uapts-legend-title">Layers</div>
-      <div v-for="s in layerStates" :key="`legend-${s.key}`" class="uapts-legend-row">
-        <span class="uapts-legend-dot" :style="{ background: s.color }"></span>
-        <span class="uapts-legend-label">{{ s.label }}</span>
-        <span class="uapts-legend-count">{{ s.count.toLocaleString() }}</span>
+    <!-- Data-props legend overlay - collapsed to a small chip by default so it
+         never sits on top of map content; expands on click. -->
+    <div v-if="props.showLegend && layerStates.length" class="uapts-legend" :class="{ 'is-expanded': legendExpanded }">
+      <button type="button" class="uapts-legend-title uapts-legend-toggle" :aria-expanded="legendExpanded" @click="legendExpanded = !legendExpanded">
+        <span>Layers</span>
+        <svg class="uapts-legend-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      <div v-if="legendExpanded" class="uapts-legend-body">
+        <button
+          v-for="s in layerStates" :key="`legend-${s.key}`"
+          type="button" class="uapts-legend-row" :class="{ 'is-hidden': !s.visible }"
+          :aria-pressed="s.visible" :aria-label="`${s.visible ? 'Hide' : 'Show'} ${s.label} layer`"
+          :title="s.visible ? `Hide ${s.label}` : `Show ${s.label}`"
+          @click="toggleLayer(s.key)"
+        >
+          <span class="uapts-legend-dot" :style="{ background: s.color }"></span>
+          <span class="uapts-legend-label">{{ s.label }}</span>
+          <span class="uapts-legend-count">{{ s.count.toLocaleString() }}</span>
+        </button>
       </div>
     </div>
 
@@ -1373,6 +1436,15 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
 <style scoped>
 .uapts-map-wrapper {
   position: relative;
+  /* Establishes a stacking context so nothing inside the map - Leaflet's
+     own zoom/attribution controls included, which ship z-index:1000 in
+     leaflet.css - can ever paint above page chrome like the fixed
+     top-nav (also z-index:1000). Without this, z-index:1000 here and
+     z-index:1000 on .top-nav are compared in the same root stacking
+     context, and whichever is later in the DOM (the map, always) wins
+     the tie - which is exactly why the zoom buttons/labels used to float
+     on top of the header while scrolling. */
+  z-index: 0;
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
@@ -1409,8 +1481,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   font-size: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
-.uapts-layer-control,
-.uapts-legend {
+.uapts-layer-control {
   padding: 10px 12px;
   min-width: 200px;
   max-width: 260px;
@@ -1421,6 +1492,12 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
      rather than sitting directly underneath it. */
   top: 76px;
   left: 12px;
+  padding: 0;
+  min-width: 0;
+  max-width: 260px;
+}
+.uapts-legend.is-expanded {
+  padding: 10px 12px;
 }
 
 .uapts-toolbar {
@@ -1457,8 +1534,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   .uapts-toolbar-btn.is-active { animation: none; }
 }
 
-.uapts-layer-control-title,
-.uapts-legend-title {
+.uapts-layer-control-title {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -1469,6 +1545,36 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.uapts-legend-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.uapts-legend-toggle:hover { color: #e2e8f0; }
+.uapts-legend-toggle:focus-visible { outline: 2px solid #60a5fa; outline-offset: -2px; }
+.uapts-legend-chevron {
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+.uapts-legend.is-expanded .uapts-legend-chevron { transform: rotate(180deg); }
+.uapts-legend-body {
+  padding: 8px 12px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .uapts-layer-row,
 .uapts-legend-row {
   display: flex;
@@ -1477,6 +1583,27 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   padding: 4px 0;
 }
 .uapts-layer-row { border-radius: 4px; overflow: hidden; margin: 2px 0; }
+
+/* Legend rows double as layer toggles (see toggleLayer()) - reset the
+   <button> chrome so a row still reads as a legend entry, not a form
+   control, until you hover/press it. */
+.uapts-legend-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  transition: background 0.1s, opacity 0.1s;
+}
+.uapts-legend-row:hover { background: rgba(255, 255, 255, 0.06); }
+.uapts-legend-row:focus-visible { outline: 2px solid #60a5fa; outline-offset: -2px; }
+.uapts-legend-row.is-hidden { opacity: 0.45; }
+.uapts-legend-row.is-hidden .uapts-legend-dot { background: transparent !important; border: 1.5px solid currentColor; }
 
 .uapts-layer-toggle {
   flex: 1;

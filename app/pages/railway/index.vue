@@ -2,12 +2,9 @@
   <PageHeader
     eyebrow="Railway Management (KRC)"
     title="Railway Operations"
-    subtitle="KRC · KPA · KenTrade · NCTTCA - SGR &amp; MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
+    subtitle="KRC · KPA · KenTrade · NCTTCA - SGR & MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >
     <template #actions>
-      <BadgePill v-if="summary" variant="info">
-        {{ fmtNum(summary.kpis.trains_in_service) }} trains live
-      </BadgePill>
       <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory →</NuxtLink>
       <NuxtLink to="/railway/safety" class="btn">Rail Safety →</NuxtLink>
       <NuxtLink to="/railway/live" class="btn-primary">Live Operations →</NuxtLink>
@@ -35,56 +32,75 @@
     <KpiCard
       label="Active Rail Lines"
       :value="summary ? `${fmtNum(summary.kpis.sgr_lines)} SGR / ${fmtNum(summary.kpis.mgr_lines)} MGR` : '-'"
-      :sub="`${fmtNum(summary?.kpis.total_lines ?? null)} total`"
-      source="batch" source-title="KRC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      period="LIVE"
+      :description="`${fmtNum(summary?.kpis.total_lines ?? null)} total`"
     />
     <KpiCard
       label="Trains in Service"
       :value="summary ? fmtNum(summary.kpis.trains_in_service) : '-'"
-      :sub="`of ${fmtNum(summary?.kpis.total_trains ?? null)} fleet`"
-      source="live" source-title="KRC OCC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(summary?.kpis.total_trains ?? null)} fleet`"
+      to="#live-operations"
     />
     <KpiCard
       label="Operations (24h)"
       :value="summary ? fmtNum(summary.kpis.operations_24h) : '-'"
-      sub="Trains run today"
-      trend-direction="up"
-      source="live" source-title="KRC OCC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      period="24H"
+      description="Trains run today"
+      to="#live-operations"
     />
     <KpiCard
       label="On-Time Performance"
       :value="summary ? `${summary.on_time_30d.on_time_pct.toFixed(1)}%` : '-'"
-      :sub="summary ? `Avg delay ${summary.on_time_30d.avg_delay_min.toFixed(0)} min (30d)` : '-'"
-      :trend-direction="summary && summary.on_time_30d.on_time_pct >= 85 ? 'up' : 'down'"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      period="30D"
+      :description="summary ? `Avg delay ${summary.on_time_30d.avg_delay_min.toFixed(0)} min (30d)` : ''"
+      :status="!summary ? undefined : summary.on_time_30d.on_time_pct >= 85 ? 'healthy' : 'warning'"
+      to="#otp-summary"
     />
     <KpiCard
       label="Passenger Bookings (30d)"
       :value="summary ? fmtNum(summary.kpis.passenger_bookings_30d) : '-'"
-      :sub="summary ? `KES ${fmtKES(summary.ridership_30d.revenue_kes)}` : '-'"
-      trend-direction="up"
-      source="batch" source-title="KRC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      period="30D"
+      :description="summary ? `KES ${fmtKES(summary.ridership_30d.revenue_kes)}` : ''"
+      to="#ridership-summary"
     />
     <KpiCard
       label="Freight Shipments (30d)"
       :value="summary ? fmtNum(summary.kpis.freight_30d_shipments) : '-'"
-      :sub="summary ? `${fmtNum(summary.freight_30d.total_tons)} tons` : '-'"
-      trend-direction="up"
-      source="batch" source-title="KRC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      period="30D"
+      :description="summary ? `${fmtNum(summary.freight_30d.total_tons)} tons` : ''"
+      to="/railway/freight"
     />
     <KpiCard
       label="No-Show Rate"
       :value="summary ? `${summary.ridership_30d.no_show_rate_pct.toFixed(1)}%` : '-'"
-      sub="Passengers (30d)"
-      :trend-direction="summary && summary.ridership_30d.no_show_rate_pct < 5 ? 'up' : 'down'"
-      source="batch" source-title="KRC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      period="30D"
+      description="Passengers (30d)"
+      :status="!summary ? undefined : summary.ridership_30d.no_show_rate_pct < 5 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Open Incidents"
       :value="summary ? fmtNum(summary.kpis.open_incidents) : '-'"
-      :sub="summary ? `${fmtNum(summary.incidents_90d.casualties)} casualties (90d)` : '-'"
-      :trend-direction="summary && summary.kpis.open_incidents === 0 ? 'up' : 'down'"
-      source="live" source-title="KRC Safety"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'"
+      period="90D"
+      :description="summary ? `${fmtNum(summary.incidents_90d.casualties)} casualties (90d)` : ''"
+      :status="!summary ? undefined : summary.kpis.open_incidents === 0 ? 'healthy' : 'warning'"
+      to="/railway/safety"
     />
   </div>
 
@@ -114,14 +130,14 @@
 
     <div class="right-col">
       <!-- OTP summary card -->
-      <div class="card">
+      <div id="otp-summary" class="card drill-target">
         <div class="card-header">On-Time Performance - 30d</div>
         <div class="card-body" v-if="summary">
           <div class="otp-big">{{ summary.on_time_30d.on_time_pct.toFixed(1) }}%</div>
           <div class="otp-bar-wrap">
             <div class="otp-bar" :style="{
-              width: `${summary.on_time_30d.on_time_pct}%`,
-              background: summary.on_time_30d.on_time_pct >= 85 ? '#22c55e' : summary.on_time_30d.on_time_pct >= 70 ? '#f59e0b' : '#ef4444'
+              transform: `scaleX(${summary.on_time_30d.on_time_pct / 100})`,
+              background: summary.on_time_30d.on_time_pct >= 85 ? 'var(--success)' : summary.on_time_30d.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
             }" />
           </div>
           <div class="otp-stats">
@@ -131,11 +147,11 @@
             <div><span class="stat-label">Avg Delay</span><span>{{ summary.on_time_30d.avg_delay_min.toFixed(0) }} min</span></div>
           </div>
         </div>
-        <div v-else class="card-body" style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No OTP data' }}</div>
+        <EmptyState v-else :loading="loading" message="No OTP data" compact />
       </div>
 
       <!-- Ridership summary -->
-      <div class="card stack-card">
+      <div id="ridership-summary" class="card stack-card drill-target">
         <div class="card-header">Ridership & Revenue (30d)</div>
         <div class="card-body" v-if="summary">
           <div class="rid-stat-row">
@@ -199,7 +215,7 @@
   <!-- Live operations table -->
   <SectionTitle pill="KRC OCC · Live">Live Train Operations</SectionTitle>
 
-  <div class="card">
+  <div id="live-operations" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -214,27 +230,31 @@
           </tr>
         </thead>
         <tbody v-if="liveOps.length">
-          <tr v-for="op in liveOps" :key="op.id">
+          <tr v-for="op in liveOpsPageRows" :key="op.id">
             <td style="font-family:monospace;font-weight:700">{{ op.train_number }}</td>
             <td style="font-size:12px">{{ op.origin_code }} → {{ op.destination_code }}</td>
             <td><BadgePill :variant="opBadge(op.status)">{{ op.status.replace(/_/g,' ') }}</BadgePill></td>
             <td style="font-size:12px;font-family:monospace">{{ op.current_station_code ?? '-' }}</td>
-            <td :style="{ color: op.delay_arrival_min > 30 ? '#ef4444' : op.delay_arrival_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+            <td :style="{ color: op.delay_arrival_min > 30 ? 'var(--danger-fg)' : op.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ op.delay_arrival_min > 0 ? `+${op.delay_arrival_min} min` : 'On time' }}
             </td>
             <td style="font-size:12px;text-transform:capitalize">{{ (op as any).delay_reason?.replace(/_/g,' ') ?? '-' }}</td>
             <td>
               <div v-if="(op as any).occupancy_pct != null" class="occ-wrap">
-                <div class="occ-bar" :style="{ width: `${(op as any).occupancy_pct}%`, background: (op as any).occupancy_pct >= 90 ? '#ef4444' : (op as any).occupancy_pct >= 70 ? '#f59e0b' : '#22c55e' }" />
+                <div class="occ-bar" :style="{ width: `${(op as any).occupancy_pct}%`, background: (op as any).occupancy_pct >= 90 ? 'var(--destructive)' : (op as any).occupancy_pct >= 70 ? 'var(--warning)' : 'var(--success)' }" />
               </div>
               <span style="font-size:11px">{{ (op as any).occupancy_pct != null ? `${(op as any).occupancy_pct.toFixed(0)}%` : '-' }}</span>
             </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading live operations…' : 'No live train operations.' }}</td></tr>
+          <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading live operations…' : 'No live train operations.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="liveOpsPage" :total-pages="liveOpsTotalPages" :total="liveOpsTotal"
+        @prev="liveOpsPrev" @next="liveOpsNext"
+      />
     </div>
   </div>
 
@@ -254,31 +274,33 @@
           </tr>
         </thead>
         <tbody v-if="topRoutes.length">
-          <tr v-for="r in topRoutes" :key="`${r.origin__code}-${r.destination__code}`">
-            <td style="font-weight:600">{{ r.origin__name }} <span style="font-size:11px;color:#94a3b8">({{ r.origin__code }})</span></td>
-            <td>{{ r.destination__name }} <span style="font-size:11px;color:#94a3b8">({{ r.destination__code }})</span></td>
+          <tr v-for="r in topRoutesPageRows" :key="`${r.origin__code}-${r.destination__code}`">
+            <td style="font-weight:600">{{ r.origin__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.origin__code }})</span></td>
+            <td>{{ r.destination__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.destination__code }})</span></td>
             <td style="font-weight:700">{{ fmtNum(r.bookings) }}</td>
             <td>{{ fmtKES(r.revenue) }}</td>
             <td>
               <div class="share-bar-wrap">
-                <div class="share-bar" style="background:#3b82f6"
-                  :style="{ width: `${maxBookings > 0 ? (r.bookings / maxBookings) * 100 : 0}%` }" />
+                <div class="share-bar"
+                  :style="{ width: `${maxBookings > 0 ? (r.bookings / maxBookings) * 100 : 0}%`, background: 'var(--primary-fill)' }" />
               </div>
             </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No route data.' }}</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No route data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="topRoutesPage" :total-pages="topRoutesTotalPages" :total="topRoutesTotal"
+        @prev="topRoutesPrev" @next="topRoutesNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Railway')
-
 import { useRailway, useGis } from '~/composables/api'
 import type { RailwaySummary, LiveOperation, OnTimeStats } from '~/composables/api'
 
@@ -332,6 +354,17 @@ onUnmounted(() => { if (t) clearInterval(t) })
 const topRoutes  = computed(() => summary.value?.top_routes ?? [])
 const maxBookings = computed(() => Math.max(1, ...topRoutes.value.map(r => r.bookings)))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: liveOpsPageRows, page: liveOpsPage, totalPages: liveOpsTotalPages,
+  total: liveOpsTotal, next: liveOpsNext, prev: liveOpsPrev,
+} = usePagination(liveOps, 15)
+
+const {
+  pageRows: topRoutesPageRows, page: topRoutesPage, totalPages: topRoutesTotalPages,
+  total: topRoutesTotal, next: topRoutesNext, prev: topRoutesPrev,
+} = usePagination(topRoutes, 15)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -352,9 +385,6 @@ function opBadge(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .eol-banner { margin-bottom:12px; display:flex; flex-direction:column; gap:6px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 
@@ -362,7 +392,7 @@ function opBadge(s: string) {
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; align-items:start; }
 @media(max-width:1100px) { .two-col-map { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; color:#475569; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); color:var(--fg-2); }
 .mk { display:flex; align-items:center; gap:5px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .line-seg { width:20px; height:4px; border-radius:2px; display:inline-block; flex-shrink:0; }
@@ -373,37 +403,37 @@ function opBadge(s: string) {
 .right-col > .card + .card { margin-top: 12px; }
 
 /* ── OTP card ── */
-.otp-big { font-size:36px; font-weight:800; text-align:center; padding:10px 0 2px; color:#1e293b; letter-spacing:-0.02em; }
-.otp-bar-wrap { background:#f1f5f9; border-radius:6px; height:12px; overflow:hidden; margin:6px 0 12px; }
-.otp-bar { height:100%; border-radius:6px; transition:width .5s ease; }
-.otp-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border-top:1px solid #f1f5f9; }
-.otp-stats > div { text-align:center; padding:8px 4px; border-right:1px solid #f1f5f9; }
+.otp-big { font-size:36px; font-weight:800; text-align:center; padding:10px 0 2px; color:var(--fg-1); letter-spacing:-0.02em; }
+.otp-bar-wrap { background:var(--surface-sunken); border-radius:6px; height:12px; overflow:hidden; margin:6px 0 12px; }
+.otp-bar { height:100%; width:100%; border-radius:6px; transform-origin:left; transition:transform .5s ease; }
+.otp-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border-top:1px solid var(--border-subtle); }
+.otp-stats > div { text-align:center; padding:8px 4px; border-right:1px solid var(--border-subtle); }
 .otp-stats > div:last-child { border-right:none; }
 
 /* ── Stat labels / values ── */
-.stat-label { font-size:10px; display:block; color:#94a3b8; margin-bottom:2px; text-transform:uppercase; letter-spacing:.04em; }
+.stat-label { font-size:10px; display:block; color:var(--fg-3); margin-bottom:2px; text-transform:uppercase; letter-spacing:.04em; }
 .rid-stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(70px,1fr)); gap:8px; }
-.freight-stats { margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #f1f5f9; }
-.rid-val { font-size:16px; font-weight:700; display:block; color:#1e293b; }
-.val-ok     { color:#16a34a; }
-.val-warn   { color:#d97706; }
-.val-danger { color:#dc2626; }
-.empty-cell { color:#94a3b8; font-size:13px; }
+.freight-stats { margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle); }
+.rid-val { font-size:16px; font-weight:700; display:block; color:var(--fg-1); }
+.val-ok     { color:var(--success-fg); }
+.val-warn   { color:var(--warning-fg); }
+.val-danger { color:var(--danger-fg); }
+.empty-cell { color:var(--fg-3); font-size:13px; }
 
 /* ── Mini section head ── */
-.mini-section-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; margin-bottom:8px; }
+.mini-section-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); margin-bottom:8px; }
 
 /* ── Corridor list ── */
 .corridor-list { display:flex; flex-direction:column; gap:0; }
-.corridor-row { display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 0; border-bottom:1px solid #f8fafc; }
+.corridor-row { display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 0; border-bottom:1px solid var(--border-subtle); }
 .corridor-row:last-child { border-bottom:none; }
-.corridor-route { font-family:monospace; font-weight:700; flex:1; color:#1e293b; }
-.corridor-stat { font-size:11px; font-weight:600; color:#475569; white-space:nowrap; }
+.corridor-route { font-family:monospace; font-weight:700; flex:1; color:var(--fg-1); }
+.corridor-stat { font-size:11px; font-weight:600; color:var(--fg-2); white-space:nowrap; }
 
 /* ── Operations table ── */
-.occ-wrap { background:#f1f5f9; border-radius:3px; height:5px; overflow:hidden; margin-bottom:2px; }
+.occ-wrap { background:var(--surface-sunken); border-radius:3px; height:5px; overflow:hidden; margin-bottom:2px; }
 .occ-bar { height:100%; border-radius:3px; }
-.share-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; }
+.share-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; }
 .share-bar { height:100%; border-radius:4px; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; }
 </style>

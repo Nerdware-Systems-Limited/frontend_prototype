@@ -5,9 +5,7 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - Freight manifests, corridor analysis, KenTrade single-window clearances, NCTTCA transit tracking, and KPA port-rail reconciliation"
   >
     <template #actions>
-      <div class="day-filter">
-        <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink to="/railway/infrastructure" class="btn">Freight Terminals →</NuxtLink>
     </template>
   </PageHeader>
@@ -19,61 +17,76 @@
     <KpiCard
       label="Total Shipments"
       :value="fmtNum(manifests.length)"
-      sub="Manifests in view"
-      source="batch" source-title="KRC"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      :period="`${days}D`"
+      description="Manifests in view"
+      to="#manifest-log"
     />
     <KpiCard
       label="Total Tonnage"
       :value="totalTons ? `${fmtNum(totalTons)} t` : '-'"
-      sub="Freight tonne-km"
-      trend-direction="up"
-      source="batch" source-title="KRC"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      :period="`${days}D`"
+      description="Freight tonne-km"
+      to="#cargo-type-mix"
     />
     <KpiCard
       label="Total Revenue"
       :value="totalRevenue ? `KES ${fmtKES(totalRevenue)}` : '-'"
-      sub="Freight revenue"
-      trend-direction="up"
-      source="batch" source-title="KRC"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      :period="`${days}D`"
+      description="Freight revenue"
+      to="#manifest-log"
     />
     <KpiCard
       label="Avg Wagons/Shipment"
       :value="avgWagons ? avgWagons.toFixed(1) : '-'"
-      sub="Average wagon count"
-      source="batch" source-title="KRC"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      :period="`${days}D`"
+      description="Average wagon count"
     />
     <KpiCard
       label="Port-Rail Manifests"
       :value="fmtNum(portRailManifests.length)"
-      sub="Rail-nominated containers (KPA)"
-      source="batch" source-title="KRC / KPA"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC / KPA feed unavailable'"
+      :period="`${days}D`"
+      description="Rail-nominated containers (KPA)"
+      to="#port-rail-reconciliation"
     />
     <KpiCard
       label="Transit Manifests"
       :value="fmtNum(manifests.filter(m => m.port_origin).length)"
-      sub="From port of origin"
-      source="batch" source-title="KRC"
+      :unavailable="loading || mfError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      :period="`${days}D`"
+      description="From port of origin"
+      to="#intermodal-transfer"
     />
   </div>
 
   <!-- Cargo type mix + corridor breakdown -->
   <div class="two-col">
-    <div class="card">
+    <div id="cargo-type-mix" class="card drill-target">
       <div class="card-header">Cargo Type Mix</div>
       <div class="card-body">
         <div v-if="byCargoType.length" class="type-list">
           <div v-for="c in byCargoType" :key="c.type" class="type-row">
             <span class="type-label">{{ c.type.replace(/_/g,' ') }}</span>
             <div class="type-bar-wrap">
-              <div class="type-bar" :style="{ width: `${maxCargoTons > 0 ? (c.tons / maxCargoTons) * 100 : 0}%`, background: cargoColor(c.type) }" />
+              <div class="type-bar" :style="{ transform: `scaleX(${maxCargoTons > 0 ? c.tons / maxCargoTons : 0})`, background: cargoColor(c.type) }" />
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end">
               <span style="font-size:12px;font-weight:600">{{ fmtNum(c.tons) }}t</span>
-              <span style="font-size:10px;color:#94a3b8">{{ c.count }} ships</span>
+              <span style="font-size:10px;color:var(--fg-3)">{{ c.count }} ships</span>
             </div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No cargo data.' }}</div>
+        <EmptyState v-else :loading="loading" message="No cargo data." compact />
       </div>
     </div>
 
@@ -91,11 +104,11 @@
               <span><strong>{{ fmtNum(c.shipments) }}</strong> shipments</span>
             </div>
             <div class="ci-bar-wrap">
-              <div class="ci-bar" :style="{ width: `${maxCorridorTons > 0 ? ((c.tons ?? c.total_tons ?? 0) / maxCorridorTons) * 100 : 0}%` }" />
+              <div class="ci-bar" :style="{ transform: `scaleX(${maxCorridorTons > 0 ? (c.tons ?? c.total_tons ?? 0) / maxCorridorTons : 0})` }" />
             </div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No corridor data.' }}</div>
+        <EmptyState v-else :loading="loading" message="No corridor data." compact />
       </div>
     </div>
   </div>
@@ -103,7 +116,7 @@
   <!-- Port-Rail reconciliation -->
   <SectionTitle pill="KRC / KPA · Rail-Nominated Containers">Port-Rail Container Reconciliation</SectionTitle>
 
-  <div class="card">
+  <div id="port-rail-reconciliation" class="card drill-target">
     <div class="card-body">
       <div class="recon-note">
         Rail-nominated containers are manifests with a KPA customs clearance reference or declared port origin.
@@ -125,9 +138,9 @@
           </tr>
         </thead>
         <tbody v-if="portRailManifests.length">
-          <tr v-for="m in portRailManifests.slice(0, 30)" :key="m.id">
+          <tr v-for="m in portRailPageRows" :key="m.id">
             <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
-            <td style="font-family:monospace;font-size:12px;color:#3b82f6">{{ m.customs_clearance_ref ?? '-' }}</td>
+            <td style="font-family:monospace;font-size:12px;color:var(--link)">{{ m.customs_clearance_ref ?? '-' }}</td>
             <td style="font-family:monospace;font-size:12px">{{ m.port_origin ?? '-' }}</td>
             <td><BadgePill :variant="cargoBadge(m.cargo_type)">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
             <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
@@ -137,20 +150,24 @@
             <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
             <td style="font-size:11px;white-space:nowrap">
               <span v-if="m.arrived_at">{{ fmtTime(m.arrived_at) }}</span>
-              <span v-else style="color:#f59e0b">Pending</span>
+              <span v-else style="color:var(--warning-fg)">Pending</span>
             </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading reconciliation data…' : 'No port-rail manifests found.' }}</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading reconciliation data…' : 'No port-rail manifests found.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="portRailPage" :total-pages="portRailTotalPages" :total="portRailTotal"
+        @prev="portRailPrev" @next="portRailNext"
+      />
     </div>
   </div>
 
   <!-- Intermodal transfer analysis -->
   <SectionTitle pill="Computed · Rail-Port">Intermodal Transfer Analysis</SectionTitle>
-  <div class="card" style="margin-bottom:16px">
+  <div id="intermodal-transfer" class="card drill-target" style="margin-bottom:16px">
     <div class="card-body">
       <div class="recon-note">
         Rail-port intermodal performance, derived from manifests with a declared port of origin. Rail-road intermodal transfer is not yet modelled - no road-leg linkage exists in the freight data today.
@@ -159,24 +176,28 @@
         <table>
           <thead><tr><th>Port of Origin</th><th>Manifests</th><th>Tonnage</th><th>Avg Transit Time</th><th>Pending Arrival</th></tr></thead>
           <tbody>
-            <tr v-for="p in intermodalByPort" :key="p.port">
+            <tr v-for="p in intermodalPageRows" :key="p.port">
               <td style="font-weight:600">{{ p.port }}</td>
               <td>{{ fmtNum(p.count) }}</td>
               <td>{{ fmtNum(p.tons) }}t</td>
               <td style="font-size:12px">{{ p.avgTransitHours != null ? `${p.avgTransitHours.toFixed(1)}h` : '-' }}</td>
-              <td :style="{ color: p.pending > 0 ? '#f59e0b' : 'inherit' }">{{ p.pending }}</td>
+              <td :style="{ color: p.pending > 0 ? 'var(--warning-fg)' : 'inherit' }">{{ p.pending }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No manifests with a declared port of origin in the current view.' }}</div>
+      <EmptyState v-else :loading="loading" message="No manifests with a declared port of origin in the current view." icon="search" compact />
+      <TablePagination
+        :page="intermodalPage" :total-pages="intermodalTotalPages" :total="intermodalTotal"
+        @prev="intermodalPrev" @next="intermodalNext"
+      />
     </div>
   </div>
 
   <!-- Full manifest log -->
   <SectionTitle>Freight Manifest Log</SectionTitle>
 
-  <div class="card">
+  <div id="manifest-log" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="cargoFilter" class="select-sm">
@@ -209,7 +230,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredManifests.length">
-          <template v-for="m in filteredManifests.slice(0, 50)" :key="m.id">
+          <template v-for="m in manifestsPageRows" :key="m.id">
             <tr class="expand-row" @click="expanded = expanded === m.id ? null : m.id">
               <td class="expand-cell">{{ expanded === m.id ? '▾' : '▸' }}</td>
               <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
@@ -220,7 +241,7 @@
               <td style="font-family:monospace;font-size:12px">{{ m.schedule_train_number ?? '-' }}</td>
               <td style="font-size:12px">{{ fmtKES(parseFloat(m.revenue_kes)) }}</td>
               <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
-              <td style="font-size:11px;white-space:nowrap;color:#22c55e">{{ m.arrived_at ? fmtTime(m.arrived_at) : '-' }}</td>
+              <td style="font-size:11px;white-space:nowrap;color:var(--success-fg)">{{ m.arrived_at ? fmtTime(m.arrived_at) : '-' }}</td>
             </tr>
             <tr v-if="expanded === m.id" class="detail-row">
               <td :colspan="10">
@@ -234,17 +255,19 @@
           </template>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading manifests…' : 'No manifests match filters.' }}</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading manifests…' : 'No manifests match filters.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="manifestsPage" :total-pages="manifestsTotalPages" :total="manifestsTotal"
+        @prev="manifestsPrev" @next="manifestsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Rail Freight')
-
 import { useRailway } from '~/composables/api'
 import type { FreightManifest } from '~/composables/api'
 
@@ -252,6 +275,7 @@ const manifests = ref<FreightManifest[]>([])
 const corridors = ref<any[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const mfError   = ref(false)
 const lastRefreshed = ref('-')
 const days          = ref(30)
 const cargoFilter   = ref('')
@@ -271,6 +295,8 @@ async function load() {
   if (mfRes.status   === 'fulfilled') manifests.value = (mfRes.value as any).results ?? []
   if (corrRes.status === 'fulfilled') corridors.value = (corrRes.value as any).results ?? []
 
+  mfError.value = mfRes.status === 'rejected'
+
   if ([mfRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Railway API.'
 
@@ -288,6 +314,12 @@ const portRailManifests = computed(() =>
   manifests.value.filter(m => m.customs_clearance_ref || m.port_origin),
 )
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: portRailPageRows, page: portRailPage, totalPages: portRailTotalPages,
+  total: portRailTotal, next: portRailNext, prev: portRailPrev,
+} = usePagination(portRailManifests, 15)
+
 const filteredManifests = computed(() =>
   manifests.value.filter(m => {
     if (cargoFilter.value    && m.cargo_type !== cargoFilter.value)                                               return false
@@ -300,6 +332,11 @@ const filteredManifests = computed(() =>
     return true
   }),
 )
+
+const {
+  pageRows: manifestsPageRows, page: manifestsPage, totalPages: manifestsTotalPages,
+  total: manifestsTotal, next: manifestsNext, prev: manifestsPrev,
+} = usePagination(filteredManifests, 15)
 
 const byCargoType = computed(() => {
   const map = new Map<string, { type: string; tons: number; count: number }>()
@@ -329,6 +366,11 @@ const intermodalByPort = computed(() => {
     .map(p => ({ port: p.port, count: p.count, tons: p.tons, pending: p.pending, avgTransitHours: p.transitHours.length ? p.transitHours.reduce((a, b) => a + b, 0) / p.transitHours.length : null }))
     .sort((a, b) => b.count - a.count)
 })
+
+const {
+  pageRows: intermodalPageRows, page: intermodalPage, totalPages: intermodalTotalPages,
+  total: intermodalTotal, next: intermodalNext, prev: intermodalPrev,
+} = usePagination(intermodalByPort, 15)
 
 const manifestExportColumns = [
   { key: 'manifest_ref', label: 'Manifest Ref' },
@@ -376,14 +418,7 @@ function cargoBadge(t: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
-
-/* ── Actions bar ── */
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 
 /* ── Layout ── */
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; align-items:start; }
@@ -392,36 +427,34 @@ function cargoBadge(t: string) {
 /* ── Cargo type list ── */
 .type-list { display:flex; flex-direction:column; gap:10px; }
 .type-row { display:grid; grid-template-columns:110px 1fr 70px; align-items:center; gap:8px; }
-.type-label { font-size:12px; text-transform:capitalize; font-weight:500; color:#374151; }
-.type-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.type-bar { height:100%; border-radius:4px; transition:width .4s ease; }
+.type-label { font-size:12px; text-transform:capitalize; font-weight:500; color:var(--fg-2); }
+.type-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.type-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s ease; }
 
 /* ── Corridor list ── */
 .corridor-list { display:flex; flex-direction:column; gap:0; }
 .corridor-item {
   padding: 10px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .corridor-item:last-child { border-bottom: none; }
 .ci-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-.ci-route { font-family:monospace; font-size:13px; font-weight:700; color:#1e293b; flex:1; }
-.ci-stats { display:flex; gap:14px; font-size:12px; color:#475569; margin-bottom:5px; }
-.ci-stats strong { color:#1e293b; font-weight:700; }
-.ci-bar-wrap { background:#e2e8f0; border-radius:4px; height:5px; overflow:hidden; }
-.ci-bar { height:100%; background:#3b82f6; border-radius:4px; transition:width .4s ease; }
+.ci-route { font-family:monospace; font-size:13px; font-weight:700; color:var(--fg-1); flex:1; }
+.ci-stats { display:flex; gap:14px; font-size:12px; color:var(--fg-2); margin-bottom:5px; }
+.ci-stats strong { color:var(--fg-1); font-weight:700; }
+.ci-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:5px; overflow:hidden; }
+.ci-bar { height:100%; width:100%; background:var(--primary-fill); border-radius:4px; transform-origin:left; transition:transform .4s ease; }
 
 /* ── Reconciliation note ── */
-.recon-note { font-size:12px; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
+.recon-note { font-size:12px; color:var(--info-fg); background:var(--info-bg); border:1px solid var(--info-fg); border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
 .table-scroll { overflow-x:auto; }
 
 /* ── Filters & table ── */
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; color:#374151; }
-.select-sm:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.12); }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

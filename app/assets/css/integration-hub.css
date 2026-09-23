@@ -1,0 +1,133 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Integration Hub — shared surface primitives for the inner pages
+   (/integrations/files, /integrations/files/[id], /integrations/feeds/[id],
+   /integrations/analytics) so they read as one instrument panel with the
+   /integrations landing view.
+
+   Everything here is built from the theme.css instrument-panel tokens
+   (--surface-*, --fg-*, --border-*, --elev-*, --r-*, --dur-*, --ease-*).
+   All classes are namespaced .ih-* — this is a global sheet (loaded via
+   nuxt.config.ts) but the prefix keeps it from touching anything else.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Breadcrumb above the page title ──────────────────────────────────── */
+.ih-crumb {
+  font-size: 12px; color: var(--fg-2); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.ih-crumb:hover { color: var(--primary); }
+
+/* ── Card ─────────────────────────────────────────────────────────────── */
+.ih-card {
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md); box-shadow: var(--elev-1); overflow: hidden;
+}
+.ih-card + .ih-card { margin-top: 14px; }
+.ih-card-body { padding: 16px 18px; }
+.ih-card-head {
+  padding: 13px 18px; border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.ih-card-head h2, .ih-card-head h3 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-2); margin: 0;
+}
+
+/* ── Metric ribbon (KpiTile grid) ────────────────────────────────────── */
+.ih-ribbon {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+
+/* ── Lead paragraph under a section title ─────────────────────────────── */
+.ih-lead { font-size: 12px; color: var(--fg-3); line-height: 1.55; margin: 4px 0 12px; max-width: 74ch; }
+
+/* ── Refined data table ──────────────────────────────────────────────── */
+.ih-table-wrap { overflow-x: auto; }
+.ih-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ih-table th {
+  text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--fg-3); padding: 9px 12px; white-space: nowrap;
+  background: var(--surface-1); border-bottom: 1px solid var(--border-subtle);
+}
+.ih-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle; color: var(--fg-1);
+}
+.ih-table tbody tr:last-child td { border-bottom: none; }
+.ih-table tbody tr.is-clickable { cursor: pointer; transition: background-color var(--dur-fast) var(--ease-standard); }
+.ih-table tbody tr.is-clickable:hover { background: var(--surface-quiet); }
+.ih-table .num { font-variant-numeric: tabular-nums; }
+.ih-table .ih-num-danger { color: var(--danger-fg); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Chip / tag list ─────────────────────────────────────────────────── */
+.ih-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ih-chip {
+  font: 500 11.5px/1.4 var(--font-mono);
+  background: var(--surface-quiet); border: 1px solid var(--border-subtle); border-radius: var(--r-xs);
+  padding: 3px 8px; color: var(--fg-2);
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Window / segment toggle ─────────────────────────────────────────── */
+.ih-toggle { display: inline-flex; border: 1px solid var(--border-interactive); border-radius: var(--r-sm); overflow: hidden; }
+.ih-toggle button {
+  background: var(--surface-2); border: none; border-right: 1px solid var(--border-subtle);
+  padding: 6px 12px; font: 600 12px/1 inherit; color: var(--fg-2); cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.ih-toggle button:last-child { border-right: none; }
+.ih-toggle button:hover { background: var(--surface-quiet); }
+.ih-toggle button.active { background: var(--primary); color: #fff; }
+
+/* ── Two-column card grid ────────────────────────────────────────────── */
+.ih-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .ih-two-col { grid-template-columns: 1fr; } }
+
+/* ── Stat cluster (label + big mono number) ──────────────────────────── */
+.ih-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.ih-stat { display: flex; flex-direction: column; gap: 3px; }
+.ih-stat-value { font: 700 20px/1.15 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg-1); }
+.ih-stat-value.warn { color: var(--warning-fg); }
+.ih-stat-label { font-size: 11px; color: var(--fg-3); max-width: 24ch; }
+
+/* ── Mini vertical bar chart (feed delivery strip) ───────────────────── */
+.ih-sparkbars {
+  display: flex; align-items: flex-end; gap: 6px; height: 96px; margin-top: 16px;
+  padding: 12px 14px 0; background: var(--surface-1);
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+}
+.ih-sparkbar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; height: 100%; }
+.ih-sparkbar-count { font: 600 10px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg-3); height: 12px; margin-bottom: 3px; }
+.ih-sparkbar-track { width: 100%; max-width: 26px; height: 52px; display: flex; align-items: flex-end; }
+.ih-sparkbar-fill {
+  width: 100%; height: 100%; border-radius: var(--r-xs) var(--r-xs) 0 0; background: var(--primary);
+  transform-origin: bottom; transition: transform var(--dur-slow) var(--ease-out);
+}
+.ih-sparkbar-label { font-size: 10px; color: var(--fg-3); margin-top: 5px; text-transform: uppercase; letter-spacing: .03em; }
+
+/* ── Horizontal ranked bars (agency contributions) ──────────────────── */
+.ih-hbars { display: flex; flex-direction: column; gap: 8px; }
+.ih-hbar {
+  display: grid; grid-template-columns: 84px 1fr 76px; align-items: center; gap: 10px;
+  background: none; border: none; padding: 3px 0; width: 100%; text-align: left; cursor: pointer;
+}
+.ih-hbar-label { font: 500 12px/1.4 var(--font-mono); color: var(--fg-2); transition: color var(--dur-fast) var(--ease-standard); }
+.ih-hbar-track { height: 8px; border-radius: var(--r-pill); background: var(--surface-sunken); overflow: hidden; }
+.ih-hbar-fill {
+  display: block; width: 100%; height: 100%; border-radius: var(--r-pill); background: var(--primary);
+  transform-origin: left center; transition: transform var(--dur-slow) var(--ease-out);
+}
+.ih-hbar-value { text-align: right; font: 600 12px/1 var(--font-mono); color: var(--fg-1); font-variant-numeric: tabular-nums; }
+.ih-hbar:hover .ih-hbar-label { color: var(--primary); }
+
+/* ── Entrance ────────────────────────────────────────────────────────── */
+@keyframes ih-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.ih-rise { animation: ih-rise var(--dur-slow) var(--ease-out) both; }
+.ih-rise-2 { animation-delay: 60ms; }
+.ih-rise-3 { animation-delay: 120ms; }
+.ih-rise-4 { animation-delay: 180ms; }
+@media (prefers-reduced-motion: reduce) {
+  .ih-rise, .ih-rise-2, .ih-rise-3, .ih-rise-4 { animation: none; }
+}

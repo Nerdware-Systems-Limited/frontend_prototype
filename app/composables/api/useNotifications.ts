@@ -79,9 +79,75 @@ export interface AlertRule {
   message_template: string
   cooldown_seconds: number
   active: boolean
+  /** Optional EscalationPolicy.id - when set, each firing opens an EscalationRun. */
+  escalation_policy_id?: string | null
   created_at: string
   updated_at: string
   last_fired_at: string | null
+}
+
+// ── Escalation workflows (real Postgres models - see backend
+// apps.notifications.models.EscalationPolicy/Step/Run) ───────────────
+
+export interface EscalationStep {
+  id: string
+  order: number
+  title: string
+  description: string
+  channels: Channel[]
+  target_role: string
+  wait_minutes: number
+  is_emergency: boolean
+}
+
+export interface EscalationPolicy {
+  id: string
+  name: string
+  description: string
+  is_active: boolean
+  steps: EscalationStep[]
+  created_at: string
+  updated_at: string
+}
+
+export type EscalationRunStatus = 'pending' | 'acknowledged' | 'escalated' | 'emergency'
+
+export interface EscalationRun {
+  id: string
+  policy: string | null
+  policy_name: string
+  notification_ref: string
+  rule_id: string
+  rule_name: string
+  title: string
+  current_step_index: number
+  current_step: EscalationStep | null
+  policy_steps_count: number
+  status: EscalationRunStatus
+  acknowledged_by_email: string | null
+  acknowledged_at: string | null
+  escalated_at: string | null
+  created_at: string
+}
+
+export interface EscalationQuickStats {
+  acknowledged_1h: number
+  escalated_1h: number
+  emergency_1h: number
+}
+
+// ── Admin-facing stats + recent activity (Alert Rules page) ─────────
+
+export interface AlertStats {
+  alerts_sent_24h: number
+  active_rules: number
+  avg_delivery_seconds: number | null
+  delivery_rate_pct: number | null
+}
+
+export interface AlertActivityItem extends Notification {
+  rule_name: string | null
+  recipient_email: string | null
 }
 
 // ── API request/response envelopes ──────────────────────────────────
@@ -137,6 +203,24 @@ export interface CreateRuleRequest {
   message_template?: string
   cooldown_seconds?: number
   active?: boolean
+  escalation_policy_id?: string | null
+}
+
+export interface EscalationStepInput {
+  order?: number
+  title: string
+  description?: string
+  channels?: Channel[]
+  target_role?: string
+  wait_minutes?: number
+  is_emergency?: boolean
+}
+
+export interface EscalationPolicyRequest {
+  name: string
+  description?: string
+  is_active?: boolean
+  steps?: EscalationStepInput[]
 }
 
 export interface HealthResponse {
@@ -226,6 +310,45 @@ export function useNotifications() {
         }),
       delete: (id: string) =>
         api<void>(`/api/v1/notifications/rules/${id}/`, { method: 'DELETE' }),
+    },
+
+    // ── Admin: stats + recent activity (Alert Rules page) ──────────
+    stats: () => api<AlertStats>('/api/v1/notifications/stats/'),
+    activity: (limit = 50) =>
+      api<{ results: AlertActivityItem[] }>('/api/v1/notifications/activity/', {
+        query: { limit },
+      }),
+
+    // ── Admin: escalation workflows ─────────────────────────────────
+    escalation: {
+      policies: {
+        list: () =>
+          api<{ results: EscalationPolicy[] }>('/api/v1/notifications/escalation-policies/'),
+        create: (req: EscalationPolicyRequest) =>
+          api<EscalationPolicy>('/api/v1/notifications/escalation-policies/', {
+            method: 'POST',
+            body: req,
+          }),
+        update: (id: string, req: Partial<EscalationPolicyRequest>) =>
+          api<EscalationPolicy>(`/api/v1/notifications/escalation-policies/${id}/`, {
+            method: 'PATCH',
+            body: req,
+          }),
+        delete: (id: string) =>
+          api<void>(`/api/v1/notifications/escalation-policies/${id}/`, { method: 'DELETE' }),
+      },
+      runs: {
+        list: (status?: EscalationRunStatus) =>
+          api<{ results: EscalationRun[] }>('/api/v1/notifications/escalation-runs/', {
+            query: cleanQuery({ status } as Record<string, unknown>),
+          }),
+        acknowledge: (id: string) =>
+          api<EscalationRun>(`/api/v1/notifications/escalation-runs/${id}/acknowledge/`, { method: 'POST' }),
+        escalate: (id: string) =>
+          api<EscalationRun>(`/api/v1/notifications/escalation-runs/${id}/escalate/`, { method: 'POST' }),
+        quickStats: () =>
+          api<EscalationQuickStats>('/api/v1/notifications/escalation-runs/quick-stats/'),
+      },
     },
 
     // ── Health ─────────────────────────────────────────────────────

@@ -17,20 +17,74 @@
     <KpiCard
       label="Operational Track"
       :value="`${fmtNum(operationalTrackKm, 0)} km`"
-      :sub="`of ${fmtNum(totalTrackKm, 0)} km total network`"
-      source="live" source-title="Rail Line Registry"
+      :unavailable="loading || linesError"
+      :unavailable-note="loading ? 'Loading…' : 'Rail Line Registry feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(totalTrackKm, 0)} km total network`"
     />
-    <KpiCard label="Sections Needing Repair" :value="fmtNum(poorCriticalSections.length)" :sub="`of ${fmtNum(trackSections.length)} track sections`" trend-direction="down" source="live" source-title="KRC Track Registry" />
-    <KpiCard label="Signal Availability" :value="signalAvailabilityPct != null ? `${signalAvailabilityPct.toFixed(1)}%` : '-'" :sub="`${fmtNum(signals.length)} signals registered`" :trend-direction="(signalAvailabilityPct ?? 0) >= 95 ? 'up' : 'down'" source="live" source-title="KRC Signalling" />
-    <KpiCard label="Crossings Needing Action" :value="fmtNum(highRiskCrossings.length)" sub="High / critical risk rating" trend-direction="down" source="live" source-title="KRC Level Crossings" />
-    <KpiCard label="Culverts Poor / Critical" :value="fmtNum(poorCriticalCulverts.length)" :sub="`of ${fmtNum(culverts.length)} culverts`" trend-direction="down" source="live" source-title="KRC Track Registry" />
-    <KpiCard label="Open Capital Works" :value="fmtNum(openCapitalWorks.length)" :sub="`of ${fmtNum(capitalWorks.length)} projects`" source="live" source-title="KRC / National Treasury" />
-    <KpiCard label="Capital Works Budget" :value="capitalWorksBudget ? `KES ${fmtKES(capitalWorksBudget)}` : '-'" sub="Sum of active project budgets" source="live" source-title="KRC / National Treasury" />
+    <KpiCard
+      label="Sections Needing Repair"
+      :value="fmtNum(poorCriticalSections.length)"
+      :unavailable="loading || trackError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC Track Registry feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(trackSections.length)} track sections`"
+      :status="loading || trackError ? undefined : poorCriticalSections.length > 0 ? 'warning' : 'healthy'"
+      to="#track-sections"
+    />
+    <KpiCard
+      label="Signal Availability"
+      :value="signalAvailabilityPct != null ? `${signalAvailabilityPct.toFixed(1)}%` : '-'"
+      :unavailable="loading || sigError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC Signalling feed unavailable'"
+      period="LIVE"
+      :description="`${fmtNum(signals.length)} signals registered`"
+      :status="loading || sigError || signalAvailabilityPct == null ? undefined : signalAvailabilityPct >= 95 ? 'healthy' : 'warning'"
+      to="#signalling"
+    />
+    <KpiCard
+      label="Crossings Needing Action"
+      :value="fmtNum(highRiskCrossings.length)"
+      :unavailable="loading || crossingsError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC Level Crossings feed unavailable'"
+      period="LIVE"
+      description="High / critical risk rating"
+      :status="loading || crossingsError ? undefined : highRiskCrossings.length > 0 ? 'warning' : 'healthy'"
+      to="#level-crossings"
+    />
+    <KpiCard
+      label="Culverts Poor / Critical"
+      :value="fmtNum(poorCriticalCulverts.length)"
+      :unavailable="loading || culvError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC Track Registry feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(culverts.length)} culverts`"
+      :status="loading || culvError ? undefined : poorCriticalCulverts.length > 0 ? 'warning' : 'healthy'"
+      to="#culverts"
+    />
+    <KpiCard
+      label="Open Capital Works"
+      :value="fmtNum(openCapitalWorks.length)"
+      :unavailable="loading || capError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC / National Treasury feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(capitalWorks.length)} projects`"
+      to="#capital-works"
+    />
+    <KpiCard
+      label="Capital Works Budget"
+      :value="capitalWorksBudget ? `KES ${fmtKES(capitalWorksBudget)}` : '-'"
+      :unavailable="loading || capError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC / National Treasury feed unavailable'"
+      period="LIVE"
+      description="Sum of active project budgets"
+      to="#capital-works"
+    />
   </div>
 
   <!-- Track sections -->
   <SectionTitle pill="KRC Track Registry · Live">Track Sections</SectionTitle>
-  <div class="card">
+  <div id="track-sections" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="trackSearch" class="select-sm" placeholder="Search section / line…" style="min-width:180px" />
@@ -53,7 +107,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredTrackSections.length">
-            <tr v-for="t in filteredTrackSections" :key="t.id">
+            <tr v-for="t in trackPageRows" :key="t.id">
               <td style="font-weight:600;font-size:12px">{{ t.line_name ?? t.line }}</td>
               <td style="font-family:monospace;font-size:12px">{{ t.section_ref }}</td>
               <td style="font-size:12px">{{ t.chainage_start_km }} - {{ t.chainage_end_km }}</td>
@@ -66,16 +120,20 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading track sections…' : 'No track sections match the current filters.' }}</td></tr>
+            <tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading track sections…' : 'No track sections match the current filters.' }}</td></tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="trackPage" :total-pages="trackTotalPages" :total="trackTotal"
+        @prev="trackPrev" @next="trackNext"
+      />
     </div>
   </div>
 
   <!-- Level crossings -->
   <SectionTitle pill="KRC Level Crossings · Live">Level Crossings</SectionTitle>
-  <div class="card">
+  <div id="level-crossings" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="crossingSearch" class="select-sm" placeholder="Search road / line…" style="min-width:180px" />
@@ -97,7 +155,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredCrossings.length">
-            <tr v-for="c in filteredCrossings" :key="c.id">
+            <tr v-for="c in crossingsPageRows" :key="c.id">
               <td style="font-family:monospace;font-weight:700;font-size:12px">{{ c.crossing_ref }}</td>
               <td style="font-weight:600;font-size:12px">{{ c.road_name }}</td>
               <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
@@ -111,22 +169,26 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings match the current filters.' }}</td></tr>
+            <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings match the current filters.' }}</td></tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="crossingsPage" :total-pages="crossingsTotalPages" :total="crossingsTotal"
+        @prev="crossingsPrev" @next="crossingsNext"
+      />
     </div>
   </div>
 
   <!-- Signals + Culverts -->
   <div class="two-col">
-    <div class="card">
+    <div id="signalling" class="card drill-target">
       <div class="card-header">Signalling</div>
       <div class="card-body">
         <table>
           <thead><tr><th>Signal</th><th>Line</th><th>Type</th><th>Status</th><th>Automatic</th></tr></thead>
           <tbody v-if="signals.length">
-            <tr v-for="s in signals" :key="s.id">
+            <tr v-for="s in signalsPageRows" :key="s.id">
               <td style="font-family:monospace;font-weight:600;font-size:12px">{{ s.signal_ref }}</td>
               <td style="font-size:12px">{{ s.line_name ?? s.line }}</td>
               <td style="font-size:12px">{{ s.signal_type.replace(/_/g,' ') }}</td>
@@ -134,18 +196,22 @@
               <td style="text-align:center">{{ s.is_automatic ? '✓' : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No signals registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No signals registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="signalsPage" :total-pages="signalsTotalPages" :total="signalsTotal"
+          @prev="signalsPrev" @next="signalsNext"
+        />
       </div>
     </div>
 
-    <div class="card">
+    <div id="culverts" class="card drill-target">
       <div class="card-header">Culverts</div>
       <div class="card-body">
         <table>
           <thead><tr><th>Culvert</th><th>Line</th><th>Type</th><th>Span (m)</th><th>Condition</th></tr></thead>
           <tbody v-if="culverts.length">
-            <tr v-for="c in culverts" :key="c.id">
+            <tr v-for="c in culvertsPageRows" :key="c.id">
               <td style="font-family:monospace;font-weight:600;font-size:12px">{{ c.culvert_ref }}</td>
               <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
               <td style="font-size:12px">{{ c.culvert_type }}</td>
@@ -153,22 +219,26 @@
               <td><BadgePill :variant="condBadge(c.condition)">{{ c.condition }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No culverts registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No culverts registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="culvertsPage" :total-pages="culvertsTotalPages" :total="culvertsTotal"
+          @prev="culvertsPrev" @next="culvertsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Capital works -->
   <SectionTitle pill="KRC / National Treasury · Live">Capital Works Pipeline</SectionTitle>
-  <div class="card">
+  <div id="capital-works" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
           <tr><th>Project</th><th>Type</th><th>Line</th><th>Status</th><th>Budget (KES)</th><th>Spent (KES)</th><th>Progress</th><th>Funding Source</th><th>Contractor</th><th>Expected Completion</th></tr>
         </thead>
         <tbody v-if="capitalWorks.length">
-          <tr v-for="c in capitalWorks" :key="c.id">
+          <tr v-for="c in capitalWorksPageRows" :key="c.id">
             <td style="font-weight:600;font-size:12px">{{ c.project_name }}</td>
             <td style="font-size:12px">{{ c.project_type.replace(/_/g,' ') }}</td>
             <td style="font-size:12px">{{ c.line_name ?? c.line ?? '-' }}</td>
@@ -182,17 +252,19 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading capital works…' : 'No capital works projects on file.' }}</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading capital works…' : 'No capital works projects on file.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="capitalWorksPage" :total-pages="capitalWorksTotalPages" :total="capitalWorksTotal"
+        @prev="capitalWorksPrev" @next="capitalWorksNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Rail Infrastructure')
-
 import { useRailway, useRailInfrastructure } from '~/composables/api'
 import type { RailLine, TrackSection, LevelCrossing, RailCapitalWork, RailCulvert, RailSignal } from '~/composables/api'
 
@@ -204,6 +276,12 @@ const culverts      = ref<RailCulvert[]>([])
 const signals       = ref<RailSignal[]>([])
 const loading       = ref(true)
 const error         = ref<string | null>(null)
+const linesError      = ref(false)
+const trackError      = ref(false)
+const crossingsError  = ref(false)
+const capError        = ref(false)
+const culvError       = ref(false)
+const sigError        = ref(false)
 
 const trackSearch     = ref('')
 const conditionFilter  = ref('')
@@ -231,6 +309,13 @@ async function load() {
   if (capRes.status   === 'fulfilled') capitalWorks.value  = (capRes.value as any).results ?? []
   if (culvRes.status  === 'fulfilled') culverts.value      = (culvRes.value as any).results ?? []
   if (sigRes.status   === 'fulfilled') signals.value       = (sigRes.value as any).results ?? []
+
+  linesError.value     = linesRes.status === 'rejected'
+  trackError.value     = trackRes.status === 'rejected'
+  crossingsError.value = crossRes.status === 'rejected'
+  capError.value       = capRes.status   === 'rejected'
+  culvError.value      = culvRes.status  === 'rejected'
+  sigError.value       = sigRes.status   === 'rejected'
 
   if ([linesRes, trackRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Railway API.'
@@ -268,6 +353,32 @@ const filteredCrossings = computed(() => crossings.value.filter(c => {
 }))
 
 const poorCriticalCulverts = computed(() => culverts.value.filter(c => c.condition === 'poor' || c.condition === 'critical'))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: trackPageRows, page: trackPage, totalPages: trackTotalPages,
+  total: trackTotal, next: trackNext, prev: trackPrev,
+} = usePagination(filteredTrackSections, 15)
+
+const {
+  pageRows: crossingsPageRows, page: crossingsPage, totalPages: crossingsTotalPages,
+  total: crossingsTotal, next: crossingsNext, prev: crossingsPrev,
+} = usePagination(filteredCrossings, 15)
+
+const {
+  pageRows: signalsPageRows, page: signalsPage, totalPages: signalsTotalPages,
+  total: signalsTotal, next: signalsNext, prev: signalsPrev,
+} = usePagination(signals, 15)
+
+const {
+  pageRows: culvertsPageRows, page: culvertsPage, totalPages: culvertsTotalPages,
+  total: culvertsTotal, next: culvertsNext, prev: culvertsPrev,
+} = usePagination(culverts, 15)
+
+const {
+  pageRows: capitalWorksPageRows, page: capitalWorksPage, totalPages: capitalWorksTotalPages,
+  total: capitalWorksTotal, next: capitalWorksNext, prev: capitalWorksPrev,
+} = usePagination(capitalWorks, 15)
 
 const signalAvailabilityPct = computed(() => {
   if (!signals.value.length) return null
@@ -315,11 +426,9 @@ function capitalWorkBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 </style>

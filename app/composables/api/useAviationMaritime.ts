@@ -351,9 +351,9 @@ export function useAviationMaritime() {
     // ── Aviation catalog ──────────────────────────────────────────
     airports: (q?: { iata?: string; city?: string; airport_type?: string }) =>
       api<Paged<Airport>>(`${AV}/airports/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    airlines: (q?: { aoc_status?: string; cargo_only?: boolean }) =>
+    airlines: (q?: { aoc_status?: string; cargo_only?: boolean; page_size?: number }) =>
       api<Paged<Airline>>(`${AV}/airlines/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    aircraft: (q?: { aircraft_type?: string; airline?: string }) =>
+    aircraft: (q?: { aircraft_type?: string; airline?: string; page_size?: number }) =>
       api<Paged<Aircraft>>(`${AV}/aircraft/`, { query: cleanQuery(q as Record<string, unknown>) }),
     flightSchedules: (q?: { flight_number?: string; origin?: string; destination?: string; airline?: string }) =>
       api<Paged<any>>(`${AV}/flight-schedules/`, { query: cleanQuery(q as Record<string, unknown>) }),
@@ -397,9 +397,9 @@ export function useAviationMaritime() {
     // ── Maritime catalog ──────────────────────────────────────────
     ports: (q?: { port_type?: string }) =>
       api<Paged<Port>>(`${MA}/ports/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    berths: (q?: { port?: string; berth_type?: string }) =>
+    berths: (q?: { port?: string; berth_type?: string; page_size?: number }) =>
       api<Paged<Berth>>(`${MA}/berths/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    vessels: (q?: { vessel_type?: string; flag_state?: string }) =>
+    vessels: (q?: { vessel_type?: string; flag_state?: string; page_size?: number }) =>
       api<Paged<Vessel>>(`${MA}/vessels/`, { query: cleanQuery(q as Record<string, unknown>) }),
     vesselMovements: (q?: PortQuery) =>
       api<Paged<VesselMovement>>(`${MA}/vessel-movements/`, { query: cleanQuery(q as Record<string, unknown>) }),

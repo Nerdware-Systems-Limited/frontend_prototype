@@ -31,18 +31,47 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Projects" :value="fmtNum(agencyProjects.length)" :sub="agencyLabel" source="batch" source-title="Agency PMU" />
-    <KpiCard label="In Progress" :value="fmtNum(countByStatus('in_progress'))" sub="Active construction" trend-direction="up" source="batch" source-title="Agency PMU" />
-    <KpiCard label="On Hold" :value="fmtNum(countByStatus('on_hold'))" sub="Suspended works" trend-direction="down" source="batch" source-title="Agency PMU" />
-    <KpiCard label="Delayed Projects" :value="fmtNum(agencyDelayed.length)" sub="Behind planned schedule" trend-direction="down" source="batch" source-title="Agency PMU" />
-    <KpiCard label="Total Contract Value" :value="totalContract ? `KES ${fmtKES(totalContract)}` : '-'" :sub="agencyLabel" source="batch" source-title="Agency PMU" />
-    <KpiCard label="Total Disbursed" :value="totalDisbursed ? `KES ${fmtKES(totalDisbursed)}` : '-'" :sub="totalContract ? `${((totalDisbursed / totalContract) * 100).toFixed(0)}% absorption` : '-'" source="batch" source-title="National Treasury" />
+    <KpiCard
+      label="Total Projects" :value="fmtNum(agencyProjects.length)"
+      :unavailable="loading || projectsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" :description="agencyLabel" to="#project-portfolio"
+    />
+    <KpiCard
+      label="In Progress" :value="fmtNum(countByStatus('in_progress'))"
+      :unavailable="loading || projectsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" description="Active construction" to="#project-portfolio"
+    />
+    <KpiCard
+      label="On Hold" :value="fmtNum(countByStatus('on_hold'))"
+      :unavailable="loading || projectsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" description="Suspended works"
+      :status="loading || projectsError ? undefined : countByStatus('on_hold') > 0 ? 'warning' : 'healthy'"
+      to="#project-portfolio"
+    />
+    <KpiCard
+      label="Delayed Projects" :value="fmtNum(agencyDelayed.length)"
+      :unavailable="loading || delayedError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" description="Behind planned schedule"
+      :status="loading || delayedError ? undefined : agencyDelayed.length > 0 ? 'critical' : 'healthy'"
+      to="#exceptions-delayed"
+    />
+    <KpiCard
+      label="Total Contract Value" :value="totalContract ? `KES ${fmtKES(totalContract)}` : '-'"
+      :unavailable="loading || projectsError" :unavailable-note="loading ? 'Loading…' : 'Agency PMU feed unavailable'"
+      period="LIVE" :description="agencyLabel" to="#project-portfolio"
+    />
+    <KpiCard
+      label="Total Disbursed" :value="totalDisbursed ? `KES ${fmtKES(totalDisbursed)}` : '-'"
+      :unavailable="loading || projectsError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" :description="totalContract ? `${((totalDisbursed / totalContract) * 100).toFixed(0)}% absorption` : ''"
+      to="#project-portfolio"
+    />
   </div>
 
   <!-- Exception panels -->
   <SectionTitle pill="Computed · Rolling">Exceptions</SectionTitle>
   <div class="two-col">
-    <div class="card">
+    <div id="exceptions-delayed" class="card drill-target">
       <div class="card-header">Delayed Projects ({{ agencyDelayed.length }})</div>
       <div class="card-body scroll-body">
         <div v-if="agencyDelayed.length">
@@ -53,7 +82,7 @@
             :meta="`${p.agency_code ?? '-'} · ${p.county} · Physical: ${p.physical_progress_pct ?? '-'}% · Planned end: ${fmtDate(p.planned_end)}`"
           />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No delayed projects found.' }}</div>
+        <EmptyState v-else :loading="loading" message="No delayed projects found." icon="search" compact />
       </div>
     </div>
 
@@ -68,19 +97,19 @@
             :meta="`Financial ${p.financial_progress_pct?.toFixed(0)}% vs physical ${p.physical_progress_pct?.toFixed(0)}% · ${p.contractor || 'contractor n/a'}`"
           />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No projects with financial progress significantly ahead of physical progress.' }}</div>
+        <EmptyState v-else :loading="loading" message="No projects with financial progress significantly ahead of physical progress." icon="search" compact />
       </div>
     </div>
   </div>
   <div class="two-col">
-    <div class="card">
+    <div id="critical-assets" class="card drill-target">
       <div class="card-header">Critical Assets ({{ agencyCriticalBridges.length + agencySignalFaults.length }})</div>
       <div class="card-body scroll-body">
         <div v-if="agencyCriticalBridges.length || agencySignalFaults.length">
           <AlertItem v-for="b in agencyCriticalBridges" :key="'b-'+b.id" severity="critical" :title="`Bridge: ${b.bridge_name} (${b.bridge_code})`" :meta="`Condition ${b.condition_class} · score ${b.condition_score?.toFixed(0) ?? '-'}`" />
           <AlertItem v-for="s in agencySignalFaults" :key="'s-'+s.id" severity="warning" :title="`Signal: ${s.intersection_name}`" :meta="`${s.status} · ${s.agency_code ?? '-'}`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No critical assets flagged.' }}</div>
+        <EmptyState v-else :loading="loading" message="No critical assets flagged." icon="search" compact />
       </div>
     </div>
 
@@ -90,11 +119,11 @@
         <div v-if="freshnessRows.length">
           <div v-for="r in freshnessRows" :key="r.agency" class="fresh-row">
             <span class="fresh-agency">{{ r.agency }}</span>
-            <span :style="{ color: r.stale ? '#ef4444' : '#22c55e' }">{{ r.lastUpdate ? fmtDate(r.lastUpdate) : 'no data' }}</span>
+            <span :style="{ color: r.stale ? 'var(--danger-fg)' : 'var(--success-fg)' }">{{ r.lastUpdate ? fmtDate(r.lastUpdate) : 'no data' }}</span>
             <BadgePill :variant="r.stale ? 'danger' : 'success'">{{ r.stale ? 'stale (>30d)' : 'fresh' }}</BadgePill>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No agency data loaded.' }}</div>
+        <EmptyState v-else :loading="loading" message="No agency data loaded." compact />
       </div>
     </div>
   </div>
@@ -102,20 +131,44 @@
   <!-- Assets & closures -->
   <SectionTitle pill="Agency Systems · Rolling">Assets &amp; Closures ({{ agencyLabel }})</SectionTitle>
   <div class="kpi-grid">
-    <KpiCard label="Overdue Bridge Inspections" :value="fmtNum(agencyOverdueInspections)" sub="Past next-inspection date" trend-direction="down" source="batch" source-title="Bridge Mgmt" />
-    <KpiCard label="Streetlights Operational" :value="streetlightPct != null ? `${streetlightPct.toFixed(0)}%` : '-'" sub="Network-wide" source="batch" source-title="Streetlight Registry" />
-    <KpiCard label="Traffic Signal Faults" :value="fmtNum(agencySignalFaults.length)" :sub="agencyLabel" trend-direction="down" source="live" source-title="NaMATA / NCC" />
-    <KpiCard label="WIM Overload Rate" :value="summary?.wim.overload_rate_pct != null ? `${summary.wim.overload_rate_pct.toFixed(1)}%` : '-'" sub="Network-wide · 30d" source="live" source-title="WIM Stations" />
-    <KpiCard label="Rural Road Closures" :value="fmtNum(agencyClosures.length)" :sub="agencyLabel" trend-direction="down" source="batch" source-title="Field Reports" />
+    <KpiCard
+      label="Overdue Bridge Inspections" :value="fmtNum(agencyOverdueInspections)"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt feed unavailable'"
+      period="LIVE" description="Past next-inspection date"
+      :status="loading || bridgesError ? undefined : agencyOverdueInspections > 0 ? 'warning' : 'healthy'"
+      to="/infrastructure/bridges"
+    />
+    <KpiCard
+      label="Streetlights Operational" :value="streetlightPct != null ? `${streetlightPct.toFixed(0)}%` : '-'"
+      :unavailable="loading || summaryError" :unavailable-note="loading ? 'Loading…' : 'Streetlight Registry feed unavailable'"
+      period="LIVE" description="Network-wide"
+    />
+    <KpiCard
+      label="Traffic Signal Faults" :value="fmtNum(agencySignalFaults.length)"
+      :unavailable="loading || signalError" :unavailable-note="loading ? 'Loading…' : 'NaMATA / NCC feed unavailable'"
+      period="LIVE" :description="agencyLabel"
+      :status="loading || signalError ? undefined : agencySignalFaults.length > 0 ? 'warning' : 'healthy'"
+      to="#critical-assets"
+    />
+    <KpiCard
+      label="WIM Overload Rate" :value="summary?.wim.overload_rate_pct != null ? `${summary.wim.overload_rate_pct.toFixed(1)}%` : '-'"
+      :unavailable="loading || summaryError" :unavailable-note="loading ? 'Loading…' : 'WIM Stations feed unavailable'"
+      period="30D" description="Network-wide · 30d"
+    />
+    <KpiCard
+      label="Rural Road Closures" :value="fmtNum(agencyClosures.length)"
+      :unavailable="loading || closuresError" :unavailable-note="loading ? 'Loading…' : 'Field Reports feed unavailable'"
+      period="LIVE" :description="agencyLabel" to="#closures-table"
+    />
   </div>
 
-  <div v-if="agencyClosures.length" class="card" style="margin-bottom:16px">
+  <div v-if="agencyClosures.length" id="closures-table" class="card drill-target" style="margin-bottom:16px">
     <div class="card-header">Closures / Restrictions</div>
     <div class="card-body">
       <table>
         <thead><tr><th>Road</th><th>Status</th><th>Reason</th><th>Reported</th></tr></thead>
         <tbody>
-          <tr v-for="c in agencyClosures" :key="c.id">
+          <tr v-for="c in closuresPageRows" :key="c.id">
             <td style="font-weight:600;font-size:12px">{{ c.segment_road_name ?? c.segment_road_code ?? '-' }}</td>
             <td><BadgePill variant="warning">{{ c.status }}</BadgePill></td>
             <td style="font-size:12px">{{ c.closure_reason || '-' }}</td>
@@ -123,13 +176,17 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="closuresPage" :total-pages="closuresTotalPages" :total="closuresTotal"
+        @prev="closuresPrev" @next="closuresNext"
+      />
     </div>
   </div>
 
   <!-- Project table with filters -->
   <SectionTitle>Project Portfolio ({{ agencyLabel }})</SectionTitle>
 
-  <div class="card">
+  <div id="project-portfolio" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="statusFilter" class="select-sm">
@@ -164,23 +221,23 @@
             </tr>
           </thead>
           <tbody v-if="filteredProjects.length">
-            <template v-for="p in filteredProjects" :key="p.id">
+            <template v-for="p in projectsPageRows" :key="p.id">
               <tr class="expand-row" :class="{ 'row-delayed': isDelayed(p.id) }" @click="expandedProject = expandedProject === p.id ? null : p.id">
                 <td class="expand-cell">{{ expandedProject === p.id ? '▾' : '▸' }}</td>
                 <td>
                   <div style="font-weight:600;font-size:13px">{{ p.project_name }}</div>
-                  <div style="font-size:11px;color:#94a3b8;font-family:monospace">{{ p.project_code }}</div>
+                  <div style="font-size:11px;color:var(--fg-3);font-family:monospace">{{ p.project_code }}</div>
                 </td>
                 <td style="font-size:12px">{{ p.county }}{{ p.corridor ? ` · ${p.corridor}` : '' }}</td>
                 <td><BadgePill variant="info">{{ p.agency_code ?? '-' }}</BadgePill></td>
                 <td><BadgePill :variant="statusBadge(p.status)">{{ p.status.replace(/_/g,' ') }}</BadgePill></td>
                 <td style="font-size:12px">{{ p.contractor || '-' }}</td>
                 <td>
-                  <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.physical_progress_pct ?? 0}%`, background: progColor(p.physical_progress_pct) }" /></div>
+                  <div class="prog-wrap"><div class="prog-bar" :style="{ transform: `scaleX(${(p.physical_progress_pct ?? 0) / 100})`, background: progColor(p.physical_progress_pct) }" /></div>
                   <span style="font-size:11px">{{ p.physical_progress_pct != null ? `${p.physical_progress_pct.toFixed(0)}%` : '-' }}</span>
                 </td>
                 <td>
-                  <div class="prog-wrap"><div class="prog-bar" :style="{ width: `${p.financial_progress_pct ?? 0}%`, background: '#3b82f6' }" /></div>
+                  <div class="prog-wrap"><div class="prog-bar" :style="{ transform: `scaleX(${(p.financial_progress_pct ?? 0) / 100})`, background: 'var(--primary-fill)' }" /></div>
                   <span style="font-size:11px">{{ p.financial_progress_pct != null ? `${p.financial_progress_pct.toFixed(0)}%` : '-' }}</span>
                 </td>
                 <td style="font-size:12px;white-space:nowrap">{{ p.contract_sum_kes != null ? `KES ${fmtKES(p.contract_sum_kes)}` : '-' }}</td>
@@ -226,10 +283,14 @@
             </template>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading projects…' : 'No projects match the current filters.' }}</td></tr>
+            <tr><td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading projects…' : 'No projects match the current filters.' }}</td></tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="projectsPage" :total-pages="projectsTotalPages" :total="projectsTotal"
+        @prev="projectsPrev" @next="projectsNext"
+      />
     </div>
   </div>
 
@@ -245,7 +306,7 @@
           <div class="cc-val"><span v-if="c.avg_physical != null">{{ c.avg_physical.toFixed(0) }}% avg progress</span></div>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading county data…' : 'No county breakdown available.' }}</div>
+      <EmptyState v-else :loading="loading" message="No county breakdown available." compact />
     </div>
   </div>
 
@@ -287,10 +348,10 @@
             </tr>
           </thead>
           <tbody v-if="filteredOrders.length">
-            <tr v-for="o in filteredOrders" :key="o.id">
+            <tr v-for="o in ordersPageRows" :key="o.id">
               <td>
                 <div style="font-weight:600;font-size:13px">{{ o.segment_road_name ?? o.segment_road_code ?? '-' }}</div>
-                <div v-if="o.description" style="font-size:11px;color:#94a3b8">{{ o.description.slice(0,60) }}{{ o.description.length > 60 ? '…' : '' }}</div>
+                <div v-if="o.description" style="font-size:11px;color:var(--fg-3)">{{ o.description.slice(0,60) }}{{ o.description.length > 60 ? '…' : '' }}</div>
               </td>
               <td><BadgePill variant="info">{{ segmentAgency(o.segment) ?? '-' }}</BadgePill></td>
               <td><BadgePill variant="info">{{ o.work_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -298,7 +359,7 @@
               <td><BadgePill :variant="priorityBadge(o.priority)">{{ o.priority }}</BadgePill></td>
               <td style="font-size:12px">{{ o.contractor_name || '-' }}</td>
               <td>
-                <div v-if="o.status === 'in_progress'" class="prog-wrap"><div class="prog-bar" :style="{ width: `${o.progress_pct ?? 0}%`, background: progColor(o.progress_pct) }" /></div>
+                <div v-if="o.status === 'in_progress'" class="prog-wrap"><div class="prog-bar" :style="{ transform: `scaleX(${(o.progress_pct ?? 0) / 100})`, background: progColor(o.progress_pct) }" /></div>
                 <span style="font-size:11px">{{ o.progress_pct != null ? `${o.progress_pct.toFixed(0)}%` : '-' }}</span>
               </td>
               <td style="font-size:12px;white-space:nowrap">{{ o.cost_kes != null ? `KES ${fmtKES(o.cost_kes)}` : '-' }}</td>
@@ -306,18 +367,20 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading maintenance orders…' : 'No orders match the current filters.' }}</td></tr>
+            <tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading maintenance orders…' : 'No orders match the current filters.' }}</td></tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="ordersPage" :total-pages="ordersTotalPages" :total="ordersTotal"
+        @prev="ordersPrev" @next="ordersNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Road Infrastructure Status')
-
 import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { ConstructionProject, MaintenanceOrder, RoadSegment, Bridge, TrafficSignal, MaintenanceBudget, InfrastructureSummary, RuralRoadStatus } from '~/composables/api'
 
@@ -337,6 +400,13 @@ const closures      = ref<RuralRoadStatus[]>([])
 const agencyNames   = ref<Record<string, string>>({})
 const loading       = ref(true)
 const error         = ref<string | null>(null)
+const projectsError = ref(false)
+const delayedError  = ref(false)
+const ordersError   = ref(false)
+const bridgesError  = ref(false)
+const signalError   = ref(false)
+const summaryError  = ref(false)
+const closuresError = ref(false)
 const statusFilter  = ref('')
 const countySearch  = ref('')
 const nameSearch    = ref('')
@@ -388,6 +458,14 @@ async function load() {
     const list = (agencyRes.value as any).results ?? []
     agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
   }
+
+  projectsError.value = projRes.status  === 'rejected'
+  delayedError.value  = delayRes.status === 'rejected'
+  ordersError.value   = ordRes.status   === 'rejected'
+  bridgesError.value  = bridgeRes.status === 'rejected'
+  signalError.value   = sigRes.status   === 'rejected'
+  summaryError.value  = sumRes.status   === 'rejected'
+  closuresError.value = closureRes.status === 'rejected'
 
   if ([projRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -502,6 +580,22 @@ const filteredOrders = computed(() =>
   }),
 )
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: closuresPageRows, page: closuresPage, totalPages: closuresTotalPages,
+  total: closuresTotal, next: closuresNext, prev: closuresPrev,
+} = usePagination(agencyClosures, 15)
+
+const {
+  pageRows: projectsPageRows, page: projectsPage, totalPages: projectsTotalPages,
+  total: projectsTotal, next: projectsNext, prev: projectsPrev,
+} = usePagination(filteredProjects, 15)
+
+const {
+  pageRows: ordersPageRows, page: ordersPage, totalPages: ordersTotalPages,
+  total: ordersTotal, next: ordersNext, prev: ordersPrev,
+} = usePagination(filteredOrders, 15)
+
 // Real server-side exports (honor the same django-filter params as their
 // list endpoints) - more complete than exporting only the currently-loaded page.
 // Both filters' `agency` param expects the Agency UUID, not its code
@@ -578,44 +672,43 @@ function priorityBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function progColor(pct: number | null | undefined) {
-  if (pct == null) return '#94a3b8'
-  return pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
+  if (pct == null) return 'var(--border-strong)'
+  return pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--destructive)'
 }
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
-.agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
-.agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab:hover { border-color:var(--primary); color:var(--primary); }
+.agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .scroll-body { max-height:280px; overflow-y:auto; }
-.prog-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.prog-bar { height:100%; border-radius:4px; transition:width .4s; }
-.row-delayed td:first-child { border-left:3px solid #f59e0b; }
+.prog-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.prog-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+/* Delayed is a background tint, not a coloured border-left slab. */
+.row-delayed td { background:var(--warning-bg); }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
-.dd-group-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin-bottom:8px; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-group-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-2); margin-bottom:8px; }
 .dd-group-title:not(:first-child) { margin-top:4px; }
-.dd-description { font-size:12.5px; line-height:1.5; color:#334155; white-space:pre-wrap; }
+.dd-description { font-size:12.5px; line-height:1.5; color:var(--fg-1); white-space:pre-wrap; }
 .county-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
-.county-card { border:1px solid #f1f5f9; border-radius:6px; padding:10px 12px; }
+.county-card { border:1px solid var(--border-subtle); border-radius:6px; padding:10px 12px; }
 .cc-name { font-size:13px; font-weight:600; margin-bottom:2px; }
-.cc-count { font-size:12px; color:#64748b; margin-bottom:6px; }
-.cc-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:4px; }
-.cc-bar { height:100%; background:#3b82f6; border-radius:4px; }
-.cc-val { font-size:11px; color:#94a3b8; }
-.fresh-row { display:grid; grid-template-columns:80px 1fr 90px; align-items:center; gap:8px; padding:6px 0; font-size:12px; border-bottom:1px solid #f8fafc; }
+.cc-count { font-size:12px; color:var(--fg-2); margin-bottom:6px; }
+.cc-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:4px; }
+.cc-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
+.cc-val { font-size:11px; color:var(--fg-3); }
+.fresh-row { display:grid; grid-template-columns:80px 1fr 90px; align-items:center; gap:8px; padding:6px 0; font-size:12px; border-bottom:1px solid var(--border-subtle); }
 .fresh-agency { font-weight:600; }
 </style>

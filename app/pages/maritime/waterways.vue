@@ -16,17 +16,44 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Chartered Waterways" :value="fmtNum(charteredCount)" sub="Surveyed &amp; gazetted" source="live" source-title="KMA" />
-    <KpiCard label="Unchartered Waterways" :value="fmtNum(unchateredCount)" sub="Unsurveyed / artisanal use" source="live" source-title="KMA" />
-    <KpiCard label="Navaid Availability" :value="pct(navaidOperationalPct)" sub="Buoys/lighthouses/radar/VHF (target 100%)" :trend-direction="(navaidOperationalPct ?? 0) >= 95 ? 'up' : 'down'" source="live" source-title="KMA" />
-    <KpiCard label="Lighthouse Uptime" :value="pct(lighthouseUptimePct)" sub="Target 99.9%" :trend-direction="(lighthouseUptimePct ?? 0) >= 99.9 ? 'up' : 'down'" source="live" source-title="KMA" />
-    <KpiCard label="VHF Station Uptime" :value="pct(vhfUptimePct)" sub="Registered VHF stations" source="live" source-title="KMA" />
-    <KpiCard label="Vessel Traffic / Incidents" value="Not tracked" sub="No waterway link on vessel_movements/maritime_incidents" source="live" source-title="KMA" />
+    <KpiCard
+      label="Chartered Waterways" :value="fmtNum(charteredCount)"
+      :unavailable="loading || listError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Surveyed &amp; gazetted" to="#waterway-registry"
+    />
+    <KpiCard
+      label="Unchartered Waterways" :value="fmtNum(unchateredCount)"
+      :unavailable="loading || listError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Unsurveyed / artisanal use" to="#waterway-registry"
+    />
+    <KpiCard
+      label="Navaid Availability" :value="pct(navaidOperationalPct)"
+      :unavailable="loading || infraError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Buoys/lighthouses/radar/VHF (target 100%)"
+      :status="navaidOperationalPct == null ? undefined : navaidOperationalPct >= 95 ? 'healthy' : 'warning'"
+      to="#navigation-aids"
+    />
+    <KpiCard
+      label="Lighthouse Uptime" :value="pct(lighthouseUptimePct)"
+      :unavailable="loading || infraError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Target 99.9%"
+      :status="lighthouseUptimePct == null ? undefined : lighthouseUptimePct >= 99.9 ? 'healthy' : 'warning'"
+      to="#navigation-aids"
+    />
+    <KpiCard
+      label="VHF Station Uptime" :value="pct(vhfUptimePct)"
+      :unavailable="loading || infraError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Registered VHF stations" to="#navigation-aids"
+    />
+    <KpiCard
+      label="Vessel Traffic / Incidents"
+      unavailable unavailable-note="No waterway link on vessel_movements/maritime_incidents"
+    />
   </div>
 
   <!-- Waterway registry -->
   <SectionTitle pill="KMA · Live">Waterway Classification</SectionTitle>
-  <div class="card">
+  <div id="waterway-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="categoryFilter" class="select-sm">
@@ -42,7 +69,7 @@
             <tr><th>Waterway</th><th>Category</th><th>Region</th><th>Channel Depth</th><th>Last Survey</th><th>Access Restrictions</th></tr>
           </thead>
           <tbody v-if="filteredWaterways.length">
-            <tr v-for="w in filteredWaterways" :key="w.id">
+            <tr v-for="w in waterwaysPageRows" :key="w.id">
               <td style="font-weight:600;font-size:12px">{{ w.name }}</td>
               <td><BadgePill :variant="w.category === 'chartered' ? 'success' : 'warning'">{{ w.category }}</BadgePill></td>
               <td style="font-size:12px">{{ w.region || '-' }}</td>
@@ -51,8 +78,12 @@
               <td style="font-size:12px">{{ w.access_restrictions || '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No waterways registered.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No waterways registered.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="waterwaysPage" :total-pages="waterwaysTotalPages" :total="waterwaysTotal"
+          @prev="waterwaysPrev" @next="waterwaysNext"
+        />
       </div>
       <div class="source-note">Vessel traffic counts and incident counts per waterway aren't tracked on this backend yet - neither vessel movements nor maritime incidents carry a waterway link (only a port link).</div>
     </div>
@@ -60,7 +91,7 @@
 
   <!-- Waterway infrastructure -->
   <SectionTitle pill="KMA · Live">Navigation Aids (on chartered waterways)</SectionTitle>
-  <div class="card">
+  <div id="navigation-aids" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -68,7 +99,7 @@
             <tr><th>Waterway</th><th>Name</th><th>Type</th><th>Status</th><th>Uptime</th></tr>
           </thead>
           <tbody v-if="navaids.length">
-            <tr v-for="n in navaids" :key="n.id">
+            <tr v-for="n in navaidsPageRows" :key="n.id">
               <td style="font-weight:600;font-size:12px">{{ n.waterway_name ?? '-' }}</td>
               <td style="font-size:12px">{{ n.name }}</td>
               <td><BadgePill variant="info">{{ n.aid_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -76,8 +107,12 @@
               <td style="font-size:12px">{{ n.uptime_pct != null ? `${n.uptime_pct.toFixed(1)}%` : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No navigation aids linked to a waterway yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No navigation aids linked to a waterway yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="navaidsPage" :total-pages="navaidsTotalPages" :total="navaidsTotal"
+          @prev="navaidsPrev" @next="navaidsNext"
+        />
       </div>
     </div>
   </div>
@@ -91,7 +126,7 @@
             <tr><th>Waterway</th><th>Channel</th><th>Dredged Depth (m)</th><th>Target Depth (m)</th><th>vs Target</th><th>Last Dredged</th></tr>
           </thead>
           <tbody v-if="channels.length">
-            <tr v-for="c in channels" :key="c.id">
+            <tr v-for="c in channelsPageRows" :key="c.id">
               <td style="font-weight:600;font-size:12px">{{ c.waterway_name ?? '-' }}</td>
               <td style="font-size:12px">{{ c.name }}</td>
               <td>{{ c.dredged_depth_m }}</td>
@@ -105,8 +140,12 @@
               <td style="font-size:11px">{{ c.last_dredged_date ? fmtDay(c.last_dredged_date) : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No channels linked to a waterway yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No channels linked to a waterway yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="channelsPage" :total-pages="channelsTotalPages" :total="channelsTotal"
+          @prev="channelsPrev" @next="channelsNext"
+        />
       </div>
     </div>
   </div>
@@ -114,8 +153,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Waterways')
-
 import { useMaritimeWaterways } from '~/composables/api'
 import type { MaritimeWaterwaysSummary, Waterway, MaritimeNavaid, MaritimeChannel, WaterwayCategory } from '~/composables/api'
 
@@ -125,6 +162,8 @@ const navaids = ref<MaritimeNavaid[]>([])
 const channels = ref<MaritimeChannel[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const listError = ref(false)
+const infraError = ref(false)
 
 const categoryFilter = ref<'' | WaterwayCategory>('')
 
@@ -146,6 +185,9 @@ async function load() {
     channels.value = infraRes.value.channels ?? []
   }
 
+  listError.value  = listRes.status  === 'rejected'
+  infraError.value = infraRes.status === 'rejected'
+
   if ([sumRes, listRes, infraRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime Waterways API.'
 
@@ -155,6 +197,22 @@ async function load() {
 onMounted(load)
 
 const filteredWaterways = computed(() => waterways.value.filter(w => !categoryFilter.value || w.category === categoryFilter.value))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: waterwaysPageRows, page: waterwaysPage, totalPages: waterwaysTotalPages,
+  total: waterwaysTotal, next: waterwaysNext, prev: waterwaysPrev,
+} = usePagination(filteredWaterways, 15)
+
+const {
+  pageRows: navaidsPageRows, page: navaidsPage, totalPages: navaidsTotalPages,
+  total: navaidsTotal, next: navaidsNext, prev: navaidsPrev,
+} = usePagination(navaids, 15)
+
+const {
+  pageRows: channelsPageRows, page: channelsPage, totalPages: channelsTotalPages,
+  total: channelsTotal, next: channelsNext, prev: channelsPrev,
+} = usePagination(channels, 15)
 
 // ── KPIs, computed from the live catalogues (this backend has no flat kpis summary) ─
 const charteredCount   = computed(() => waterways.value.filter(w => w.category === 'chartered').length)
@@ -194,9 +252,7 @@ function statusBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 </style>

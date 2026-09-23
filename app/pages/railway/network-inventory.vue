@@ -67,7 +67,7 @@
             </tr>
           </thead>
           <tbody v-if="lines.length">
-            <tr v-for="l in lines" :key="l.id">
+            <tr v-for="l in linesPageRows" :key="l.id">
               <td style="font-weight:600;font-size:12px">{{ l.name || l.osm_id }}</td>
               <td><BadgePill :variant="l.network === 'sgr' ? 'info' : 'success'">{{ l.network.toUpperCase() }}</BadgePill></td>
               <td style="font-size:12px">{{ l.gauge }}{{ l.gauge_mm ? ` (${l.gauge_mm}mm)` : '' }}</td>
@@ -80,9 +80,13 @@
               <td style="font-size:11px">{{ fmtDate(l.updated_at) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading lines…' : 'No lines available.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading lines…' : 'No lines available.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="linesPage" :total-pages="linesTotalPages" :total="linesTotal"
+        @prev="linesPrev" @next="linesNext"
+      />
       <div class="source-note">Origin/destination termini and dedicated signalling status are not yet modelled per line - region shown is the OSM administrative boundary the line traverses.</div>
     </div>
   </div>
@@ -119,7 +123,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredStations.length">
-            <template v-for="s in filteredStations" :key="s.id">
+            <template v-for="s in stationsPageRows" :key="s.id">
               <tr class="station-row" @click="toggleStation(s)">
                 <td class="expand-cell">{{ expandedStation === s.id ? '▾' : '▸' }}</td>
                 <td style="font-family:monospace;font-weight:700">{{ s.code }}</td>
@@ -138,16 +142,16 @@
                     <div class="dd-col">
                       <div class="dd-title">Passenger Activity (loaded tickets)</div>
                       <div class="dd-list">
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Boardings (origin)</span><span>{{ stationActivity(s.code).boardings }}</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Alightings (destination)</span><span>{{ stationActivity(s.code).alightings }}</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Revenue (loaded)</span><span>KES {{ fmtKES(stationActivity(s.code).revenue) }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Boardings (origin)</span><span>{{ stationActivity(s.code).boardings }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Alightings (destination)</span><span>{{ stationActivity(s.code).alightings }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Revenue (loaded)</span><span>KES {{ fmtKES(stationActivity(s.code).revenue) }}</span></div>
                       </div>
                     </div>
                     <div class="dd-col">
                       <div class="dd-title">Occupancy at Station (recent ops)</div>
                       <div class="dd-list">
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Avg occupancy</span><span>{{ stationActivity(s.code).avgOccupancy != null ? stationActivity(s.code).avgOccupancy.toFixed(0) + '%' : 'no recent operations' }}</span></div>
-                        <div class="dd-item dd-item-block"><span style="color:#94a3b8">Operations observed</span><span>{{ stationActivity(s.code).opsCount }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Avg occupancy</span><span>{{ stationActivity(s.code).avgOccupancy != null ? stationActivity(s.code).avgOccupancy!.toFixed(0) + '%' : 'no recent operations' }}</span></div>
+                        <div class="dd-item dd-item-block"><span style="color:var(--fg-3)">Operations observed</span><span>{{ stationActivity(s.code).opsCount }}</span></div>
                       </div>
                     </div>
                   </div>
@@ -155,9 +159,13 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading stations…' : 'No stations match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading stations…' : 'No stations match the current filters.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="stationsPage" :total-pages="stationsTotalPages" :total="stationsTotal"
+        @prev="stationsPrev" @next="stationsNext"
+      />
     </div>
   </div>
 
@@ -192,7 +200,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredTrains.length">
-            <tr v-for="tr in filteredTrains" :key="tr.id">
+            <tr v-for="tr in trainsPageRows" :key="tr.id">
               <td style="font-family:monospace;font-weight:700">{{ tr.unit_id }}</td>
               <td style="font-size:12px">{{ tr.train_type.replace(/_/g,' ') }}</td>
               <td><BadgePill :variant="trainNetwork(tr) === 'sgr' ? 'info' : trainNetwork(tr) === 'mgr' ? 'success' : 'neutral'">{{ trainNetwork(tr).toUpperCase() }}</BadgePill></td>
@@ -200,18 +208,22 @@
               <td style="font-size:12px">{{ tr.capacity_passengers ? `${fmtNum(tr.capacity_passengers)} pax` : `${fmtNum(tr.capacity_freight_tons)}t` }}</td>
               <td style="font-size:12px">{{ tr.current_location_code ?? tr.current_location ?? '-' }}</td>
               <td style="font-size:11px">
-                <span :style="{ color: isDue(tr.next_maintenance) ? '#ef4444' : 'inherit' }">{{ fmtDate(tr.next_maintenance) }}</span>
+                <span :style="{ color: isDue(tr.next_maintenance) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(tr.next_maintenance) }}</span>
               </td>
               <td>{{ tr.year_built ? new Date().getFullYear() - tr.year_built : '-' }}</td>
               <td style="font-size:12px">{{ tr.home_depot ?? '-' }}</td>
               <td style="text-align:center">
-                <span :style="{ color: ['in_service','standby'].includes(tr.status) ? '#22c55e' : '#94a3b8' }">{{ ['in_service','standby'].includes(tr.status) ? '✓' : '-' }}</span>
+                <span :style="{ color: ['in_service','standby'].includes(tr.status) ? 'var(--success-fg)' : 'var(--fg-3)' }">{{ ['in_service','standby'].includes(tr.status) ? '✓' : '-' }}</span>
               </td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading rolling stock…' : 'No rolling stock matches the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading rolling stock…' : 'No rolling stock matches the current filters.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="trainsPage" :total-pages="trainsTotalPages" :total="trainsTotal"
+        @prev="trainsPrev" @next="trainsNext"
+      />
     </div>
   </div>
 
@@ -224,7 +236,7 @@
         <div v-if="qualityChecks.missingGeometry.length">
           <AlertItem v-for="item in qualityChecks.missingGeometry" :key="item.id" severity="warning" :title="item.label" :meta="item.kind" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'All loaded lines and stations have usable geometry.' }}</div>
+        <EmptyState v-else :loading="loading" message="All loaded lines and stations have usable geometry." icon="search" compact />
       </div>
     </div>
     <div class="card">
@@ -233,7 +245,7 @@
         <div v-if="qualityChecks.staleStations.length">
           <AlertItem v-for="s in qualityChecks.staleStations" :key="s.id" severity="info" :title="`${s.name} (${s.code})`" :meta="`Last updated ${s.updated_at ? fmtDate(s.updated_at) : 'never'}`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No stale station records (>365d) detected.' }}</div>
+        <EmptyState v-else :loading="loading" message="No stale station records (>365d) detected." icon="search" compact />
       </div>
     </div>
   </div>
@@ -244,7 +256,7 @@
         <div v-if="qualityChecks.unknownStatus.length">
           <AlertItem v-for="tr in qualityChecks.unknownStatus" :key="tr.id" severity="warning" :title="tr.unit_id" meta="No status recorded" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'Every rolling-stock unit has a recorded status.' }}</div>
+        <EmptyState v-else :loading="loading" message="Every rolling-stock unit has a recorded status." icon="search" compact />
       </div>
     </div>
     <div class="card">
@@ -253,7 +265,7 @@
         <div v-if="qualityChecks.gaugeMismatch.length">
           <AlertItem v-for="l in qualityChecks.gaugeMismatch" :key="l.id" severity="warning" :title="l.name || l.osm_id" :meta="`${l.network.toUpperCase()} line classified with ${l.gauge} gauge`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No network/gauge inconsistencies detected.' }}</div>
+        <EmptyState v-else :loading="loading" message="No network/gauge inconsistencies detected." icon="search" compact />
       </div>
     </div>
   </div>
@@ -261,8 +273,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Rail Network Inventory')
-
 import { useRailway } from '~/composables/api'
 import type { RailLine, RailStation, Train, TrainSchedule, TrainOperation, RailTicket, FreightManifest, RailIncident, RailNetwork } from '~/composables/api'
 
@@ -382,6 +392,22 @@ const filteredTrains = computed(() => trains.value.filter(tr => {
 }))
 function isDue(s: string | null | undefined) { return !!s && new Date(s).getTime() <= Date.now() }
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: linesPageRows, page: linesPage, totalPages: linesTotalPages,
+  total: linesTotal, next: linesNext, prev: linesPrev,
+} = usePagination(lines, 15)
+
+const {
+  pageRows: stationsPageRows, page: stationsPage, totalPages: stationsTotalPages,
+  total: stationsTotal, next: stationsNext, prev: stationsPrev,
+} = usePagination(filteredStations, 15)
+
+const {
+  pageRows: trainsPageRows, page: trainsPage, totalPages: trainsTotalPages,
+  total: trainsTotal, next: trainsNext, prev: trainsPrev,
+} = usePagination(filteredTrains, 15)
+
 // ── Station passenger activity drill-down (from loaded tickets/operations) ──
 function stationActivity(code: string) {
   const boardings  = tickets.value.filter(tk => tk.origin_code === code).length
@@ -491,28 +517,26 @@ function trainStatusBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; color:#475569; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); color:var(--fg-2); }
 .mk { display:flex; align-items:center; gap:5px; }
 .line-seg { width:20px; height:4px; border-radius:2px; display:inline-block; flex-shrink:0; }
 .compare-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; margin-bottom:16px; }
-.compare-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; }
+.compare-card { background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:10px; padding:16px 18px; }
 .cc-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-.cc-lines { font-size:12px; color:#94a3b8; }
+.cc-lines { font-size:12px; color:var(--fg-3); }
 .cc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-.cc-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; display:block; margin-bottom:2px; }
-.cc-val { font-size:15px; font-weight:700; color:#1e293b; }
-.val-danger { color:#dc2626; }
+.cc-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); display:block; margin-bottom:2px; }
+.cc-val { font-size:15px; font-weight:700; color:var(--fg-1); }
+.val-danger { color:var(--danger-fg); }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.source-note { margin-top:10px; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px; }
+.source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }
 .station-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.station-detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.station-detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:8px; }
+.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
 .dd-list { display:flex; flex-direction:column; gap:6px; }
 .dd-item { display:flex; align-items:center; gap:8px; font-size:12px; }
 .dd-item-block { flex-direction:column; align-items:flex-start; gap:2px; }

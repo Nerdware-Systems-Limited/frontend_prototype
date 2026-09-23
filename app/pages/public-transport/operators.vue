@@ -17,75 +17,93 @@
     <KpiCard
       label="Registered Operators"
       :value="fmtNum(saccos.length)"
-      :sub="`${fmtNum(kpis.active)} active`"
-      source="batch" source-title="NTSA PSV Registry"
+      :unavailable="loading || saccosError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE"
+      :description="`${fmtNum(kpis.active)} active`"
+      to="#operator-registry"
     />
     <KpiCard
       label="Suspended"
       :value="fmtNum(kpis.suspended)"
-      sub="Registration suspended"
-      trend-direction="down"
-      source="batch" source-title="NTSA PSV Registry"
+      :unavailable="loading || saccosError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE"
+      description="Registration suspended"
     />
     <KpiCard
       label="Revoked"
       :value="fmtNum(kpis.revoked)"
-      sub="Registration revoked"
-      trend-direction="down"
-      source="batch" source-title="NTSA PSV Registry"
+      :unavailable="loading || saccosError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE"
+      description="Registration revoked"
     />
     <KpiCard
       label="Total Fleet Size"
       :value="fmtNum(kpis.fleetSize)"
-      sub="Across all operators"
-      source="batch" source-title="NTSA iTIMS"
+      :unavailable="loading || saccosError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE"
+      description="Across all operators"
     />
     <KpiCard
       label="Active Routes"
       :value="fmtNum(kpis.activeRoutes)"
-      :sub="`${fmtNum(routes.length)} total routes served`"
-      source="live" source-title="NaMATA GTFS-RT"
+      :unavailable="loading || routesError"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA GTFS-RT feed unavailable'"
+      period="LIVE"
+      :description="`${fmtNum(routes.length)} total routes served`"
     />
     <KpiCard
       label="Avg Service Quality"
       :value="kpis.avgQuality != null ? kpis.avgQuality.toFixed(0) + '/100' : '-'"
-      sub="Composite score, all operators"
-      :trend-direction="kpis.avgQuality && kpis.avgQuality >= 70 ? 'up' : 'down'"
-      source="batch" source-title="NaMATA"
+      :unavailable="loading || saccosError"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA feed unavailable'"
+      period="LIVE"
+      description="Composite score, all operators"
+      :status="kpis.avgQuality == null ? undefined : kpis.avgQuality >= 70 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Open Complaints"
       :value="fmtNum(kpis.openComplaints)"
-      sub="Unresolved passenger feedback"
-      trend-direction="down"
-      source="live" source-title="NaMATA Feedback"
+      :unavailable="loading || feedbackError"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA Feedback feed unavailable'"
+      period="LIVE"
+      description="Unresolved passenger feedback"
     />
     <KpiCard
       label="Route Compliance"
       :value="kpis.routeCompliance != null ? kpis.routeCompliance.toFixed(1) + '%' : '-'"
-      sub="Compliant checks / total checks"
-      :trend-direction="kpis.routeCompliance && kpis.routeCompliance >= 85 ? 'up' : 'down'"
-      source="batch" source-title="NaMATA / NTSA"
+      :unavailable="loading || complianceError"
+      :unavailable-note="loading ? 'Loading…' : 'NaMATA / NTSA feed unavailable'"
+      period="LIVE"
+      description="Compliant checks / total checks"
+      :status="kpis.routeCompliance == null ? undefined : kpis.routeCompliance >= 85 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Avg GPS Compliance"
       :value="kpis.avgGps != null ? kpis.avgGps.toFixed(1) + '%' : '-'"
-      sub="Across active PSV licences"
-      :trend-direction="kpis.avgGps && kpis.avgGps >= 90 ? 'up' : 'down'"
-      source="live" source-title="NTSA iTIMS"
+      :unavailable="loading || licensesError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE"
+      description="Across active PSV licences"
+      :status="kpis.avgGps == null ? undefined : kpis.avgGps >= 90 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="PSV Licence Compliance"
       :value="kpis.licenceCompliance != null ? kpis.licenceCompliance.toFixed(1) + '%' : '-'"
-      sub="Active licences / total issued"
-      source="batch" source-title="NTSA PSV Registry"
+      :unavailable="loading || licensesError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE"
+      description="Active licences / total issued"
     />
   </div>
 
   <!-- Registry -->
   <SectionTitle pill="NaMATA / NTSA · Rolling">Operator Registry</SectionTitle>
 
-  <div class="card">
+  <div id="operator-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search operator name…" style="min-width:180px" />
@@ -150,7 +168,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredOperators.length">
-            <template v-for="op in filteredOperators" :key="op.id">
+            <template v-for="op in operatorsPageRows" :key="op.id">
               <tr class="op-row" @click="toggleExpand(op.id)">
                 <td class="expand-cell">{{ expandedId === op.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:600">{{ op.sacco_name }}</td>
@@ -160,7 +178,7 @@
                 <td>{{ fmtNum(op.fleet_size) }}</td>
                 <td>
                   <div class="util-bar-wrap">
-                    <div class="util-bar" :style="{ width: `${op.service_quality_score}%`, background: scoreBg(op.service_quality_score) }" />
+                    <div class="util-bar" :style="{ transform: `scaleX(${op.service_quality_score / 100})`, background: scoreBg(op.service_quality_score) }" />
                   </div>
                   <span style="font-size:11px">{{ op.service_quality_score.toFixed(0) }}/100</span>
                 </td>
@@ -168,10 +186,10 @@
                   <span v-if="op.route_compliance != null" :style="{ color: scoreBg(op.route_compliance) }">
                     {{ op.route_compliance.toFixed(0) }}%
                   </span>
-                  <span v-else style="color:#94a3b8">-</span>
+                  <span v-else style="color:var(--fg-3)">-</span>
                 </td>
                 <td>
-                  <span :style="{ color: op.complaint_count > 5 ? '#ef4444' : op.complaint_count > 0 ? '#f59e0b' : '#22c55e' }">
+                  <span :style="{ color: op.complaint_count > 5 ? 'var(--danger-fg)' : op.complaint_count > 0 ? 'var(--warning-fg)' : 'var(--success-fg)' }">
                     {{ fmtNum(op.complaint_count) }}
                   </span>
                 </td>
@@ -189,7 +207,7 @@
                         <div v-for="r in op.routesForSacco" :key="r.id" class="dd-item">
                           <span style="font-weight:600">{{ r.route_name }}</span>
                           <BadgePill variant="info">{{ r.service_type }}</BadgePill>
-                          <span style="color:#94a3b8">{{ r.stop_count }} stops · KES {{ r.fare_kes }}</span>
+                          <span style="color:var(--fg-3)">{{ r.stop_count }} stops · KES {{ r.fare_kes }}</span>
                         </div>
                       </div>
                       <div v-else class="dd-empty">No routes on file.</div>
@@ -201,7 +219,7 @@
                         <div v-for="l in op.licensesForSacco" :key="l.id" class="dd-item">
                           <span style="font-family:monospace">{{ l.license_number }}</span>
                           <BadgePill :variant="statusBadge(l.status)">{{ l.status }}</BadgePill>
-                          <span style="color:#94a3b8">exp {{ fmtDate(l.expiry_date) }} · GPS {{ l.gps_compliance_pct.toFixed(0) }}%</span>
+                          <span style="color:var(--fg-3)">exp {{ fmtDate(l.expiry_date) }} · GPS {{ l.gps_compliance_pct.toFixed(0) }}%</span>
                         </div>
                       </div>
                       <div v-else class="dd-empty">No PSV licences on file.</div>
@@ -211,7 +229,7 @@
                       <div class="dd-title">Service Quality Components</div>
                       <div v-if="op.qualityForSacco.length" class="dd-list">
                         <div v-for="q in op.qualityForSacco" :key="q.id" class="dd-item dd-item-block">
-                          <span style="color:#94a3b8">{{ fmtDate(q.period_start) }} – {{ fmtDate(q.period_end) }}</span>
+                          <span style="color:var(--fg-3)">{{ fmtDate(q.period_start) }} – {{ fmtDate(q.period_end) }}</span>
                           <span>On-time {{ q.on_time_pct.toFixed(0) }}% · Complaint rate {{ q.complaint_rate.toFixed(2) }} · Vehicle age {{ q.vehicle_age_score.toFixed(0) }} · Occupancy {{ q.occupancy_score.toFixed(0) }}</span>
                         </div>
                       </div>
@@ -226,7 +244,7 @@
                             <BadgePill :variant="fbStatusBadge(f.status)">{{ f.status }}</BadgePill>
                             {{ f.category.replace(/_/g,' ') }} · {{ f.rating }}★
                           </span>
-                          <span style="color:#94a3b8">{{ f.text || '(no comment)' }}</span>
+                          <span style="color:var(--fg-3)">{{ f.text || '(no comment)' }}</span>
                         </div>
                       </div>
                       <div v-else class="dd-empty">No feedback on file.</div>
@@ -249,12 +267,16 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="13" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="13" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ loading ? 'Loading operators…' : 'No operators match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="operatorsPage" :total-pages="operatorsTotalPages" :total="operatorsTotal"
+          @prev="operatorsPrev" @next="operatorsNext"
+        />
       </div>
     </div>
   </div>
@@ -276,11 +298,11 @@
           </tr>
         </thead>
         <tbody v-if="forecasts.length">
-          <tr v-for="f in forecasts" :key="f.id">
+          <tr v-for="f in forecastsPageRows" :key="f.id">
             <td style="font-weight:600;font-size:12px">{{ f.route_name ?? f.route }}</td>
             <td style="font-size:12px;white-space:nowrap">{{ fmtTime(f.target_at) }}</td>
             <td style="font-weight:700">{{ fmtNum(f.predicted_passengers) }}</td>
-            <td style="font-size:12px;color:#64748b">
+            <td style="font-size:12px;color:var(--fg-2)">
               {{ fmtNum(f.lower_passengers) }} – {{ fmtNum(f.upper_passengers) }}
             </td>
             <td style="font-size:11px">
@@ -291,20 +313,22 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading forecasts…' : 'No demand forecast data available.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="forecastsPage" :total-pages="forecastsTotalPages" :total="forecastsTotal"
+        @prev="forecastsPrev" @next="forecastsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Public Operators')
-
 import { usePublicTransport } from '~/composables/api'
 import type {
   Sacco, Route, OperatorMetric, ServiceQualityScore,
@@ -324,6 +348,11 @@ const compliance   = ref<ComplianceRecord[]>([])
 const forecasts    = ref<DemandForecast[]>([])
 const loading      = ref(true)
 const error        = ref<string | null>(null)
+const saccosError     = ref(false)
+const routesError     = ref(false)
+const feedbackError   = ref(false)
+const complianceError = ref(false)
+const licensesError   = ref(false)
 const lastRefreshed = ref('-')
 
 const search            = ref('')
@@ -360,6 +389,12 @@ async function load() {
   if (paymentsRes.status   === 'fulfilled') payments.value   = (paymentsRes.value as any).results ?? []
   if (complianceRes.status === 'fulfilled') compliance.value = (complianceRes.value as any).results ?? []
   if (forecastsRes.status  === 'fulfilled') forecasts.value  = (forecastsRes.value as any).results ?? []
+
+  saccosError.value     = saccosRes.status     === 'rejected'
+  routesError.value     = routesRes.status     === 'rejected'
+  feedbackError.value   = feedbackRes.status   === 'rejected'
+  complianceError.value = complianceRes.status === 'rejected'
+  licensesError.value   = licensesRes.status   === 'rejected'
 
   if ([saccosRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Public Transport API.'
@@ -461,6 +496,17 @@ const exportRows = computed(() => filteredOperators.value.map(op => ({
   payment_channels: op.payment_channels.join(', '),
 })))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: operatorsPageRows, page: operatorsPage, totalPages: operatorsTotalPages,
+  total: operatorsTotal, next: operatorsNext, prev: operatorsPrev,
+} = usePagination(filteredOperators, 15)
+
+const {
+  pageRows: forecastsPageRows, page: forecastsPage, totalPages: forecastsTotalPages,
+  total: forecastsTotal, next: forecastsNext, prev: forecastsPrev,
+} = usePagination(forecasts, 15)
+
 // ── KPIs ─────────────────────────────────────────────────────────────────
 const kpis = computed(() => {
   const active    = saccos.value.filter(s => s.registration_status === 'active').length
@@ -505,7 +551,7 @@ function fmtTime(iso: string) {
   catch { return iso }
 }
 function scoreBg(pct: number) {
-  return pct >= 85 ? '#22c55e' : pct >= 60 ? '#f59e0b' : '#ef4444'
+  return pct >= 85 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--destructive)'
 }
 function statusBadge(s: string) {
   const m: Record<string,string> = { active:'success', expired:'danger', suspended:'warning', revoked:'danger' }
@@ -522,20 +568,18 @@ function complianceBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.util-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.util-bar { height:100%; border-radius:4px; transition:width .4s; }
+.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.util-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .op-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.op-detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.op-detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:8px; }
+.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
 .dd-list { display:flex; flex-direction:column; gap:6px; }
 .dd-item { display:flex; align-items:center; gap:8px; font-size:12px; flex-wrap:wrap; }
 .dd-item-block { flex-direction:column; align-items:flex-start; gap:2px; }
-.dd-empty { font-size:12px; color:#94a3b8; }
+.dd-empty { font-size:12px; color:var(--fg-3); }
 </style>

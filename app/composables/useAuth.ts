@@ -13,14 +13,27 @@ export function useAuth() {
   const router = useRouter()
   const route  = useRoute()
 
+  function redirectAfterLogin() {
+    const redirect = (route.query.redirect as string) || '/dashboard'
+    return navigateTo(redirect)
+  }
+
   /**
-   * Login and redirect to the intended page (or dashboard).
-   * Wraps store.login so the composable owns the post-login navigation.
+   * Login and redirect to the intended page (or dashboard) - unless the
+   * account has MFA enabled, in which case no tokens are issued yet and the
+   * result tells the caller (login.vue) to show the code-entry step instead.
    */
   async function login(email: string, password: string, remember = false) {
-    await store.login(email, password, remember)
-    const redirect = (route.query.redirect as string) || '/dashboard'
-    await navigateTo(redirect)
+    const result = await store.login(email, password, remember)
+    if (result.mfaRequired) return result
+    await redirectAfterLogin()
+    return result
+  }
+
+  /** Confirms the login-challenge code and completes the redirect. */
+  async function mfaVerify(otpId: string, code: string) {
+    await store.mfaVerify(otpId, code)
+    await redirectAfterLogin()
   }
 
   async function logout() {
@@ -38,5 +51,13 @@ export function useAuth() {
     login,
     logout,
     fetchMe: store.fetchMe,
+    mfaVerify,
+    mfaResend: store.mfaResend,
+    mfaEnroll: store.mfaEnroll,
+    mfaEnrollVerify: store.mfaEnrollVerify,
+    mfaDisable: store.mfaDisable,
+    requestPasswordReset: store.requestPasswordReset,
+    confirmPasswordReset: store.confirmPasswordReset,
+    changePassword: store.changePassword,
   }
 }

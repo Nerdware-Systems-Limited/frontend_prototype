@@ -5,10 +5,7 @@
     subtitle="KAA · KCAA · KenTrade - Airport throughput, domestic vs international volumes, KenTrade air cargo clearances, and revenue trends"
   >
     <template #actions>
-      
-      <div class="day-filter">
-        <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <select v-model="airportFilter" class="select-sm" @change="load">
         <option value="">All airports</option>
         <option v-for="a in airports" :key="a.iata_code" :value="a.iata_code">{{ a.iata_code }} - {{ a.name }}</option>
@@ -23,48 +20,62 @@
     <KpiCard
       label="Total Passengers"
       :value="fmtNum(totalPax)"
-      :sub="`${days}d all airports`"
-      trend-direction="up"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="All airports"
+      to="#by-airport"
     />
     <KpiCard
       label="Domestic"
       :value="fmtNum(totalDomestic)"
-      :sub="totalPax > 0 ? `${((totalDomestic / totalPax) * 100).toFixed(1)}% share` : '-'"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      :description="totalPax > 0 ? `${((totalDomestic / totalPax) * 100).toFixed(1)}% share` : ''"
+      to="#volume-comparison"
     />
     <KpiCard
       label="International"
       :value="fmtNum(totalIntl)"
-      :sub="totalPax > 0 ? `${((totalIntl / totalPax) * 100).toFixed(1)}% share` : '-'"
-      trend-direction="up"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      :description="totalPax > 0 ? `${((totalIntl / totalPax) * 100).toFixed(1)}% share` : ''"
+      to="#volume-comparison"
     />
     <KpiCard
       label="Total Revenue"
       :value="totalRevenue ? `KES ${fmtKES(totalRevenue)}` : '-'"
-      :sub="`${days}d across network`"
-      trend-direction="up"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="Across network"
+      to="#by-airport"
     />
     <KpiCard
       label="Airports Reporting"
       :value="fmtNum(byAirport.length)"
-      sub="With passenger data"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="With passenger data"
+      to="#by-airport"
     />
     <KpiCard
       label="Avg Rev / Pax"
       :value="totalPax > 0 && totalRevenue ? `KES ${fmtKES(totalRevenue / totalPax)}` : '-'"
-      sub="Yield per passenger"
-      source="batch" source-title="KAA"
+      :unavailable="loading || byApError"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="Yield per passenger"
     />
   </div>
 
   <!-- Airport breakdown table + intl share bars -->
   <SectionTitle :pill="`KAA · ${days}d`">By Airport</SectionTitle>
 
-  <div class="card">
+  <div id="by-airport" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -80,7 +91,7 @@
           </tr>
         </thead>
         <tbody v-if="byAirport.length">
-          <tr v-for="p in byAirport" :key="p.airport__iata_code">
+          <tr v-for="p in byAirportPageRows" :key="p.airport__iata_code">
             <td style="font-weight:600">{{ p.airport__name }}</td>
             <td style="font-family:monospace;font-weight:700;font-size:14px">{{ p.airport__iata_code }}</td>
             <td style="font-weight:700">{{ fmtNum(p.total_pax) }}</td>
@@ -99,16 +110,20 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No passenger data.' }}</td></tr>
+          <tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No passenger data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="byAirportPage" :total-pages="byAirportTotalPages" :total="byAirportTotal"
+        @prev="byAirportPrev" @next="byAirportNext"
+      />
     </div>
   </div>
 
   <!-- Volume comparison bar chart -->
   <SectionTitle pill="KAA">Domestic vs International Volumes</SectionTitle>
 
-  <div class="card">
+  <div id="volume-comparison" class="card drill-target">
     <div class="card-body">
       <div v-if="byAirport.length" class="vol-compare">
         <div v-for="p in byAirport" :key="p.airport__iata_code" class="vc-row">
@@ -129,7 +144,7 @@
           <span><span class="vc-dot int-bg" /> International</span>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data.' }}</div>
+      <EmptyState v-else :loading="loading" message="No data." compact />
     </div>
   </div>
 
@@ -150,7 +165,7 @@
           </tr>
         </thead>
         <tbody v-if="paxRecords.length">
-          <tr v-for="(r, i) in paxRecords.slice(0, 50)" :key="i">
+          <tr v-for="(r, i) in paxRecordsPageRows" :key="i">
             <td>{{ airportName(r.airport_code) }}</td>
             <td style="font-size:12px">{{ r.report_date ? fmtDate(r.report_date) : '-' }}</td>
             <td style="font-weight:600">{{ fmtNum(r.passengers) }}</td>
@@ -160,17 +175,19 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No detailed records.' }}</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No detailed records.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="paxRecordsPage" :total-pages="paxRecordsTotalPages" :total="paxRecordsTotal"
+        @prev="paxRecordsPrev" @next="paxRecordsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Passenger Stats')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { PassengerByAirport, Airport } from '~/composables/api'
 
@@ -179,6 +196,7 @@ const airports   = ref<Airport[]>([])
 const paxRecords = ref<any[]>([])
 const loading    = ref(true)
 const error      = ref<string | null>(null)
+const byApError  = ref(false)
 const lastRefreshed = ref('-')
 const days          = ref(30)
 const airportFilter = ref('')
@@ -198,6 +216,8 @@ async function load() {
   if (apRes.status   === 'fulfilled') airports.value   = (apRes.value as any).results ?? []
   if (recRes.status  === 'fulfilled') paxRecords.value = (recRes.value as any).results ?? []
 
+  byApError.value = byApRes.status === 'rejected'
+
   if ([byApRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Aviation API.'
 
@@ -216,6 +236,17 @@ const totalDomestic = computed(() => byAirport.value.reduce((s, p) => s + p.dome
 const totalIntl     = computed(() => byAirport.value.reduce((s, p) => s + p.intl, 0))
 const totalRevenue  = computed(() => byAirport.value.reduce((s, p) => s + p.revenue_kes, 0))
 const maxPax        = computed(() => Math.max(1, ...byAirport.value.map(p => Math.max(p.domestic, p.intl))))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: byAirportPageRows, page: byAirportPage, totalPages: byAirportTotalPages,
+  total: byAirportTotal, next: byAirportNext, prev: byAirportPrev,
+} = usePagination(byAirport, 15)
+
+const {
+  pageRows: paxRecordsPageRows, page: paxRecordsPage, totalPages: paxRecordsTotalPages,
+  total: paxRecordsTotal, next: paxRecordsNext, prev: paxRecordsPrev,
+} = usePagination(paxRecords, 15)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -240,26 +271,20 @@ function airportName(code: string | null | undefined) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
-.share-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.intl-bar { height:100%; background:#3b82f6; border-radius:4px; }
+.share-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.intl-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
 .vol-compare { display:flex; flex-direction:column; gap:10px; }
 .vc-row { display:grid; grid-template-columns:60px 1fr; align-items:center; gap:10px; }
 .vc-label { font-family:monospace; font-weight:700; font-size:13px; }
 .vc-bars { display:flex; flex-direction:column; gap:4px; }
 .vc-bar-wrap { display:flex; align-items:center; gap:8px; }
 .vc-bar { height:12px; border-radius:3px; min-width:2px; flex-shrink:0; }
-.vc-count { font-size:11px; color:#64748b; white-space:nowrap; }
-.dom-bar { background:#22c55e; }
-.int-bar { background:#3b82f6; }
+.vc-count { font-size:11px; color:var(--fg-2); white-space:nowrap; }
+.dom-bar { background:var(--success); }
+.int-bar { background:var(--primary-fill); }
 .vc-legend { display:flex; gap:16px; font-size:12px; margin-top:8px; }
 .vc-dot { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:4px; }
-.dom-bg { background:#22c55e; }
-.int-bg { background:#3b82f6; }
+.dom-bg { background:var(--success); }
+.int-bg { background:var(--primary-fill); }
 </style>

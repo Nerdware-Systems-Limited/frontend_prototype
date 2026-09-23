@@ -38,41 +38,51 @@
     <KpiCard
       label="Network Length"
       :value="`${fmtNum(stats.totalLength, 0)} km`"
-      :sub="stats.usingAggregate ? `${segmentsLabel} · network-wide` : `${segmentsLabel} · estimated`"
-      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE"
+      :description="stats.usingAggregate ? `${segmentsLabel} · network-wide` : `${segmentsLabel} · estimated`"
+      to="#road-inventory-table"
     />
     <KpiCard
       label="Asset Count"
       :value="fmtNum(stats.assetCount)"
-      :sub="stats.usingAggregate ? 'Segments + bridges + streetlights · network-wide' : 'Segments + bridges + streetlights · estimated'"
-      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE"
+      :description="stats.usingAggregate ? 'Segments + bridges + streetlights · network-wide' : 'Segments + bridges + streetlights · estimated'"
+      to="#road-inventory-table"
     />
     <KpiCard
       label="Avg IRI"
       :value="stats.avgIri != null ? stats.avgIri.toFixed(2) : '-'"
-      :sub="stats.usingAggregate ? 'IRI (m/km) · network-wide average' : 'IRI (m/km) · estimated'"
-      :trend-direction="stats.avgIri != null && stats.avgIri <= 4 ? 'up' : 'down'"
-      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE"
+      :description="stats.usingAggregate ? 'IRI (m/km) · network-wide average' : 'IRI (m/km) · estimated'"
+      :status="stats.avgIri == null ? undefined : stats.avgIri <= 4 ? 'healthy' : 'warning'"
+      to="#condition-distribution"
     />
     <KpiCard
       label="Avg PCI"
       :value="stats.avgPci != null ? stats.avgPci.toFixed(1) : '-'"
-      :sub="stats.usingAggregate ? 'PCI (0–100) · network-wide average' : 'PCI (0–100) · estimated'"
-      :trend-direction="stats.avgPci != null && stats.avgPci >= 70 ? 'up' : 'down'"
-      :source="stats.usingAggregate ? 'live' : 'batch'" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE"
+      :description="stats.usingAggregate ? 'PCI (0–100) · network-wide average' : 'PCI (0–100) · estimated'"
+      :status="stats.avgPci == null ? undefined : stats.avgPci >= 70 ? 'healthy' : 'warning'"
+      to="#condition-distribution"
     />
     <KpiCard
       label="Data Completeness"
       :value="stats.completenessPct != null ? `${stats.completenessPct.toFixed(0)}%` : '-'"
-      sub="IRI + PCI recorded · estimated"
-      :trend-direction="stats.completenessPct != null && stats.completenessPct >= 80 ? 'up' : 'down'"
-      source="batch" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE" description="IRI + PCI recorded · estimated"
+      :status="stats.completenessPct == null ? undefined : stats.completenessPct >= 80 ? 'healthy' : 'warning'"
+      to="#road-inventory-table"
     />
     <KpiCard
       label="Latest Survey"
       :value="stats.latestSurvey ? fmtDate(stats.latestSurvey) : '-'"
-      :sub="`Source: ${agencyLabel}`"
-      source="batch" source-title="Agency Survey"
+      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      period="LIVE" :description="`Source: ${agencyLabel}`"
+      to="#road-inventory-table"
     />
   </div>
   <div v-if="!stats.usingAggregate && !loading" class="sample-caveat">
@@ -88,11 +98,11 @@
         <div v-if="stats.byClass.length" class="dist-list">
           <div v-for="d in stats.byClass" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key.replace(/_/g,' ') }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" style="background:#3b82f6" :style="{ width: `${stats.segmentCount > 0 ? (d.count / stats.segmentCount) * 100 : 0}%` }" /></div>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: 'var(--primary-fill)', transform: `scaleX(${stats.segmentCount > 0 ? d.count / stats.segmentCount : 0})` }" /></div>
             <span class="dist-val">{{ d.count }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <EmptyState v-else :loading="loading" message="No road class data" compact />
       </div>
     </div>
 
@@ -103,26 +113,26 @@
         <div v-if="stats.bySurface.length" class="dist-list">
           <div v-for="d in stats.bySurface" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" style="background:#8b5cf6" :style="{ width: `${stats.segmentCount > 0 ? (d.count / stats.segmentCount) * 100 : 0}%` }" /></div>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: '#8b5cf6', transform: `scaleX(${stats.segmentCount > 0 ? d.count / stats.segmentCount : 0})` }" /></div>
             <span class="dist-val">{{ d.count }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <EmptyState v-else :loading="loading" message="No surface type data" compact />
       </div>
     </div>
 
-    <div class="card">
+    <div id="condition-distribution" class="card drill-target">
       <div class="card-header">Condition Distribution</div>
       <div v-if="!stats.usingAggregate && !loading" class="dist-caveat">Estimated - the per-agency breakdown is unavailable right now.</div>
       <div class="card-body">
         <div v-if="stats.byCondition.length" class="dist-list">
           <div v-for="d in stats.byCondition" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: `${stats.conditionBase > 0 ? (d.count / stats.conditionBase) * 100 : 0}%`, background: condColor(d.key) }" /></div>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ transform: `scaleX(${stats.conditionBase > 0 ? d.count / stats.conditionBase : 0})`, background: condColor(d.key) }" /></div>
             <span class="dist-val">{{ fmtNum(d.count) }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <EmptyState v-else :loading="loading" message="No condition data" compact />
       </div>
     </div>
   </div>
@@ -158,8 +168,8 @@
         <div class="card-header">Maintenance Budget FY{{ agencyBudget.fiscal_year }} ({{ agencyLabel }})</div>
         <div class="card-body">
           <div class="budget-row"><span>Allocated</span><strong>KES {{ fmtKES(agencyBudget.allocated_kes) }}</strong></div>
-          <div class="budget-row"><span>Disbursed</span><strong style="color:#22c55e">KES {{ fmtKES(agencyBudget.disbursed_kes) }}</strong></div>
-          <div class="budget-row"><span>Committed</span><strong style="color:#f59e0b">KES {{ fmtKES(agencyBudget.committed_kes) }}</strong></div>
+          <div class="budget-row"><span>Disbursed</span><strong style="color:var(--success-fg)">KES {{ fmtKES(agencyBudget.disbursed_kes) }}</strong></div>
+          <div class="budget-row"><span>Committed</span><strong style="color:var(--warning-fg)">KES {{ fmtKES(agencyBudget.committed_kes) }}</strong></div>
           <div class="budget-row"><span>Utilization</span><strong>{{ agencyBudget.utilization_pct.toFixed(1) }}%</strong></div>
           <div class="budget-bar-wrap" style="margin-top:8px"><div class="budget-bar" :style="{ width: `${agencyBudget.utilization_pct}%` }" /></div>
         </div>
@@ -169,10 +179,10 @@
         <div class="card-header">Weigh-in-Motion (30d, network-wide)</div>
         <div class="card-body">
           <div class="budget-row"><span>Total Passings</span><strong>{{ fmtNum(summary.wim.total_passings_30d) }}</strong></div>
-          <div class="budget-row"><span>Overloads</span><strong style="color:#ef4444">{{ fmtNum(summary.wim.overloads_30d) }}</strong></div>
+          <div class="budget-row"><span>Overloads</span><strong style="color:var(--danger-fg)">{{ fmtNum(summary.wim.overloads_30d) }}</strong></div>
           <div class="budget-row">
             <span>Overload Rate</span>
-            <strong :style="{ color: summary.wim.overload_rate_pct > 10 ? '#ef4444' : '#22c55e' }">{{ summary.wim.overload_rate_pct.toFixed(1) }}%</strong>
+            <strong :style="{ color: summary.wim.overload_rate_pct > 10 ? 'var(--danger-fg)' : 'var(--success-fg)' }">{{ summary.wim.overload_rate_pct.toFixed(1) }}%</strong>
           </div>
         </div>
       </div>
@@ -180,8 +190,8 @@
       <div class="card" style="margin-top:12px">
         <div class="card-header">Critical Bridges ({{ agencyLabel }})</div>
         <div class="card-body">
-          <div class="budget-row"><span>Critical / Poor</span><strong style="color:#ef4444">{{ agencyCriticalBridges.length }}</strong></div>
-          <div class="budget-row"><span>Overdue Inspections</span><strong style="color:#f59e0b">{{ agencyOverdueInspections }}</strong></div>
+          <div class="budget-row"><span>Critical / Poor</span><strong style="color:var(--danger-fg)">{{ agencyCriticalBridges.length }}</strong></div>
+          <div class="budget-row"><span>Overdue Inspections</span><strong style="color:var(--warning-fg)">{{ agencyOverdueInspections }}</strong></div>
         </div>
       </div>
     </div>
@@ -190,7 +200,7 @@
   <!-- Inventory table -->
   <SectionTitle pill="Agency Survey · Rolling">Road Inventory ({{ agencyLabel }})</SectionTitle>
 
-  <div class="card">
+  <div id="road-inventory-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search road name or code…" style="min-width:180px" />
@@ -246,16 +256,16 @@
               <td style="font-size:12px">{{ s.bridge_count }} / {{ s.streetlight_count }}</td>
               <td>{{ s.iri_value != null ? s.iri_value.toFixed(2) : '-' }}</td>
               <td>{{ s.pci_value != null ? s.pci_value.toFixed(0) : '-' }}</td>
-              <td><BadgePill :variant="condBadge(s.condition_class)">{{ s.condition_class }}</BadgePill></td>
+              <td><BadgePill :variant="condBadge(s.condition_class ?? '')">{{ s.condition_class ?? '-' }}</BadgePill></td>
               <td style="font-size:11px">{{ fmtDate(s.last_evaluated_at) }}</td>
               <td style="text-align:center">
-                <span :style="{ color: onMapIds.has(s.id) ? '#22c55e' : '#94a3b8' }">{{ onMapIds.has(s.id) ? '✓' : '-' }}</span>
+                <span :style="{ color: onMapIds.has(s.id) ? 'var(--success-fg)' : 'var(--fg-3)' }">{{ onMapIds.has(s.id) ? '✓' : '-' }}</span>
               </td>
             </tr>
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="13" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="13" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ tableLoading ? 'Loading inventory…' : 'No road segments match the current filters.' }}
               </td>
             </tr>
@@ -267,12 +277,6 @@
         <button class="btn" :disabled="tablePage <= 1 || tableLoading" @click="goToPage(tablePage - 1)">← Prev</button>
         <span class="page-info">Page {{ fmtNum(tablePage) }} of {{ fmtNum(tableTotalPages) }} · {{ fmtNum(tableTotal) }} segments</span>
         <button class="btn" :disabled="tablePage >= tableTotalPages || tableLoading" @click="goToPage(tablePage + 1)">Next →</button>
-        <select v-model.number="tablePageSize" class="select-sm">
-          <option :value="25">25 / page</option>
-          <option :value="50">50 / page</option>
-          <option :value="100">100 / page</option>
-          <option :value="200">200 / page</option>
-        </select>
       </div>
     </div>
   </div>
@@ -291,7 +295,7 @@
             :meta="`Agencies: ${d.agencies.join(', ')}${d.inconsistentClass ? ' · classification mismatch' : ''}`"
           />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No duplicate road codes detected.' }}</div>
+        <EmptyState v-else :loading="loading" message="No duplicate road codes detected." icon="search" compact />
       </div>
     </div>
 
@@ -306,7 +310,7 @@
             :meta="`${s.agency_code ?? '-'} · Last surveyed ${s.last_evaluated_at ? fmtDate(s.last_evaluated_at) : 'never'}`"
           />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No stale survey records (>365d) detected.' }}</div>
+        <EmptyState v-else :loading="loading" message="No stale survey records (>365d) detected." icon="search" compact />
       </div>
     </div>
   </div>
@@ -317,14 +321,18 @@
       <table v-if="qualityChecks.missingGeometry.length">
         <thead><tr><th>Agency</th><th>Road Code</th><th>Road Name</th></tr></thead>
         <tbody>
-          <tr v-for="s in qualityChecks.missingGeometry.slice(0, 30)" :key="s.id">
+          <tr v-for="s in missingGeometryPageRows" :key="s.id">
             <td style="font-size:12px">{{ s.agency_code ?? '-' }}</td>
             <td style="font-family:monospace;font-size:12px">{{ s.road_code }}</td>
             <td style="font-size:12px">{{ s.road_name }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'All loaded segments are represented in the condition map.' }}</div>
+      <EmptyState v-else :loading="loading" message="All loaded segments are represented in the condition map." icon="search" compact />
+      <TablePagination
+        :page="missingGeometryPage" :total-pages="missingGeometryTotalPages" :total="missingGeometryTotal"
+        @prev="missingGeometryPrev" @next="missingGeometryNext"
+      />
     </div>
   </div>
 
@@ -349,7 +357,7 @@
               </td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No at-risk segments found.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No at-risk segments found.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -369,7 +377,7 @@
               <td style="font-size:12px;white-space:nowrap">{{ fmtDate(sig.last_status_change_at) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No signal faults reported.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="3" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No signal faults reported.' }}</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -378,8 +386,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Road Network Inventory')
-
 import { useInfrastructure, useGis, useAgencies } from '~/composables/api'
 import type { InfrastructureSummary, DeteriorationForecast, TrafficSignal, RoadSegment, Bridge, MaintenanceBudget } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -684,7 +690,7 @@ const surfaceTypes = computed(() => [...new Set(allAgencySample.value.map(s => s
 const tableSegments  = ref<RoadSegment[]>([])
 const tableTotal     = ref(0)
 const tablePage      = ref(1)
-const tablePageSize  = ref(50)
+const tablePageSize  = ref(15)
 const tableLoading   = ref(true)
 const tableTotalPages = computed(() => Math.max(1, Math.ceil(tableTotal.value / tablePageSize.value)))
 
@@ -770,6 +776,12 @@ const qualityChecks = computed(() => {
   return { duplicates, stale, missingGeometry }
 })
 
+// ── Table pagination (max 15 rows visible) ──────────────────────────────
+const {
+  pageRows: missingGeometryPageRows, page: missingGeometryPage, totalPages: missingGeometryTotalPages,
+  total: missingGeometryTotal, next: missingGeometryNext, prev: missingGeometryPrev,
+} = usePagination(computed(() => qualityChecks.value.missingGeometry), 15)
+
 // ── Map markers (only plotted when the API returns real coordinates) ────
 const segmentMarkers = computed((): MarkerSpec[] => {
   const raw = segments.value as any[]
@@ -824,8 +836,8 @@ function condBadge(cls: string) {
   return m[cls] ?? 'neutral'
 }
 function failColor(p: number | null | undefined) {
-  if (p == null) return '#94a3b8'
-  return p >= 0.7 ? '#ef4444' : p >= 0.4 ? '#f59e0b' : '#22c55e'
+  if (p == null) return 'var(--fg-3)'
+  return p >= 0.7 ? 'var(--danger-fg)' : p >= 0.4 ? 'var(--warning-fg)' : 'var(--success-fg)'
 }
 function sigBadge(s: string) {
   const m: Record<string,string> = { operational:'success', fault:'danger', degraded:'warning', maintenance:'warning', offline:'neutral' }
@@ -834,13 +846,12 @@ function sigBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.sample-caveat { margin:-8px 0 16px; font-size:11.5px; color:#94a3b8; }
-.dist-caveat { font-size:11px; color:#94a3b8; padding:0 14px 6px; margin-top:-4px; }
+.sample-caveat { margin:-8px 0 16px; font-size:11.5px; color:var(--fg-3); }
+.dist-caveat { font-size:11px; color:var(--fg-3); padding:0 14px 6px; margin-top:-4px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
-.agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
-.agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab:hover { border-color:var(--primary); color:var(--primary); }
+.agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
@@ -849,26 +860,25 @@ function sigBadge(s: string) {
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col-map, .two-col { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
-.map-note { font-size:11px; color:#94a3b8; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
+.map-note { font-size:11px; color:var(--fg-3); padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .right-col { display:flex; flex-direction:column; gap:0; overflow-y:auto; max-height:468px; }
 .dist-list { display:flex; flex-direction:column; gap:8px; }
 .dist-row { display:grid; grid-template-columns:90px 1fr 36px; align-items:center; gap:8px; }
 .dist-label { font-size:12px; text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.dist-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.dist-bar { height:100%; border-radius:4px; transition:width .4s; }
+.dist-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.dist-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .dist-val { font-size:11px; text-align:right; }
-.budget-row { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid #f8fafc; }
-.budget-bar-wrap { background:#f1f5f9; border-radius:4px; height:8px; overflow:hidden; }
-.budget-bar { height:100%; background:#3b82f6; border-radius:4px; }
+.budget-row { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--border-subtle); }
+.budget-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:8px; overflow:hidden; }
+.budget-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.pagination { display:flex; justify-content:center; align-items:center; gap:16px; padding-top:12px; border-top:1px solid #f1f5f9; margin-top:8px; }
-.page-info { font-size:12.5px; color:#64748b; white-space:nowrap; }
+.pagination { display:flex; justify-content:center; align-items:center; gap:16px; padding-top:12px; border-top:1px solid var(--border-subtle); margin-top:8px; }
+.page-info { font-size:12.5px; color:var(--fg-2); white-space:nowrap; }
 .scroll-body { max-height:320px; overflow-y:auto; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }
 </style>

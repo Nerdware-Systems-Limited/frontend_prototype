@@ -14,36 +14,36 @@
 
   <!-- KPI strip (computed from the loaded registry - real fields only) -->
   <div class="kpi-grid">
-    <KpiCard label="Inspections (loaded)" :value="fmtNum(inspections.length)" sub="Most recent records" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Passed" :value="fmtNum(countByResult('pass'))" sub="Roadworthy" trend-direction="up" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Failed" :value="fmtNum(countByResult('fail'))" sub="Not roadworthy" trend-direction="down" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Conditional Pass" :value="fmtNum(countByResult('conditional_pass'))" sub="Passed with conditions" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Pass Rate" :value="passRate != null ? `${passRate.toFixed(1)}%` : '-'" sub="Pass / (pass + fail)" :trend-direction="(passRate ?? 0) >= 80 ? 'up' : 'down'" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Re-inspections" :value="fmtNum(reinspectionCount)" sub="Follow-up records" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Overdue" :value="fmtNum(overdueCount)" sub="Next inspection due date passed" trend-direction="down" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Due ≤30d" :value="fmtNum(dueSoonCount)" sub="Next inspection approaching" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Active Centres" :value="fmtNum(byCentre.length)" sub="Distinct inspection centres" source="live" source-title="NTSA Fleet Inspections" />
-    <KpiCard label="Active Inspectors" :value="fmtNum(byInspector.length)" sub="Distinct inspectors on file" source="live" source-title="NTSA Fleet Inspections" />
+    <KpiCard label="Inspections (loaded)" :value="fmtNum(inspections.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Most recent records" to="#inspection-registry" />
+    <KpiCard label="Passed" :value="fmtNum(countByResult('pass'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Roadworthy" />
+    <KpiCard label="Failed" :value="fmtNum(countByResult('fail'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Not roadworthy" />
+    <KpiCard label="Conditional Pass" :value="fmtNum(countByResult('conditional_pass'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Passed with conditions" />
+    <KpiCard label="Pass Rate" :value="passRate != null ? `${passRate.toFixed(1)}%` : '-'" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Pass / (pass + fail)" :status="passRate == null ? undefined : passRate >= 80 ? 'healthy' : 'warning'" />
+    <KpiCard label="Re-inspections" :value="fmtNum(reinspectionCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Follow-up records" />
+    <KpiCard label="Overdue" :value="fmtNum(overdueCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Next inspection due date passed" to="#overdue-queue" />
+    <KpiCard label="Due ≤30d" :value="fmtNum(dueSoonCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="30D" description="Next inspection approaching" />
+    <KpiCard label="Active Centres" :value="fmtNum(byCentre.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Distinct inspection centres" to="#inspections-by-centre" />
+    <KpiCard label="Active Inspectors" :value="fmtNum(byInspector.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Distinct inspectors on file" />
   </div>
 
   <!-- Analytics -->
   <SectionTitle pill="Computed · Rolling">Inspections by Centre</SectionTitle>
-  <div class="card">
+  <div id="inspections-by-centre" class="card drill-target">
     <div class="card-body">
       <div v-if="byCentre.length" class="bar-list bar-list-wide">
         <div v-for="c in byCentre" :key="c.centre" class="bar-row bar-row-wide">
           <span class="bar-label">{{ c.centre }}</span>
-          <div class="bar-wrap"><div class="bar-fill" :style="{ width: `${maxCentre > 0 ? (c.count / maxCentre) * 100 : 0}%` }" /></div>
+          <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxCentre > 0 ? c.count / maxCentre : 0})` }" /></div>
           <span class="bar-val">{{ c.count }} · {{ c.passRate.toFixed(0) }}% pass</span>
         </div>
       </div>
-      <div v-else style="font-size:13px;color:#94a3b8">{{ loading ? 'Loading…' : 'No inspection records.' }}</div>
+      <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No inspection records.' }}</div>
     </div>
   </div>
 
   <!-- Overdue queue -->
   <SectionTitle pill="Computed · Rolling">Overdue Inspections</SectionTitle>
-  <div class="card">
+  <div id="overdue-queue" class="card drill-target">
     <div class="card-body">
       <div v-if="overdue.length">
         <AlertItem
@@ -53,13 +53,13 @@
           :meta="`Due ${fmtDate(i.next_inspection_due)} · Last result ${i.result} · ${i.inspection_centre}`"
         />
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No overdue inspections in the loaded registry.' }}</div>
+      <EmptyState v-else :loading="loading" message="No overdue inspections in the loaded registry." icon="search" compact />
     </div>
   </div>
 
   <!-- Registry -->
   <SectionTitle pill="NTSA Fleet Inspections · Rolling">Inspection Registry</SectionTitle>
-  <div class="card">
+  <div id="inspection-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search plate / centre / inspector…" style="min-width:200px" @keyup.enter="load" />
@@ -94,7 +94,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredInspections.length">
-            <template v-for="i in filteredInspections" :key="i.id">
+            <template v-for="i in inspectionsPageRows" :key="i.id">
               <tr class="insp-row" @click="toggleExpand(i)">
                 <td class="expand-cell">{{ expandedId === i.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:700;font-family:monospace">{{ i.plate_number }}</td>
@@ -104,12 +104,12 @@
                 <td><BadgePill :variant="resultBadge(i.result)">{{ i.result.replace(/_/g,' ') }}</BadgePill></td>
                 <td style="font-family:monospace;font-size:11px">{{ i.sticker_no || '-' }}</td>
                 <td style="font-size:11px">
-                  <span :style="{ color: isOverdue(i.next_inspection_due) ? '#ef4444' : 'inherit' }">{{ fmtDate(i.next_inspection_due) }}</span>
+                  <span :style="{ color: isOverdue(i.next_inspection_due) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(i.next_inspection_due) }}</span>
                 </td>
                 <td style="text-align:center">{{ i.is_reinspection ? '✓' : '-' }}</td>
                 <td>
                   <a v-if="i.report_url" :href="i.report_url" target="_blank" rel="noopener" class="link-sm" @click.stop>View →</a>
-                  <span v-else style="color:#94a3b8;font-size:11px">-</span>
+                  <span v-else style="color:var(--fg-3);font-size:11px">-</span>
                 </td>
               </tr>
               <tr v-if="expandedId === i.id" class="insp-detail-row">
@@ -128,12 +128,16 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ loading ? 'Loading inspections…' : 'No inspection records match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="inspectionsPage" :total-pages="inspectionsTotalPages" :total="inspectionsTotal"
+          @prev="inspectionsPrev" @next="inspectionsNext"
+        />
       </div>
     </div>
   </div>
@@ -141,8 +145,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Vehicle Inspections')
-
 import { useVehicleInspections } from '~/composables/api'
 import type { VehicleInspection } from '~/composables/api'
 
@@ -208,6 +210,12 @@ const filteredInspections = computed(() => inspections.value.filter(i => {
   return true
 }))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: inspectionsPageRows, page: inspectionsPage, totalPages: inspectionsTotalPages,
+  total: inspectionsTotal, next: inspectionsNext, prev: inspectionsPrev,
+} = usePagination(filteredInspections, 15)
+
 // ── KPIs / analytics (all computed client-side from real loaded records) ─
 function countByResult(r: string) { return inspections.value.filter(i => i.result === r).length }
 const reinspectionCount = computed(() => inspections.value.filter(i => i.is_reinspection).length)
@@ -266,17 +274,15 @@ function resultBadge(r: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
 .table-scroll { overflow-x:auto; }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:140px 1fr 90px; align-items:center; gap:8px; }
 .bar-label { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.bar-fill { height:100%; background:#3b82f6; border-radius:4px; transition:width .4s; }
+.bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.bar-fill { height:100%; width:100%; background:var(--primary-fill); border-radius:4px; transform-origin:left; transition:transform .4s; }
 .bar-val { font-size:11px; text-align:right; }
 .bar-list-wide { gap:12px; }
 .bar-row-wide { grid-template-columns:240px 1fr 130px; gap:14px; }
@@ -284,11 +290,11 @@ function resultBadge(r: string) {
 .bar-row-wide .bar-wrap { height:16px; }
 .bar-row-wide .bar-val { font-size:12.5px; font-weight:600; }
 .insp-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.insp-detail-row td { background:#fafbfc; padding:12px 18px; border-bottom:1px solid #f1f5f9; }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:8px; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.insp-detail-row td { background:var(--surface-1); padding:12px 18px; border-bottom:1px solid var(--border-subtle); }
+.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
 .dd-list { display:flex; flex-direction:column; gap:6px; }
 .dd-item { display:flex; align-items:center; gap:8px; font-size:12px; }
-.dd-empty { font-size:12px; color:#94a3b8; }
-.link-sm { font-size:11px; color:#3b82f6; text-decoration:none; }
+.dd-empty { font-size:12px; color:var(--fg-3); }
+.link-sm { font-size:11px; color:var(--link); text-decoration:none; }
 </style>

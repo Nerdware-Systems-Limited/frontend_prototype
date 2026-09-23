@@ -12,6 +12,7 @@
     <main class="main-content animate-fade-in">
       <slot />
     </main>
+    <BackToTop />
   </div>
 </template>
 

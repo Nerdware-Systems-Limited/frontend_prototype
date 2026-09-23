@@ -4,13 +4,14 @@
 //   - Polyfills `process.client` so the auth store works (it gates
 //     localStorage reads behind this flag).
 //   - Polyfills Nuxt's auto-imported composables (`ref`, `computed`,
-//     `useRuntimeConfig`, `useNuxtApp`, `useState`) so production
-//     source code can be imported unchanged in tests.
+//     `reactive`, `onMounted`, `useRuntimeConfig`, `useNuxtApp`,
+//     `useState`) so production source code can be imported unchanged
+//     in tests.
 //   - Clears localStorage / sessionStorage between tests so auth state
 //     doesn't leak across runs.
 // ─────────────────────────────────────────────────────────────────────
 
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 
 // Provide the runtime flag the auth store guards on. In Nuxt, `process.client`
 // is set to true in the browser bundle; we replicate that here for happy-dom.
@@ -26,6 +27,7 @@ import { ref, computed, reactive } from 'vue'
 ;(globalThis as any).ref = ref
 ;(globalThis as any).computed = computed
 ;(globalThis as any).reactive = reactive
+;(globalThis as any).onMounted = onMounted
 ;(globalThis as any).useRuntimeConfig = () => ({
   public: {
     apiBase: process.env.UAPTS_API_BASE ?? 'http://test.local:8000',
@@ -36,6 +38,11 @@ import { ref, computed, reactive } from 'vue'
 ;(globalThis as any).useState = <T>(_k: string, init: () => T): { value: T } => {
   return { value: init() } as any
 }
+// `definePageMeta` is a Nuxt compiler macro (compiled away at build time,
+// so it has no runtime implementation to import) - any page component
+// imported directly in a test needs it polyfilled to a no-op, same as
+// every other auto-import above.
+;(globalThis as any).definePageMeta = () => {}
 
 import { afterEach } from 'vitest'
 

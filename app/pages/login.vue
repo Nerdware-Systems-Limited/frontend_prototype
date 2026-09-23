@@ -22,12 +22,12 @@
       <template v-if="step === 'login'">
         <div class="form-heading">
           <h1 class="heading-main">Sign in to UAPTS</h1>
-          <p class="heading-sub">Use your email address to sign in.</p>
+          <p class="heading-sub">Use your email address or username to sign in.</p>
         </div>
 
         <form class="auth-form" @submit.prevent="handleLogin" novalidate>
           <div class="field-group">
-            <label class="field-label" for="uapts-email">Email address</label>
+            <label class="field-label" for="uapts-email">Email or username</label>
             <div class="field-input-wrap">
               <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -38,7 +38,7 @@
                 v-model="email"
                 type="text"
                 class="field-input has-icon"
-                placeholder="officer@transport.go.ke"
+                placeholder="officer@transport.go.ke or username"
                 autocomplete="username"
                 required
               />
@@ -48,7 +48,7 @@
           <div class="field-group">
             <div class="field-label-row">
               <label class="field-label" for="uapts-pwd">Password</label>
-              <a href="#" class="forgot-link">Forgot Password</a>
+              <NuxtLink to="/forgot-password" class="forgot-link">Forgot Password</NuxtLink>
             </div>
             <div class="field-input-wrap">
               <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -115,7 +115,9 @@
           </button>
           <p class="eyebrow">Step 2 of 2</p>
           <h1 class="heading-main">Two-factor verification</h1>
-          <p class="heading-sub">A 6-digit code has been sent to your registered authenticator app.</p>
+          <p class="heading-sub">
+            A 6-digit code has been sent to your registered {{ mfaChannel === 'sms' ? 'phone number' : 'email address' }}.
+          </p>
         </div>
 
         <div class="mfa-icon-ring" aria-hidden="true">
@@ -169,17 +171,16 @@
               <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
             </svg>
           </button>
-
-          <div class="skip-block">
-            <div class="or-divider"><span></span><em>or</em><span></span></div>
-            <button type="button" class="skip-btn" @click="skipMFA">Skip 2FA for now</button>
-            <p class="skip-note">Development mode · 2FA enforcement is disabled</p>
-          </div>
         </form>
 
         <div class="resend-row">
-          <span class="resend-text">Didn't receive a code?</span>
-          <button type="button" class="resend-link" @click="resendCode">Resend code</button>
+          <span v-if="resendNotice" class="resend-text">{{ resendNotice }}</span>
+          <template v-else>
+            <span class="resend-text">Didn't receive a code?</span>
+            <button type="button" class="resend-link" :disabled="isResending" @click="resendCode">
+              {{ isResending ? 'Sending…' : 'Resend code' }}
+            </button>
+          </template>
         </div>
       </template>
     </div>
@@ -243,29 +244,54 @@ const email = ref('')
 const password = ref('')
 const showPwd = ref(false)
 const rememberMe = ref(false)
-const { login, isLoading } = useAuth()
+const { login, mfaVerify, mfaResend, isLoading } = useAuth()
 const loginError = ref('')
 const mfaError = ref('')
+const isResending = ref(false)
+const resendNotice = ref('')
 const highContrast = ref(false)
 const grayscale = ref(false)
 const fontSize = ref(0)
 const fontSizes = ['14px', '15px', '16px', '18px']
 
+// Set once /auth/login/ returns an MFA challenge; mfaVerify()/resend need
+// otpId to know which pending code they're answering.
+const otpId = ref('')
+const mfaChannel = ref<'email' | 'sms'>('email')
+
 const otpDigits = ref(['','','','','',''])
 const otpRefs = ref<HTMLInputElement[]>([])
 const otpCode = computed(() => otpDigits.value.join(''))
 
+function otpErrorMessage(err: unknown): string {
+  const status = (err as { status?: number })?.status
+  const detail = (err as { data?: { detail?: string } })?.data?.detail
+  if (status === 404) return 'This code has expired. Request a new one.'
+  if (detail) return detail
+  if (status === 429) return 'Too many attempts. Please wait and try again.'
+  return 'Unable to reach the server. Check your connection.'
+}
+
 async function handleLogin() {
   loginError.value = ''
   if (!email.value.trim() || !password.value) {
-    loginError.value = 'Please enter your email and password.'
+    loginError.value = 'Please enter your email or username, and password.'
     return
   }
   try {
-    await login(email.value.trim(), password.value, rememberMe.value)
+    const result = await login(email.value.trim(), password.value, rememberMe.value)
+    if (result?.mfaRequired) {
+      otpId.value = result.otpId
+      mfaChannel.value = result.channel
+      otpDigits.value = ['', '', '', '', '', '']
+      step.value = 'mfa'
+      nextTick(() => otpRefs.value[0]?.focus())
+    }
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status
-    if (status === 401) loginError.value = 'Invalid email or password.'
+    // dj-rest-auth's LoginSerializer returns 400 (not 401) for bad
+    // credentials - handle both in case that ever changes upstream.
+    if (status === 400 || status === 401) loginError.value = 'Invalid email/username or password.'
     else if (status === 429) loginError.value = 'Too many attempts. Please wait and try again.'
     else loginError.value = 'Unable to reach the server. Check your connection.'
   }
@@ -273,16 +299,31 @@ async function handleLogin() {
 
 async function handleMFA() {
   mfaError.value = ''
-  await new Promise(r => setTimeout(r, 700))
-  navigateTo('/dashboard')
+  if (otpCode.value.length < 6) return
+  try {
+    await mfaVerify(otpId.value, otpCode.value)
+  } catch (err: unknown) {
+    mfaError.value = otpErrorMessage(err)
+    otpDigits.value = ['', '', '', '', '', '']
+    nextTick(() => otpRefs.value[0]?.focus())
+  }
 }
 
-function skipMFA() {
-  navigateTo('/dashboard')
-}
-
-function resendCode() {
-  // TODO: call /api/v1/auth/mfa/otp/send/
+async function resendCode() {
+  isResending.value = true
+  mfaError.value = ''
+  try {
+    const res = await mfaResend(otpId.value)
+    otpId.value = res.otp_id
+    otpDigits.value = ['', '', '', '', '', '']
+    resendNotice.value = 'A new code is on its way.'
+    setTimeout(() => { resendNotice.value = '' }, 6000)
+    nextTick(() => otpRefs.value[0]?.focus())
+  } catch (err: unknown) {
+    mfaError.value = otpErrorMessage(err)
+  } finally {
+    isResending.value = false
+  }
 }
 
 function onOTPInput(idx: number) {
@@ -565,26 +606,9 @@ function onOTPPaste(e: ClipboardEvent) {
   box-shadow: 0 0 0 3px rgba(13, 76, 139, .18); outline: none;
 }
 
-/* ─── MFA: skip block ────────────────────────────────────── */
-.skip-block { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-.or-divider {
-  display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: 0.75rem;
-}
-.or-divider span { flex: 1; height: 1px; background: #e5e7eb; }
-.or-divider em { font-style: normal; }
-.skip-btn {
-  width: 100%; padding: 12px; border-radius: 6px;
-  background: #f9fafb; border: 1px solid #e5e7eb; color: #374151;
-  font-size: 0.875rem; font-weight: 600; font-family: inherit; cursor: pointer;
-  transition: background .15s, border-color .15s;
-}
-.skip-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
-.skip-btn:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
-.skip-note { font-size: 0.75rem; color: #9ca3af; text-align: center; }
-
 /* ─── MFA: resend row ────────────────────────────────────── */
 .resend-row {
-  display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px;
 }
 .resend-text { font-size: 0.8125rem; color: #6b7280; }
 .resend-link {
@@ -592,7 +616,8 @@ function onOTPPaste(e: ClipboardEvent) {
   font-size: 0.8125rem; font-weight: 600; color: var(--brand);
   font-family: inherit; cursor: pointer; border-radius: 4px; transition: color .12s;
 }
-.resend-link:hover { color: var(--brand-dark); text-decoration: underline; }
+.resend-link:hover:not(:disabled) { color: var(--brand-dark); text-decoration: underline; }
+.resend-link:disabled { color: #9ca3af; cursor: not-allowed; }
 .resend-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
 
 /* ─── Footer ─────────────────────────────────────────────── */
@@ -636,7 +661,7 @@ function onOTPPaste(e: ClipboardEvent) {
 .hero-panel {
   flex: 1; height: 100vh;
   /* Multimodal transport photograph, served locally from /public
-     (public/hero-multimodal.webp) — road, rail, maritime and air
+     (public/hero-multimodal.webp) - road, rail, maritime and air
      side by side in one aerial frame. Hotlinking a stock CDN was
      removed deliberately: it leaks traffic off-network and breaks
      on restricted deployments. */

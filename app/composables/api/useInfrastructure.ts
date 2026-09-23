@@ -33,13 +33,13 @@ export type ProjectStatus =
 export type StreetlightStatus =
   | 'operational' | 'faulty' | 'damaged' | 'missing' | 'under_installation'
 export type LampType = 'led' | 'sodium' | 'halogen' | 'solar'
-// TrafficSignal.STATUS_CHOICES — note real value is 'fault', not 'faulty'.
+// TrafficSignal.STATUS_CHOICES - note real value is 'fault', not 'faulty'.
 export type TrafficSignalStatus = 'operational' | 'degraded' | 'fault' | 'offline' | 'maintenance'
 export type TrafficSignalMode = 'fixed_time' | 'actuated' | 'adaptive' | 'manual' | 'flashing'
 // Bridge.BRIDGE_TYPE_CHOICES.
 export type BridgeType =
   | 'beam' | 'arch' | 'suspension' | 'truss' | 'culvert' | 'bailey' | 'box_culvert'
-// WIMReading.VERDICT_CHOICES — there is no 'underloaded' verdict on this backend.
+// WIMReading.VERDICT_CHOICES - there is no 'underloaded' verdict on this backend.
 export type WIMVerdict = 'compliant' | 'overloaded' | 'gross_overload'
 
 // ── Shapes ──────────────────────────────────────────────────────────
@@ -351,7 +351,7 @@ export interface InfrastructureSummary {
 }
 
 // The `condition-map` action is a custom @action rollup, not the standard
-// paginated list — it returns a bare `{count, results}` (no next/previous/
+// paginated list - it returns a bare `{count, results}` (no next/previous/
 // page/page_size), and each row is a purpose-built subset of RoadSegment
 // fields plus a computed lat/lon centroid, not a full RoadSegment.
 export interface RoadSegmentMapPoint {

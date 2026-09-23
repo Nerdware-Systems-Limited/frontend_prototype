@@ -14,12 +14,38 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Cohorts" :value="fmtNum(cohorts.length)" sub="This page" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Ongoing" :value="fmtNum(byStatus('ongoing'))" sub="Currently running" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Scheduled" :value="fmtNum(byStatus('scheduled'))" sub="Not yet started" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Completed" :value="fmtNum(byStatus('completed'))" sub="Closed cohorts" source="batch" source-title="UAPTS Training API" />
-    <KpiCard label="Total Enrolled" :value="fmtNum(totalEnrolled)" sub="Across all cohorts" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Avg Fill Rate" :value="avgFillRate ? avgFillRate.toFixed(0) + '%' : '-'" sub="Capacity utilisation" :trend-direction="avgFillRate >= 70 ? 'up' : 'down'" source="live" source-title="UAPTS Training API" />
+    <KpiCard
+      label="Total Cohorts" :value="fmtNum(cohorts.length)"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="This page" to="#cohorts-table"
+    />
+    <KpiCard
+      label="Ongoing" :value="fmtNum(byStatus('ongoing'))"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Currently running" to="#cohorts-table"
+    />
+    <KpiCard
+      label="Scheduled" :value="fmtNum(byStatus('scheduled'))"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Not yet started" to="#cohorts-table"
+    />
+    <KpiCard
+      label="Completed" :value="fmtNum(byStatus('completed'))"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Closed cohorts" to="#cohorts-table"
+    />
+    <KpiCard
+      label="Total Enrolled" :value="fmtNum(totalEnrolled)"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Across all cohorts" to="#cohorts-table"
+    />
+    <KpiCard
+      label="Avg Fill Rate" :value="avgFillRate ? avgFillRate.toFixed(0) + '%' : '-'"
+      :unavailable="loading || cohortsError" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Capacity utilisation"
+      :status="loading || cohortsError ? undefined : avgFillRate >= 70 ? 'healthy' : 'warning'"
+      to="#cohorts-table"
+    />
   </div>
 
   <!-- Filters -->
@@ -38,7 +64,7 @@
 
   <!-- Cohort table -->
   <SectionTitle>Cohorts</SectionTitle>
-  <div class="card">
+  <div id="cohorts-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -57,7 +83,7 @@
           </tr>
         </thead>
         <tbody v-if="filtered.length">
-          <tr v-for="h in filtered" :key="h.id">
+          <tr v-for="h in cohortsPageRows" :key="h.id">
             <td class="mono-cell">{{ h.cohort_code }}</td>
             <td class="name-cell">{{ h.course_detail?.name ?? '-' }}</td>
             <td class="dim-cell">{{ h.course_detail?.institute_name ?? '-' }}</td>
@@ -73,7 +99,7 @@
             <td>
               <div class="fill-wrap">
                 <div class="fill-track">
-                  <div class="fill-bar" :style="{ width: Math.min(h.fill_rate_pct ?? 0, 100) + '%', background: fillColor(h.fill_rate_pct ?? 0) }" />
+                  <div class="fill-bar" :style="{ transform: `scaleX(${Math.min(h.fill_rate_pct ?? 0, 100) / 100})`, background: fillColor(h.fill_rate_pct ?? 0) }" />
                 </div>
                 <span class="fill-label">{{ (h.fill_rate_pct ?? 0).toFixed(0) }}%</span>
               </div>
@@ -90,6 +116,10 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="cohortsPage" :total-pages="cohortsTotalPages" :total="cohortsTotal"
+        @prev="cohortsPrev" @next="cohortsNext"
+      />
     </div>
   </div>
 
@@ -111,7 +141,7 @@
           </tr>
         </thead>
         <tbody v-if="sessions.length">
-          <tr v-for="s in sessions" :key="s.id">
+          <tr v-for="s in sessionsPageRows" :key="s.id">
             <td class="mono-cell">{{ s.cohort_code }}</td>
             <td class="name-cell">{{ s.title || '-' }}</td>
             <td>
@@ -132,14 +162,16 @@
           <tr><td colspan="8" class="empty-row">{{ loading ? 'Loading sessions…' : 'No sessions found.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="sessionsPage" :total-pages="sessionsTotalPages" :total="sessionsTotal"
+        @prev="sessionsPrev" @next="sessionsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Training')
-
 import { useTraining } from '~/composables/api'
 import type { TrainingCohort, TrainingSession } from '~/composables/api'
 
@@ -147,6 +179,7 @@ const cohorts  = ref<TrainingCohort[]>([])
 const sessions = ref<TrainingSession[]>([])
 const loading  = ref(true)
 const error    = ref<string | null>(null)
+const cohortsError = ref(false)
 const search       = ref('')
 const statusFilter = ref('')
 
@@ -168,6 +201,8 @@ async function load() {
 
   if (hRes.status === 'fulfilled') cohorts.value  = (hRes.value as any).results ?? []
   if (sRes.status === 'fulfilled') sessions.value = (sRes.value as any).results ?? []
+
+  cohortsError.value = hRes.status === 'rejected'
 
   if (hRes.status === 'rejected' && sRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Training API.'
@@ -191,6 +226,17 @@ const filtered = computed(() => {
     return matchStatus && matchSearch
   })
 })
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: cohortsPageRows, page: cohortsPage, totalPages: cohortsTotalPages,
+  total: cohortsTotal, next: cohortsNext, prev: cohortsPrev,
+} = usePagination(filtered, 15)
+
+const {
+  pageRows: sessionsPageRows, page: sessionsPage, totalPages: sessionsTotalPages,
+  total: sessionsTotal, next: sessionsNext, prev: sessionsPrev,
+} = usePagination(sessions, 15)
 
 function byStatus(s: string) { return cohorts.value.filter(h => h.status === s).length }
 const totalEnrolled = computed(() => cohorts.value.reduce((sum, h) => sum + (h.enrolled_count ?? 0), 0))
@@ -219,9 +265,9 @@ function statusBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function fillColor(pct: number) {
-  if (pct >= 90) return '#22c55e'
-  if (pct >= 60) return '#f59e0b'
-  return '#ef4444'
+  if (pct >= 90) return 'var(--success)'
+  if (pct >= 60) return 'var(--warning)'
+  return 'var(--destructive)'
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -255,20 +301,19 @@ function sessionTypeBadge(t?: string | null) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.filter-input { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; min-width:180px; }
-.filter-select { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; cursor:pointer; }
-.loading-note { font-size:12px; color:#94a3b8; }
-.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; }
-.name-cell  { font-weight:500; color:#1e293b; }
-.num-bold   { font-weight:700; color:#1e293b; }
-.num-cell   { color:#374151; }
-.dim-cell   { font-size:12px; color:#64748b; white-space:nowrap; }
-.empty-row  { text-align:center; color:#94a3b8; font-size:13px; padding:24px; }
+.filter-input { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; min-width:180px; background:var(--surface-2); color:var(--fg-1); }
+.filter-select { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); color:var(--fg-1); cursor:pointer; }
+.loading-note { font-size:12px; color:var(--fg-3); }
+.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); white-space:nowrap; }
+.name-cell  { font-weight:500; color:var(--fg-1); }
+.num-bold   { font-weight:700; color:var(--fg-1); }
+.num-cell   { color:var(--fg-2); }
+.dim-cell   { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.empty-row  { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 .fill-wrap  { display:flex; align-items:center; gap:6px; min-width:110px; }
-.fill-track { background:#f1f5f9; border-radius:4px; height:6px; flex:1; overflow:hidden; }
-.fill-bar   { height:100%; border-radius:4px; transition:width .3s ease; }
-.fill-label { font-size:11px; color:#64748b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fill-track { background:var(--surface-sunken); border-radius:4px; height:6px; flex:1; overflow:hidden; }
+.fill-bar   { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .3s ease; }
+.fill-label { font-size:11px; color:var(--fg-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
 </style>

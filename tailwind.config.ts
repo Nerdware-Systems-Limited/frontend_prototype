@@ -65,12 +65,40 @@ export default {
         // Wireframe secondary accents
         'accent-purple': '#8b5cf6',
         'accent-cyan':   '#06b6d4',
+
+        // ── Instrument-panel tokens (mirrors theme.css :root additions) ──
+        surface: {
+          page:   '#E4E9F0',
+          1:      '#F8FAFC',
+          2:      '#FFFFFF',
+          sunken: '#DCE3EC',
+          quiet:  '#E7EDF5',
+        },
+        ink: {
+          1: '#16202B',
+          2: '#4A5A6E',
+          3: '#586778',
+        },
+        line: {
+          subtle:      '#D5DEE9',
+          interactive: '#7B8EA8',
+        },
+        'status-success': { fg: '#146C33', bg: 'rgba(20,108,51,.12)' },
+        'status-warning': { fg: '#8A5A00', bg: 'rgba(138,90,0,.12)' },
+        'status-danger':  { fg: '#B42318', bg: 'rgba(180,35,24,.12)' },
+        'status-info':    { fg: '#0D4C8B', bg: 'rgba(13,76,139,.10)' },
       },
       borderRadius: {
         sm: '4px',
         DEFAULT: '6px',
         md: '6px',
         lg: '8px',
+        // ── Instrument-panel radius scale (mirrors --r-* in theme.css) ──
+        xs:      '4px',
+        panel:   '8px',
+        card:    '12px',
+        surface: '16px',
+        full:    '999px',
       },
       boxShadow: {
         sm: '0 1px 2px rgba(15,23,42,.06)',
@@ -78,6 +106,20 @@ export default {
         md: '0 4px 10px rgba(15,23,42,.08)',
         lg: '0 10px 24px rgba(15,23,42,.10)',
         card: '0 1px 2px rgba(15,23,42,.06)',
+        // ── Instrument-panel elevation (mirrors --elev-* in theme.css) ──
+        'elev-1': '0 1px 2px rgba(22,32,43,.05), 0 1px 3px rgba(22,32,43,.04)',
+        'elev-2': '0 4px 10px rgba(22,32,43,.07), 0 2px 4px rgba(22,32,43,.05)',
+        'elev-3': '0 12px 28px rgba(22,32,43,.12), 0 4px 8px rgba(22,32,43,.06)',
+      },
+      transitionDuration: {
+        fast:  '120ms',
+        base:  '180ms',
+        slow:  '260ms',
+        panel: '320ms',
+      },
+      transitionTimingFunction: {
+        out:      'cubic-bezier(.2,.8,.3,1)',
+        standard: 'cubic-bezier(.4,0,.2,1)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

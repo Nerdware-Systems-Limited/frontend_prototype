@@ -14,15 +14,33 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Events Loaded" :value="fmtNum(events.length)" sub="Driver behaviour log" source="live" source-title="NTSA iTIMS" />
-    <KpiCard label="Critical Severity" :value="fmtNum(events.filter(e => e.severity === 'critical').length)" sub="Requires review" trend-direction="down" source="live" source-title="NTSA iTIMS" />
-    <KpiCard label="Vehicles Ranked" :value="fmtNum(utilization.length)" sub="Utilization leaderboard" source="batch" source-title="NTSA iTIMS" />
-    <KpiCard label="Avg Utilization" :value="avgUtilization != null ? `${avgUtilization.toFixed(1)}%` : '-'" sub="Across ranked vehicles" source="batch" source-title="NTSA iTIMS" />
+    <KpiCard
+      label="Events Loaded" :value="fmtNum(events.length)"
+      :unavailable="loading || eventsError" :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE" description="Driver behaviour log" to="#behaviour-events"
+    />
+    <KpiCard
+      label="Critical Severity" :value="fmtNum(events.filter(e => e.severity === 'critical').length)"
+      :unavailable="loading || eventsError" :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE" description="Requires review"
+      :status="loading || eventsError ? undefined : events.filter(e => e.severity === 'critical').length > 0 ? 'critical' : 'healthy'"
+      to="#behaviour-events"
+    />
+    <KpiCard
+      label="Vehicles Ranked" :value="fmtNum(utilization.length)"
+      :unavailable="loading || utilError" :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE" description="Utilization leaderboard" to="#utilization-leaderboard"
+    />
+    <KpiCard
+      label="Avg Utilization" :value="avgUtilization != null ? `${avgUtilization.toFixed(1)}%` : '-'"
+      :unavailable="loading || utilError" :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE" description="Across ranked vehicles" to="#utilization-leaderboard"
+    />
   </div>
 
   <!-- Driver behaviour events -->
   <SectionTitle pill="NTSA iTIMS · Live">Driver Behaviour Events</SectionTitle>
-  <div class="card">
+  <div id="behaviour-events" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="eventSearch" class="select-sm" placeholder="Search plate number…" style="min-width:180px" @change="load" />
@@ -60,7 +78,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredEvents.length">
-            <template v-for="ev in filteredEvents" :key="ev.id">
+            <template v-for="ev in eventsPageRows" :key="ev.id">
               <tr class="expand-row" @click="expandedEvent = expandedEvent === ev.id ? null : ev.id">
                 <td class="expand-cell">{{ expandedEvent === ev.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:600">{{ ev.plate_number }}</td>
@@ -82,15 +100,19 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No events match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No events match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="eventsPage" :total-pages="eventsTotalPages" :total="eventsTotal"
+          @prev="eventsPrev" @next="eventsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Utilization leaderboard -->
   <SectionTitle pill="NTSA iTIMS · Batch">Fleet Utilization Leaderboard</SectionTitle>
-  <div class="card">
+  <div id="utilization-leaderboard" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="utilSearch" class="select-sm" placeholder="Search plate / operator…" style="min-width:180px" />
@@ -113,13 +135,13 @@
             </tr>
           </thead>
           <tbody v-if="filteredUtilization.length">
-            <tr v-for="(u, i) in filteredUtilization" :key="u.id">
-              <td style="font-weight:700;color:#94a3b8">#{{ i + 1 }}</td>
+            <tr v-for="(u, i) in utilPageRows" :key="u.id">
+              <td style="font-weight:700;color:var(--fg-3)">#{{ i + 1 }}</td>
               <td style="font-weight:600">{{ u.plate_number }}</td>
               <td>{{ u.operator_name ?? '-' }}</td>
               <td>
                 <div class="util-bar-wrap">
-                  <div class="util-bar" :style="{ width: `${u.utilization_pct ?? 0}%`, background: utilColor(u.utilization_pct) }" />
+                  <div class="util-bar" :style="{ transform: `scaleX(${(u.utilization_pct ?? 0) / 100})`, background: utilColor(u.utilization_pct) }" />
                 </div>
                 <span style="font-size:12px">{{ u.utilization_pct != null ? `${u.utilization_pct.toFixed(1)}%` : '-' }}</span>
               </td>
@@ -129,8 +151,12 @@
               <td style="font-size:12px">{{ u.date }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No utilization data matches the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No utilization data matches the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="utilPage" :total-pages="utilTotalPages" :total="utilTotal"
+          @prev="utilPrev" @next="utilNext"
+        />
       </div>
     </div>
   </div>
@@ -138,8 +164,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Driver Behaviour & Utilization')
-
 import { useFleet } from '~/composables/api'
 import type { DriverBehaviorEvent, FleetUtilization } from '~/composables/api'
 
@@ -147,6 +171,8 @@ const events      = ref<DriverBehaviorEvent[]>([])
 const utilization = ref<FleetUtilization[]>([])
 const loading     = ref(true)
 const error       = ref<string | null>(null)
+const eventsError = ref(false)
+const utilError   = ref(false)
 
 const eventSearch     = ref('')
 const severityFilter  = ref('')
@@ -168,6 +194,9 @@ async function load() {
   if (evRes.status   === 'fulfilled') events.value      = (evRes.value as any).results ?? []
   if (utilRes.status === 'fulfilled') utilization.value = (utilRes.value as any).results ?? []
 
+  eventsError.value = evRes.status   === 'rejected'
+  utilError.value   = utilRes.status === 'rejected'
+
   if ([evRes, utilRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Fleet API.'
 
@@ -185,6 +214,11 @@ const filteredEvents = computed(() => events.value.filter(ev => {
   if (eventTypeFilter.value && ev.event_type !== eventTypeFilter.value) return false
   return true
 }))
+const {
+  pageRows: eventsPageRows, page: eventsPage, totalPages: eventsTotalPages,
+  total: eventsTotal, next: eventsNext, prev: eventsPrev,
+} = usePagination(filteredEvents, 15)
+
 const eventExportColumns = [
   { key: 'plate_number', label: 'Plate' },
   { key: 'event_type', label: 'Event Type' },
@@ -202,6 +236,11 @@ const filteredUtilization = computed(() => utilization.value.filter(u => {
   }
   return true
 }))
+const {
+  pageRows: utilPageRows, page: utilPage, totalPages: utilTotalPages,
+  total: utilTotal, next: utilNext, prev: utilPrev,
+} = usePagination(filteredUtilization, 15)
+
 const avgUtilization = computed(() => {
   const vals = utilization.value.filter(u => u.utilization_pct != null).map(u => u.utilization_pct as number)
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
@@ -225,28 +264,23 @@ function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
   catch { return iso }
 }
-function sevBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'success' }
-  return m[s] ?? 'neutral'
-}
+const { riskBadge: sevBadge } = useSeverityBadge()
 function utilColor(pct: number | null | undefined) {
-  if (pct == null) return '#94a3b8'
-  return pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
+  if (pct == null) return 'var(--border-strong)'
+  return pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--destructive)'
 }
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
-.util-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.util-bar { height:100%; border-radius:4px; transition:width .4s; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.util-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 </style>

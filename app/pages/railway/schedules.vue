@@ -5,9 +5,7 @@
     subtitle="KRC · NCTTCA - SGR &amp; MGR timetables, OTP, NCTTCA corridor punctuality benchmarks, and recent operation adherence"
   >
     <template #actions>
-      <div class="day-filter">
-        <button v-for="d in [7, 30, 90]" :key="d" class="btn" :class="{ 'btn-active': otpDays === d }" @click="otpDays = d; loadOtp()">{{ d }}d OTP</button>
-      </div>
+      <DayRangeToggle v-model="otpDays" :options="[7, 30, 90]" suffix="d OTP" @update:model-value="loadOtp" />
       <NuxtLink to="/railway/network-inventory" class="btn">Station / Route Performance →</NuxtLink>
     </template>
   </PageHeader>
@@ -15,9 +13,9 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- OTP visual panel -->
-  <div v-if="otp" class="otp-panel">
+  <div v-if="otp" id="otp-panel" class="otp-panel drill-target">
     <div class="otp-panel-pct">
-      <span class="otp-pct-num" :style="{ color: otp.on_time_pct >= 85 ? '#16a34a' : otp.on_time_pct >= 70 ? '#d97706' : '#dc2626' }">
+      <span class="otp-pct-num" :style="{ color: otp.on_time_pct >= 85 ? 'var(--success-fg)' : otp.on_time_pct >= 70 ? 'var(--warning-fg)' : 'var(--danger-fg)' }">
         {{ otp.on_time_pct.toFixed(1) }}%
       </span>
       <span class="otp-pct-label">On-Time ({{ otpDays }}d)</span>
@@ -25,8 +23,8 @@
     <div class="otp-panel-bar-col">
       <div class="otp-panel-bar-wrap">
         <div class="otp-panel-bar" :style="{
-          width: `${otp.on_time_pct}%`,
-          background: otp.on_time_pct >= 85 ? '#22c55e' : otp.on_time_pct >= 70 ? '#f59e0b' : '#ef4444'
+          transform: `scaleX(${otp.on_time_pct / 100})`,
+          background: otp.on_time_pct >= 85 ? 'var(--success)' : otp.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
         }" />
       </div>
       <div class="otp-panel-stats">
@@ -43,48 +41,64 @@
     <KpiCard
       label="On-Time Performance"
       :value="otp ? `${otp.on_time_pct.toFixed(1)}%` : '-'"
-      :sub="`${otpDays}d rolling period`"
-      :trend-direction="otp && otp.on_time_pct >= 85 ? 'up' : 'down'"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!otp"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      :period="`${otpDays}D`"
+      description="Rolling period"
+      :status="!otp ? undefined : otp.on_time_pct >= 85 ? 'healthy' : 'warning'"
+      to="#otp-panel"
     />
     <KpiCard
       label="Total Operations"
       :value="otp ? fmtNum(otp.total_operations) : '-'"
-      :sub="`${otpDays}d`"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!otp"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      :period="`${otpDays}D`"
+      to="#schedule-adherence"
     />
     <KpiCard
       label="Avg Delay"
       :value="otp ? `${otp.avg_delay_min.toFixed(0)} min` : '-'"
-      sub="Arrival delay average"
-      :trend-direction="otp && otp.avg_delay_min < 10 ? 'up' : 'down'"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!otp"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      :period="`${otpDays}D`"
+      description="Arrival delay average"
+      :status="!otp ? undefined : otp.avg_delay_min < 10 ? 'healthy' : 'warning'"
     />
     <KpiCard
       label="Delayed Operations"
       :value="otp ? fmtNum(otp.delayed) : '-'"
-      :sub="otp ? `${otp.cancellation_pct.toFixed(1)}% cancellation rate` : '-'"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!otp"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      :period="`${otpDays}D`"
+      :description="otp ? `${otp.cancellation_pct.toFixed(1)}% cancellation rate` : ''"
+      to="#schedule-adherence"
     />
     <KpiCard
       label="Cancelled"
       :value="otp ? fmtNum(otp.cancelled) : '-'"
-      sub="Service cancelled"
-      :trend-direction="otp && otp.cancelled === 0 ? 'up' : 'down'"
-      source="batch" source-title="KRC OCC"
+      :unavailable="!otp"
+      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
+      :period="`${otpDays}D`"
+      description="Service cancelled"
+      :status="!otp ? undefined : otp.cancelled === 0 ? 'healthy' : 'warning'"
+      to="#schedule-adherence"
     />
     <KpiCard
       label="Active Schedules"
       :value="fmtNum(schedules.filter(s => s.is_active).length)"
-      :sub="`of ${fmtNum(schedules.length)} total`"
-      source="batch" source-title="KRC"
+      :unavailable="loading || schedulesError"
+      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
+      period="LIVE"
+      :description="`of ${fmtNum(schedules.length)} total`"
+      to="#active-schedules-table"
     />
   </div>
 
   <!-- Schedule table -->
   <SectionTitle pill="KRC Timetables">Active Schedules</SectionTitle>
 
-  <div class="card">
+  <div id="active-schedules-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="networkFilter" class="select-sm">
@@ -132,7 +146,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredSchedules.length">
-          <template v-for="s in filteredSchedules.slice(0, 50)" :key="s.id">
+          <template v-for="s in schedulesPageRows" :key="s.id">
             <tr class="expand-row" @click="expanded = expanded === s.id ? null : s.id">
               <td class="expand-cell">{{ expanded === s.id ? '▾' : '▸' }}</td>
               <td style="font-family:monospace;font-weight:700">{{ s.train_number }}</td>
@@ -143,8 +157,8 @@
               </td>
               <td><BadgePill :variant="classBadge(s.service_class)">{{ s.service_class }}</BadgePill></td>
               <td style="font-size:12px;font-weight:600">{{ s.origin_code }} → {{ s.destination_code }}</td>
-              <td style="font-family:monospace;font-weight:700;color:#1e293b">{{ s.departure_time }}</td>
-              <td style="font-family:monospace;color:#64748b">{{ s.arrival_time }}</td>
+              <td style="font-family:monospace;font-weight:700;color:var(--fg-1)">{{ s.departure_time }}</td>
+              <td style="font-family:monospace;color:var(--fg-2)">{{ s.arrival_time }}</td>
               <td style="font-size:12px">{{ formatDuration(s.duration_minutes) }}</td>
               <td style="font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.days_of_week">{{ s.days_of_week }}</td>
               <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_economy_kes)) }}</td>
@@ -164,9 +178,13 @@
           </template>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading schedules…' : 'No schedules match filters.' }}</td></tr>
+          <tr><td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading schedules…' : 'No schedules match filters.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="schedulesPage" :total-pages="schedulesTotalPages" :total="schedulesTotal"
+        @prev="schedulesPrev" @next="schedulesNext"
+      />
     </div>
   </div>
 
@@ -179,24 +197,28 @@
         <table>
           <thead><tr><th>Route</th><th>Bookings</th><th>No-Shows</th><th>No-Show Rate</th><th>Revenue (KES)</th></tr></thead>
           <tbody v-if="revenueByRoute.length">
-            <tr v-for="r in revenueByRoute" :key="`${r.origin}-${r.destination}`">
+            <tr v-for="r in revenuePageRows" :key="`${r.origin}-${r.destination}`">
               <td style="font-weight:600;font-size:12px">{{ r.origin }} → {{ r.destination }}</td>
               <td>{{ fmtNum(r.bookings) }}</td>
               <td>{{ fmtNum(r.noShows) }}</td>
-              <td :style="{ color: r.noShowRate > 10 ? '#ef4444' : '#22c55e' }">{{ r.noShowRate.toFixed(1) }}%</td>
+              <td :style="{ color: r.noShowRate > 10 ? 'var(--danger-fg)' : 'var(--success-fg)' }">{{ r.noShowRate.toFixed(1) }}%</td>
               <td style="font-size:12px">KES {{ fmtKES(r.revenue) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No ticketing data in the current view.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No ticketing data in the current view.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="revenuePage" :total-pages="revenueTotalPages" :total="revenueTotal"
+        @prev="revenuePrev" @next="revenueNext"
+      />
     </div>
   </div>
 
   <!-- Recent operations with adherence -->
   <SectionTitle pill="KRC OCC · Recent">Recent Operations - Schedule Adherence</SectionTitle>
 
-  <div class="card">
+  <div id="schedule-adherence" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -214,7 +236,7 @@
           </tr>
         </thead>
         <tbody v-if="recentOps.length">
-          <tr v-for="op in recentOps.slice(0, 30)" :key="op.id">
+          <tr v-for="op in recentOpsPageRows" :key="op.id">
             <td style="font-family:monospace;font-weight:700">{{ op.schedule_train_number }}</td>
             <td style="font-size:12px">{{ op.origin_code }} → {{ op.destination_code }}</td>
             <td style="font-size:12px;white-space:nowrap">{{ op.service_date }}</td>
@@ -224,12 +246,12 @@
             </td>
             <td style="font-size:11px;white-space:nowrap">{{ op.actual_departure ? fmtTime(op.actual_departure) : '-' }}</td>
             <td>
-              <span :style="{ color: op.delay_departure_min > 30 ? '#ef4444' : op.delay_departure_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600', fontSize:'12px' }">
+              <span :style="{ color: op.delay_departure_min > 30 ? 'var(--danger-fg)' : op.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
                 {{ op.delay_departure_min > 0 ? `+${op.delay_departure_min} min` : '✓' }}
               </span>
             </td>
             <td>
-              <span :style="{ color: op.delay_arrival_min > 30 ? '#ef4444' : op.delay_arrival_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600', fontSize:'12px' }">
+              <span :style="{ color: op.delay_arrival_min > 30 ? 'var(--danger-fg)' : op.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
                 {{ op.delay_arrival_min > 0 ? `+${op.delay_arrival_min} min` : '✓' }}
               </span>
             </td>
@@ -238,17 +260,19 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading operations…' : 'No recent operations.' }}</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading operations…' : 'No recent operations.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="recentOpsPage" :total-pages="recentOpsTotalPages" :total="recentOpsTotal"
+        @prev="recentOpsPrev" @next="recentOpsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Rail Schedules')
-
 import { useRailway } from '~/composables/api'
 import type { TrainSchedule, TrainOperation, OnTimeStats, RailTicket } from '~/composables/api'
 
@@ -258,6 +282,7 @@ const tickets    = ref<RailTicket[]>([])
 const otp        = ref<OnTimeStats | null>(null)
 const loading    = ref(true)
 const error      = ref<string | null>(null)
+const schedulesError = ref(false)
 const lastRefreshed  = ref('-')
 const otpDays        = ref(30)
 const networkFilter  = ref('')
@@ -283,6 +308,8 @@ async function load() {
   if (opRes.status  === 'fulfilled') recentOps.value = (opRes.value as any).results ?? []
   if (otpRes.status === 'fulfilled') otp.value       = otpRes.value
   if (ticketsRes.status === 'fulfilled') tickets.value = (ticketsRes.value as any).results ?? []
+
+  schedulesError.value = schRes.status === 'rejected'
 
   if ([schRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Railway API.'
@@ -312,6 +339,17 @@ const filteredSchedules = computed(() =>
     return true
   }),
 )
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: schedulesPageRows, page: schedulesPage, totalPages: schedulesTotalPages,
+  total: schedulesTotal, next: schedulesNext, prev: schedulesPrev,
+} = usePagination(filteredSchedules, 15)
+
+const {
+  pageRows: recentOpsPageRows, page: recentOpsPage, totalPages: recentOpsTotalPages,
+  total: recentOpsTotal, next: recentOpsNext, prev: recentOpsPrev,
+} = usePagination(recentOps, 15)
 
 const scheduleExportColumns = [
   { key: 'train_number', label: 'Train #' },
@@ -356,6 +394,11 @@ const revenueByRoute = computed(() => {
     .slice(0, 15)
 })
 
+const {
+  pageRows: revenuePageRows, page: revenuePage, totalPages: revenueTotalPages,
+  total: revenueTotal, next: revenueNext, prev: revenuePrev,
+} = usePagination(revenueByRoute, 15)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -386,43 +429,35 @@ function opBadge(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; color:#374151; }
-.select-sm:focus { outline:none; border-color:#3b82f6; }
-.checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; color:#374151; }
-.checkbox-label input[type="checkbox"] { width:14px; height:14px; accent-color:#3b82f6; cursor:pointer; }
+.checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; color:var(--fg-2); }
+.checkbox-label input[type="checkbox"] { width:14px; height:14px; accent-color:var(--primary-fill); cursor:pointer; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 
 /* ── OTP visual panel ── */
 .otp-panel {
   display: flex;
   align-items: center;
   gap: 24px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 16px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.05);
 }
 .otp-panel-pct { text-align:center; flex-shrink:0; }
 .otp-pct-num { font-size:44px; font-weight:800; line-height:1; letter-spacing:-0.03em; display:block; }
-.otp-pct-label { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; display:block; margin-top:2px; }
+.otp-pct-label { font-size:11px; color:var(--fg-3); text-transform:uppercase; letter-spacing:.06em; display:block; margin-top:2px; }
 .otp-panel-bar-col { flex:1; }
-.otp-panel-bar-wrap { background:#f1f5f9; border-radius:8px; height:14px; overflow:hidden; margin-bottom:10px; }
-.otp-panel-bar { height:100%; border-radius:8px; transition:width .6s ease; }
+.otp-panel-bar-wrap { background:var(--surface-sunken); border-radius:8px; height:14px; overflow:hidden; margin-bottom:10px; }
+.otp-panel-bar { height:100%; width:100%; border-radius:8px; transform-origin:left; transition:transform .6s ease; }
 .otp-panel-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .otp-stat-pill {
   display: flex;
@@ -433,8 +468,8 @@ function opBadge(s: string) {
   font-size: 12px;
   font-weight: 600;
 }
-.otp-ok     { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-.otp-delay  { background:#fefce8; color:#d97706; border:1px solid #fef08a; }
-.otp-cancel { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-.otp-info   { background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; }
+.otp-ok     { background:var(--success-bg); color:var(--success-fg); border:1px solid var(--success-fg); }
+.otp-delay  { background:var(--warning-bg); color:var(--warning-fg); border:1px solid var(--warning-fg); }
+.otp-cancel { background:var(--danger-bg); color:var(--danger-fg); border:1px solid var(--danger-fg); }
+.otp-info   { background:var(--info-bg); color:var(--info-fg); border:1px solid var(--info-fg); }
 </style>

@@ -14,12 +14,40 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Completions" :value="fmtNum(completions.length)" sub="This page" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Pass + Distinction" :value="fmtNum(byOutcome('pass') + byOutcome('distinction'))" sub="Successful completions" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Fail" :value="fmtNum(byOutcome('fail'))" sub="Failed assessments" :trend-direction="byOutcome('fail') === 0 ? 'up' : 'down'" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Certificates Valid" :value="fmtNum(validCerts)" sub="Currently valid" source="live" source-title="NTSA / KCAA / KMA" />
-    <KpiCard label="Certificates Expired" :value="fmtNum(expiredCerts)" sub="Renewal required" :trend-direction="expiredCerts === 0 ? 'up' : 'down'" source="live" source-title="NTSA / KCAA / KMA" />
-    <KpiCard label="Avg Score" :value="avgScore ? avgScore.toFixed(1) + '%' : '-'" sub="Final assessment score" source="batch" source-title="UAPTS Training API" />
+    <KpiCard
+      label="Total Completions" :value="fmtNum(completions.length)"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="This page" to="#certificate-register"
+    />
+    <KpiCard
+      label="Pass + Distinction" :value="fmtNum(byOutcome('pass') + byOutcome('distinction'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Successful completions" to="#certificate-register"
+    />
+    <KpiCard
+      label="Fail" :value="fmtNum(byOutcome('fail'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Failed assessments"
+      :status="loading || !!error ? undefined : byOutcome('fail') === 0 ? 'healthy' : 'warning'"
+      to="#certificate-register"
+    />
+    <KpiCard
+      label="Certificates Valid" :value="fmtNum(validCerts)"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA / KCAA / KMA feed unavailable'"
+      period="LIVE" description="Currently valid" to="#certificate-register"
+    />
+    <KpiCard
+      label="Certificates Expired" :value="fmtNum(expiredCerts)"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA / KCAA / KMA feed unavailable'"
+      period="LIVE" description="Renewal required"
+      :status="loading || !!error ? undefined : expiredCerts === 0 ? 'healthy' : 'warning'"
+      to="#certificate-register"
+    />
+    <KpiCard
+      label="Avg Score" :value="avgScore ? avgScore.toFixed(1) + '%' : '-'"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Final assessment score" to="#score-distribution"
+    />
   </div>
 
   <!-- Outcome breakdown chips -->
@@ -58,7 +86,7 @@
 
   <!-- Certificate register -->
   <SectionTitle>Certificate Register</SectionTitle>
-  <div class="card" style="margin-bottom:16px">
+  <div id="certificate-register" class="card drill-target" style="margin-bottom:16px">
     <div class="card-body">
       <table>
         <thead>
@@ -79,7 +107,7 @@
           </tr>
         </thead>
         <tbody v-if="filtered.length">
-          <tr v-for="c in filtered" :key="c.id">
+          <tr v-for="c in completionsPageRows" :key="c.id">
             <td class="mono-cell cert-no">{{ c.certificate_number || '-' }}</td>
             <td class="name-cell">{{ c.enrollment_detail?.full_name ?? '-' }}</td>
             <td class="mono-cell">{{ c.enrollment_detail?.national_id ?? '-' }}</td>
@@ -90,7 +118,7 @@
             <td>
               <div class="score-wrap" v-if="c.score_pct != null">
                 <div class="score-bar-bg">
-                  <div class="score-bar-fill" :style="{ width: c.score_pct + '%', background: scoreColor(c.score_pct) }" />
+                  <div class="score-bar-fill" :style="{ transform: `scaleX(${c.score_pct / 100})`, background: scoreColor(c.score_pct) }" />
                 </div>
                 <span class="score-text">{{ c.score_pct.toFixed(1) }}%</span>
               </div>
@@ -121,17 +149,21 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="completionsPage" :total-pages="completionsTotalPages" :total="completionsTotal"
+        @prev="completionsPrev" @next="completionsNext"
+      />
     </div>
   </div>
 
   <!-- Score distribution summary -->
   <SectionTitle pill="computed">Score Distribution</SectionTitle>
-  <div class="dist-grid">
+  <div id="score-distribution" class="dist-grid drill-target">
     <div class="dist-card" v-for="band in scoreBands" :key="band.label">
       <div class="dist-bar-wrap">
         <div
           class="dist-bar"
-          :style="{ height: bandHeight(band.count) + 'px', background: band.color }"
+          :style="{ transform: `scaleY(${bandHeight(band.count) / 80})`, background: band.color }"
         ></div>
       </div>
       <div class="dist-count">{{ band.count }}</div>
@@ -142,8 +174,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Training')
-
 import { useTraining } from '~/composables/api'
 import type { TrainingCompletion } from '~/composables/api'
 
@@ -192,6 +222,12 @@ const filtered = computed(() => {
     return true
   })
 })
+
+// ── Table pagination (max 15 rows visible per table) ────────────────────
+const {
+  pageRows: completionsPageRows, page: completionsPage, totalPages: completionsTotalPages,
+  total: completionsTotal, next: completionsNext, prev: completionsPrev,
+} = usePagination(filtered, 15)
 
 function byOutcome(o: string) { return completions.value.filter(c => c.outcome === o).length }
 const validCerts   = computed(() => completions.value.filter(c => c.is_certificate_valid).length)
@@ -265,44 +301,43 @@ function outcomeColor(o: string) {
   return m[o] ?? '#94a3b8'
 }
 function scoreColor(pct: number) {
-  if (pct >= 80) return '#22c55e'
-  if (pct >= 60) return '#f59e0b'
-  return '#ef4444'
+  if (pct >= 80) return 'var(--success)'
+  if (pct >= 60) return 'var(--warning)'
+  return 'var(--destructive)'
 }
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.filter-input { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; min-width:180px; }
-.filter-select { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; cursor:pointer; }
-.loading-note { font-size:12px; color:#94a3b8; }
-.result-count { font-size:12px; color:#64748b; margin-left:4px; }
+.filter-input { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; min-width:180px; background:var(--surface-2); color:var(--fg-1); }
+.filter-select { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); color:var(--fg-1); cursor:pointer; }
+.loading-note { font-size:12px; color:var(--fg-3); }
+.result-count { font-size:12px; color:var(--fg-2); margin-left:4px; }
 
 .outcome-row { display:flex; gap:8px; flex-wrap:wrap; }
 .outcome-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:4px 12px; border-radius:20px; border:1px solid; }
 .outcome-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
 
-.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; }
-.cert-no    { font-family:monospace; font-size:11px; color:#0369a1; font-weight:700; }
-.name-cell  { font-weight:500; color:#1e293b; }
-.dim-cell   { font-size:12px; color:#64748b; white-space:nowrap; }
-.empty-row  { text-align:center; color:#94a3b8; font-size:13px; padding:24px; }
-.expiry-warn { color:#b45309 !important; font-weight:600; }
+.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); white-space:nowrap; }
+.cert-no    { font-family:monospace; font-size:11px; color:var(--info-fg); font-weight:700; }
+.name-cell  { font-weight:500; color:var(--fg-1); }
+.dim-cell   { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.empty-row  { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
+.expiry-warn { color:var(--warning-fg) !important; font-weight:600; }
 
 .score-wrap { display:flex; align-items:center; gap:6px; min-width:90px; }
-.score-bar-bg { background:#f1f5f9; border-radius:3px; height:6px; flex:1; overflow:hidden; }
-.score-bar-fill { height:100%; border-radius:3px; transition:width .3s ease; }
-.score-text { font-size:11px; font-weight:600; color:#374151; white-space:nowrap; }
+.score-bar-bg { background:var(--surface-sunken); border-radius:3px; height:6px; flex:1; overflow:hidden; }
+.score-bar-fill { height:100%; width:100%; border-radius:3px; transform-origin:left; transition:transform .3s ease; }
+.score-text { font-size:11px; font-weight:600; color:var(--fg-2); white-space:nowrap; }
 
-.issuer-chip { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; white-space:nowrap; }
+.issuer-chip { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); border:1px solid color-mix(in srgb, var(--info-fg) 30%, transparent); white-space:nowrap; }
 
 /* Score distribution chart */
 .dist-grid { display:flex; gap:12px; align-items:flex-end; padding:12px 0; }
 .dist-card { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:56px; }
 .dist-bar-wrap { display:flex; align-items:flex-end; height:88px; }
-.dist-bar { width:36px; border-radius:4px 4px 0 0; transition:height .4s ease; min-height:4px; }
-.dist-count { font-size:13px; font-weight:700; color:#1e293b; }
-.dist-label { font-size:11px; color:#64748b; white-space:nowrap; }
+.dist-bar { width:36px; height:80px; transform-origin:bottom; border-radius:4px 4px 0 0; transition:transform .4s ease; }
+.dist-count { font-size:13px; font-weight:700; color:var(--fg-1); }
+.dist-label { font-size:11px; color:var(--fg-2); white-space:nowrap; }
 </style>

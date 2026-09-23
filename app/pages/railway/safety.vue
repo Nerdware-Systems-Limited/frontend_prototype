@@ -14,21 +14,21 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Open Incidents" :value="fmtNum(openIncidents.length)" sub="Investigating or unresolved" trend-direction="down" source="live" source-title="KRC Safety" />
-    <KpiCard label="Fatal / Serious" :value="fmtNum(countBySeverity('fatal') + countBySeverity('serious'))" :sub="`${countBySeverity('fatal')} fatal · ${countBySeverity('serious')} serious`" trend-direction="down" source="live" source-title="KRC Safety" />
-    <KpiCard label="Derailments" :value="fmtNum(countByType('derailment') + countByType('derailment_minor'))" sub="Incl. minor derailments" trend-direction="down" source="batch" source-title="KRC Safety" />
-    <KpiCard label="Collisions" :value="fmtNum(countByType('collision'))" sub="Rolling stock collisions" trend-direction="down" source="batch" source-title="KRC Safety" />
-    <KpiCard label="Level Crossing Incidents" :value="fmtNum(countByType('level_crossing'))" sub="At grade crossings" trend-direction="down" source="batch" source-title="KRC Safety" />
-    <KpiCard label="Signal Failures / SPAD" :value="fmtNum(countByType('signal_failure'))" sub="Signal-passed-at-danger events" trend-direction="down" source="batch" source-title="KRC Safety" />
-    <KpiCard label="Trespasser Incidents" :value="fmtNum(countByType('trespasser'))" sub="Unauthorized track access" trend-direction="down" source="batch" source-title="KRC Safety" />
-    <KpiCard label="Total Casualties" :value="fmtNum(totalCasualties)" sub="All incidents in view" trend-direction="down" source="live" source-title="KRC Safety" />
-    <KpiCard label="Days Since Last Serious Incident" :value="daysSinceSerious != null ? fmtNum(daysSinceSerious) : '-'" sub="Fatal or serious severity" :trend-direction="(daysSinceSerious ?? 0) >= 30 ? 'up' : 'down'" source="live" source-title="KRC Safety" />
-    <KpiCard label="Corrective Actions Overdue" :value="correctiveActions.length ? fmtNum(overdueActions.length) : '-'" sub="Past due date, not closed" trend-direction="down" source="batch" source-title="RSSB / KRC" />
+    <KpiCard label="Open Incidents" :value="fmtNum(openIncidents.length)" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Investigating or unresolved" :status="loading || incidentsError ? undefined : openIncidents.length > 0 ? 'warning' : 'healthy'" to="#incident-registry" />
+    <KpiCard label="Fatal / Serious" :value="fmtNum(countBySeverity('fatal') + countBySeverity('serious'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" :description="`${countBySeverity('fatal')} fatal · ${countBySeverity('serious')} serious`" :status="loading || incidentsError ? undefined : (countBySeverity('fatal') + countBySeverity('serious')) > 0 ? 'critical' : 'healthy'" to="#incident-registry" />
+    <KpiCard label="Derailments" :value="fmtNum(countByType('derailment') + countByType('derailment_minor'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Incl. minor derailments" to="#incident-registry" />
+    <KpiCard label="Collisions" :value="fmtNum(countByType('collision'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Rolling stock collisions" to="#incident-registry" />
+    <KpiCard label="Level Crossing Incidents" :value="fmtNum(countByType('level_crossing'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="At grade crossings" to="#incident-registry" />
+    <KpiCard label="Signal Failures / SPAD" :value="fmtNum(countByType('signal_failure'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Signal-passed-at-danger events" to="#incident-registry" />
+    <KpiCard label="Trespasser Incidents" :value="fmtNum(countByType('trespasser'))" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Unauthorized track access" to="#incident-registry" />
+    <KpiCard label="Total Casualties" :value="fmtNum(totalCasualties)" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="All incidents in view" to="#incident-registry" />
+    <KpiCard label="Days Since Last Serious Incident" :value="daysSinceSerious != null ? fmtNum(daysSinceSerious) : '-'" :unavailable="loading || incidentsError" :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'" period="LIVE" description="Fatal or serious severity" :status="loading || incidentsError || daysSinceSerious == null ? undefined : daysSinceSerious >= 30 ? 'healthy' : 'warning'" />
+    <KpiCard label="Corrective Actions Overdue" :value="correctiveActions.length ? fmtNum(overdueActions.length) : '-'" :unavailable="loading || actionsError" :unavailable-note="loading ? 'Loading…' : 'RSSB / KRC feed unavailable'" period="LIVE" description="Past due date, not closed" to="#compliance-corrective-action" />
   </div>
 
   <!-- Incident table -->
   <SectionTitle pill="KRC Safety Dept · Live">Incident Registry</SectionTitle>
-  <div class="card">
+  <div id="incident-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="typeFilter" class="select-sm">
@@ -67,7 +67,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredIncidents.length">
-            <tr v-for="i in filteredIncidents" :key="i.id">
+            <tr v-for="i in incidentsPageRows" :key="i.id">
               <td style="font-family:monospace;font-size:11px">{{ i.incident_ref }}</td>
               <td style="font-size:11px;white-space:nowrap">{{ fmtDateTime(i.occurred_at) }}</td>
               <td style="font-size:12px">{{ i.station_name ?? i.station_code ?? '-' }}</td>
@@ -80,9 +80,13 @@
               <td style="font-size:12px">{{ actionFor(i.incident_ref) ? actionFor(i.incident_ref)!.investigation_status.replace(/_/g,' ') : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading incidents…' : 'No incidents match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading incidents…' : 'No incidents match the current filters.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="incidentsPage" :total-pages="incidentsTotalPages" :total="incidentsTotal"
+        @prev="incidentsPrev" @next="incidentsNext"
+      />
       <div class="source-note">Incident core fields (type, severity, casualties, status) are live from KRC Safety reporting. Response owner and corrective-action status await the RSSB compliance-tracking integration; train/rolling-stock involvement and root cause are not yet captured upstream.</div>
     </div>
   </div>
@@ -95,7 +99,7 @@
         <table>
           <thead><tr><th>Crossing</th><th>Road</th><th>Line</th><th>Risk Rating</th><th>Protection</th><th>Near Misses</th><th>Daily Road Traffic</th><th>Daily Trains</th><th>Last Incident</th></tr></thead>
           <tbody v-if="levelCrossings.length">
-            <tr v-for="c in levelCrossings" :key="c.id">
+            <tr v-for="c in crossingsPageRows" :key="c.id">
               <td style="font-family:monospace;font-size:12px">{{ c.crossing_ref }}</td>
               <td style="font-size:12px">{{ c.road_name }}</td>
               <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
@@ -107,35 +111,43 @@
               <td style="font-size:11px">{{ c.last_incident_at ? fmtDate(c.last_incident_at) : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings on file.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings on file.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="crossingsPage" :total-pages="crossingsTotalPages" :total="crossingsTotal"
+        @prev="crossingsPrev" @next="crossingsNext"
+      />
     </div>
   </div>
 
   <!-- Compliance & corrective action -->
   <SectionTitle pill="RSSB · Pending Integration">Compliance &amp; Corrective Action</SectionTitle>
-  <div class="card">
+  <div id="compliance-corrective-action" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
           <thead><tr><th>Incident Ref</th><th>Investigation Status</th><th>Regulatory Reference</th><th>Action Owner</th><th>Due Date</th><th>Closure Evidence</th><th>Recurrence</th></tr></thead>
           <tbody v-if="correctiveActions.length">
-            <tr v-for="a in correctiveActions" :key="a.id">
+            <tr v-for="a in actionsPageRows" :key="a.id">
               <td style="font-family:monospace;font-size:11px">{{ a.incident_ref }}</td>
               <td><BadgePill :variant="investigationBadge(a.investigation_status)">{{ a.investigation_status.replace(/_/g,' ') }}</BadgePill></td>
               <td style="font-size:12px">{{ a.regulatory_reference ?? '-' }}</td>
               <td style="font-size:12px">{{ a.action_owner ?? '-' }}</td>
               <td style="font-size:11px">
-                <span :style="{ color: isOverdue(a) ? '#ef4444' : 'inherit' }">{{ fmtDate(a.due_date) }}</span>
+                <span :style="{ color: isOverdue(a) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(a.due_date) }}</span>
               </td>
               <td style="font-size:12px">{{ a.closure_evidence ?? '-' }}</td>
               <td style="text-align:center">{{ a.recurrence_flag ? '⚠' : '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Corrective-action tracking has not been integrated from RSSB yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Corrective-action tracking has not been integrated from RSSB yet.' }}</td></tr></tbody>
         </table>
       </div>
+      <TablePagination
+        :page="actionsPage" :total-pages="actionsTotalPages" :total="actionsTotal"
+        @prev="actionsPrev" @next="actionsNext"
+      />
     </div>
   </div>
 
@@ -160,11 +172,11 @@
         <div v-if="byType.length" class="bar-list">
           <div v-for="ty in byType" :key="ty.type" class="bar-row">
             <span class="bar-label">{{ ty.type.replace(/_/g,' ') }}</span>
-            <div class="bar-wrap"><div class="bar-fill" :style="{ width: `${maxByType > 0 ? (ty.count / maxByType) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxByType > 0 ? ty.count / maxByType : 0})` }" /></div>
             <span class="bar-val">{{ ty.count }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No incident data.' }}</div>
+        <EmptyState v-else :loading="loading" message="No incident data." compact />
       </div>
     </div>
   </div>
@@ -175,11 +187,11 @@
         <div v-if="highRiskLines.length" class="bar-list">
           <div v-for="l in highRiskLines" :key="l.line" class="bar-row">
             <span class="bar-label">{{ l.line }}</span>
-            <div class="bar-wrap"><div class="bar-fill" style="background:#ef4444" :style="{ width: `${maxLineRisk > 0 ? (l.count / maxLineRisk) * 100 : 0}%` }" /></div>
+            <div class="bar-wrap"><div class="bar-fill" :style="{ transform: `scaleX(${maxLineRisk > 0 ? l.count / maxLineRisk : 0})`, background: 'var(--destructive)' }" /></div>
             <span class="bar-val">{{ l.count }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No line-linked incidents recorded.' }}</div>
+        <EmptyState v-else :loading="loading" message="No line-linked incidents recorded." icon="search" compact />
       </div>
     </div>
     <div class="card">
@@ -188,7 +200,7 @@
         <div v-if="highRiskCrossings.length">
           <AlertItem v-for="c in highRiskCrossings" :key="c.id" :severity="c.risk_rating === 'critical' ? 'critical' : 'warning'" :title="c.road_name" :meta="`${c.near_miss_count} near-misses · ${c.protection_type.replace(/_/g,' ')}${c.last_incident_at ? ' · last incident ' + fmtDate(c.last_incident_at) : ''}`" />
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No high-risk crossings on file yet.' }}</div>
+        <EmptyState v-else :loading="loading" message="No high-risk crossings on file yet." icon="search" compact />
       </div>
     </div>
   </div>
@@ -198,25 +210,27 @@
       <table>
         <thead><tr><th>Line</th><th>Network</th><th>Risk Type</th><th>Risk Score</th><th>Contributing Factors</th><th>Generated</th></tr></thead>
         <tbody v-if="riskIndicators.length">
-          <tr v-for="r in riskIndicators" :key="r.id">
+          <tr v-for="r in riskPageRows" :key="r.id">
             <td style="font-weight:600;font-size:12px">{{ r.line_name ?? r.line }}</td>
             <td><BadgePill :variant="r.network === 'sgr' ? 'info' : 'success'">{{ r.network.toUpperCase() }}</BadgePill></td>
             <td style="font-size:12px">{{ r.risk_type.replace(/_/g,' ') }}</td>
-            <td :style="{ color: r.risk_score >= 70 ? '#ef4444' : r.risk_score >= 40 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">{{ r.risk_score.toFixed(0) }}</td>
+            <td :style="{ color: r.risk_score >= 70 ? 'var(--danger-fg)' : r.risk_score >= 40 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">{{ r.risk_score.toFixed(0) }}</td>
             <td style="font-size:12px">{{ (r.contributing_factors ?? []).join(', ') || '-' }}</td>
             <td style="font-size:11px">{{ fmtDate(r.generated_at) }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'ML-based derailment/signal risk scoring has not been integrated yet.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'ML-based derailment/signal risk scoring has not been integrated yet.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="riskPage" :total-pages="riskTotalPages" :total="riskTotal"
+        @prev="riskPrev" @next="riskNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Rail Safety')
-
 import { useRailway, useRailInfrastructure, useRailSafety } from '~/composables/api'
 import type { RailIncident, RailLine, LevelCrossing, CorrectiveAction, RailRiskIndicator, RailNetwork } from '~/composables/api'
 
@@ -227,6 +241,8 @@ const correctiveActions = ref<CorrectiveAction[]>([])
 const riskIndicators    = ref<RailRiskIndicator[]>([])
 const loading = ref(true)
 const error   = ref<string | null>(null)
+const incidentsError = ref(false)
+const actionsError   = ref(false)
 
 const typeFilter     = ref('')
 const severityFilter = ref('')
@@ -252,6 +268,9 @@ async function load() {
   if (crossRes.status  === 'fulfilled') levelCrossings.value    = (crossRes.value as any).results ?? []
   if (actionsRes.status === 'fulfilled') correctiveActions.value = (actionsRes.value as any).results ?? []
   if (riskRes.status   === 'fulfilled') riskIndicators.value    = (riskRes.value as any).results ?? []
+
+  incidentsError.value = incRes.status     === 'rejected'
+  actionsError.value   = actionsRes.status === 'rejected'
 
   if (incRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Railway API.'
@@ -287,6 +306,27 @@ const filteredIncidents = computed(() => incidents.value.filter(i => {
   if (statusFilter.value && i.status !== statusFilter.value) return false
   return true
 }))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: incidentsPageRows, page: incidentsPage, totalPages: incidentsTotalPages,
+  total: incidentsTotal, next: incidentsNext, prev: incidentsPrev,
+} = usePagination(filteredIncidents, 15)
+
+const {
+  pageRows: crossingsPageRows, page: crossingsPage, totalPages: crossingsTotalPages,
+  total: crossingsTotal, next: crossingsNext, prev: crossingsPrev,
+} = usePagination(levelCrossings, 15)
+
+const {
+  pageRows: actionsPageRows, page: actionsPage, totalPages: actionsTotalPages,
+  total: actionsTotal, next: actionsNext, prev: actionsPrev,
+} = usePagination(correctiveActions, 15)
+
+const {
+  pageRows: riskPageRows, page: riskPage, totalPages: riskTotalPages,
+  total: riskTotal, next: riskNext, prev: riskPrev,
+} = usePagination(riskIndicators, 15)
 
 // ── KPIs ─────────────────────────────────────────────────────────────────
 const openIncidents = computed(() => incidents.value.filter(i => i.status === 'open' || i.status === 'investigating'))
@@ -367,18 +407,16 @@ function investigationBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.source-note { margin-top:10px; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px; }
+.source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:140px 1fr 40px; align-items:center; gap:8px; }
 .bar-label { font-size:12px; text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.bar-fill { height:100%; background:#3b82f6; border-radius:4px; transition:width .4s; }
+.bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.bar-fill { height:100%; width:100%; background:var(--primary-fill); border-radius:4px; transform-origin:left; transition:transform .4s; }
 .bar-val { font-size:11px; text-align:right; }
 </style>

@@ -5,16 +5,7 @@
     subtitle="KeNHA · KURA · KMD - Volume trends, speed compliance, vehicle class breakdown, O-D matrix, and AI forecasts"
   >
     <template #actions>
-      
-      <div class="day-filter">
-        <button
-          v-for="d in [1, 7, 30]"
-          :key="d"
-          class="btn"
-          :class="{ 'btn-active': days === d }"
-          @click="days = d; load()"
-        >{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="days" :options="[1, 7, 30]" @update:model-value="load" />
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
@@ -26,50 +17,69 @@
     <KpiCard
       label="Total Volume"
       :value="summary ? fmtNum(summary.kpis.total_volume_24h) : '-'"
-      sub="Vehicles counted (24h)"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="24H"
+      description="Vehicles counted (24h)"
+      :series="volumeSeries"
+      to="#volume-trend"
     />
     <KpiCard
       label="Avg Network Speed"
       :value="summary?.kpis.avg_speed_24h_kmh != null ? `${summary.kpis.avg_speed_24h_kmh.toFixed(0)} km/h` : '-'"
-      sub="24-hour average"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="24H"
+      description="24-hour average"
+      :status="!summary?.kpis.avg_speed_24h_kmh ? undefined : summary.kpis.avg_speed_24h_kmh >= 40 ? 'healthy' : 'warning'"
+      :series="speedSeries"
     />
     <KpiCard
       label="Speed Compliance"
       :value="summary ? `${summary.speed_compliance.avg_compliance_pct.toFixed(1)}%` : '-'"
-      sub="Within posted limit"
-      :trend-direction="summary && summary.speed_compliance.avg_compliance_pct >= 80 ? 'up' : 'down'"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="24H"
+      description="Within posted limit"
+      :status="!summary ? undefined : summary.speed_compliance.avg_compliance_pct >= 80 ? 'healthy' : 'warning'"
+      to="#speed-compliance-table"
     />
     <KpiCard
       label="Top O-D Pair"
       :value="topPairs[0] ? `${topPairs[0].trips} trips` : '-'"
-      :sub="topPairs[0] ? `${topPairs[0].origin_zone} → ${topPairs[0].destination_zone}` : '-'"
-      source="batch" source-title="KeNHA OD Survey"
+      :unavailable="loading || odError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA OD Survey feed unavailable'"
+      :period="`${days}D`"
+      :description="topPairs[0] ? `${topPairs[0].origin_zone} → ${topPairs[0].destination_zone}` : ''"
+      to="#od-pairs-table"
     />
     <KpiCard
       label="Forecasts Available"
       :value="fmtNum(forecasts.length)"
-      sub="Predictive segments"
-      source="batch" source-title="AI Model"
+      :unavailable="loading || forecastError"
+      :unavailable-note="loading ? 'Loading…' : 'AI model feed unavailable'"
+      period="NEXT 24H"
+      description="Predictive segments"
+      to="#forecast-chart"
     />
     <KpiCard
       label="Speed Observations"
       :value="fmtNum(speedObs.length)"
-      sub="Stations reporting"
-      source="live" source-title="KeNHA ATC"
+      :unavailable="loading || speedError"
+      :unavailable-note="loading ? 'Loading…' : 'KeNHA ATC feed unavailable'"
+      period="LIVE"
+      description="Stations reporting"
+      to="#speed-compliance-table"
     />
   </div>
 
   <!-- Volume trend + vehicle class mix -->
   <div class="two-col">
-    <div class="card">
+    <div id="volume-trend" class="card drill-target">
       <div class="card-header">Volume Trend (24h)</div>
       <div class="card-body">
         <TrendLineChart
           :points="volumeChartPoints"
-          color="#3b82f6"
           :height="180"
           :format-value="v => fmtNum(v)"
           :empty-text="loading ? 'Loading…' : 'No volume data'"
@@ -84,15 +94,15 @@
           <div v-for="c in classData" :key="c.vehicle_class" class="class-row">
             <span class="class-label">{{ c.vehicle_class.replace(/_/g,' ') }}</span>
             <div class="class-bar-wrap">
-              <div class="class-bar" :style="{ width: `${c.share_pct}%`, background: classColor(c.vehicle_class) }" />
+              <div class="class-bar" :style="{ transform: `scaleX(${c.share_pct / 100})`, background: classColor(c.vehicle_class) }" />
             </div>
             <div class="class-nums">
               <span style="font-size:12px;font-weight:600">{{ c.share_pct.toFixed(1) }}%</span>
-              <span style="font-size:11px;color:#94a3b8">{{ fmtNum(c.total) }}</span>
+              <span style="font-size:11px;color:var(--fg-3)">{{ fmtNum(c.total) }}</span>
             </div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No class data' }}</div>
+        <EmptyState v-else :loading="loading" message="No class data" compact />
       </div>
     </div>
   </div>
@@ -100,7 +110,7 @@
   <!-- 24h forecast chart -->
   <SectionTitle pill="AI Model · KeNHA">24-Hour Traffic Forecast</SectionTitle>
 
-  <div class="card">
+  <div id="forecast-chart" class="card drill-target">
     <div class="card-body">
       <MultiLineChart
         :series="forecastSeries"
@@ -114,7 +124,7 @@
   <!-- Speed compliance per station -->
   <SectionTitle :pill="sourceLabel('kenha_traffic')">Speed Compliance by Station</SectionTitle>
 
-  <div class="card">
+  <div id="speed-compliance-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -129,7 +139,7 @@
           </tr>
         </thead>
         <tbody v-if="speedObs.length">
-          <tr v-for="s in speedObs" :key="s.id">
+          <tr v-for="s in speedObsPageRows" :key="s.id">
             <td style="font-family:monospace;font-size:12px;font-weight:600">{{ s.station_code ?? s.station }}</td>
             <td>{{ s.avg_speed_kmh.toFixed(0) }}</td>
             <td>{{ s.p85_speed_kmh != null ? s.p85_speed_kmh.toFixed(0) : '-' }}</td>
@@ -138,7 +148,7 @@
               <div class="comp-bar-wrap">
                 <div
                   class="comp-bar"
-                  :style="{ width: `${s.compliance_pct}%`, background: compColor(s.compliance_pct) }"
+                  :style="{ transform: `scaleX(${s.compliance_pct / 100})`, background: compColor(s.compliance_pct) }"
                 />
               </div>
               <span style="font-size:11px">{{ s.compliance_pct.toFixed(1) }}%</span>
@@ -149,19 +159,23 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading…' : 'No speed observations available.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="speedObsPage" :total-pages="speedObsTotalPages" :total="speedObsTotal"
+        @prev="speedObsPrev" @next="speedObsNext"
+      />
     </div>
   </div>
 
   <!-- Top O-D pairs -->
   <SectionTitle :pill="`KeNHA OD Survey · ${days}d`">Top Origin-Destination Pairs</SectionTitle>
 
-  <div class="card">
+  <div id="od-pairs-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -174,7 +188,7 @@
           </tr>
         </thead>
         <tbody v-if="topPairs.length">
-          <tr v-for="(p, i) in topPairs" :key="i">
+          <tr v-for="(p, i) in topPairsPageRows" :key="i">
             <td style="font-weight:600">{{ p.origin_zone }}</td>
             <td>{{ p.destination_zone }}</td>
             <td style="font-weight:700">{{ fmtNum(p.trips) }}</td>
@@ -183,8 +197,7 @@
               <div class="comp-bar-wrap">
                 <div
                   class="comp-bar"
-                  style="background:#3b82f6"
-                  :style="{ width: `${maxTrips > 0 ? (p.trips / maxTrips) * 100 : 0}%` }"
+                  :style="{ transform: `scaleX(${maxTrips > 0 ? p.trips / maxTrips : 0})`, background: 'var(--primary-fill)' }"
                 />
               </div>
             </td>
@@ -192,20 +205,22 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading O-D data…' : 'No O-D pairs available.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="topPairsPage" :total-pages="topPairsTotalPages" :total="topPairsTotal"
+        @prev="topPairsPrev" @next="topPairsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Traffic Analytics')
-
 import { useTraffic } from '~/composables/api'
 import type { TrafficSummary, TrafficForecast, SpeedObservation } from '~/composables/api'
 
@@ -216,6 +231,9 @@ const classData = ref<{ vehicle_class: string; total: number; share_pct: number 
 const topPairs  = ref<{ origin_zone: string; destination_zone: string; trips: number; avg_min: number }[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const speedError = ref(false)
+const odError    = ref(false)
+const forecastError = ref(false)
 const lastRefreshed = ref('-')
 const days = ref(7)
 
@@ -244,6 +262,10 @@ async function load() {
     classData.value = (classRes.value as any).results ?? []
   if (odRes.status    === 'fulfilled') topPairs.value  = (odRes.value as any).results ?? []
 
+  speedError.value    = speedRes.status === 'rejected'
+  odError.value       = odRes.status    === 'rejected'
+  forecastError.value = fcRes.status    === 'rejected'
+
   if ([sumRes, fcRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Traffic API.'
 
@@ -259,10 +281,30 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // ── Computed ──────────────────────────────────────────────────────────────
 const maxTrips = computed(() => Math.max(1, ...topPairs.value.map(p => p.trips)))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: speedObsPageRows, page: speedObsPage, totalPages: speedObsTotalPages,
+  total: speedObsTotal, next: speedObsNext, prev: speedObsPrev,
+} = usePagination(speedObs, 15)
+
+const {
+  pageRows: topPairsPageRows, page: topPairsPage, totalPages: topPairsTotalPages,
+  total: topPairsTotal, next: topPairsNext, prev: topPairsPrev,
+} = usePagination(topPairs, 15)
+
 // ── Volume trend line chart ─────────────────────────────────────────────
 const volumeChartPoints = computed(() =>
   (summary.value?.volume_24h ?? []).map(h => ({ label: fmtHour(h.hour), value: h.volume })),
 )
+const volumeSeries = computed(() => {
+  const h = summary.value?.volume_24h ?? []
+  return h.length > 1 ? h.map(x => x.volume) : undefined
+})
+const speedSeries = computed(() => {
+  const h = summary.value?.volume_24h ?? []
+  const vals = h.map(x => x.avg_speed).filter((v): v is number => v != null)
+  return vals.length > 1 ? vals : undefined
+})
 
 // ── Forecast multi-line chart (one line per model) ──────────────────────
 const forecastModels = computed(() =>
@@ -294,30 +336,38 @@ function classColor(cls: string) {
   const m: Record<string,string> = { car:'#3b82f6', motorcycle:'#a855f7', light_truck:'#f59e0b', heavy_truck:'#ef4444', bus:'#22c55e', other:'#94a3b8' }
   return m[cls] ?? '#64748b'
 }
+// Forecast-model line colors on the 24h chart - validated as a categorical
+// set (dataviz skill's validate_palette.js: CVD ΔE >= 8 adjacent, normal-vision
+// >= 15, both light and dark against this app's actual surfaces). The
+// previous set (blue/violet/amber/green) put arima and lstm at CVD ΔE 0.9 -
+// effectively the same color under deuteranopia, the most common form of
+// color blindness.
+const theme = useTheme()
+const MODEL_COLORS: Record<string, { light: string; dark: string }> = {
+  arima:          { light: '#2a78d6', dark: '#3987e5' },
+  lstm:           { light: '#eb6834', dark: '#d95926' },
+  gradient_boost: { light: '#1baf7a', dark: '#199e70' },
+  timesfm:        { light: '#eda100', dark: '#c98500' },
+}
 function modelColor(m: string) {
-  const c: Record<string,string> = { arima:'#3b82f6', prophet:'#22c55e', lstm:'#a855f7', gradient_boost:'#f59e0b' }
-  return c[m] ?? '#64748b'
+  const pair = MODEL_COLORS[m] ?? { light: '#64748b', dark: '#8B9AAD' }
+  return theme.resolved.value === 'dark' ? pair.dark : pair.light
 }
 function compColor(pct: number) {
-  return pct >= 85 ? '#22c55e' : pct >= 70 ? '#f59e0b' : '#ef4444'
+  return pct >= 85 ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
 }
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .class-list { display:flex; flex-direction:column; gap:8px; }
 .class-row { display:grid; grid-template-columns:110px 1fr 80px; align-items:center; gap:8px; }
 .class-label { font-size:12px; text-transform:capitalize; }
-.class-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.class-bar { height:100%; border-radius:4px; transition:width .4s; }
+.class-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.class-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .class-nums { display:flex; flex-direction:column; align-items:flex-end; }
-.comp-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.comp-bar { height:100%; border-radius:4px; transition:width .4s; }
+.comp-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.comp-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 </style>

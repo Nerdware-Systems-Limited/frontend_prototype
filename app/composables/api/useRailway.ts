@@ -445,7 +445,7 @@ export function useRailway() {
           lon: coords[0],
           title: p.name || p.code,
           subtitle:
-            `${p.code ?? ''} · ${p.station_type ?? ''} · ${p.network ?? ''}`.trim(' ·'),
+            [p.code, p.station_type, p.network].filter(Boolean).join(' · '),
           color: isTerminal ? 'red' : p.network === 'sgr' ? 'blue' : 'green',
           size: isTerminal ? 'lg' : 'sm',
         })

@@ -15,15 +15,31 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Registered Vessels" :value="fmtNum(vessels.length)" sub="KMA vessel registry" source="live" source-title="KMA · NAV 2018" />
-    <KpiCard label="Valid Safety Certs" :value="fmtNum(vessels.filter(v => v.safety_cert_status === 'valid').length)" :sub="`of ${fmtNum(vessels.length)} registered`" source="batch" source-title="KMA PSC" />
-    <KpiCard label="Movements Loaded" :value="fmtNum(movements.length)" sub="Port-call log" source="live" source-title="KMA AIS" />
-    <KpiCard label="Vessels In Port" :value="fmtNum(movements.filter(m => m.status === 'in_port').length)" sub="Currently berthed / anchored" source="live" source-title="KMA AIS" />
+    <KpiCard
+      label="Registered Vessels" :value="fmtNum(vessels.length)"
+      :unavailable="loading || vesselsError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="KMA vessel registry" to="#vessel-registry"
+    />
+    <KpiCard
+      label="Valid Safety Certs" :value="fmtNum(vessels.filter(v => v.safety_cert_status === 'valid').length)"
+      :unavailable="loading || vesselsError" :unavailable-note="loading ? 'Loading…' : 'KMA PSC feed unavailable'"
+      period="LIVE" :description="`of ${fmtNum(vessels.length)} registered`" to="#vessel-registry"
+    />
+    <KpiCard
+      label="Movements Loaded" :value="fmtNum(movements.length)"
+      :unavailable="loading || movementsError" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      period="LIVE" description="Port-call log" to="#vessel-movements"
+    />
+    <KpiCard
+      label="Vessels In Port" :value="fmtNum(movements.filter(m => m.status === 'in_port').length)"
+      :unavailable="loading || movementsError" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      period="LIVE" description="Currently berthed / anchored" to="#vessel-movements"
+    />
   </div>
 
   <!-- Vessel registry -->
   <SectionTitle pill="KMA · NAV 2018 · Continuous">Vessel Registry</SectionTitle>
-  <div class="card">
+  <div id="vessel-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="vesselSearch" class="select-sm" placeholder="Search vessel name / IMO…" style="min-width:200px" />
@@ -59,7 +75,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredVessels.length">
-            <template v-for="v in filteredVessels" :key="v.id">
+            <template v-for="v in vesselsPageRows" :key="v.id">
               <tr class="expand-row" @click="expandedVessel = expandedVessel === v.id ? null : v.id">
                 <td class="expand-cell">{{ expandedVessel === v.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:600">{{ v.vessel_name }}</td>
@@ -83,15 +99,19 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading vessels…' : 'No vessels match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading vessels…' : 'No vessels match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="vesselsPage" :total-pages="vesselsTotalPages" :total="vesselsTotal"
+          @prev="vesselsPrev" @next="vesselsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Vessel movements -->
   <SectionTitle pill="KMA AIS · Live">Vessel Movements</SectionTitle>
-  <div class="card">
+  <div id="vessel-movements" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="movementSearch" class="select-sm" placeholder="Search vessel name…" style="min-width:200px" />
@@ -128,7 +148,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredMovements.length">
-            <template v-for="m in filteredMovements" :key="m.id">
+            <template v-for="m in movementsPageRows" :key="m.id">
               <tr class="expand-row" @click="expandedMovement = expandedMovement === m.id ? null : m.id">
                 <td class="expand-cell">{{ expandedMovement === m.id ? '▾' : '▸' }}</td>
                 <td style="font-weight:600">{{ m.vessel_name }}</td>
@@ -157,8 +177,12 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="movementsPage" :total-pages="movementsTotalPages" :total="movementsTotal"
+          @prev="movementsPrev" @next="movementsNext"
+        />
       </div>
     </div>
   </div>
@@ -166,8 +190,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Vessel Registry & Movements')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { Vessel, VesselMovement } from '~/composables/api'
 
@@ -175,6 +197,8 @@ const vessels   = ref<Vessel[]>([])
 const movements = ref<VesselMovement[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const vesselsError   = ref(false)
+const movementsError = ref(false)
 
 const vesselSearch     = ref('')
 const vesselTypeFilter = ref('')
@@ -198,6 +222,9 @@ async function load() {
 
   if (vsRes.status === 'fulfilled') vessels.value   = (vsRes.value as any).results ?? []
   if (mvRes.status === 'fulfilled') movements.value = (mvRes.value as any).results ?? []
+
+  vesselsError.value   = vsRes.status === 'rejected'
+  movementsError.value = mvRes.status === 'rejected'
 
   if ([vsRes, mvRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime API.'
@@ -240,6 +267,17 @@ const filteredMovements = computed(() => movements.value.filter(m => {
   if (statusFilter.value && m.status !== statusFilter.value) return false
   return true
 }))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: vesselsPageRows, page: vesselsPage, totalPages: vesselsTotalPages,
+  total: vesselsTotal, next: vesselsNext, prev: vesselsPrev,
+} = usePagination(filteredVessels, 15)
+
+const {
+  pageRows: movementsPageRows, page: movementsPage, totalPages: movementsTotalPages,
+  total: movementsTotal, next: movementsNext, prev: movementsPrev,
+} = usePagination(filteredMovements, 15)
 const movementExportColumns = [
   { key: 'vessel_name', label: 'Vessel' },
   { key: 'vessel_imo', label: 'IMO' },
@@ -274,15 +312,13 @@ function mvmtBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

@@ -14,14 +14,14 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Flights Loaded" :value="fmtNum(flights.length)" :sub="`Last ${days}d`" source="live" source-title="KAA ATC" />
-    <KpiCard label="Delayed" :value="fmtNum(flights.filter(f => f.delay_departure_min > 0).length)" sub="Departure delay > 0" trend-direction="down" source="live" source-title="KAA ATC" />
-    <KpiCard label="Cancelled" :value="fmtNum(flights.filter(f => f.status === 'cancelled').length)" sub="This window" trend-direction="down" source="live" source-title="KAA ATC" />
-    <KpiCard label="Avg Departure Delay" :value="avgDepDelay != null ? `${avgDepDelay.toFixed(0)} min` : '-'" sub="All loaded flights" source="live" source-title="KAA ATC" />
+    <KpiCard label="Flights Loaded" :value="fmtNum(flights.length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" to="#flight-log" />
+    <KpiCard label="Delayed" :value="fmtNum(flights.filter(f => f.delay_departure_min > 0).length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="Departure delay > 0" :status="loading || flError ? undefined : flights.filter(f => f.delay_departure_min > 0).length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
+    <KpiCard label="Cancelled" :value="fmtNum(flights.filter(f => f.status === 'cancelled').length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="This window" :status="loading || flError ? undefined : flights.filter(f => f.status === 'cancelled').length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
+    <KpiCard label="Avg Departure Delay" :value="avgDepDelay != null ? `${avgDepDelay.toFixed(0)} min` : '-'" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="All loaded flights" />
   </div>
 
   <SectionTitle pill="KAA ATC · Live">Flight Log</SectionTitle>
-  <div class="card">
+  <div id="flight-log" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search flight no. / route…" style="min-width:180px" />
@@ -37,9 +37,7 @@
           <option value="landed">Landed</option>
           <option value="scheduled">Scheduled</option>
         </select>
-        <div class="day-filter">
-          <button v-for="d in [7, 14, 30]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
-        </div>
+        <DayRangeToggle v-model="days" :options="[7, 14, 30]" @update:model-value="load" />
         <button class="btn" @click="search=''; airlineFilter=''; statusFilter=''; load()">Clear</button>
         <ExportButton filename="uapts-flight-log.csv" :rows="filteredFlights" :columns="exportColumns" style="margin-left:auto" />
       </div>
@@ -60,17 +58,17 @@
             </tr>
           </thead>
           <tbody v-if="filteredFlights.length">
-            <template v-for="f in filteredFlights" :key="f.id">
+            <template v-for="f in flightsPageRows" :key="f.id">
               <tr class="expand-row" @click="expanded = expanded === f.id ? null : f.id">
                 <td class="expand-cell">{{ expanded === f.id ? '▾' : '▸' }}</td>
                 <td style="font-family:monospace;font-weight:700">{{ f.schedule_flight_number }}</td>
                 <td style="font-size:12px">{{ f.airline_iata }}</td>
                 <td style="font-size:12px">{{ f.origin_code }} → {{ f.destination_code }}</td>
                 <td><BadgePill :variant="flightBadge(f.status)">{{ f.status.replace(/_/g,' ') }}</BadgePill></td>
-                <td :style="{ color: f.delay_departure_min > 30 ? '#ef4444' : f.delay_departure_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+                <td :style="{ color: f.delay_departure_min > 30 ? 'var(--danger-fg)' : f.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
                   {{ f.delay_departure_min > 0 ? `+${f.delay_departure_min} min` : 'On time' }}
                 </td>
-                <td :style="{ color: f.delay_arrival_min > 30 ? '#ef4444' : f.delay_arrival_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+                <td :style="{ color: f.delay_arrival_min > 30 ? 'var(--danger-fg)' : f.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
                   {{ f.delay_arrival_min > 0 ? `+${f.delay_arrival_min} min` : '-' }}
                 </td>
                 <td>{{ f.passengers_actual != null ? fmtNum(f.passengers_actual) : fmtNum(f.passengers_booked) }}</td>
@@ -90,8 +88,12 @@
               </tr>
             </template>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading flights…' : 'No flights match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading flights…' : 'No flights match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="flightsPage" :total-pages="flightsTotalPages" :total="flightsTotal"
+          @prev="flightsPrev" @next="flightsNext"
+        />
       </div>
     </div>
   </div>
@@ -99,8 +101,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Flight Movements')
-
 import { useAviationMaritime } from '~/composables/api'
 import type { Airline, Flight } from '~/composables/api'
 
@@ -108,6 +108,7 @@ const airlines = ref<Airline[]>([])
 const flights  = ref<Flight[]>([])
 const loading  = ref(true)
 const error    = ref<string | null>(null)
+const flError  = ref(false)
 const days     = ref(7)
 
 const search        = ref('')
@@ -127,6 +128,8 @@ async function load() {
 
   if (alRes.status === 'fulfilled') airlines.value = (alRes.value as any).results ?? []
   if (flRes.status === 'fulfilled') flights.value  = (flRes.value as any).results ?? []
+
+  flError.value = flRes.status === 'rejected'
 
   if (flRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Aviation API.'
@@ -152,6 +155,12 @@ const avgDepDelay = computed(() => {
   if (!flights.value.length) return null
   return flights.value.reduce((s, f) => s + f.delay_departure_min, 0) / flights.value.length
 })
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: flightsPageRows, page: flightsPage, totalPages: flightsTotalPages,
+  total: flightsTotal, next: flightsNext, prev: flightsPrev,
+} = usePagination(filteredFlights, 15)
 const exportColumns = [
   { key: 'schedule_flight_number', label: 'Flight' },
   { key: 'airline_iata', label: 'Airline' },
@@ -177,17 +186,13 @@ function flightBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

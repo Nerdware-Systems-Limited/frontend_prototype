@@ -2,9 +2,10 @@
   <PageHeader
     eyebrow="User Management"
     title="Users"
-    subtitle="Platform account directory - create accounts, manage status, and view profiles across all UAPTS agencies"
+    :subtitle="unscoped ? 'Platform account directory - create accounts, manage status, and view profiles across all UAPTS agencies' : `Account directory for ${ownAgencyCode} - create accounts, manage status, and view profiles within your own agency`"
   >
     <template #actions>
+      <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-accounts" label="Export" />
       <NuxtLink to="/roles" class="btn">Roles & Permissions →</NuxtLink>
       <button class="btn-primary" @click="openCreate">+ Create User</button>
     </template>
@@ -14,72 +15,60 @@
   <div v-if="actionError"    class="error-banner action-error">⚠ {{ actionError }}</div>
   <div v-if="actionSuccess"  class="success-banner">✓ {{ actionSuccess }}</div>
 
-  <!-- KPIs -->
-  <div class="kpi-grid">
-    <KpiCard label="Total Accounts"   :value="String(users.length)"                                    sub="All platform users"         source="live" source-title="UAPTS" />
-    <KpiCard label="Active"           :value="String(activeCount)"                                     sub="Login enabled"               trend-direction="up" source="live" source-title="UAPTS" />
-    <KpiCard label="Inactive"         :value="String(users.length - activeCount)"                      sub="Login disabled"              :trend-direction="(users.length - activeCount) === 0 ? 'up' : 'down'" source="live" source-title="UAPTS" />
-    <KpiCard label="MFA Enrolled"     :value="mfaCount + ' / ' + users.length"                        sub="2FA set up"                  trend-direction="up" source="live" source-title="UAPTS" />
-    <KpiCard label="No MFA"           :value="String(users.length - mfaCount)"                        sub="2FA not configured"          :trend-direction="(users.length - mfaCount) === 0 ? 'up' : 'down'" source="live" source-title="UAPTS" />
-    <KpiCard label="Staff / Admin"    :value="String(users.filter(u => u.is_staff).length)"           sub="Django admin access"         source="live" source-title="UAPTS" />
-  </div>
-
-  <!-- Agency breakdown -->
-  <SectionTitle>Users by Agency</SectionTitle>
-  <div class="agency-strip">
-    <div
-      v-for="ag in agencyStats"
-      :key="ag.code"
-      class="agency-chip"
-      :class="{ 'agency-chip--active': agencyFilter === ag.code }"
-      @click="agencyFilter = agencyFilter === ag.code ? '' : ag.code"
-    >
-      <span class="agency-chip-code">{{ ag.code }}</span>
-      <span class="agency-chip-count">{{ ag.total }}</span>
-      <span class="agency-chip-active">{{ ag.active }} active</span>
+  <!-- Metric strip - one flat row, not six separate cards -->
+  <div class="metric-strip" role="group" aria-label="Account statistics">
+    <div v-for="m in metrics" :key="m.label" class="metric-item">
+      <span class="metric-label">{{ m.label }}</span>
+      <span class="metric-value" :class="{ 'is-warn': m.warn }">{{ metricsUnavailable ? '-' : m.value }}</span>
+      <span class="metric-sub">{{ metricsUnavailable ? (loading ? 'Loading…' : 'Unavailable') : m.sub }}</span>
     </div>
-    <div v-if="!agencyStats.length" class="dim" style="font-size:12px;padding:8px 0">{{ loading ? 'Loading…' : 'No agency data.' }}</div>
   </div>
 
   <!-- Filters -->
+  <SectionTitle>Account Directory</SectionTitle>
   <div class="filter-bar">
     <input
       v-model="search"
-      class="select-sm"
+      class="select-sm filter-input"
       placeholder="Search email…"
-      style="min-width:200px"
+      aria-label="Search by email"
       @keyup.enter="applyFilters"
     />
-    <select v-model="agencyFilter" class="select-sm">
-      <option value="">All agencies</option>
-      <option v-for="a in agencies" :key="a.id" :value="a.agency_code">{{ a.agency_code }} - {{ a.agency_name }}</option>
+    <select
+      v-model="agencyFilter" class="select-sm filter-select filter-select--agency" aria-label="Filter by agency"
+      :disabled="!unscoped" :title="!unscoped ? `Scoped to your own agency (${ownAgencyCode})` : undefined"
+    >
+      <option v-if="unscoped" value="">All agencies</option>
+      <option v-for="a in visibleAgencies" :key="a.id" :value="a.agency_code">{{ a.agency_code }} - {{ a.agency_name }}</option>
     </select>
-    <select v-model="roleFilter" class="select-sm">
+    <select v-model="roleFilter" class="select-sm filter-select" aria-label="Filter by role">
       <option value="">All roles</option>
+      <option value="super_admin">Super Admin</option>
       <option value="admin">Admin</option>
       <option value="analyst">Analyst</option>
       <option value="operator">Operator</option>
       <option value="public">Public</option>
     </select>
-    <select v-model="activeFilter" class="select-sm">
+    <select v-model="activeFilter" class="select-sm filter-select" aria-label="Filter by account status">
       <option value="">All statuses</option>
       <option value="true">Active only</option>
       <option value="false">Inactive only</option>
     </select>
-    <select v-model="mfaFilter" class="select-sm">
+    <select v-model="mfaFilter" class="select-sm filter-select" aria-label="Filter by MFA status">
       <option value="">All MFA</option>
       <option value="true">MFA enrolled</option>
       <option value="false">No MFA</option>
     </select>
-    <button class="btn" @click="applyFilters">Apply</button>
     <button class="btn" @click="resetFilters">Reset</button>
-    <span style="flex:1" />
-    <span class="result-count">{{ filteredUsers.length }} of {{ users.length }}</span>
+    <div class="mini-pager">
+      <span class="result-count">{{ usersTotal }} of {{ users.length }} · Page {{ usersPage }} of {{ usersTotalPages }}</span>
+      <button type="button" class="icon-btn" :disabled="usersPage <= 1" aria-label="Previous page" @click="usersPrev">‹</button>
+      <button type="button" class="icon-btn" :disabled="usersPage >= usersTotalPages" aria-label="Next page" @click="usersNext">›</button>
+    </div>
   </div>
 
   <!-- User directory table -->
-  <SectionTitle>Account Directory</SectionTitle>
-  <div class="card">
+  <div id="account-directory" class="card drill-target">
     <div class="card-body">
       <table class="users-table">
         <thead>
@@ -91,12 +80,12 @@
             <th>Status</th>
             <th>MFA</th>
             <th>Created</th>
-            <th>Last Login</th>
+            <th title="Most recent 'login' event for this account from the audit log">Last Login</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody v-if="filteredUsers.length">
-          <template v-for="u in filteredUsers" :key="u.id">
+          <template v-for="u in usersPageRows" :key="u.id">
 
             <!-- Main row -->
             <tr
@@ -104,46 +93,49 @@
               @click="expanded = expanded === u.id ? null : u.id"
               style="cursor:pointer"
             >
-              <td class="expand-cell">
-                <span class="expand-icon">{{ expanded === u.id ? '▾' : '▸' }}</span>
+              <td class="expand-cell" data-label="" @click.stop>
+                <button
+                  type="button"
+                  class="expand-toggle"
+                  :aria-expanded="expanded === u.id"
+                  :aria-label="`${expanded === u.id ? 'Collapse' : 'Expand'} details for ${u.email}`"
+                  @click="expanded = expanded === u.id ? null : u.id"
+                >
+                  <span class="expand-icon" aria-hidden="true">{{ expanded === u.id ? '▾' : '▸' }}</span>
+                </button>
               </td>
               <td>
-                <span class="email-cell">{{ u.email }}</span>
+                <span class="email-cell" :title="u.email">{{ u.email }}</span>
                 <span v-if="u.is_staff" class="staff-pip" title="Has Django admin / staff access">★</span>
               </td>
-              <td>
+              <td data-label="Agency">
                 <BadgePill v-if="u.agency_code" variant="neutral">{{ u.agency_code }}</BadgePill>
                 <span v-else class="dim">-</span>
               </td>
-              <td>
+              <td data-label="Role">
                 <BadgePill :variant="roleBadge(u.role_type)">{{ u.role_type }}</BadgePill>
               </td>
-              <td>
+              <td data-label="Status">
                 <BadgePill :variant="u.is_active !== false ? 'success' : 'danger'">
                   {{ u.is_active !== false ? 'Active' : 'Inactive' }}
                 </BadgePill>
               </td>
-              <td>
+              <td data-label="MFA">
                 <BadgePill :variant="u.mfa_active ? 'success' : 'neutral'">
                   {{ u.mfa_active ? '2FA On' : 'No 2FA' }}
                 </BadgePill>
               </td>
-              <td class="dim date-cell">{{ fmtDate(u.created_at) }}</td>
-              <td class="dim date-cell">{{ (u as any).last_login ? fmtDateTime((u as any).last_login) : 'Never' }}</td>
+              <td class="dim date-cell" data-label="Created">{{ fmtDate(u.created_at) }}</td>
+              <td class="dim date-cell" data-label="Last Login">{{ fmtLastLogin(u) }}</td>
               <td @click.stop>
-                <div class="action-group">
-                  <button
-                    class="btn btn-sm"
-                    :class="u.is_active !== false ? 'btn-warn' : 'btn-ok'"
-                    :disabled="actionId === u.id"
-                    @click="toggleActive(u)"
-                  >{{ u.is_active !== false ? 'Deactivate' : 'Activate' }}</button>
-                  <button
-                    class="btn btn-sm btn-danger"
-                    :disabled="actionId === u.id"
-                    @click="deleteUser(u)"
-                  >Delete</button>
-                </div>
+                <button
+                  type="button"
+                  class="btn btn-sm row-menu-trigger"
+                  aria-haspopup="true"
+                  :aria-expanded="openMenuId === u.id"
+                  :disabled="actionId === u.id"
+                  @click="toggleMenu(u, $event)"
+                >More <span aria-hidden="true">▾</span></button>
               </td>
             </tr>
 
@@ -188,11 +180,11 @@
                     </div>
                     <div class="detail-item">
                       <span class="detail-label">Account Created</span>
-                      <span class="detail-value">{{ fmtDateTime(u.created_at) }}</span>
+                      <span class="detail-value mono">{{ fmtDateTime(u.created_at) }}</span>
                     </div>
                     <div class="detail-item">
                       <span class="detail-label">Last Login</span>
-                      <span class="detail-value">{{ (u as any).last_login ? fmtDateTime((u as any).last_login) : 'Never' }}</span>
+                      <span class="detail-value mono">{{ fmtLastLogin(u) }}</span>
                     </div>
                   </div>
                   <div class="detail-footer">
@@ -212,12 +204,54 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="usersPage" :total-pages="usersTotalPages" :total="usersTotal"
+        @prev="usersPrev" @next="usersNext"
+      />
 
       <div v-if="hasMore" class="load-more">
         <button class="btn" :disabled="loading" @click="loadMore">Load more users…</button>
       </div>
     </div>
   </div>
+
+  <!-- Row action menu - teleported so the card's clipped/scrolling body never cuts it off -->
+  <Teleport to="body">
+    <div
+      v-if="openMenuUser"
+      ref="menuPopRef"
+      class="row-menu-pop"
+      role="menu"
+      :style="{ top: menuPos.top, left: menuPos.left }"
+      @keydown="onMenuKeydown"
+    >
+      <button
+        role="menuitem"
+        class="row-menu-item"
+        :disabled="actionId === openMenuUser.id"
+        @click="confirmToggleActive(openMenuUser); closeMenu()"
+      >{{ openMenuUser.is_active !== false ? 'Deactivate' : 'Activate' }}</button>
+      <button
+        role="menuitem"
+        class="row-menu-item row-menu-item--danger"
+        :disabled="actionId === openMenuUser.id"
+        @click="confirmDeleteUser(openMenuUser); closeMenu()"
+      >Delete</button>
+    </div>
+  </Teleport>
+
+  <!-- Destructive/high-consequence action confirmation - replaces window.confirm() -->
+  <ConfirmDialog
+    :open="!!confirmAction"
+    :title="confirmAction?.title ?? ''"
+    :message="confirmAction?.message ?? ''"
+    :confirm-label="confirmAction?.confirmLabel ?? 'Confirm'"
+    busy-label="Working…"
+    :danger="confirmAction?.danger ?? false"
+    :busy="actionId === confirmAction?.userId"
+    @confirm="runConfirmAction"
+    @cancel="confirmAction = null"
+  />
 
   <!-- Create User Modal -->
   <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
@@ -246,17 +280,19 @@
               <option value="analyst">Analyst - read + reports</option>
               <option value="operator">Operator - operations</option>
               <option value="admin">Admin - full access</option>
+              <option value="super_admin">Super Admin - full platform bypass</option>
               <option value="public">Public - read only</option>
             </select>
           </div>
           <div class="form-group">
             <label>Agency</label>
-            <select v-model="form.agency" class="input-full">
+            <select v-if="unscoped" v-model="form.agency" class="input-full">
               <option value="">No agency (public user)</option>
               <option v-for="a in agencies" :key="a.id" :value="a.id">
                 {{ a.agency_code }} - {{ a.agency_name }}
               </option>
             </select>
+            <input v-else class="input-full" disabled :value="`${ownAgencyCode} (your agency)`" />
           </div>
         </div>
         <div class="form-group">
@@ -289,10 +325,22 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Users')
-
-import { useUsers as _useUsers, useAgencies as _useAgencies } from '~/composables/api'
+import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit } from '~/composables/api'
 import type { User, Agency } from '~/types/uapts'
+import { isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOptions, canManageUser } from '~/composables/useAgencyScope'
+
+// ── Agency scoping ───────────────────────────────────────────────────────
+// An agency admin manages only their own tenant's accounts; super_admin is
+// the only tier that sees/manages every agency (spec: access-control.json's
+// M10 notes already call this out as the intended behaviour - this page
+// just never enforced it). Client-side convenience only, same as every
+// other RBAC check in this app - the backend list() call is the real gate
+// via agencyListQueryFor()'s `agency` filter.
+const { user: viewer } = useAuth()
+const viewerScope = computed(() => viewer.value as any)
+const unscoped = computed(() => isUnscopedAdmin(viewerScope.value))
+const ownAgencyCode = computed(() => scopedAgencyCode(viewerScope.value))
+const visibleAgencies = computed(() => visibleAgencyOptions(agencies.value, viewerScope.value))
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -319,17 +367,32 @@ const createApiError = ref<string | null>(null)
 const form         = ref({ email: '', role_type: 'analyst', agency: '', department: '', is_active: true, is_staff: false })
 const formErrors   = ref({ email: '' })
 
+// The User record has no reliable last-login field of its own (see
+// fmtLastLogin() below) - derived instead from the audit log's real
+// 'login' events, keyed by the same user UUID both APIs share.
+const lastLoginByUser = ref<Record<string, string>>({})
+
 // ── Load ───────────────────────────────────────────────────────────────
 
 async function load() {
   loading.value  = true
   error.value    = null
   expanded.value = null
+  closeMenu()
   currentPage    = 1
 
-  const [uRes, aRes] = await Promise.allSettled([
-    _useUsers().list({ page_size: 100, ordering: '-created_at' }),
+  // Scoped admins can't drift the filter to another tenant on a reload.
+  if (!unscoped.value) agencyFilter.value = ownAgencyCode.value ?? ''
+
+  const [uRes, aRes, auditRes] = await Promise.allSettled([
+    _useUsers().list({ page_size: 100, ordering: '-created_at', ...agencyListQueryFor(viewerScope.value) }),
     _useAgencies().list({ page_size: 100 }),
+    // Most-recent-first isn't guaranteed by the API contract, so this
+    // reduces to the true max per user rather than trusting result order.
+    // 300 covers this registry's ~44 accounts many times over even if
+    // login frequency is uneven across them; a user genuinely absent from
+    // this window just renders "-", same as any other untracked field.
+    _useAudit().list({ action: 'login', limit: 300 }),
   ])
 
   if (uRes.status === 'fulfilled') {
@@ -339,6 +402,19 @@ async function load() {
   if (aRes.status === 'fulfilled') agencies.value = (aRes.value as any).results ?? aRes.value ?? []
   if (uRes.status === 'rejected') error.value = 'Unable to reach the UAPTS Accounts API.'
 
+  if (auditRes.status === 'fulfilled') {
+    const latest: Record<string, string> = {}
+    for (const entry of auditRes.value.results) {
+      const uid = entry.user_id
+      if (!uid || uid === 'None') continue
+      if (!latest[uid] || new Date(entry.created_at) > new Date(latest[uid]))
+        latest[uid] = entry.created_at
+    }
+    lastLoginByUser.value = latest
+  }
+  // A rejected audit fetch (e.g. role-gated 403) just leaves the map as-is -
+  // fmtLastLogin() already renders "-" for anyone missing from it.
+
   loading.value = false
 }
 
@@ -346,7 +422,7 @@ async function loadMore() {
   loading.value = true
   currentPage++
   try {
-    const res = await _useUsers().list({ page_size: 100, page: currentPage, ordering: '-created_at' })
+    const res = await _useUsers().list({ page_size: 100, page: currentPage, ordering: '-created_at', ...agencyListQueryFor(viewerScope.value) })
     const more = (res as any).results ?? []
     users.value.push(...more)
     hasMore.value = !!((res as any).next)
@@ -362,25 +438,17 @@ function resetFilters()  {
 
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
+onMounted(() => {
+  // Skip a silent background refresh while the user has a detail row or the
+  // row-action menu open - a mid-task reset with no warning is real data loss.
+  t = setInterval(() => { if (!expanded.value && !openMenuId.value) load() }, 120_000)
+})
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ───────────────────────────────────────────────────────────
 
 const activeCount = computed(() => users.value.filter(u => u.is_active !== false).length)
 const mfaCount    = computed(() => users.value.filter(u => u.mfa_active).length)
-
-const agencyStats = computed(() => {
-  const map: Record<string, { code: string; total: number; active: number }> = {}
-  for (const u of users.value) {
-    const code = u.agency_code
-    if (!code) continue
-    if (!map[code]) map[code] = { code, total: 0, active: 0 }
-    map[code].total++
-    if (u.is_active !== false) map[code].active++
-  }
-  return Object.values(map).sort((a, b) => b.total - a.total)
-})
 
 const filteredUsers = computed(() =>
   users.value.filter(u => {
@@ -402,16 +470,125 @@ const filteredUsers = computed(() =>
   }),
 )
 
+// ── Table pagination (max 15 rows visible) ──────────────────────────────
+const {
+  pageRows: usersPageRows, page: usersPage, totalPages: usersTotalPages,
+  total: usersTotal, next: usersNext, prev: usersPrev,
+} = usePagination(filteredUsers, 15)
+
+// ── Metric strip ─────────────────────────────────────────────────────────
+
+const metricsUnavailable = computed(() => loading.value || !!error.value)
+const metrics = computed(() => {
+  const inactive = users.value.length - activeCount.value
+  const noMfa    = users.value.length - mfaCount.value
+  return [
+    { label: 'Total Accounts', value: users.value.length,                            sub: 'All platform users' },
+    { label: 'Active',         value: activeCount.value,                             sub: 'Login enabled' },
+    { label: 'Inactive',       value: inactive,                                      sub: 'Login disabled', warn: inactive > 0 },
+    { label: 'MFA Enrolled',   value: `${mfaCount.value} / ${users.value.length}`,    sub: '2FA set up' },
+    { label: 'No MFA',         value: noMfa,                                         sub: '2FA not configured', warn: noMfa > 0 },
+    { label: 'Staff / Admin',  value: users.value.filter(u => u.is_staff).length,     sub: 'Django admin access' },
+  ]
+})
+
+// ── Export ─────────────────────────────────────────────────────────────
+// Client-side CSV of exactly what the table currently shows (already-loaded,
+// already-filtered rows) - no backend export endpoint for this registry.
+
+const exportColumns = [
+  { key: 'email',     label: 'Email' },
+  { key: 'agency',    label: 'Agency' },
+  { key: 'role',      label: 'Role' },
+  { key: 'status',    label: 'Status' },
+  { key: 'mfa',       label: 'MFA' },
+  { key: 'staff',     label: 'Staff' },
+  { key: 'created',   label: 'Created' },
+  { key: 'lastLogin', label: 'Last Login' },
+]
+const exportRows = computed(() => filteredUsers.value.map(u => ({
+  email:     u.email,
+  agency:    u.agency_code ?? '-',
+  role:      u.role_type,
+  status:    u.is_active !== false ? 'Active' : 'Inactive',
+  mfa:       u.mfa_active ? '2FA On' : 'No 2FA',
+  staff:     u.is_staff ? 'Staff' : 'No',
+  created:   fmtDate(u.created_at),
+  lastLogin: fmtLastLogin(u),
+})))
+
+// ── Row action menu ──────────────────────────────────────────────────────
+// A single teleported popover shared by every row, positioned from the
+// trigger button's own rect so a clipped/scrolling card body never cuts it
+// off. Closes on outside click, Escape, or any scroll (cheaper and more
+// robust than tracking every ancestor's scroll position to reposition it).
+
+const openMenuId    = ref<string | null>(null)
+const openMenuUser  = computed(() => users.value.find(u => u.id === openMenuId.value) ?? null)
+const menuPos       = ref({ top: '0px', left: '0px' })
+const menuPopRef    = ref<HTMLElement | null>(null)
+const menuTriggerEl = ref<HTMLElement | null>(null)
+const MENU_WIDTH    = 160
+
+function toggleMenu(u: User, ev: MouseEvent) {
+  if (openMenuId.value === u.id) { closeMenu(); return }
+  const btn = ev.currentTarget as HTMLElement
+  const rect = btn.getBoundingClientRect()
+  menuPos.value = {
+    top:  `${rect.bottom + 4}px`,
+    left: `${Math.max(8, rect.right - MENU_WIDTH)}px`,
+  }
+  menuTriggerEl.value = btn
+  openMenuId.value = u.id
+  nextTick(() => menuPopRef.value?.querySelector<HTMLElement>('.row-menu-item')?.focus())
+}
+/** `refocus` returns focus to the trigger - only wanted for a keyboard-driven
+ *  close (Escape); an outside click, a scroll, or a background reload
+ *  shouldn't yank focus back to wherever it happened to be. */
+function closeMenu(refocus = false) {
+  openMenuId.value = null
+  if (refocus) menuTriggerEl.value?.focus()
+}
+
+function onMenuKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab') return
+  const items = menuPopRef.value?.querySelectorAll<HTMLElement>('.row-menu-item:not(:disabled)')
+  if (!items || items.length === 0) return
+  const first = items[0]!, last = items[items.length - 1]!
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+}
+
+function onDocClick(e: MouseEvent) {
+  const el = e.target as HTMLElement
+  if (!el.closest('.row-menu-pop') && !el.closest('.row-menu-trigger')) closeMenu()
+}
+function onDocKeydown(e: KeyboardEvent) { if (e.key === 'Escape') closeMenu(true) }
+
+function onScrollClose() { closeMenu() }
+
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onDocKeydown)
+  window.addEventListener('scroll', onScrollClose, true)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onDocKeydown)
+  window.removeEventListener('scroll', onScrollClose, true)
+})
+
 // ── Actions ────────────────────────────────────────────────────────────
 
 async function toggleActive(u: User) {
+  if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   actionId.value    = u.id
   actionError.value = null
   const activate    = u.is_active === false
   try {
     await _useUsers().update(u.id, { is_active: activate })
     const idx = users.value.findIndex(x => x.id === u.id)
-    if (idx !== -1) users.value[idx] = { ...users.value[idx], is_active: activate }
+    if (idx !== -1) users.value[idx] = { ...users.value[idx]!, is_active: activate }
     flash(`${u.email} ${activate ? 'activated' : 'deactivated'}.`)
   } catch (err: any) {
     actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to update account status.'
@@ -419,7 +596,7 @@ async function toggleActive(u: User) {
 }
 
 async function deleteUser(u: User) {
-  if (!window.confirm(`Permanently delete account "${u.email}"?\n\nThis cannot be undone. Audit log entries will be preserved.`)) return
+  if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   actionId.value    = u.id
   actionError.value = null
   try {
@@ -432,10 +609,53 @@ async function deleteUser(u: User) {
   } finally { actionId.value = null }
 }
 
+// ── Confirmation dialog ──────────────────────────────────────────────────
+// Replaces window.confirm() - a themed modal that can carry the app's own
+// copy and tone. Activating (re-enabling access) proceeds immediately as
+// before, same as it always has; deactivating (an access-lockout, the
+// consequential direction) now asks first, same as delete already did.
+
+interface ConfirmSpec { title: string; message: string; confirmLabel: string; danger: boolean; userId: string; run: () => void | Promise<void> }
+const confirmAction = ref<ConfirmSpec | null>(null)
+
+function confirmToggleActive(u: User) {
+  if (u.is_active === false) { toggleActive(u); return } // activating - low risk, no confirmation
+  confirmAction.value = {
+    title: 'Deactivate account',
+    message: `Deactivate "${u.email}"? They will immediately lose the ability to sign in.`,
+    confirmLabel: 'Deactivate',
+    danger: true,
+    userId: u.id,
+    run: () => toggleActive(u),
+  }
+}
+
+function confirmDeleteUser(u: User) {
+  confirmAction.value = {
+    title: 'Delete account',
+    message: `Permanently delete account "${u.email}"?\n\nThis cannot be undone. Audit log entries will be preserved.`,
+    confirmLabel: 'Delete',
+    danger: true,
+    userId: u.id,
+    run: () => deleteUser(u),
+  }
+}
+
+async function runConfirmAction() {
+  const action = confirmAction.value
+  if (!action) return
+  // Stay open (the :busy prop reflects actionId) so the user sees the
+  // in-flight request, not just a dialog that vanishes and hopes for the
+  // best; toggleActive/deleteUser already catch their own errors into
+  // actionError, so this always resolves and the dialog always closes.
+  await action.run()
+  confirmAction.value = null
+}
+
 // ── Create user ────────────────────────────────────────────────────────
 
 function openCreate() {
-  form.value = { email: '', role_type: 'analyst', agency: '', department: '', is_active: true, is_staff: false }
+  form.value = { email: '', role_type: 'analyst', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
   formErrors.value = { email: '' }
   createApiError.value = null
   showModal.value = true
@@ -448,6 +668,10 @@ async function doCreate() {
   createApiError.value   = null
   if (!form.value.email) { formErrors.value.email = 'Email is required.'; return }
   if (!form.value.email.includes('@')) { formErrors.value.email = 'Enter a valid email address.'; return }
+  if (!unscoped.value && form.value.agency !== (viewerScope.value?.agency ?? '')) {
+    createApiError.value = 'You can only create accounts in your own agency.'
+    return
+  }
 
   creating.value = true
   try {
@@ -463,7 +687,7 @@ async function doCreate() {
     const created = await _useUsers().create(payload as any) as User
     users.value.unshift(created)
     closeModal()
-    flash(`Account ${created.email} created.`)
+    flash(`Account ${created.email} created: a welcome email with a set-password link is on its way.`)
   } catch (err: any) {
     createApiError.value = err?.data?.detail
       ?? (err?.data?.errors?.[0]?.message)
@@ -482,7 +706,7 @@ function flash(msg: string) {
 }
 
 function roleBadge(r: string) {
-  const m: Record<string, string> = { admin: 'danger', analyst: 'info', operator: 'fair', public: 'neutral' }
+  const m: Record<string, string> = { admin: 'danger', analyst: 'info', operator: 'warning', public: 'neutral' }
   return m[r] ?? 'neutral'
 }
 
@@ -497,63 +721,164 @@ function fmtDateTime(d?: string | null) {
   try { return new Date(d).toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
   catch { return String(d) }
 }
+
+// The User record itself carries no reliable last-login field - it's not
+// part of the typed User shape (~/types/uapts.ts) or the OpenAPI fixture
+// tests.unit/types.test.ts checks against, and it's used nowhere else in
+// the app (not even the user's own profile page). Rather than assert a
+// specific fact the platform doesn't actually track, this is derived from
+// the audit log's genuine 'login' events (see lastLoginByUser in load()) -
+// real data, honestly sourced, with "-" for anyone outside that window.
+function fmtLastLogin(u: User) {
+  return fmtDateTime(lastLoginByUser.value[u.id])
+}
 </script>
 
 <style scoped>
 /* Banners */
-.error-banner   { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.action-error   { background:#fee2e2; border-color:#f87171; color:#b91c1c; }
-.success-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#f0fdf4; border:1px solid #86efac; font-size:13px; color:#15803d; }
+.action-error   { background:var(--danger-bg); border-color:color-mix(in srgb, var(--danger-fg) 40%, transparent); color:var(--danger-fg); }
+.success-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:var(--success-bg); border:1px solid color-mix(in srgb, var(--success-fg) 40%, transparent); font-size:13px; color:var(--success-fg); }
 
-/* KPIs */
-.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:12px; margin-bottom:16px; }
+/* Tighter section rhythm for this page - denser than the site default */
+.section-title { margin: 18px 0 8px; }
+.section-title:first-of-type { margin-top: 14px; }
 
-/* Agency strip */
-.agency-strip {
-  display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;
-  padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;
+/* Metric strip - one flat row with dividers, replaces six separate KPI cards */
+.metric-strip {
+  display:flex; flex-wrap:wrap;
+  background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius);
+  margin-bottom:14px;
 }
-.agency-chip {
-  display:flex; flex-direction:column; align-items:center;
-  background:#fff; border:2px solid #e2e8f0; border-radius:8px;
-  padding:8px 14px; cursor:pointer; transition:border-color .15s;
-  min-width:80px; user-select:none;
+.metric-item {
+  flex:1 1 150px; min-width:130px;
+  padding:10px 16px;
+  border-left:1px solid var(--border-subtle);
+  display:flex; flex-direction:column; gap:2px;
 }
-.agency-chip:hover { border-color:#94a3b8; }
-.agency-chip--active { border-color:#3b82f6; background:#eff6ff; }
-.agency-chip-code   { font-weight:700; font-size:13px; color:#1e293b; }
-.agency-chip-count  { font-size:20px; font-weight:800; color:#0f172a; line-height:1.1; }
-.agency-chip-active { font-size:10px; color:#64748b; white-space:nowrap; }
+.metric-item:first-child { border-left:0; }
+.metric-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
+.metric-value { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--fg-1); line-height:1.15; }
+.metric-value.is-warn { color:var(--warning-fg); }
+.metric-sub   { font-size:10.5px; color:var(--fg-3); }
+@media (max-width:640px) {
+  .metric-strip { display:grid; grid-template-columns:1fr 1fr; }
+  .metric-item  { border-left:0; border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); }
+  .metric-item:nth-child(2n)        { border-right:0; }
+  .metric-item:nth-last-child(-n+2) { border-bottom:0; }
+}
 
-/* Filters */
-.filter-bar  { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-.result-count { font-size:12px; color:#64748b; }
+/* Filters - every control gets min-width:0 so it can actually shrink below
+   its content's natural width (the flexbox default is min-width:auto, which
+   silently blocks shrinking and forces the whole row - pager included - to
+   wrap instead). The pager is the one thing that must never wrap or shrink;
+   everything to its left gives way first. */
+.result-count { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.filter-bar   { padding:8px 12px; margin-bottom:10px; }
+.filter-bar > * { min-width:0; }
+.filter-input  { width:180px; flex:0 1 180px; }
+.filter-select { flex:0 1 130px; max-width:130px; text-overflow:ellipsis; }
+.filter-select--agency { flex-basis:170px; max-width:170px; }
+.mini-pager   { display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
+.icon-btn {
+  width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--border-interactive); border-radius:var(--r-sm);
+  background:var(--surface-2); color:var(--fg-2); cursor:pointer; font-size:15px; line-height:1; padding:0;
+}
+.icon-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary); background:var(--surface-quiet); }
+.icon-btn:disabled { opacity:.4; cursor:not-allowed; }
 
-/* Table */
+/* Table - card-body goes flush so the table's own cell padding sets the
+   inset; the pagination/load-more rows below get their own horizontal
+   padding back since TablePagination has none of its own. */
+#account-directory .card-body { padding:0; }
+#account-directory :deep(.table-pagination) { padding-left:12px; padding-right:12px; }
 .users-table { width:100%; }
+.users-table th, .users-table td { padding:6px 12px; }
 .expand-cell { width:24px; text-align:center; padding:0 4px; }
-.expand-icon { font-size:11px; color:#94a3b8; }
-.row-inactive { opacity:.55; }
-.row-expanded > td { background:#f8fafc; }
-.email-cell  { font-size:13px; font-weight:500; color:#0f172a; }
-.staff-pip   { margin-left:5px; font-size:11px; color:#b45309; }
-.date-cell   { font-size:12px; white-space:nowrap; }
-.dim         { color:#94a3b8; }
+.expand-toggle {
+  background:none; border:0; padding:4px; margin:-4px;
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:var(--r-xs);
+}
+.expand-toggle:focus-visible { outline:2px solid var(--primary); outline-offset:1px; }
+.expand-icon { font-size:11px; color:var(--fg-3); }
+.row-inactive { opacity:.55; background:var(--surface-1); }
+.row-expanded > td { background:var(--surface-1); }
+.email-cell  {
+  font-size:13px; font-weight:600; color:var(--fg-1);
+  display:inline-block; max-width:260px; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; vertical-align:middle;
+}
+.staff-pip   { margin-left:5px; font-size:11px; color:var(--warning-fg); }
+.date-cell   { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11.5px; white-space:nowrap; }
+.dim         { color:var(--fg-3); }
+
+/* Tablet - shed the least-important columns before forcing horizontal scroll */
+@media (max-width:1100px) {
+  .users-table th:nth-child(8), .users-table td:nth-child(8) { display:none; } /* Last Login */
+}
+@media (max-width:900px) {
+  .users-table th:nth-child(7), .users-table td:nth-child(7) { display:none; } /* Created */
+}
+
+/* Mobile - each row becomes a compact record, email first, all fields kept */
+@media (max-width:640px) {
+  .users-table thead { display:none; }
+  .users-table, .users-table tbody { display:block; width:100%; }
+  .users-table tr {
+    position:relative; display:block; width:100%; margin-bottom:8px; padding:10px 12px;
+    background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
+  }
+  .users-table td {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:4px 0; border:0; font-size:12.5px;
+  }
+  .users-table td::before {
+    content:attr(data-label); flex-shrink:0;
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3);
+  }
+  .users-table td:nth-child(7), .users-table td:nth-child(8) { display:flex; } /* Created/Last Login back on mobile cards */
+  .users-table td.expand-cell {
+    position:absolute; top:8px; right:8px; padding:0; margin:0; border:0; width:auto;
+  }
+  .users-table td.expand-cell::before { content:none; }
+  .users-table td:nth-child(2) {
+    display:block; font-size:14px; font-weight:700;
+    padding:0 28px 8px 0; margin-bottom:6px; border-bottom:1px solid var(--border-subtle);
+  }
+  .users-table td:last-child {
+    display:flex; justify-content:flex-start;
+    padding:8px 0 0; margin-top:4px; border-top:1px solid var(--border-subtle);
+  }
+  /* The expanded detail panel keeps its own grid layout - it is not a data row. */
+  .users-table tr.detail-row { border:0; background:none; padding:0; margin-bottom:8px; }
+  .users-table .detail-row td { display:block; padding:0; }
+}
 
 /* Action buttons */
-.action-group  { display:flex; gap:4px; flex-wrap:wrap; }
-.btn-sm        { font-size:12px !important; padding:3px 8px !important; }
-.btn-warn      { color:#b45309; }
-.btn-ok        { color:#15803d; }
-.btn-danger    { color:#dc2626; }
+.row-menu-trigger { color:var(--fg-2); }
+
+/* Row action popover - teleported to <body>, positioned via inline top/left */
+.row-menu-pop {
+  position:fixed; z-index:1500; min-width:160px;
+  background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
+  box-shadow:var(--elev-2); padding:4px; display:flex; flex-direction:column; gap:1px;
+}
+.row-menu-item {
+  text-align:left; background:none; border:0; padding:7px 10px; font-size:12.5px;
+  border-radius:var(--r-xs); cursor:pointer; color:var(--fg-1);
+}
+.row-menu-item:hover:not(:disabled) { background:var(--surface-1); }
+.row-menu-item:disabled { opacity:.5; cursor:not-allowed; }
+.row-menu-item--danger { color:var(--danger-fg); }
+.row-menu-item--danger:hover:not(:disabled) { background:var(--danger-bg); }
 
 /* Expanded detail panel */
 .detail-row > td { padding:0; }
 .detail-panel {
   padding:16px 20px;
-  background:#f8fafc;
-  border-left:3px solid #3b82f6;
-  border-bottom:1px solid #e2e8f0;
+  background:var(--surface-1);
+  border-bottom:1px solid var(--border-subtle);
 }
 .detail-grid {
   display:grid;
@@ -562,37 +887,37 @@ function fmtDateTime(d?: string | null) {
   margin-bottom:12px;
 }
 .detail-item   { display:flex; flex-direction:column; gap:2px; }
-.detail-label  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
-.detail-value  { font-size:12px; color:#1e293b; word-break:break-all; }
-.detail-value.mono { font-family:monospace; font-size:11px; color:#475569; }
-.detail-footer { border-top:1px solid #e2e8f0; padding-top:10px; display:flex; gap:8px; }
+.detail-label  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.detail-value  { font-size:12px; color:var(--fg-1); word-break:break-all; }
+.detail-value.mono { font-family:var(--font-mono); font-size:11px; color:var(--fg-2); }
+.detail-footer { border-top:1px solid var(--border-subtle); padding-top:10px; display:flex; gap:8px; }
 
 /* Load more */
-.load-more { text-align:center; padding:12px 0 4px; }
+.load-more { text-align:center; padding:12px 12px 4px; }
 
 /* Modal */
-.modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
-.modal { background:#fff; border-radius:12px; width:480px; max-width:100%; box-shadow:0 24px 64px rgba(0,0,0,.22); display:flex; flex-direction:column; }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid #f1f5f9; }
-.modal-close  { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; line-height:1; padding:0 4px; }
-.modal-close:hover { color:#475569; }
+.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
+.modal { background:var(--surface-2); border-radius:var(--r-lg); width:480px; max-width:100%; box-shadow:var(--elev-3); display:flex; flex-direction:column; }
+.modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--border-subtle); }
+.modal-close  { background:none; border:none; font-size:22px; cursor:pointer; color:var(--fg-3); line-height:1; padding:0 4px; }
+.modal-close:hover { color:var(--fg-2); }
 .modal-body   { padding:20px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:70vh; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid #f1f5f9; }
+.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border-subtle); }
 
 /* Form elements */
 .form-group { display:flex; flex-direction:column; gap:4px; }
-.form-group label { font-size:12px; font-weight:600; color:#374151; }
+.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); }
 .form-row   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.input-full { width:100%; padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; background:#fff; box-sizing:border-box; }
-.input-full:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px #dbeafe; }
-.input-error { border-color:#f87171; }
-.field-error { font-size:11px; color:#dc2626; margin-top:2px; }
-.hint       { font-weight:400; color:#94a3b8; }
-.required   { color:#dc2626; }
+.input-full { width:100%; padding:7px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); box-sizing:border-box; }
+.input-full:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-wash); }
+.input-error { border-color:var(--destructive); }
+.field-error { font-size:11px; color:var(--danger-fg); margin-top:2px; }
+.hint       { font-weight:400; color:var(--fg-3); }
+.required   { color:var(--danger-fg); }
 .form-check-row { display:flex; flex-wrap:wrap; gap:16px; }
 .check-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; }
-.api-error  { font-size:12px; color:#dc2626; padding:8px 12px; background:#fee2e2; border-radius:6px; border:1px solid #fca5a5; }
+.api-error  { font-size:12px; color:var(--danger-fg); padding:8px 12px; background:var(--danger-bg); border-radius:6px; border:1px solid color-mix(in srgb, var(--danger-fg) 30%, transparent); }
 
 /* Empty */
-.empty-row { text-align:center; color:#94a3b8; font-size:13px; padding:28px; }
+.empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 </style>

@@ -16,17 +16,45 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Cargo Ops (30d)" :value="fmtNum(cargoOpsTotal)" sub="Offload / load / stevedoring" source="live" source-title="KPA Ops" />
-    <KpiCard label="Avg Tonnes / Gang Hour" :value="avgTonnesPerGangHour != null ? avgTonnesPerGangHour.toFixed(1) : '-'" sub="Stevedoring productivity (from sampled ops)" source="live" source-title="KPA Ops" />
-    <KpiCard label="Pilotage Calls (30d)" :value="fmtNum(pilotageCallsTotal)" sub="Boarding to berthing" source="live" source-title="KPA Pilotage" />
-    <KpiCard label="Avg Pilotage Duration" :value="avgPilotageDurationMin != null ? `${avgPilotageDurationMin.toFixed(0)} min` : '-'" sub="Target: <120 min (Mombasa)" :trend-direction="avgPilotageDurationMin != null && avgPilotageDurationMin <= 120 ? 'up' : 'down'" source="live" source-title="KPA Pilotage" />
-    <KpiCard label="Pilotage Incidents (sampled)" :value="fmtNum(pilotageIncidentsSampled)" sub="Flagged near-miss / grounding / collision" :trend-direction="pilotageIncidentsSampled === 0 ? 'up' : 'down'" source="live" source-title="KMA" />
-    <KpiCard label="Licences Expiring (30d)" :value="fmtNum(licencesExpiringTotal)" sub="Vessel / pilot / equipment" source="live" source-title="KMA" />
+    <KpiCard
+      label="Cargo Ops (30d)" :value="fmtNum(cargoOpsTotal)"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA Ops feed unavailable'"
+      period="30D" description="Offload / load / stevedoring" to="#cargo-ops-table"
+    />
+    <KpiCard
+      label="Avg Tonnes / Gang Hour" :value="avgTonnesPerGangHour != null ? avgTonnesPerGangHour.toFixed(1) : '-'"
+      :unavailable="loading || cargoOpsError" :unavailable-note="loading ? 'Loading…' : 'KPA Ops feed unavailable'"
+      period="LIVE" description="Stevedoring productivity (from sampled ops)" to="#cargo-ops-table"
+    />
+    <KpiCard
+      label="Pilotage Calls (30d)" :value="fmtNum(pilotageCallsTotal)"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA Pilotage feed unavailable'"
+      period="30D" description="Boarding to berthing" to="#pilotage-table"
+    />
+    <KpiCard
+      label="Avg Pilotage Duration" :value="avgPilotageDurationMin != null ? `${avgPilotageDurationMin.toFixed(0)} min` : '-'"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA Pilotage feed unavailable'"
+      period="30D" description="Target: &lt;120 min (Mombasa)"
+      :status="avgPilotageDurationMin == null ? undefined : avgPilotageDurationMin <= 120 ? 'healthy' : 'warning'"
+      to="#pilotage-table"
+    />
+    <KpiCard
+      label="Pilotage Incidents (sampled)" :value="fmtNum(pilotageIncidentsSampled)"
+      :unavailable="loading || pilotageError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Flagged near-miss / grounding / collision"
+      :status="loading || pilotageError ? undefined : pilotageIncidentsSampled === 0 ? 'healthy' : 'warning'"
+      to="#pilotage-table"
+    />
+    <KpiCard
+      label="Licences Expiring (30d)" :value="fmtNum(licencesExpiringTotal)"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="30D" description="Vessel / pilot / equipment" to="#licensing-table"
+    />
   </div>
 
   <!-- Cargo Handling Operations -->
   <SectionTitle pill="KPA Ops · Live">Cargo Handling Operations</SectionTitle>
-  <div class="card">
+  <div id="cargo-ops-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="opFilter" class="select-sm">
@@ -43,7 +71,7 @@
             <tr><th>Vessel</th><th>Port</th><th>Operation</th><th>Crane</th><th>Gang Size</th><th>Tonnes Moved</th><th>t/hr</th><th>Equipment</th><th>Damage</th></tr>
           </thead>
           <tbody v-if="filteredCargoOps.length">
-            <tr v-for="c in filteredCargoOps" :key="c.id">
+            <tr v-for="c in cargoRowsPageRows" :key="c.id">
               <td style="font-weight:600;font-size:12px">{{ c.vessel_name ?? '-' }}</td>
               <td style="font-family:monospace;font-size:12px">{{ c.port_unlocode }}</td>
               <td><BadgePill variant="info">{{ c.operation_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -55,40 +83,48 @@
               <td><BadgePill :variant="c.damage_reported ? 'danger' : 'success'">{{ c.damage_reported ? 'Yes' : 'No' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No cargo handling operations in the current view.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No cargo handling operations in the current view.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="cargoRowsPage" :total-pages="cargoRowsTotalPages" :total="cargoRowsTotal"
+          @prev="cargoRowsPrev" @next="cargoRowsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- Pilotage -->
   <SectionTitle pill="KPA Pilotage Dept · Live">Pilotage Records</SectionTitle>
-  <div class="card">
+  <div id="pilotage-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
           <tr><th>Vessel</th><th>Port</th><th>Pilot</th><th>Boarding</th><th>Berthing</th><th>Duration</th><th>Tugs</th><th>Incident</th></tr>
         </thead>
         <tbody v-if="pilotage.length">
-          <tr v-for="p in pilotage" :key="p.id">
+          <tr v-for="p in pilotagePageRows" :key="p.id">
             <td style="font-weight:600;font-size:12px">{{ p.vessel_name }}</td>
             <td style="font-family:monospace;font-size:12px">{{ p.port_unlocode }}</td>
             <td style="font-size:12px;font-family:monospace">{{ p.pilot_id }}</td>
             <td style="font-size:11px">{{ fmtDate(p.boarding_time) }}</td>
             <td style="font-size:11px">{{ p.berthing_time ? fmtDate(p.berthing_time) : '-' }}</td>
-            <td :style="{ color: (p.duration_hours ?? 0) > 2 ? '#ef4444' : '#22c55e', fontWeight:'600' }">{{ p.duration_hours != null ? `${Math.round(p.duration_hours * 60)} min` : '-' }}</td>
+            <td :style="{ color: (p.duration_hours ?? 0) > 2 ? 'var(--danger-fg)' : 'var(--success-fg)', fontWeight:'600' }">{{ p.duration_hours != null ? `${Math.round(p.duration_hours * 60)} min` : '-' }}</td>
             <td>{{ p.tug_assist_ids.length }}</td>
             <td><BadgePill :variant="p.incident_flag ? 'danger' : 'success'">{{ p.incident_flag ? 'Flagged' : 'None' }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No pilotage records in the current view.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No pilotage records in the current view.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="pilotagePage" :total-pages="pilotageTotalPages" :total="pilotageTotal"
+        @prev="pilotagePrev" @next="pilotageNext"
+      />
     </div>
   </div>
 
   <!-- Licensing -->
   <SectionTitle pill="KMA · Live">Licensing Register</SectionTitle>
-  <div class="card">
+  <div id="licensing-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="licenceCategoryFilter" class="select-sm">
@@ -110,7 +146,7 @@
           <tr><th>Category</th><th>Licence #</th><th>Holder</th><th>Authority</th><th>Issued</th><th>Expiry</th><th>Status</th><th>Endorsements</th></tr>
         </thead>
         <tbody v-if="filteredLicences.length">
-          <tr v-for="l in filteredLicences" :key="l.id">
+          <tr v-for="l in licencesPageRows" :key="l.id">
             <td><BadgePill variant="info">{{ l.licence_type.replace(/_/g,' ') }}</BadgePill></td>
             <td style="font-family:monospace;font-size:11px">{{ l.licence_number }}</td>
             <td style="font-weight:600;font-size:12px">{{ l.vessel_name ?? l.holder_id ?? '-' }}</td>
@@ -121,16 +157,18 @@
             <td style="font-size:12px">{{ l.endorsements.length ? l.endorsements.join(', ') : '-' }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No licences in the current view.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No licences in the current view.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="licencesPage" :total-pages="licencesTotalPages" :total="licencesTotal"
+        @prev="licencesPrev" @next="licencesNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Port Services')
-
 import { useMaritimeServices } from '~/composables/api'
 import type { MaritimeServicesSummary, CargoHandlingRecord, PilotageRecord, MaritimeLicence, LicenceCategory, LicenceStatus } from '~/composables/api'
 
@@ -140,6 +178,8 @@ const pilotage  = ref<PilotageRecord[]>([])
 const licences  = ref<MaritimeLicence[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const cargoOpsError = ref(false)
+const pilotageError = ref(false)
 
 const opFilter = ref('')
 const licenceCategoryFilter = ref('')
@@ -162,6 +202,9 @@ async function load() {
   if (plRes.status  === 'fulfilled') pilotage.value = (plRes.value as any).results ?? []
   if (licRes.status === 'fulfilled') licences.value = (licRes.value as any).results ?? []
 
+  cargoOpsError.value = coRes.status === 'rejected'
+  pilotageError.value = plRes.status === 'rejected'
+
   if ([sumRes, coRes, plRes, licRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime Services API.'
 
@@ -176,6 +219,22 @@ const filteredLicences = computed(() => licences.value.filter(l => {
   if (licenceStatusFilter.value && l.status !== (licenceStatusFilter.value as LicenceStatus)) return false
   return true
 }))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: cargoRowsPageRows, page: cargoRowsPage, totalPages: cargoRowsTotalPages,
+  total: cargoRowsTotal, next: cargoRowsNext, prev: cargoRowsPrev,
+} = usePagination(filteredCargoOps, 15)
+
+const {
+  pageRows: pilotagePageRows, page: pilotagePage, totalPages: pilotageTotalPages,
+  total: pilotageTotal, next: pilotageNext, prev: pilotagePrev,
+} = usePagination(pilotage, 15)
+
+const {
+  pageRows: licencesPageRows, page: licencesPage, totalPages: licencesTotalPages,
+  total: licencesTotal, next: licencesNext, prev: licencesPrev,
+} = usePagination(filteredLicences, 15)
 
 // ── Summary KPIs (aggregated from the per-port summary + sampled catalogues) ─
 const cargoOpsTotal = computed(() => summary.value?.ports.reduce((s, p) => s + p.cargo_operations_count, 0) ?? null)
@@ -221,9 +280,7 @@ function licenceBadge(l: MaritimeLicence) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
 </style>

@@ -18,8 +18,10 @@
 // ─────────────────────────────────────────────────────────────────────
 import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  plugins: [vue()],
   test: {
     // Per-file environment override - happy-dom for Vue/Pinia,
     // node for integration tests that hit the live backend.

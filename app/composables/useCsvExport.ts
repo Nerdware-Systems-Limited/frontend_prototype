@@ -19,7 +19,7 @@ export function useCsvExport() {
   function exportCsv(filename: string, rows: Record<string, unknown>[], columns?: CsvColumn[]) {
     if (typeof window === 'undefined' || !rows.length) return
 
-    const cols = columns ?? Object.keys(rows[0]).map(k => ({ key: k, label: k }))
+    const cols = columns ?? Object.keys(rows[0]!).map(k => ({ key: k, label: k }))
     const header = cols.map(c => toCsvValue(c.label)).join(',')
     const body = rows.map(r => cols.map(c => toCsvValue(r[c.key])).join(',')).join('\n')
     const csv = `${header}\n${body}`

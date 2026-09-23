@@ -17,40 +17,56 @@
     <KpiCard
       label="Critical Black Spots"
       :value="fmtNum(tierCount('critical'))"
-      sub="Highest-ranked risk clusters"
-      source="batch" source-title="NTSA KDE Analysis"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA KDE Analysis feed unavailable'"
+      period="ALL"
+      description="Highest-ranked risk clusters"
+      :status="loading || spotsError ? undefined : tierCount('critical') > 0 ? 'critical' : 'healthy'"
+      to="#blackspot-inventory"
     />
     <KpiCard
       label="High-Risk Spots"
       :value="fmtNum(tierCount('high'))"
-      sub="Tier 2 clusters"
-      source="batch" source-title="NTSA KDE Analysis"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA KDE Analysis feed unavailable'"
+      period="ALL"
+      description="Tier 2 clusters"
+      to="#blackspot-inventory"
     />
     <KpiCard
       label="Total Black Spots"
       :value="fmtNum(spots.length)"
-      sub="All tiers"
-      source="batch" source-title="NTSA KDE Analysis"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA KDE Analysis feed unavailable'"
+      period="ALL"
+      description="All tiers"
+      to="#blackspot-inventory"
     />
     <KpiCard
       label="Avg KDE Intensity"
       :value="avgKDE ? avgKDE.toFixed(3) : '-'"
-      sub="Kernel density estimate"
-      source="batch" source-title="KDE Model"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'KDE Model feed unavailable'"
+      period="ALL"
+      description="Kernel density estimate"
     />
     <KpiCard
       label="Total Accidents (rolling)"
       :value="fmtNum(totalAccidents)"
-      sub="Across all black spots"
-      trend-direction="down"
-      source="batch" source-title="NTSA IRSMS"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
+      period="ROLLING"
+      description="Across all black spots"
+      to="#blackspot-inventory"
     />
     <KpiCard
       label="Total Fatalities (rolling)"
       :value="fmtNum(totalFatalities)"
-      sub="Rolling window count"
-      trend-direction="down"
-      source="batch" source-title="NTSA IRSMS"
+      :unavailable="loading || spotsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
+      period="ROLLING"
+      description="Rolling window count"
+      to="#blackspot-inventory"
     />
   </div>
 
@@ -79,7 +95,7 @@
   <!-- Black spot table -->
   <SectionTitle>Black Spot Inventory</SectionTitle>
 
-  <div class="card">
+  <div id="blackspot-inventory" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="spotSearch" class="select-sm" placeholder="Search road name / code…" style="min-width:180px" />
@@ -108,7 +124,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredSpots.length">
-          <template v-for="bs in filteredSpots" :key="bs.id">
+          <template v-for="bs in spotsPageRows" :key="bs.id">
             <tr class="expand-row" @click="expanded = expanded === bs.id ? null : bs.id">
               <td class="expand-cell">{{ expanded === bs.id ? '▾' : '▸' }}</td>
               <td>{{ bs.segment_road_name ?? bs.segment_road_code ?? '-' }}</td>
@@ -132,12 +148,16 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading…' : 'No black spots found' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="spotsPage" :total-pages="spotsTotalPages" :total="spotsTotal"
+        @prev="spotsPrev" @next="spotsNext"
+      />
     </div>
   </div>
 
@@ -160,7 +180,7 @@
             <div class="bar-val">{{ fmtNum(c.total ?? 0) }}</div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No data' }}</div>
+        <EmptyState v-else :loading="loading" message="No data" compact />
       </div>
     </div>
 
@@ -179,7 +199,7 @@
             <span class="hs-score">{{ hs.predicted_risk_score.toFixed(2) }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No hotspot data' }}</div>
+        <EmptyState v-else :loading="loading" message="No hotspot data" compact />
       </div>
     </div>
   </div>
@@ -187,8 +207,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Blackspot Analysis')
-
 import { useSafety, useGis } from '~/composables/api'
 import type { BlackSpot, PredictiveHotspot } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -201,6 +219,7 @@ const causeData = ref<any[]>([])
 const roadsGeo  = ref<GeoJSONFeatureCollection | null>(null)
 const loading   = ref(true)
 const error     = ref<string | null>(null)
+const spotsError = ref(false)
 const lastRefreshed = ref('-')
 const tierFilter = ref('')
 const spotSearch = ref('')
@@ -234,6 +253,8 @@ async function load() {
   }
   if (roadsRes.status === 'fulfilled') roadsGeo.value = roadsRes.value
 
+  spotsError.value = bsRes.status === 'rejected'
+
   if (bsRes.status === 'rejected' && hsRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Safety API.'
 
@@ -257,6 +278,12 @@ const filteredSpots = computed(() =>
     return true
   }),
 )
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: spotsPageRows, page: spotsPage, totalPages: spotsTotalPages,
+  total: spotsTotal, next: spotsNext, prev: spotsPrev,
+} = usePagination(filteredSpots, 15)
+
 const spotExportColumns = [
   { key: 'segment_road_name', label: 'Road' },
   { key: 'ranking_tier', label: 'Tier' },
@@ -341,35 +368,31 @@ function riskBadge(t: string | null) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
-.map-key { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; padding:8px 16px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; padding:8px 16px; border-top:1px solid var(--border-subtle); }
 .mk-item { display:flex; align-items:center; gap:4px; }
 .mk-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 .filter-row { display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:140px 1fr 50px; align-items:center; gap:8px; }
 .bar-label { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bar-track { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.bar-fill { height:100%; background:#ef4444; border-radius:4px; }
+.bar-track { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.bar-fill { height:100%; background:var(--destructive); border-radius:4px; }
 .bar-val { font-size:12px; text-align:right; font-weight:600; }
 .hs-list { display:flex; flex-direction:column; gap:6px; }
-.hs-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f1f5f9; }
-.hs-rank { width:24px; font-size:11px; font-weight:700; color:#94a3b8; }
+.hs-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-subtle); }
+.hs-rank { width:24px; font-size:11px; font-weight:700; color:var(--fg-3); }
 .hs-info { flex:1; min-width:0; }
 .hs-seg { font-size:12px; font-weight:600; }
-.hs-factors { font-size:11px; color:#94a3b8; }
-.hs-score { font-size:13px; font-weight:700; color:#ef4444; }
+.hs-factors { font-size:11px; color:var(--fg-3); }
+.hs-score { font-size:13px; font-weight:700; color:var(--danger-fg); }
 </style>

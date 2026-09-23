@@ -31,42 +31,44 @@
     <KpiCard
       label="Total Bridges"
       :value="fmtNum(scopedBridges.length)"
-      :sub="agencyLabel"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" :description="agencyLabel" to="#bridge-inventory-table"
     />
     <KpiCard
       label="Good Condition"
       :value="fmtNum(countByClass('good'))"
-      sub="Condition score ≥ 80"
-      trend-direction="up"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" description="Condition score ≥ 80" to="#bridge-inventory-table"
     />
     <KpiCard
       label="Fair Condition"
       :value="fmtNum(countByClass('fair'))"
-      sub="Score 60–79, monitor closely"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" description="Score 60–79, monitor closely" to="#bridge-inventory-table"
     />
     <KpiCard
       label="Poor / Critical"
       :value="fmtNum(countByClass('poor') + countByClass('critical'))"
-      sub="Urgent inspection required"
-      trend-direction="down"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" description="Urgent inspection required"
+      :status="loading || bridgesError ? undefined : (countByClass('poor') + countByClass('critical')) > 0 ? 'warning' : 'healthy'"
+      to="#bridge-inventory-table"
     />
     <KpiCard
       label="Avg Condition Score"
       :value="avgScore ? avgScore.toFixed(1) : '-'"
-      sub="Out of 100"
-      :trend-direction="avgScore && avgScore >= 70 ? 'up' : 'down'"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" description="Out of 100"
+      :status="avgScore == null ? undefined : avgScore >= 70 ? 'healthy' : 'warning'"
+      to="#bridge-inventory-table"
     />
     <KpiCard
       label="Overdue Inspections"
       :value="fmtNum(overdueCount)"
-      sub="Next inspection date passed"
-      trend-direction="down"
-      source="batch" source-title="Bridge Mgmt System"
+      :unavailable="loading || bridgesError" :unavailable-note="loading ? 'Loading…' : 'Bridge Mgmt System feed unavailable'"
+      period="LIVE" description="Next inspection date passed"
+      :status="loading || bridgesError ? undefined : overdueCount > 0 ? 'warning' : 'healthy'"
+      to="#bridge-inventory-table"
     />
   </div>
 
@@ -76,28 +78,29 @@
     <KpiCard
       label="Streetlights Operational"
       :value="streetlightPct != null ? `${streetlightPct.toFixed(0)}%` : '-'"
-      sub="Of registered streetlights"
-      source="batch" source-title="Streetlight Registry"
+      :unavailable="loading || summaryError" :unavailable-note="loading ? 'Loading…' : 'Streetlight Registry feed unavailable'"
+      period="LIVE" description="Of registered streetlights"
     />
     <KpiCard
       label="Traffic Signal Faults"
       :value="fmtNum(agencySignalFaults.length)"
-      :sub="agencyLabel"
-      trend-direction="down"
-      source="live" source-title="NaMATA / NCC"
+      :unavailable="loading || signalError" :unavailable-note="loading ? 'Loading…' : 'NaMATA / NCC feed unavailable'"
+      period="LIVE" :description="agencyLabel"
+      :status="loading || signalError ? undefined : agencySignalFaults.length > 0 ? 'warning' : 'healthy'"
     />
     <KpiCard
       label="WIM Overload Rate"
       :value="summary?.wim.overload_rate_pct != null ? `${summary.wim.overload_rate_pct.toFixed(1)}%` : '-'"
-      sub="Network-wide · 30d"
-      source="live" source-title="WIM Stations"
+      :unavailable="loading || summaryError" :unavailable-note="loading ? 'Loading…' : 'WIM Stations feed unavailable'"
+      period="30D" description="Network-wide · 30d"
     />
     <KpiCard
       label="Closures / Restrictions"
       :value="fmtNum(closures.length)"
-      sub="Active rural road reports"
-      trend-direction="down"
-      source="batch" source-title="Field Reports"
+      :unavailable="loading || closuresError" :unavailable-note="loading ? 'Loading…' : 'Field Reports feed unavailable'"
+      period="LIVE" description="Active rural road reports"
+      :status="loading || closuresError ? undefined : closures.length > 0 ? 'warning' : 'healthy'"
+      to="#closures-restrictions"
     />
   </div>
 
@@ -115,9 +118,7 @@
           :meta="`${b.bridge_type} · Span: ${b.span_length_m != null ? `${b.span_length_m.toFixed(0)}m` : '-'} · Load: ${b.load_capacity_tonnes != null ? `${b.load_capacity_tonnes.toFixed(1)}t` : '-'} · Score: ${b.condition_score != null ? b.condition_score.toFixed(1) : '-'} · Last inspection: ${fmtDate(b.last_inspection_at)}`"
         />
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">
-        {{ loading ? 'Loading critical bridges…' : 'No bridges in critical condition.' }}
-      </div>
+      <EmptyState v-else :loading="loading" message="No bridges in critical condition." compact />
     </div>
   </div>
 
@@ -158,7 +159,7 @@
             <div class="ti-avg">Avg score: {{ t.avg_score != null ? t.avg_score.toFixed(1) : '-' }}</div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No type data' }}</div>
+        <EmptyState v-else :loading="loading" message="No type data" compact />
       </div>
     </div>
   </div>
@@ -166,7 +167,7 @@
   <!-- Bridge table with filters -->
   <SectionTitle>Bridge Inventory ({{ agencyLabel }})</SectionTitle>
 
-  <div class="card">
+  <div id="bridge-inventory-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="condFilter" class="select-sm">
@@ -215,7 +216,7 @@
           </tr>
         </thead>
         <tbody v-if="filteredBridges.length">
-          <template v-for="b in filteredBridges" :key="b.id">
+          <template v-for="b in bridgesPageRows" :key="b.id">
             <tr class="expand-row" @click="expanded = expanded === b.id ? null : b.id">
               <td class="expand-cell">{{ expanded === b.id ? '▾' : '▸' }}</td>
               <td style="font-weight:600">{{ b.bridge_name }}</td>
@@ -228,7 +229,7 @@
                 <div class="score-bar-wrap">
                   <div
                     class="score-bar"
-                    :style="{ width: `${b.condition_score ?? 0}%`, background: scoreColor(b.condition_score) }"
+                    :style="{ transform: `scaleX(${(b.condition_score ?? 0) / 100})`, background: scoreColor(b.condition_score) }"
                   />
                 </div>
                 <span style="font-size:11px">{{ b.condition_score != null ? b.condition_score.toFixed(1) : '-' }}</span>
@@ -237,7 +238,7 @@
               <td style="font-size:12px">{{ b.year_built ?? '-' }}</td>
               <td style="font-size:12px;white-space:nowrap">{{ fmtDate(b.last_inspection_at) }}</td>
               <td style="font-size:12px;white-space:nowrap">
-                <span :style="{ color: isOverdue(b.next_inspection_at) ? '#ef4444' : 'inherit' }">
+                <span :style="{ color: isOverdue(b.next_inspection_at) ? 'var(--danger-fg)' : 'inherit' }">
                   {{ fmtDate(b.next_inspection_at) }}
                 </span>
               </td>
@@ -255,24 +256,28 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="11" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading bridges…' : 'No bridges match current filters.' }}
             </td>
           </tr>
         </tbody>
       </table>
       </div>
+      <TablePagination
+        :page="bridgesPage" :total-pages="bridgesTotalPages" :total="bridgesTotal"
+        @prev="bridgesPrev" @next="bridgesNext"
+      />
     </div>
   </div>
 
   <!-- Closures / restrictions -->
-  <div v-if="closures.length" class="card" style="margin-bottom:16px">
+  <div v-if="closures.length" id="closures-restrictions" class="card drill-target" style="margin-bottom:16px">
     <div class="card-header">Closures / Restrictions ({{ agencyLabel }})</div>
     <div class="card-body">
       <table>
         <thead><tr><th>Road</th><th>Status</th><th>Reason</th><th>Reported</th></tr></thead>
         <tbody>
-          <tr v-for="c in scopedClosures" :key="c.id">
+          <tr v-for="c in closuresPageRows" :key="c.id">
             <td style="font-weight:600;font-size:12px">{{ c.segment_road_name ?? c.segment_road_code ?? '-' }}</td>
             <td><BadgePill variant="warning">{{ c.status }}</BadgePill></td>
             <td style="font-size:12px">{{ c.closure_reason || '-' }}</td>
@@ -280,14 +285,16 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="closuresPage" :total-pages="closuresTotalPages" :total="closuresTotal"
+        @prev="closuresPrev" @next="closuresNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Bridges')
-
 import { useInfrastructure, useGis } from '~/composables/api'
 import type { Bridge, TrafficSignal, RuralRoadStatus, InfrastructureSummary } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -305,6 +312,10 @@ const summary      = ref<InfrastructureSummary | null>(null)
 const roadsGeo = ref<GeoJSONFeatureCollection | null>(null)
 const loading  = ref(true)
 const error    = ref<string | null>(null)
+const bridgesError  = ref(false)
+const summaryError  = ref(false)
+const signalError   = ref(false)
+const closuresError = ref(false)
 const lastRefreshed = ref('-')
 const condFilter = ref('')
 const typeFilter = ref('')
@@ -341,6 +352,11 @@ async function load() {
   if (sigRes.status   === 'fulfilled') signalFaults.value = (sigRes.value as any).results ?? []
   if (closureRes.status === 'fulfilled') closures.value = (closureRes.value as any).results ?? []
   if (sumRes.status   === 'fulfilled') summary.value = sumRes.value
+
+  bridgesError.value  = allRes.status     === 'rejected'
+  summaryError.value  = sumRes.status     === 'rejected'
+  signalError.value   = sigRes.status     === 'rejected'
+  closuresError.value = closureRes.status === 'rejected'
 
   if ([allRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -381,6 +397,17 @@ const filteredBridges = computed(() =>
 )
 
 function countByClass(cls: string) { return scopedBridges.value.filter(b => b.condition_class === cls).length }
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: bridgesPageRows, page: bridgesPage, totalPages: bridgesTotalPages,
+  total: bridgesTotal, next: bridgesNext, prev: bridgesPrev,
+} = usePagination(filteredBridges, 15)
+
+const {
+  pageRows: closuresPageRows, page: closuresPage, totalPages: closuresTotalPages,
+  total: closuresTotal, next: closuresNext, prev: closuresPrev,
+} = usePagination(scopedClosures, 15)
 
 // ── Export (current filtered view) ──────────────────────────────────────
 const exportColumns = [
@@ -461,38 +488,34 @@ function condBadge(cls: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:12.5px; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
-.agency-tab:hover { border-color:#3b82f6; color:#3b82f6; }
-.agency-tab.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab:hover { border-color:var(--primary); color:var(--primary); }
+.agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
 .table-scroll { overflow-x:auto; }
 .expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:#94a3b8; font-size:11px; }
-.detail-row td { background:#fafbfc; padding:14px 18px; border-bottom:1px solid #f1f5f9; }
+.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
+.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col-map { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .type-list { display:flex; flex-direction:column; gap:10px; }
 .type-item { }
 .ti-header { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
 .ti-label { font-weight:600; text-transform:capitalize; }
-.ti-count { color:#64748b; }
-.ti-bar-wrap { background:#f1f5f9; border-radius:4px; height:8px; overflow:hidden; margin-bottom:3px; }
-.ti-bar { height:100%; background:#3b82f6; border-radius:4px; }
-.ti-avg { font-size:11px; color:#94a3b8; }
-.score-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.score-bar { height:100%; border-radius:4px; transition:width .4s; }
+.ti-count { color:var(--fg-2); }
+.ti-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:8px; overflow:hidden; margin-bottom:3px; }
+.ti-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
+.ti-avg { font-size:11px; color:var(--fg-3); }
+.score-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.score-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 </style>

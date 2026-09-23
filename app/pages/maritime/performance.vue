@@ -16,17 +16,52 @@
 
   <!-- Live-derived KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Avg Vessel Turnaround" :value="avgVesselTurnaround != null ? `${avgVesselTurnaround.toFixed(1)}h` : '-'" sub="Target: <72h" :trend-direction="avgVesselTurnaround != null && avgVesselTurnaround <= 72 ? 'up' : 'down'" source="live" source-title="KPA" />
-    <KpiCard label="Total TEU" :value="fmtNum(totalTEU)" :sub="`All ports, last ${summary?.days ?? 30}d`" trend-direction="up" source="live" source-title="KPA" />
-    <KpiCard label="Avg BCH" :value="avgBch != null ? avgBch.toFixed(1) : '-'" sub="Target: ≥25 (world class >30)" :trend-direction="avgBch != null && avgBch >= 25 ? 'up' : 'down'" source="live" source-title="Crane Monitoring" />
-    <KpiCard label="Avg Berth Occupancy" :value="pct(avgOccupancy)" sub="Optimal: 70-80%" source="live" source-title="Berth Allocation" />
-    <KpiCard label="Avg Ship Waiting" :value="avgWaiting != null ? `${avgWaiting.toFixed(1)}h` : '-'" sub="UNCTAD threshold: <24h" :trend-direction="avgWaiting != null && avgWaiting <= 24 ? 'up' : 'down'" source="live" source-title="Vessel Traffic" />
-    <KpiCard label="Avg Truck Turnaround" :value="avgTruckTurnaround != null ? `${avgTruckTurnaround.toFixed(0)} min` : '-'" sub="Target: <60 min" :trend-direction="avgTruckTurnaround != null && avgTruckTurnaround <= 60 ? 'up' : 'down'" source="live" source-title="Port Gate System" />
+    <KpiCard
+      label="Avg Vessel Turnaround" :value="avgVesselTurnaround != null ? `${avgVesselTurnaround.toFixed(1)}h` : '-'"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      period="LIVE" description="Target: &lt;72h"
+      :status="avgVesselTurnaround == null ? undefined : avgVesselTurnaround <= 72 ? 'healthy' : 'warning'"
+      to="#core-kpi-table"
+    />
+    <KpiCard
+      label="Total TEU" :value="fmtNum(totalTEU)"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
+      :period="`${summary?.days ?? 30}D`" description="All ports"
+      to="#core-kpi-table"
+    />
+    <KpiCard
+      label="Avg BCH" :value="avgBch != null ? avgBch.toFixed(1) : '-'"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'Crane monitoring feed unavailable'"
+      period="LIVE" description="Target: ≥25 (world class &gt;30)"
+      :status="avgBch == null ? undefined : avgBch >= 25 ? 'healthy' : 'warning'"
+      to="#core-kpi-table"
+    />
+    <KpiCard
+      label="Avg Berth Occupancy" :value="pct(avgOccupancy)"
+      :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'Berth allocation feed unavailable'"
+      period="LIVE" description="Optimal: 70-80%"
+      :status="avgOccupancy == null ? undefined : avgOccupancy >= 70 && avgOccupancy <= 80 ? 'healthy' : 'warning'"
+      to="#core-kpi-table"
+    />
+    <KpiCard
+      label="Avg Ship Waiting" :value="avgWaiting != null ? `${avgWaiting.toFixed(1)}h` : '-'"
+      :unavailable="loading || kpisError" :unavailable-note="loading ? 'Loading…' : 'Vessel traffic feed unavailable'"
+      period="LIVE" description="UNCTAD threshold: &lt;24h"
+      :status="avgWaiting == null ? undefined : avgWaiting <= 24 ? 'healthy' : 'warning'"
+      to="#core-kpi-table"
+    />
+    <KpiCard
+      label="Avg Truck Turnaround" :value="avgTruckTurnaround != null ? `${avgTruckTurnaround.toFixed(0)} min` : '-'"
+      :unavailable="loading || kpisError" :unavailable-note="loading ? 'Loading…' : 'Port gate system feed unavailable'"
+      period="LIVE" description="Target: &lt;60 min"
+      :status="avgTruckTurnaround == null ? undefined : avgTruckTurnaround <= 60 ? 'healthy' : 'warning'"
+      to="#core-kpi-table"
+    />
   </div>
 
   <!-- Core KPI table (9.1) -->
   <SectionTitle pill="UNCTAD / IAPH / World Bank · Live">Core Port Performance KPIs</SectionTitle>
-  <div class="card">
+  <div id="core-kpi-table" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -99,7 +134,7 @@
         <table>
           <thead><tr><th>Rank</th><th>Port</th><th>Vessel Eff. (30%)</th><th>Cargo Speed (25%)</th><th>Turnaround (25%)</th><th>Revenue (10%)</th><th>Safety (10%)</th><th>Composite</th></tr></thead>
           <tbody>
-            <tr v-for="r in ranking" :key="r.port">
+            <tr v-for="r in rankingPageRows" :key="r.port">
               <td style="font-weight:800">#{{ r.rank }}</td>
               <td style="font-weight:600;font-size:12px">{{ r.port_name }}</td>
               <td>{{ categoryVal(r, 'vessel_efficiency') }}</td>
@@ -109,16 +144,20 @@
               <td>{{ categoryVal(r, 'safety_environmental') }}</td>
               <td>
                 <div class="score-bar-wrap">
-                  <div class="score-bar" :style="{ width: `${r.composite_score}%`, background: r.composite_score >= 70 ? '#22c55e' : r.composite_score >= 50 ? '#f59e0b' : '#ef4444' }" />
+                  <div class="score-bar" :style="{ transform: `scaleX(${r.composite_score / 100})`, background: r.composite_score >= 70 ? 'var(--success)' : r.composite_score >= 50 ? 'var(--warning)' : 'var(--destructive)' }" />
                 </div>
                 <span style="font-weight:700;font-size:12px">{{ r.composite_score.toFixed(1) }}</span>
               </td>
             </tr>
           </tbody>
         </table>
+        <TablePagination
+          :page="rankingPage" :total-pages="rankingTotalPages" :total="rankingTotal"
+          @prev="rankingPrev" @next="rankingNext"
+        />
         <div v-if="ranking.some(r => r.missing_categories.length)" class="source-note">Dashes mark categories excluded for a port due to missing data - its composite score is renormalized over the remaining weighted categories rather than penalized to zero.</div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No ports have comparable ranking data for this period.' }}</div>
+      <EmptyState v-else :loading="loading" message="No ports have comparable ranking data for this period." compact />
     </div>
   </div>
 
@@ -142,8 +181,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Port Performance KPIs & Ranking')
-
 import { useMaritimePerformance, RANK_WEIGHTS } from '~/composables/api'
 import type { MaritimePerformanceSummary, PortPerformanceKpi, PortRankingScore, TrackedKpiField, RankingCategory } from '~/composables/api'
 
@@ -152,6 +189,7 @@ const kpis     = ref<PortPerformanceKpi[]>([])
 const ranking  = ref<PortRankingScore[]>([])
 const loading  = ref(true)
 const error    = ref<string | null>(null)
+const kpisError = ref(false)
 
 async function load() {
   loading.value = true
@@ -168,6 +206,8 @@ async function load() {
   if (kpiRes.status  === 'fulfilled') kpis.value = kpiRes.value.ports ?? []
   if (rankRes.status === 'fulfilled') ranking.value = rankRes.value.rankings ?? []
 
+  kpisError.value = kpiRes.status === 'rejected'
+
   if ([sumRes, kpiRes, rankRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Maritime Performance API.'
 
@@ -175,6 +215,12 @@ async function load() {
 }
 
 onMounted(load)
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: rankingPageRows, page: rankingPage, totalPages: rankingTotalPages,
+  total: rankingTotal, next: rankingNext, prev: rankingPrev,
+} = usePagination(ranking, 15)
 
 function avgTracked<T>(rows: T[], pick: (row: T) => number | null | undefined): number | null {
   const vals = rows.map(pick).filter((v): v is number => v != null)
@@ -203,10 +249,9 @@ function pct(v: number | null | undefined) { return v == null ? '-' : `${v.toFix
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin-bottom:16px; }
 .table-scroll { overflow-x:auto; }
-.source-note { margin-top:10px; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px; }
-.score-bar-wrap { display:inline-block; width:60px; background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-right:6px; vertical-align:middle; }
-.score-bar { height:100%; border-radius:4px; transition:width .4s; }
+.source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }
+.score-bar-wrap { display:inline-block; width:60px; background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-right:6px; vertical-align:middle; }
+.score-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 </style>

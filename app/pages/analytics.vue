@@ -1,8 +1,8 @@
 <template>
   <PageHeader
-    eyebrow="Analytics & Predictive Intelligence"
-    title="Analytics Workbench"
-    subtitle="KeNHA · KURA · KMD · NTSA · NaMATA · KRC · KPA · KAA · KCAA - Multi-domain AI forecasts across traffic, safety risk, infrastructure deterioration, and public transport demand"
+    eyebrow="Machine Learning · Predictive Intelligence"
+    title="AI Predictive Workbench"
+    subtitle="KeNHA · KURA · KMD · NTSA · NaMATA · KRC · KPA · KAA · KCAA - Forecasting, anomaly detection & what-if simulation across traffic, safety risk, infrastructure deterioration, and public transport demand"
   >
   </PageHeader>
 
@@ -10,118 +10,247 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Traffic Forecasts"      :value="fmtNum(trafficForecasts.length)"  sub="Predictive segments (24h)"        source="batch" source-title="AI Model · NTSA" />
-    <KpiCard label="Safety Hotspots"        :value="fmtNum(safetyHotspots.length)"    sub="Predicted risk zones"             source="batch" source-title="AI Model · NTSA" />
-    <KpiCard label="At-Risk Road Segments"  :value="fmtNum(atRiskSegments.length)"    sub="Deterioration forecast (12mo)"    source="batch" source-title="AI Model · KeNHA" />
-    <KpiCard label="PT Demand Forecasts"    :value="fmtNum(demandForecasts.length)"   sub="Route demand predictions"         source="batch" source-title="AI Model · NTSA" />
-    <KpiCard label="High-Severity Congestion" :value="fmtNum(heavyCongestion.length)" sub="Predicted heavy/severe events"    source="batch" source-title="AI Model · KeNHA" />
-    <KpiCard label="Critical Failure Risk"  :value="fmtNum(criticalFailure.length)"   sub="Failure probability ≥ 70%"        :trend-direction="criticalFailure.length === 0 ? 'up' : 'down'" source="batch" source-title="AI Model · KeNHA" />
+    <KpiCard label="Traffic Forecasts" :value="fmtNum(trafficForecasts.length)" :unavailable="loading || tfError" :unavailable-note="loading ? 'Loading…' : 'AI Model · NTSA feed unavailable'" period="24H" description="Predictive segments (24h)" to="#traffic-forecast-table" />
+    <KpiCard label="Safety Hotspots" :value="fmtNum(safetyHotspots.length)" :unavailable="loading || shError" :unavailable-note="loading ? 'Loading…' : 'AI Model · NTSA feed unavailable'" period="LIVE" description="Predicted risk zones" to="#safety-hotspots-table" />
+    <KpiCard label="At-Risk Road Segments" :value="fmtNum(atRiskSegments.length)" :unavailable="loading || arError" :unavailable-note="loading ? 'Loading…' : 'AI Model · KeNHA feed unavailable'" period="12MO" description="Deterioration forecast (12mo)" to="#deterioration-table" />
+    <KpiCard label="PT Demand Forecasts" :value="fmtNum(demandForecasts.length)" :unavailable="loading || dfError" :unavailable-note="loading ? 'Loading…' : 'AI Model · NTSA feed unavailable'" period="24H" description="Route demand predictions" to="#pt-demand-table" />
+    <KpiCard label="High-Severity Congestion" :value="fmtNum(heavyCongestion.length)" :unavailable="loading || tfError" :unavailable-note="loading ? 'Loading…' : 'AI Model · KeNHA feed unavailable'" period="24H" description="Predicted heavy/severe events" to="#traffic-forecast-table" />
+    <KpiCard label="Critical Failure Risk" :value="fmtNum(criticalFailure.length)" :unavailable="loading || arError" :unavailable-note="loading ? 'Loading…' : 'AI Model · KeNHA feed unavailable'" period="12MO" description="Failure probability ≥ 70%" :status="loading || arError ? undefined : criticalFailure.length === 0 ? 'healthy' : 'critical'" to="#deterioration-table" />
   </div>
 
   <!-- ── Prediction Assistant ──────────────────────────────────────── -->
-  <div class="chat-panel">
+   <!-- ── Prediction Assistant ──────────────────────────────────────── -->
+  <section class="chat-panel" aria-labelledby="pa-title">
     <div class="chat-panel-header">
-      <SectionTitle pill="Analyses loaded ML model forecasts">Prediction Assistant</SectionTitle>
+      <SectionTitle id="pa-title" pill="Analyses loaded ML model forecasts">Prediction Assistant</SectionTitle>
       <div class="chat-header-actions">
-        <button class="chat-clear-btn" @click="clearChat" title="Clear conversation">Clear</button>
+        <button
+          type="button"
+          class="chat-clear-btn"
+          :disabled="!hasConversation"
+          title="Clear conversation"
+          @click="clearChat"
+        >Clear</button>
       </div>
     </div>
-
+ 
     <!-- Message thread -->
-    <div class="chat-messages" ref="messagesEl">
-      <div
-        v-for="msg in messages"
+    <div
+      ref="messagesEl"
+      class="chat-messages"
+      role="log"
+      aria-live="polite"
+      aria-relevant="additions text"
+      aria-label="Prediction Assistant conversation"
+      tabindex="0"
+      @scroll.passive="onThreadScroll"
+    >
+      <!-- Empty state: the four model domains ARE the entry points -->
+      <div v-if="!hasConversation" class="pa-start">
+        <p class="pa-start-lede">Ask about any forecast batch currently loaded on this page.</p>
+ 
+        <ul class="pa-domains">
+          <li v-for="d in DOMAINS" :key="d.key">
+            <button
+              type="button"
+              class="pa-domain"
+              :class="`pa-domain--${d.agency.toLowerCase()}`"
+              :disabled="querying"
+              @click="sendText(d.query)"
+            >
+              <span class="pa-domain-agency">{{ d.agency }}</span>
+              <span class="pa-domain-title">{{ d.title }}</span>
+              <span class="pa-domain-blurb">{{ d.blurb }}</span>
+              <span class="pa-domain-count">{{ fmtNum(d.count.value) }} loaded</span>
+            </button>
+          </li>
+        </ul>
+ 
+        <p class="pa-start-note">
+          Models are pre-production - predictions sharpen as training data accumulates.
+        </p>
+      </div>
+ 
+      <!-- `thread` (not `messages`): columns and the row preview are derived
+           once per message instead of once per cell on every render. -->
+      <article
+        v-for="msg in thread"
         :key="msg.id"
         class="chat-msg"
         :class="`chat-msg--${msg.role}`"
       >
-        <div class="chat-bubble" :class="{ 'chat-bubble--error': msg.isError }">
-
-          <!-- Typing indicator -->
-          <div v-if="msg.loading" class="typing-dots">
-            <span /><span /><span />
+        <!-- User turn -->
+        <div v-if="msg.role === 'user'" class="pa-ask">{{ msg.content }}</div>
+ 
+        <!-- Assistant turn: a readout, not a bubble - tables need the width -->
+        <div v-else class="pa-answer" :class="{ 'pa-answer--error': msg.isError }">
+          <div class="pa-answer-meta">
+            <span v-if="msg.result" class="pa-source" :class="agencyClass(msg.result.source)">{{ msg.result.source }}</span>
+            <span v-else-if="msg.isError" class="pa-source pa-source--error">Query failed</span>
+            <span v-else class="pa-source pa-source--model">Loaded forecasts</span>
+            <time class="pa-time" :datetime="msg.timestamp">{{ fmtMsgTime(msg.timestamp) }}</time>
           </div>
-
-          <!-- Text content -->
-          <div v-else class="chat-text">{{ msg.content }}</div>
-
-          <!-- Source pill -->
-          <div v-if="msg.result && !msg.loading" class="query-meta-pill">
-            <span class="qm-dataset">{{ msg.result.source }}</span>
+ 
+          <!-- Loading: says what it is doing, instead of three bouncing dots -->
+          <div v-if="msg.loading" class="pa-loading">
+            <span class="pa-loading-label">Querying forecast tables…</span>
+            <span class="pa-loading-rule" aria-hidden="true"><i /></span>
           </div>
-
-          <!-- Result table -->
-          <div v-if="msg.result && msg.result.rows && msg.result.rows.length" class="result-wrap">
-            <div class="result-header">
-              <span class="result-count-badge">{{ msg.result.rows.length }} of {{ msg.result.total }} predictions</span>
+ 
+          <template v-else>
+            <p class="pa-text">{{ msg.content }}</p>
+ 
+            <!-- Result table -->
+            <div v-if="msg.columns.length" class="result-wrap">
+              <div class="result-header">
+                <span class="result-count-badge">
+                  <strong>{{ msg.preview.length }}</strong> of {{ msg.result!.total }} predictions
+                </span>
+                <button type="button" class="pa-copy" @click="copyRows(msg)">
+                  {{ copiedId === msg.id ? 'Copied' : 'Copy as TSV' }}
+                </button>
+              </div>
+ 
+              <div class="result-table-scroll" tabindex="0" role="region" aria-label="Prediction results">
+                <table class="result-table">
+                  <thead>
+                    <tr>
+                      <th v-for="col in msg.columns" :key="col" scope="col" :class="{ 'is-num': msg.numericCols[col] }">{{ col }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, ri) in msg.preview" :key="ri">
+                      <td
+                        v-for="col in msg.columns"
+                        :key="col"
+                        class="result-cell"
+                        :class="{ 'is-num': msg.numericCols[col] }"
+                      >{{ formatCell(row[col]) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+ 
+              <p v-if="msg.hiddenCount" class="result-overflow">
+                {{ fmtNum(msg.hiddenCount) }} more in the full tables below.
+              </p>
             </div>
-            <div class="result-table-scroll">
-              <table class="result-table">
-                <thead>
-                  <tr>
-                    <th v-for="col in resultColumns(msg.result)" :key="col">{{ col }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, ri) in msg.result.rows.slice(0, 12)" :key="ri">
-                    <td v-for="col in resultColumns(msg.result)" :key="col" class="result-cell">
-                      {{ formatCell(row[col]) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-if="msg.result.total > 12" class="result-overflow">
-              … {{ msg.result.total - 12 }} more predictions - see full tables below
-            </div>
-          </div>
-
-          <!-- Zero results -->
-          <div v-if="msg.result && (!msg.result.rows || !msg.result.rows.length) && !msg.loading" class="zero-result">
-            No records matched those criteria.
-          </div>
-
-          <div class="msg-time">{{ fmtMsgTime(msg.timestamp) }}</div>
+ 
+            <!-- Zero results: says what to do next -->
+            <p v-else-if="msg.askedForRows" class="zero-result">
+              No predictions matched. Try a wider risk tier, a different corridor, or drop the condition filter.
+            </p>
+          </template>
         </div>
+      </article>
+    </div>
+ 
+    <!-- Only while the user has scrolled away from the newest turn -->
+    <button v-if="hasConversation && !atBottom" type="button" class="pa-jump" @click="scrollToLatest">
+      Jump to latest
+    </button>
+ 
+    <!-- Composer -->
+    <div class="pa-composer">
+      <!-- Chips move into the empty state before the first turn -->
+      <div v-if="hasConversation" class="suggestion-row" role="group" aria-label="Common queries">
+        <button
+          v-for="s in SUGGESTIONS"
+          :key="s.label"
+          type="button"
+          class="suggestion-chip"
+          :disabled="querying"
+          @click="sendText(s.query)"
+        >{{ s.label }}</button>
+      </div>
+ 
+      <div class="chat-input-bar">
+        <label class="pa-sr-only" for="pa-input">Ask about the loaded forecasts</label>
+        <textarea
+          id="pa-input"
+          ref="inputEl"
+          v-model="inputText"
+          class="chat-input"
+          rows="1"
+          placeholder="Ask about traffic forecasts, safety hotspots, road deterioration, PT demand…"
+          @input="autoGrow"
+          @keydown.enter.exact.prevent="send"
+        />
+        <!-- While a query runs the button stops it, rather than sitting disabled -->
+        <button v-if="querying" type="button" class="chat-send-btn chat-send-btn--stop" @click="stopQuery">Stop</button>
+        <button v-else type="button" class="chat-send-btn" :disabled="!inputText.trim()" @click="send">Ask</button>
       </div>
     </div>
+  </section>
+  <!-- ── End Prediction Assistant ──────────────────────────────────── -->
+  <!-- ── End NLP Assistant ─────────────────────────────────────────── -->
 
-    <!-- Quick suggestion chips -->
-    <div class="suggestion-row">
-      <button
-        v-for="s in SUGGESTIONS"
-        :key="s.label"
-        class="suggestion-chip"
-        :disabled="querying"
-        @click="sendText(s.query)"
-      >{{ s.label }}</button>
-    </div>
-
-    <!-- Input bar -->
-    <div class="chat-input-bar">
-      <input
-        ref="inputEl"
-        v-model="inputText"
-        class="chat-input"
-        placeholder="Ask about traffic forecasts, safety hotspots, road deterioration, PT demand…"
-        :disabled="querying"
-        @keyup.enter="send"
-      />
-      <button
-        class="chat-send-btn"
-        :disabled="!inputText.trim() || querying"
-        @click="send"
-      >
-        <span v-if="querying" class="send-spinner" />
-        <span v-else>Ask</span>
-      </button>
+  <!-- ── Anomaly Detection Feed ─────────────────────────────────────── -->
+  <SectionTitle pill="Isolation Forest · Live scan">Anomaly Detection Feed</SectionTitle>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body scroll-body">
+      <div v-if="anomalies.length">
+        <AlertItem
+          v-for="a in anomalies" :key="a.id"
+          :severity="a.severity"
+          :title="a.title"
+          :meta="a.meta"
+        />
+      </div>
+      <div v-else class="empty-row" style="padding:16px 0">
+        {{ loading ? 'Scanning for anomalies…' : 'No statistically significant anomalies in the current forecast batch.' }}
+      </div>
     </div>
   </div>
-  <!-- ── End NLP Assistant ─────────────────────────────────────────── -->
+
+  <!-- ── What-If Scenario Modelling ─────────────────────────────────── -->
+  <SectionTitle pill="Client-side projection">What-If Scenario Modelling</SectionTitle>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <div class="scenario-controls">
+        <label class="scenario-slider">
+          <span class="slider-label">Traffic demand growth <strong>{{ trafficGrowthPct > 0 ? '+' : '' }}{{ trafficGrowthPct }}%</strong></span>
+          <input type="range" min="-30" max="60" step="5" v-model.number="trafficGrowthPct" />
+        </label>
+        <label class="scenario-slider">
+          <span class="slider-label">Infrastructure capacity change <strong>{{ capacityChangePct > 0 ? '+' : '' }}{{ capacityChangePct }}%</strong></span>
+          <input type="range" min="-20" max="40" step="5" v-model.number="capacityChangePct" />
+        </label>
+        <label class="scenario-slider">
+          <span class="slider-label">PT ridership / policy shift <strong>{{ demandGrowthPct > 0 ? '+' : '' }}{{ demandGrowthPct }}%</strong></span>
+          <input type="range" min="-30" max="60" step="5" v-model.number="demandGrowthPct" />
+        </label>
+      </div>
+
+      <div class="scenario-grid">
+        <div class="scenario-item">
+          <div class="scenario-label">Avg Traffic Volume</div>
+          <div class="scenario-val" :class="scenario.volumeClass">{{ fmtNum(scenario.projectedVolume) }}</div>
+          <div class="scenario-sub">Baseline {{ fmtNum(scenario.baselineVolume) }} · {{ trafficGrowthPct >= 0 ? '+' : '' }}{{ trafficGrowthPct }}%</div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-label">Projected Congestion</div>
+          <div class="scenario-val" :class="scenario.congestionClass">{{ scenario.congestionLabel }}</div>
+          <div class="scenario-sub">Effective load vs capacity: {{ scenario.loadRatio.toFixed(2) }}×</div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-label">PT Ridership Demand</div>
+          <div class="scenario-val" :class="scenario.demandClass">{{ fmtNum(scenario.projectedDemand) }}</div>
+          <div class="scenario-sub">Baseline {{ fmtNum(scenario.baselineDemand) }} · {{ demandGrowthPct >= 0 ? '+' : '' }}{{ demandGrowthPct }}%</div>
+        </div>
+        <div class="scenario-item">
+          <div class="scenario-label">Avg Safety Risk Score</div>
+          <div class="scenario-val" :class="scenario.riskClass">{{ scenario.projectedRisk.toFixed(0) }}%</div>
+          <div class="scenario-sub">Baseline {{ scenario.baselineRisk.toFixed(0) }}% · {{ scenario.riskDelta >= 0 ? '+' : '' }}{{ scenario.riskDelta.toFixed(0) }}pp</div>
+        </div>
+      </div>
+      <div class="scenario-note">Heuristic projection from currently loaded forecasts, for directional planning discussion - not a calibrated simulation model.</div>
+    </div>
+  </div>
 
   <!-- Traffic forecast panel -->
   <SectionTitle pill="AI Model · KeNHA ATC · Next 24h">Traffic Forecasts</SectionTitle>
-  <div class="card">
+  <div id="traffic-forecast-table" class="card drill-target">
     <div class="card-body">
       <div class="model-legend">
         <span v-for="m in trafficModels" :key="m" class="model-chip">
@@ -134,8 +263,8 @@
           <tr><th>Segment</th><th>Model</th><th>Target Time</th><th>Volume</th><th>Speed</th><th>Congestion</th><th>Horizon</th><th>Computed</th></tr>
         </thead>
         <tbody v-if="trafficForecasts.length">
-          <tr v-for="f in trafficForecasts.slice(0, 20)" :key="f.id">
-            <td class="mono-cell">{{ f.segment }}</td>
+          <tr v-for="f in trafficForecastsPageRows" :key="f.id">
+            <td class="mono-cell">{{ f.segment_road_code ?? f.segment }}</td>
             <td>
               <span class="model-badge" :style="{ background: modelColor(f.model_name) + '1a', color: modelColor(f.model_name), borderColor: modelColor(f.model_name) + '44' }">
                 {{ f.model_name }}
@@ -153,12 +282,16 @@
           <tr><td colspan="8" class="empty-row">{{ loading ? 'Loading forecasts…' : 'No traffic forecast data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="trafficForecastsPage" :total-pages="trafficForecastsTotalPages" :total="trafficForecastsTotal"
+        @prev="trafficForecastsPrev" @next="trafficForecastsNext"
+      />
     </div>
   </div>
 
   <!-- Safety hotspots + infrastructure deterioration -->
   <div class="two-col">
-    <div class="card">
+    <div id="safety-hotspots-table" class="card drill-target">
       <div class="card-header">Predictive Safety Hotspots<span class="card-header-meta">Risk Ranking · AI Model · NTSA</span></div>
       <div class="card-body">
         <table>
@@ -166,12 +299,12 @@
             <tr><th>Road Segment</th><th>Tier</th><th>Risk Score</th><th>Horizon</th><th>Factors</th></tr>
           </thead>
           <tbody v-if="safetyHotspots.length">
-            <tr v-for="h in safetyHotspots.slice(0, 10)" :key="h.id">
+            <tr v-for="h in safetyHotspotsPageRows" :key="h.id">
               <td class="mono-cell">{{ h.segment_road_code ?? h.road_segment }}</td>
               <td><BadgePill :variant="riskBadge(h.risk_tier)">{{ h.risk_tier }}</BadgePill></td>
               <td>
                 <div class="score-bar-wrap">
-                  <div class="score-bar" :style="{ width: `${h.predicted_risk_score ?? 0}%`, background: riskColor(h.risk_tier) }" />
+                  <div class="score-bar" :style="{ transform: `scaleX(${(h.predicted_risk_score ?? 0) / 100})`, background: riskColor(h.risk_tier) }" />
                 </div>
                 <span class="score-label">{{ (h.predicted_risk_score ?? 0).toFixed(0) }}%</span>
               </td>
@@ -186,10 +319,14 @@
           </tbody>
           <tbody v-else><tr><td colspan="5" class="empty-row">{{ loading ? 'Loading…' : 'No safety hotspot data.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="safetyHotspotsPage" :total-pages="safetyHotspotsTotalPages" :total="safetyHotspotsTotal"
+          @prev="safetyHotspotsPrev" @next="safetyHotspotsNext"
+        />
       </div>
     </div>
 
-    <div class="card">
+    <div id="deterioration-table" class="card drill-target">
       <div class="card-header">Road Deterioration Forecasts<span class="card-header-meta">At-Risk Segments · AI Model · KeNHA</span></div>
       <div class="card-body">
         <table>
@@ -197,12 +334,12 @@
             <tr><th>Road Code</th><th>Predicted Class</th><th>Failure Probability</th><th>Horizon</th><th>Computed</th></tr>
           </thead>
           <tbody v-if="atRiskSegments.length">
-            <tr v-for="s in atRiskSegments.slice(0, 10)" :key="s.id">
+            <tr v-for="s in atRiskSegmentsPageRows" :key="s.id">
               <td class="mono-cell">{{ s.segment_road_code }}</td>
               <td><BadgePill :variant="condBadge(s.predicted_condition_class)">{{ (s.predicted_condition_class ?? '-').replace(/_/g,' ') }}</BadgePill></td>
               <td>
                 <div class="score-bar-wrap">
-                  <div class="score-bar" :style="{ width: `${(s.failure_probability ?? 0) * 100}%`, background: (s.failure_probability ?? 0) >= 0.7 ? '#ef4444' : (s.failure_probability ?? 0) >= 0.4 ? '#f59e0b' : '#22c55e' }" />
+                  <div class="score-bar" :style="{ transform: `scaleX(${s.failure_probability ?? 0})`, background: (s.failure_probability ?? 0) >= 0.7 ? 'var(--destructive)' : (s.failure_probability ?? 0) >= 0.4 ? 'var(--warning)' : 'var(--success)' }" />
                 </div>
                 <span class="score-label">{{ ((s.failure_probability ?? 0) * 100).toFixed(0) }}%</span>
               </td>
@@ -212,22 +349,26 @@
           </tbody>
           <tbody v-else><tr><td colspan="5" class="empty-row">{{ loading ? 'Loading…' : 'No deterioration forecast data.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="atRiskSegmentsPage" :total-pages="atRiskSegmentsTotalPages" :total="atRiskSegmentsTotal"
+          @prev="atRiskSegmentsPrev" @next="atRiskSegmentsNext"
+        />
       </div>
     </div>
   </div>
 
   <!-- PT demand forecasts -->
   <SectionTitle pill="AI Model · NTSA · PT Demand">Public Transport Demand Forecasts</SectionTitle>
-  <div class="card">
+  <div id="pt-demand-table" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
           <tr><th>Route</th><th>Model</th><th>Version</th><th>Predicted Passengers</th><th>Confidence Range</th><th>Horizon</th><th>Computed</th></tr>
         </thead>
         <tbody v-if="demandForecasts.length">
-          <tr v-for="f in demandForecasts.slice(0, 15)" :key="f.id">
+          <tr v-for="f in demandForecastsPageRows" :key="f.id">
             <td class="num-bold">{{ f.route_name ?? f.route ?? '-' }}</td>
-            <td><span class="model-badge" style="background:#818cf81a;color:#4f46e5;border-color:#818cf844">{{ f.model_name }}</span></td>
+            <td><span class="model-badge" style="background:var(--info-bg);color:var(--info-fg);border-color:var(--info-fg)">{{ f.model_name }}</span></td>
             <td class="dim-cell">v{{ f.model_version }}</td>
             <td class="pax-big">{{ fmtNum(f.predicted_passengers) }}</td>
             <td class="conf-range">{{ fmtNum(f.lower_passengers) }} – {{ fmtNum(f.upper_passengers) }}</td>
@@ -237,16 +378,19 @@
         </tbody>
         <tbody v-else><tr><td colspan="7" class="empty-row">{{ loading ? 'Loading…' : 'No demand forecast data.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="demandForecastsPage" :total-pages="demandForecastsTotalPages" :total="demandForecastsTotal"
+        @prev="demandForecastsPrev" @next="demandForecastsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Analytics')
-
-import { useTraffic, useSafety, useInfrastructure, usePublicTransport } from '~/composables/api'
-import type { TrafficForecast } from '~/composables/api'
+import { useTraffic, useSafety, useInfrastructure, usePublicTransport, useMlPredictive } from '~/composables/api'
+import type { TrafficForecast, MLModelRegistryEntry } from '~/composables/api'
+import type { Paged } from '~/types/uapts'
 
 // ── Forecast data ──────────────────────────────────────────────────────
 
@@ -254,24 +398,54 @@ const trafficForecasts = ref<TrafficForecast[]>([])
 const safetyHotspots   = ref<any[]>([])
 const atRiskSegments   = ref<any[]>([])
 const demandForecasts  = ref<any[]>([])
+const modelRegistry    = ref<MLModelRegistryEntry[]>([])
 const loading          = ref(true)
 const error            = ref<string | null>(null)
+const tfError = ref(false)
+const shError = ref(false)
+const arError = ref(false)
+const dfError = ref(false)
+
+// Multiple forecasting models (ARIMA/LSTM/Gradient Boost/TimesFM) now
+// coexist in TrafficForecast/DemandForecast, so a single capped page can
+// silently truncate to just one or two of them - e.g. page_size:24 over
+// 160 traffic-forecast rows only shows whichever models happen to sort
+// into the first page by target_at. Page through the *server's* max
+// page_size (100) instead, so the client-side table pagination below
+// (usePagination + TablePagination) works over the complete result set.
+async function fetchAllPages<T>(fetchPage: (page: number) => Promise<Paged<T>>, maxPages = 20): Promise<T[]> {
+  const first = await fetchPage(1)
+  const results = [...(first.results ?? [])]
+  const totalPages = first.total_pages ?? 1
+  for (let page = 2; page <= Math.min(totalPages, maxPages); page++) {
+    const next = await fetchPage(page)
+    results.push(...(next.results ?? []))
+  }
+  return results
+}
 
 async function load() {
   loading.value = true
   error.value   = null
 
-  const [tfRes, shRes, arRes, dfRes] = await Promise.allSettled([
-    useTraffic().forecasts({ page_size: 24 }),
+  const [tfRes, shRes, arRes, dfRes, mrRes] = await Promise.allSettled([
+    fetchAllPages(page => useTraffic().forecasts({ page, page_size: 100 })),
     useSafety().hotspots({ page_size: 12 }),
     useInfrastructure().atRiskForecasts(),
-    usePublicTransport().demandForecasts({ page_size: 15 }),
+    fetchAllPages(page => usePublicTransport().demandForecasts({ page, page_size: 100 })),
+    useMlPredictive().models(),
   ])
 
-  if (tfRes.status === 'fulfilled') trafficForecasts.value = (tfRes.value as any).results ?? []
+  if (tfRes.status === 'fulfilled') trafficForecasts.value = tfRes.value
   if (shRes.status === 'fulfilled') safetyHotspots.value   = (shRes.value as any).results ?? []
   if (arRes.status === 'fulfilled') atRiskSegments.value   = (arRes.value as any).results ?? []
-  if (dfRes.status === 'fulfilled') demandForecasts.value  = (dfRes.value as any).results ?? []
+  if (dfRes.status === 'fulfilled') demandForecasts.value  = dfRes.value
+  if (mrRes.status === 'fulfilled') modelRegistry.value    = mrRes.value
+
+  tfError.value = tfRes.status === 'rejected'
+  shError.value = shRes.status === 'rejected'
+  arError.value = arRes.status === 'rejected'
+  dfError.value = dfRes.status === 'rejected'
 
   if ([tfRes, shRes, arRes, dfRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Analytics API.'
@@ -292,16 +466,165 @@ const criticalFailure = computed(() =>
 )
 const trafficModels = computed(() => [...new Set(trafficForecasts.value.map(f => f.model_name))])
 
+// ── Model status strip - driven by the real MLModelRegistry, not hardcoded ──
+const avgModelLatencyMs = computed(() => {
+  const vals = modelRegistry.value.map(m => m.avg_latency_ms).filter((v): v is number => v != null)
+  if (!vals.length) return null
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+})
+const trafficAccuracyPct = computed(() =>
+  modelRegistry.value.find(m => m.task_type === 'traffic_forecast')?.accuracy_pct ?? null,
+)
+const registryAlgorithms = computed(() => [...new Set(modelRegistry.value.map(m => m.algorithm))].join(' · '))
+const registryFrameworks = computed(() => [...new Set(modelRegistry.value.map(m => m.framework))].join(' · '))
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: trafficForecastsPageRows, page: trafficForecastsPage, totalPages: trafficForecastsTotalPages,
+  total: trafficForecastsTotal, next: trafficForecastsNext, prev: trafficForecastsPrev,
+} = usePagination(trafficForecasts, 15)
+
+const {
+  pageRows: safetyHotspotsPageRows, page: safetyHotspotsPage, totalPages: safetyHotspotsTotalPages,
+  total: safetyHotspotsTotal, next: safetyHotspotsNext, prev: safetyHotspotsPrev,
+} = usePagination(safetyHotspots, 15)
+
+const {
+  pageRows: atRiskSegmentsPageRows, page: atRiskSegmentsPage, totalPages: atRiskSegmentsTotalPages,
+  total: atRiskSegmentsTotal, next: atRiskSegmentsNext, prev: atRiskSegmentsPrev,
+} = usePagination(atRiskSegments, 15)
+
+const {
+  pageRows: demandForecastsPageRows, page: demandForecastsPage, totalPages: demandForecastsTotalPages,
+  total: demandForecastsTotal, next: demandForecastsNext, prev: demandForecastsPrev,
+} = usePagination(demandForecasts, 15)
+
+// ── Anomaly Detection Feed ──────────────────────────────────────────────
+// Isolation-Forest-style outlier scan (z-score threshold) over the forecast
+// batches already loaded above - no separate anomaly API exists yet.
+
+interface Anomaly {
+  id: string
+  severity: 'critical' | 'warning' | 'info'
+  title: string
+  meta: string
+}
+
+function meanStd(vals: number[]) {
+  if (!vals.length) return { mean: 0, std: 0 }
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+  const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length
+  return { mean, std: Math.sqrt(variance) }
+}
+
+const anomalies = computed<Anomaly[]>(() => {
+  const out: Anomaly[] = []
+
+  const { mean: volMean, std: volStd } = meanStd(trafficForecasts.value.map(f => f.predicted_volume))
+  if (volStd > 0) {
+    for (const f of trafficForecasts.value) {
+      const z = (f.predicted_volume - volMean) / volStd
+      if (z <= -1.75) out.push({
+        id: `tv-${f.id}`,
+        severity: z <= -2.5 ? 'critical' : 'warning',
+        title: `Traffic Volume Drop · ${f.segment_road_code ?? f.segment}`,
+        meta: `Predicted ${fmtNum(f.predicted_volume)} vs network avg ${fmtNum(volMean)} (z=${z.toFixed(1)}) - check for an unreported closure`,
+      })
+    }
+  }
+
+  const { mean: paxMean, std: paxStd } = meanStd(demandForecasts.value.map(f => f.predicted_passengers))
+  if (paxStd > 0) {
+    for (const f of demandForecasts.value) {
+      const z = (f.predicted_passengers - paxMean) / paxStd
+      if (z >= 1.75) out.push({
+        id: `pt-${f.id}`,
+        severity: z >= 2.5 ? 'critical' : 'warning',
+        title: `Unusual Demand Spike · ${f.route_name ?? f.route ?? 'Unknown route'}`,
+        meta: `Predicted ${fmtNum(f.predicted_passengers)} passengers vs network avg ${fmtNum(paxMean)} (z=${z.toFixed(1)})`,
+      })
+    }
+  }
+
+  const { mean: fpMean, std: fpStd } = meanStd(atRiskSegments.value.map(s => s.failure_probability ?? 0))
+  if (fpStd > 0) {
+    for (const s of atRiskSegments.value) {
+      const fp = s.failure_probability ?? 0
+      const z = (fp - fpMean) / fpStd
+      if (z >= 1.75) out.push({
+        id: `if-${s.id}`,
+        severity: z >= 2.5 ? 'critical' : 'warning',
+        title: `Failure Probability Spike · ${s.segment_road_code ?? 'Unknown segment'}`,
+        meta: `${(fp * 100).toFixed(0)}% vs network avg ${(fpMean * 100).toFixed(0)}% (z=${z.toFixed(1)})`,
+      })
+    }
+  }
+
+  const order: Record<Anomaly['severity'], number> = { critical: 0, warning: 1, info: 2 }
+  return out.sort((a, b) => order[a.severity] - order[b.severity])
+})
+
+// ── What-If Scenario Modelling ──────────────────────────────────────────
+// Client-side heuristic projection driven by the sliders below - lets
+// analysts sanity-check the directional impact of demand growth, capacity
+// changes, or policy shocks against the currently loaded forecast baseline.
+
+const trafficGrowthPct  = ref(0)
+const capacityChangePct = ref(0)
+const demandGrowthPct   = ref(0)
+
+const scenario = computed(() => {
+  const baselineVolume = trafficForecasts.value.length
+    ? trafficForecasts.value.reduce((a, f) => a + f.predicted_volume, 0) / trafficForecasts.value.length
+    : 0
+  const baselineDemand = demandForecasts.value.length
+    ? demandForecasts.value.reduce((a, f) => a + f.predicted_passengers, 0) / demandForecasts.value.length
+    : 0
+  const baselineRisk = safetyHotspots.value.length
+    ? safetyHotspots.value.reduce((a, h) => a + (h.predicted_risk_score ?? 0), 0) / safetyHotspots.value.length
+    : 0
+
+  const projectedVolume = baselineVolume * (1 + trafficGrowthPct.value / 100)
+  const projectedDemand = baselineDemand * (1 + demandGrowthPct.value / 100)
+
+  const capacityFactor = 1 + capacityChangePct.value / 100
+  const loadRatio = capacityFactor > 0 ? (1 + trafficGrowthPct.value / 100) / capacityFactor : Infinity
+
+  let congestionLabel = 'Free Flow'
+  let congestionClass = 'good'
+  if (loadRatio >= 1.3)       { congestionLabel = 'Severe';   congestionClass = 'crit' }
+  else if (loadRatio >= 1.1)  { congestionLabel = 'Heavy';    congestionClass = 'warn' }
+  else if (loadRatio >= 0.95) { congestionLabel = 'Moderate'; congestionClass = 'warn' }
+
+  const riskDelta = (loadRatio - 1) * 40
+  const projectedRisk = Math.min(100, Math.max(0, baselineRisk + riskDelta))
+
+  return {
+    baselineVolume, projectedVolume,
+    baselineDemand, projectedDemand,
+    baselineRisk, projectedRisk, riskDelta,
+    loadRatio, congestionLabel, congestionClass,
+    volumeClass: trafficGrowthPct.value > 0 ? 'warn' : trafficGrowthPct.value < 0 ? 'good' : '',
+    demandClass: demandGrowthPct.value < 0 ? 'warn' : 'good',
+    riskClass: riskDelta > 5 ? 'crit' : riskDelta > 0 ? 'warn' : 'good',
+  }
+})
+
 // ── Prediction Assistant ───────────────────────────────────────────────
 // Works entirely on forecast data already loaded from the ML model APIs.
 // No additional API calls - pure client-side analysis of predictions.
 
+// ── Prediction Assistant ───────────────────────────────────────────────
+// Answers come from useMlPredictive().ask(); if that call fails for any
+// reason the client-side analysePredictions() below takes over, exactly
+// as before.
+ 
 interface ChatResult {
   rows: Record<string, unknown>[]
   total: number
   source: string
 }
-
+ 
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -311,13 +634,26 @@ interface ChatMessage {
   isError?: boolean
   result?: ChatResult | null
 }
-
-const messages  = ref<ChatMessage[]>([])
-const inputText = ref('')
-const querying  = ref(false)
+ 
+interface ThreadMessage extends ChatMessage {
+  columns: string[]
+  preview: Record<string, unknown>[]
+  numericCols: Record<string, boolean>
+  hiddenCount: number
+  askedForRows: boolean
+}
+ 
+const PREVIEW_ROWS = 12
+const NUMERIC_RE = /^-?[\d,]*\.?\d+\s*(%|km\/h|pp)?$/
+ 
+const messages   = ref<ChatMessage[]>([])
+const inputText  = ref('')
+const querying   = ref(false)
 const messagesEl = ref<HTMLElement | null>(null)
-const inputEl    = ref<HTMLInputElement | null>(null)
-
+const inputEl    = ref<HTMLTextAreaElement | null>(null)
+const atBottom   = ref(true)
+const copiedId   = ref<string | null>(null)
+ 
 const SUGGESTIONS = [
   { label: 'Worst congestion',      query: 'Show the worst traffic congestion forecasts' },
   { label: 'Critical safety zones', query: 'Which safety hotspots are critical risk?' },
@@ -326,248 +662,312 @@ const SUGGESTIONS = [
   { label: 'Forecast summary',      query: 'Give me an overview of all forecasts' },
   { label: 'Heavy traffic',         query: 'Show heavy and severe traffic segments' },
 ]
-
-const WELCOME = `Hello! I analyse UAPTS transport predictions from our ML forecast models.\n\nI can summarise and filter:\n• Traffic congestion forecasts (NTSA)\n• Safety hotspot risk rankings (NTSA)\n• Road deterioration predictions (KeNHA)\n• Public transport demand forecasts (NTSA)\n\nNote: models are in pre-production - predictions will improve as training data accumulates.`
-
-function initChat() {
-  messages.value = [{
-    id: 'welcome',
-    role: 'assistant',
-    content: WELCOME,
-    timestamp: new Date().toISOString(),
-  }]
-}
-
-// ── Local prediction analyser ─────────────────────────────────────────
-// Interprets natural language and computes answers from in-memory data.
-
-interface AnalysisResult {
-  text: string
-  result: ChatResult | null
-}
-
-function analysePredictions(input: string): AnalysisResult {
-  const t = input.toLowerCase()
-
-  const isTraffic  = /\b(traffic|congest|volume|speed|flow|jam|gridlock|road speed)\b/.test(t)
-  const isSafety   = /\b(safety|hotspot|risk|danger|blackspot|accident|crash|hazard)\b/.test(t)
-  const isInfra    = /\b(road|deteriorat|failure|infrastructure|maintenance|pavement|pothole|bridge)\b/.test(t)
-  const isPT       = /\b(transport|bus|route|passenger|demand|matatu|sacco|public transit|pt)\b/.test(t)
-  const isSummary  = /\b(summary|overview|all|everything|status|report|total)\b/.test(t)
-
-  // ── Summary ──────────────────────────────────────────────────────────
-  if (isSummary || (!isTraffic && !isSafety && !isInfra && !isPT)) {
-    const criticalHotspots = safetyHotspots.value.filter(h => h.risk_tier === 'very_high').length
-    const topRoute = [...demandForecasts.value].sort((a, b) => b.predicted_passengers - a.predicted_passengers)[0]
+ 
+// The empty state replaces the old WELCOME message: same four capabilities,
+// but each one runs the query instead of only describing it. Agency labels
+// match the `source` string each branch of analysePredictions() returns.
+const DOMAINS = [
+  { key: 'traffic', agency: 'KeNHA', title: 'Traffic congestion', blurb: 'Volume, speed and congestion class by segment',  count: computed(() => trafficForecasts.value.length), query: 'Show the worst traffic congestion forecasts' },
+  { key: 'safety',  agency: 'NTSA',  title: 'Safety hotspots',    blurb: 'Ranked risk tiers and contributing factors',      count: computed(() => safetyHotspots.value.length),   query: 'Which safety hotspots are critical risk?' },
+  { key: 'infra',   agency: 'KeNHA', title: 'Road deterioration', blurb: 'Segments by predicted failure probability',       count: computed(() => atRiskSegments.value.length),   query: 'Roads with highest failure probability' },
+  { key: 'pt',      agency: 'NTSA',  title: 'PT demand',          blurb: 'Projected passengers per route, with bounds',     count: computed(() => demandForecasts.value.length),  query: 'Highest passenger demand route forecasts' },
+]
+ 
+const hasConversation = computed(() => messages.value.length > 0)
+ 
+// Derive table shape once per message. The old template called
+// resultColumns(msg.result) inside BOTH v-for loops, so a 10 × 6 result
+// rebuilt the column list 70 times per render - and again on every tick.
+const thread = computed<ThreadMessage[]>(() =>
+  messages.value.map((m) => {
+    const rows = m.result?.rows ?? []
+    const columns = rows.length ? Object.keys(rows[0]!) : []
+    const preview = rows.slice(0, PREVIEW_ROWS)
+    const numericCols: Record<string, boolean> = {}
+    for (const col of columns) numericCols[col] = preview.every(r => isNumeric(r[col]))
     return {
-      text: [
-        'ML forecast snapshot (pre-production models):',
-        `• Traffic: ${trafficForecasts.value.length} segments · ${heavyCongestion.value.length} heavy/severe congestion`,
-        `• Safety: ${safetyHotspots.value.length} hotspots · ${criticalHotspots} at critical risk`,
-        `• Roads: ${atRiskSegments.value.length} at-risk segments · ${criticalFailure.value.length} critical failure probability`,
-        `• PT Demand: ${demandForecasts.value.length} routes · highest demand on ${topRoute?.route_name ?? topRoute?.route ?? 'N/A'}`,
-      ].join('\n'),
+      ...m,
+      columns,
+      preview,
+      numericCols,
+      // Counted against rows actually rendered. analysePredictions() caps
+      // rows at 10 while `total` is the unclipped count, so the old
+      // `total - 12` under-reported by 2 and the `total > 12` guard hid
+      // the note entirely for totals of 11 or 12.
+      hiddenCount: Math.max(0, (m.result?.total ?? rows.length) - preview.length),
+      askedForRows: !!m.result,
+    }
+  }),
+)
+ 
+function isNumeric(v: unknown): boolean {
+  if (typeof v === 'number') return true
+  return typeof v === 'string' && v.trim() !== '' && NUMERIC_RE.test(v.trim())
+}
+ 
+function agencyClass(source = ''): string {
+  if (/kenha/i.test(source)) return 'pa-source--kenha'
+  if (/ntsa/i.test(source))  return 'pa-source--ntsa'
+  return 'pa-source--model'
+}
+
+// ── Client-side fallback analysis ───────────────────────────────────────
+// Used only when useMlPredictive().ask() throws (API unreachable). Answers
+// purely from the forecast batches already loaded into this page's refs -
+// no network call.
+const CONGESTION_RANK: Record<string, number> = { free_flow: 0, moderate: 1, heavy: 2, severe: 3 }
+
+function toChatResult(rows: Record<string, unknown>[], source: string): ChatResult {
+  return { rows: rows.slice(0, 10), total: rows.length, source }
+}
+
+function analysePredictions(text: string): { text: string; result: ChatResult | null } {
+  const q = text.toLowerCase()
+
+  // Safety hotspots
+  if (/safety|hotspot|risk/.test(q)) {
+    if (!safetyHotspots.value.length)
+      return { text: 'No safety hotspot forecasts are currently loaded on this page.', result: null }
+
+    let rows = [...safetyHotspots.value]
+    if (/critical|very.?high|worst/.test(q)) {
+      const critical = rows.filter(h => h.risk_tier === 'very_high')
+      if (critical.length) rows = critical
+    }
+    rows.sort((a, b) => (b.predicted_risk_score ?? 0) - (a.predicted_risk_score ?? 0))
+    const top = rows[0]
+    const mapped = rows.map(h => ({
+      Segment: h.segment_road_code ?? h.road_segment ?? '-',
+      Tier: (h.risk_tier ?? '-').replace(/_/g, ' '),
+      'Risk Score': h.predicted_risk_score ?? 0,
+      'Horizon (d)': h.horizon_days ?? '-',
+      Factors: toFactors(h.contributing_factors).join(', ') || '-',
+    }))
+    return {
+      text: `${rows.length} safety hotspot${rows.length === 1 ? '' : 's'} match. Highest risk: ${top.segment_road_code ?? top.road_segment ?? 'unknown segment'} at ${(top.predicted_risk_score ?? 0).toFixed(0)}% (${(top.risk_tier ?? '-').replace(/_/g, ' ')}).`,
+      result: toChatResult(mapped, 'AI Model · NTSA'),
+    }
+  }
+
+  // Road deterioration / failure probability
+  if (/failure|deteriorat|condition|road/.test(q)) {
+    if (!atRiskSegments.value.length)
+      return { text: 'No road deterioration forecasts are currently loaded on this page.', result: null }
+
+    const rows = [...atRiskSegments.value].sort((a, b) => (b.failure_probability ?? 0) - (a.failure_probability ?? 0))
+    const top = rows[0]
+    const mapped = rows.map(s => ({
+      'Road Code': s.segment_road_code ?? '-',
+      'Predicted Class': (s.predicted_condition_class ?? '-').replace(/_/g, ' '),
+      'Failure Probability': `${((s.failure_probability ?? 0) * 100).toFixed(0)}%`,
+      'Horizon (mo)': s.horizon_months ?? '-',
+    }))
+    return {
+      text: `${rows.length} road segment${rows.length === 1 ? '' : 's'} ranked by failure probability. Highest risk: ${top.segment_road_code ?? 'unknown segment'} at ${((top.failure_probability ?? 0) * 100).toFixed(0)}% (${(top.predicted_condition_class ?? '-').replace(/_/g, ' ')}).`,
+      result: toChatResult(mapped, 'AI Model · KeNHA'),
+    }
+  }
+
+  // PT demand
+  if (/demand|passenger|route|\bpt\b/.test(q)) {
+    if (!demandForecasts.value.length)
+      return { text: 'No PT demand forecasts are currently loaded on this page.', result: null }
+
+    const rows = [...demandForecasts.value].sort((a, b) => (b.predicted_passengers ?? 0) - (a.predicted_passengers ?? 0))
+    const top = rows[0]
+    const mapped = rows.map(f => ({
+      Route: f.route_name ?? f.route ?? '-',
+      Model: f.model_name ?? '-',
+      'Predicted Passengers': f.predicted_passengers ?? 0,
+      'Confidence Range': `${fmtNum(f.lower_passengers)} – ${fmtNum(f.upper_passengers)}`,
+      'Horizon (h)': f.horizon_hours ?? '-',
+    }))
+    return {
+      text: `${rows.length} PT demand forecast${rows.length === 1 ? '' : 's'} ranked by predicted passengers. Highest: ${top.route_name ?? top.route ?? 'unknown route'} at ${fmtNum(top.predicted_passengers)} passengers.`,
+      result: toChatResult(mapped, 'AI Model · NTSA'),
+    }
+  }
+
+  // Traffic congestion - checked after the domains above so a stray "road"
+  // in a deterioration query doesn't get pulled in here.
+  if (/traffic|congestion|volume|speed|heavy|severe/.test(q)) {
+    if (!trafficForecasts.value.length)
+      return { text: 'No traffic forecasts are currently loaded on this page.', result: null }
+
+    let rows = [...trafficForecasts.value]
+    if (/heavy|severe/.test(q)) {
+      rows = rows.filter(f => f.predicted_congestion === 'heavy' || f.predicted_congestion === 'severe')
+      if (!rows.length)
+        return { text: 'No segments are currently forecast at heavy or severe congestion.', result: null }
+    }
+    rows.sort((a, b) =>
+      (CONGESTION_RANK[b.predicted_congestion] ?? 0) - (CONGESTION_RANK[a.predicted_congestion] ?? 0)
+      || b.predicted_volume - a.predicted_volume,
+    )
+    const top = rows[0]!
+    const mapped = rows.map(f => ({
+      Segment: f.segment_road_code ?? f.segment,
+      Model: f.model_name,
+      'Target Time': fmtTime(f.target_at),
+      Volume: f.predicted_volume,
+      'Speed (km/h)': f.predicted_speed_kmh,
+      Congestion: (f.predicted_congestion ?? '-').replace(/_/g, ' '),
+      'Horizon (h)': f.horizon_hours,
+    }))
+    return {
+      text: `${rows.length} traffic segment${rows.length === 1 ? '' : 's'} ranked by congestion severity. Worst: ${top.segment_road_code ?? top.segment} at ${(top.predicted_congestion ?? '-').replace(/_/g, ' ')} congestion (${fmtNum(top.predicted_volume)} vehicles).`,
+      result: toChatResult(mapped, 'AI Model · KeNHA'),
+    }
+  }
+
+  // Overview / summary across all domains
+  if (/overview|summary|all forecast/.test(q)) {
+    return {
+      text: `Currently loaded: ${trafficForecasts.value.length} traffic forecasts, ${safetyHotspots.value.length} safety hotspots, ${atRiskSegments.value.length} at-risk road segments, ${demandForecasts.value.length} PT demand forecasts. ${heavyCongestion.value.length} segment${heavyCongestion.value.length === 1 ? '' : 's'} show heavy/severe congestion and ${criticalFailure.value.length} segment${criticalFailure.value.length === 1 ? '' : 's'} have failure probability ≥ 70%.`,
       result: null,
     }
   }
 
-  // ── Traffic forecasts ─────────────────────────────────────────────────
-  if (isTraffic) {
-    let data = [...trafficForecasts.value]
-    let filterDesc = ''
-
-    if (/\b(heavy|severe|worst|bad|congest|jam|gridlock)\b/.test(t)) {
-      data = data.filter(f => f.predicted_congestion === 'heavy' || f.predicted_congestion === 'severe')
-      filterDesc = 'heavy or severe congestion'
-    } else if (/\b(free.?flow|clear|light|good)\b/.test(t)) {
-      data = data.filter(f => f.predicted_congestion === 'free_flow')
-      filterDesc = 'free-flow'
-    } else if (/\bmoderate\b/.test(t)) {
-      data = data.filter(f => f.predicted_congestion === 'moderate')
-      filterDesc = 'moderate congestion'
-    }
-
-    if (/\b(slow|lowest speed|speed)\b/.test(t))
-      data.sort((a, b) => a.predicted_speed_kmh - b.predicted_speed_kmh)
-    else
-      data.sort((a, b) => b.predicted_volume - a.predicted_volume)
-
-    const rows = data.slice(0, 10).map(f => ({
-      Segment:        f.segment,
-      Congestion:     f.predicted_congestion.replace(/_/g, ' '),
-      'Volume':       f.predicted_volume,
-      'Speed km/h':   Number(f.predicted_speed_kmh.toFixed(1)),
-      Model:          f.model_name,
-      'Target':       fmtTime(f.target_at),
-    }))
-
-    const horizon = trafficForecasts.value[0]?.horizon_hours ?? '?'
-    return {
-      text: data.length
-        ? `${data.length} segment${data.length > 1 ? 's' : ''} predicted with ${filterDesc || 'traffic activity'} over the next ${horizon}h. Model inference based on historical patterns - training ongoing.`
-        : `No traffic segments predicted with ${filterDesc || 'that condition'} in current model outputs.`,
-      result: data.length ? { rows, total: data.length, source: 'Traffic Forecasts · KeNHA ML Model' } : null,
-    }
-  }
-
-  // ── Safety hotspots ───────────────────────────────────────────────────
-  if (isSafety) {
-    let data = [...safetyHotspots.value]
-    let filterDesc = ''
-
-    if (/\b(critical|extreme|worst|highest)\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'very_high')
-      filterDesc = 'critical tier'
-    } else if (/\bhigh\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'very_high' || h.risk_tier === 'high')
-      filterDesc = 'high or critical tier'
-    } else if (/\blow\b/.test(t)) {
-      data = data.filter(h => h.risk_tier === 'low')
-      filterDesc = 'low tier'
-    }
-
-    data.sort((a, b) => (b.predicted_risk_score ?? 0) - (a.predicted_risk_score ?? 0))
-
-    const top = data[0]
-    const rows = data.slice(0, 10).map(h => ({
-      'Road Segment':  h.segment_road_code ?? h.road_segment ?? '-',
-      'Risk Tier':     h.risk_tier,
-      'Risk Score':    `${(h.predicted_risk_score ?? 0).toFixed(0)}%`,
-      'Horizon (d)':   h.horizon_days,
-      'Key Factors':   toFactors(h.contributing_factors).slice(0, 2).map((f: string) => f.replace(/_/g, ' ')).join(', ') || '-',
-    }))
-
-    return {
-      text: data.length
-        ? `${data.length} predicted safety hotspot${data.length > 1 ? 's' : ''}${filterDesc ? ` at ${filterDesc}` : ''}. Highest risk: ${top?.segment_road_code ?? top?.road_segment ?? 'unknown'} at ${(top?.predicted_risk_score ?? 0).toFixed(0)}%. Model is pre-production; predictions will sharpen with more incident history.`
-        : `No safety hotspots${filterDesc ? ` at ${filterDesc}` : ''} in current model outputs.`,
-      result: data.length ? { rows, total: data.length, source: 'Safety Hotspots · NTSA ML Model' } : null,
-    }
-  }
-
-  // ── Road deterioration ────────────────────────────────────────────────
-  if (isInfra) {
-    let data = [...atRiskSegments.value]
-    let filterDesc = ''
-
-    if (/\b(critical|worst|fail|collapse|urgent)\b/.test(t)) {
-      data = data.filter(s => (s.failure_probability ?? 0) >= 0.7)
-      filterDesc = 'critical failure probability ≥ 70%'
-    } else if (/\b(poor|bad|deteriorat)\b/.test(t)) {
-      data = data.filter(s => s.predicted_condition_class === 'poor' || s.predicted_condition_class === 'very_poor')
-      filterDesc = 'predicted poor or very poor condition'
-    }
-
-    data.sort((a, b) => (b.failure_probability ?? 0) - (a.failure_probability ?? 0))
-
-    const top = data[0]
-    const rows = data.slice(0, 10).map(s => ({
-      'Road Code':      s.segment_road_code ?? '-',
-      'Condition':      (s.predicted_condition_class ?? '-').replace(/_/g, ' '),
-      'Failure Prob.':  `${((s.failure_probability ?? 0) * 100).toFixed(0)}%`,
-      'Horizon (mo)':   s.horizon_months,
-    }))
-
-    return {
-      text: data.length
-        ? `${data.length} road segment${data.length > 1 ? 's' : ''} predicted for deterioration${filterDesc ? ` (${filterDesc})` : ''}. Highest risk: ${top?.segment_road_code ?? 'unknown'} at ${((top?.failure_probability ?? 0) * 100).toFixed(0)}% failure probability. Infrastructure ML model is in pre-production.`
-        : `No road segments${filterDesc ? ` matching ${filterDesc}` : ''} found in current model outputs.`,
-      result: data.length ? { rows, total: data.length, source: 'Road Deterioration · KeNHA ML Model' } : null,
-    }
-  }
-
-  // ── PT demand ─────────────────────────────────────────────────────────
-  if (isPT) {
-    const data = [...demandForecasts.value]
-
-    if (/\b(low|least|quiet|lowest)\b/.test(t))
-      data.sort((a, b) => a.predicted_passengers - b.predicted_passengers)
-    else
-      data.sort((a, b) => b.predicted_passengers - a.predicted_passengers)
-
-    const top = data[0]
-    const rows = data.slice(0, 10).map(f => ({
-      Route:           f.route_name ?? f.route ?? '-',
-      'Pred. Pax':     f.predicted_passengers,
-      'Lower':         f.lower_passengers,
-      'Upper':         f.upper_passengers,
-      Model:           f.model_name,
-      'Horizon (h)':   f.horizon_hours,
-    }))
-
-    return {
-      text: data.length
-        ? `${data.length} PT route demand forecast${data.length > 1 ? 's' : ''}. ${/low/.test(t) ? 'Lowest' : 'Highest'} demand: ${top?.route_name ?? top?.route ?? 'N/A'} with ${fmtNum(top?.predicted_passengers)} predicted passengers. Demand model is in pre-production.`
-        : 'No public transport demand forecasts in current model outputs.',
-      result: data.length ? { rows, total: data.length, source: 'PT Demand Forecasts · NTSA ML Model' } : null,
-    }
-  }
-
   return {
-    text: 'I can analyse: traffic congestion forecasts, safety risk hotspots, road deterioration predictions, and public transport demand. Try asking about one of those.',
+    text: 'The prediction API is unreachable, so this is a local read of the forecasts already loaded on this page. Try asking about traffic congestion, safety hotspots, road deterioration, or PT demand - e.g. "Show the worst traffic congestion forecasts".',
     result: null,
   }
 }
 
-// ── Send a message ────────────────────────────────────────────────────
-
+// ── Send ──────────────────────────────────────────────────────────────
+// requestSeq lets Stop discard an in-flight answer without the composable
+// needing to support AbortController.
+let requestSeq = 0
+ 
 async function send() {
   const text = inputText.value.trim()
   if (!text || querying.value) return
   inputText.value = ''
-
+  resetInputHeight()
+ 
+  const seq = ++requestSeq
   const uid = `u-${Date.now()}`
   const bid = `b-${Date.now() + 1}`
-
+ 
   messages.value.push({ id: uid, role: 'user', content: text, timestamp: new Date().toISOString() })
   messages.value.push({ id: bid, role: 'assistant', content: '', timestamp: new Date().toISOString(), loading: true })
-
+ 
+  atBottom.value = true
   await nextTick()
   scrollDown()
   querying.value = true
-
-  // Short processing pause so the typing indicator is visible
-  await new Promise(r => setTimeout(r, 400))
-
-  const { text: responseText, result } = analysePredictions(text)
-
+ 
+  let responseText: string
+  let result: ChatResult | null
+ 
+  try {
+    const ask = await useMlPredictive().ask(text)
+    responseText = ask.answer
+    result = ask.rows.length
+      ? { rows: ask.rows, total: ask.total, source: ask.source === 'openai' ? `OpenAI · ${ask.model_used}` : 'AI Model · Server Analysis' }
+      : null
+  } catch {
+    await new Promise(r => setTimeout(r, 400))
+    const local = analysePredictions(text)
+    responseText = local.text
+    result = local.result
+  }
+ 
+  if (seq !== requestSeq) return  // stopped or superseded - drop the stale answer
+ 
   replaceMsg(bid, { content: responseText, result: result ?? undefined })
-
   querying.value = false
-  await nextTick()
-  scrollDown()
+ 
+  await scrollIfPinned()
   inputEl.value?.focus()
 }
-
+ 
 function sendText(query: string) {
   inputText.value = query
   send()
 }
-
+ 
+function stopQuery() {
+  requestSeq++
+  const last = messages.value[messages.value.length - 1]
+  if (last?.loading) replaceMsg(last.id, { content: 'Query stopped.' })
+  querying.value = false
+  inputEl.value?.focus()
+}
+ 
 function replaceMsg(id: string, patch: Partial<ChatMessage>) {
   const idx = messages.value.findIndex(m => m.id === id)
-  if (idx !== -1) messages.value[idx] = { ...messages.value[idx], loading: false, ...patch }
+  if (idx !== -1) messages.value[idx] = { ...messages.value[idx]!, loading: false, ...patch }
 }
-
-function clearChat() { initChat() }
-
+ 
+function clearChat() {
+  requestSeq++
+  messages.value = []
+  inputText.value = ''
+  querying.value = false
+  atBottom.value = true
+  resetInputHeight()
+}
+ 
+// ── Scrolling ─────────────────────────────────────────────────────────
+function onThreadScroll() {
+  const el = messagesEl.value
+  if (!el) return
+  atBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+}
+ 
 function scrollDown() {
   if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
 }
-
-// ── Result table helpers ──────────────────────────────────────────────
-
-function resultColumns(result: ChatResult): string[] {
-  if (!result.rows?.length) return []
-  return Object.keys(result.rows[0])
+ 
+function scrollToLatest() {
+  const el = messagesEl.value
+  if (!el) return
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  atBottom.value = true
 }
-
+ 
+// Only follows the thread when the user is already at the bottom, so an
+// arriving answer can't yank them off a table they are mid-read.
+async function scrollIfPinned() {
+  if (!atBottom.value) return
+  await nextTick()
+  scrollDown()
+}
+ 
+// ── Composer ──────────────────────────────────────────────────────────
+function autoGrow() {
+  const el = inputEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 132)}px`
+}
+ 
+function resetInputHeight() {
+  if (inputEl.value) inputEl.value.style.height = 'auto'
+}
+ 
+// ── Result helpers ────────────────────────────────────────────────────
+async function copyRows(msg: ThreadMessage) {
+  const rows = msg.result?.rows ?? []
+  if (!rows.length) return
+  const cols = Object.keys(rows[0]!)
+  const tsv = [
+    cols.join('\t'),
+    ...rows.map(r => cols.map(c => formatCell(r[c])).join('\t')),
+  ].join('\n')
+  try {
+    await navigator.clipboard.writeText(tsv)
+    copiedId.value = msg.id
+    setTimeout(() => { copiedId.value = null }, 1600)
+  } catch { /* clipboard unavailable - no-op */ }
+}
+ 
 function formatCell(v: unknown): string {
   if (v == null) return '-'
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   if (typeof v === 'number') return v.toLocaleString()
   const s = String(v)
-  // ISO date → short format
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
     try {
       return new Date(s).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -575,7 +975,7 @@ function formatCell(v: unknown): string {
   }
   return s.length > 32 ? s.slice(0, 30) + '…' : s
 }
-
+ 
 function fmtMsgTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) }
   catch { return '' }
@@ -609,7 +1009,7 @@ function condBadge(c: string) {
   return m[c] ?? 'neutral'
 }
 function modelColor(m: string) {
-  const c: Record<string,string> = { arima:'#3b82f6', prophet:'#22c55e', lstm:'#a855f7', gradient_boost:'#f59e0b', xgboost:'#ef4444' }
+  const c: Record<string,string> = { arima:'#3b82f6', lstm:'#a855f7', gradient_boost:'#f59e0b', timesfm:'#22c55e' }
   return c[m] ?? '#64748b'
 }
 function toFactors(v: unknown): string[] {
@@ -619,229 +1019,391 @@ function toFactors(v: unknown): string[] {
   return []
 }
 
-onMounted(initChat)
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
+
+/* ── Model status strip ── */
+.model-status-strip { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; }
+.ms-chip { font-size:11px; font-weight:500; color:var(--fg-2); background:var(--surface-1); border:1px solid var(--border-subtle); border-radius:20px; padding:5px 12px; }
+.ms-chip strong { font-weight:800; color:var(--fg-1); }
+.ms-target { color:var(--fg-3); }
+
+/* ── Scenario / what-if simulator ── */
+.scenario-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:16px; }
+.scenario-slider { display:flex; flex-direction:column; gap:6px; }
+.slider-label { font-size:12px; color:var(--fg-2); }
+.slider-label strong { color:var(--fg-1); font-variant-numeric:tabular-nums; }
+.scenario-slider input[type="range"] { width:100%; accent-color:var(--primary-fill); }
+.scenario-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:4px; }
+@media(max-width:900px) { .scenario-grid { grid-template-columns:repeat(2,1fr); } }
+.scenario-item { background:var(--surface-1); border:1px solid var(--border-subtle); border-radius:6px; padding:10px; }
+.scenario-label { font-size:10px; font-weight:600; color:var(--fg-3); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
+.scenario-val { font-size:16px; font-weight:600; margin-bottom:3px; color:var(--fg-2); }
+.scenario-val.good { color:var(--success-fg); }
+.scenario-val.warn { color:var(--warning-fg); }
+.scenario-val.crit { color:var(--danger-fg); }
+.scenario-sub { font-size:10px; color:var(--fg-3); line-height:1.4; }
+.scenario-note { font-size:11px; color:var(--fg-3); margin-top:10px; font-style:italic; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; align-items:start; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
-.card-header-meta { font-size:11px; font-weight:400; color:#94a3b8; margin-left:auto; }
+.card-header-meta { font-size:11px; font-weight:400; color:var(--fg-3); margin-left:auto; }
 
 /* ── NLP Chat Panel ── */
+/* ── Prediction Assistant ──────────────────────────────────────────
+   Every --pa-* colour resolves to the app's own theme tokens (not
+   fixed hex) so the whole panel repaints correctly under
+   [data-theme="dark"] instead of staying a light-only island.
+   --pa-ntsa/--pa-kenha reuse the existing info/warning semantic
+   pair rather than inventing new agency-specific hues.
+──────────────────────────────────────────────────────────────────── */
 .chat-panel {
-  background:#fff;
-  border:1px solid #e2e8f0;
-  border-radius:12px;
-  margin-bottom:24px;
-  overflow:hidden;
-  box-shadow:0 2px 12px rgba(0,0,0,.06);
-}
+  --pa-ink: var(--fg-1);
+  --pa-ink-soft: var(--fg-2);
+  --pa-mute: var(--fg-3);
+  --pa-line: var(--border-subtle);
+  --pa-line-soft: var(--surface-1);
+  --pa-well: var(--surface-1);
+  --pa-accent: var(--primary-fill);
+  --pa-ntsa: var(--info-fg);
+  --pa-kenha: var(--warning-fg);
+  --pa-danger: var(--danger-fg);
+  --pa-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--pa-line);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+ 
+.chat-panel :is(button, textarea):focus-visible {
+  outline: 2px solid var(--pa-accent);
+  outline-offset: 2px;
+}
+ 
+.pa-sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+ 
 .chat-panel-header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:12px 16px;
-  color:#fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pa-line);
 }
-.chat-panel-title {
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-weight:700;
-  font-size:14px;
-}
-.chat-icon { font-size:16px; color:#60a5fa; }
-.chat-subtitle { font-size:11px; font-weight:400; color:#94a3b8; }
-.chat-header-actions { display:flex; align-items:center; gap:8px; }
-.dataset-count { font-size:11px; color:#64748b; background:#1e293b; padding:2px 8px; border-radius:4px; }
+.chat-header-actions { display: flex; align-items: center; gap: 8px; }
+ 
+/* Was #10e83b neon on white - unreadable, and it out-shouted the Ask
+   button. Destructive-ish action, so it stays quiet until hovered. */
 .chat-clear-btn {
-  font-size:12px; padding:4px 10px; border-radius:6px; cursor:pointer; border:none;
-  background:#10e83b; color:#f4f6f9; font-weight:500; text-decoration:none; display:inline-flex; align-items:center;
+  font-size: 12px; font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--pa-line);
+  background: transparent;
+  color: var(--pa-ink-soft);
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
 }
-.chat-clear-btn:hover { background:#10e83b; color:#fff; }
-
-/* Messages area */
+.chat-clear-btn:hover:not(:disabled) { color: var(--pa-ink); border-color: var(--pa-mute); }
+.chat-clear-btn:disabled { opacity: .4; cursor: default; }
+ 
+/* ── Thread ── */
 .chat-messages {
-  height:340px;
-  overflow-y:auto;
-  padding:16px;
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-  background:#f8fafc;
-  scroll-behavior:smooth;
+  height: 340px;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--pa-well);
+  scroll-behavior: smooth;
 }
-
-.chat-msg { display:flex; }
-.chat-msg--user      { justify-content:flex-end; }
-.chat-msg--assistant { justify-content:flex-start; }
-
-.chat-bubble {
-  max-width:75%;
-  border-radius:12px;
-  padding:10px 14px;
-  font-size:13px;
-  line-height:1.55;
-  position:relative;
+ 
+.chat-msg { max-width: 1080px; margin: 0 auto 18px; }
+.chat-msg:last-child { margin-bottom: 0; }
+ 
+.chat-msg--user { display: flex; justify-content: flex-end; }
+.pa-ask {
+  max-width: 46ch;
+  padding: 9px 13px;
+  border-radius: 12px 12px 3px 12px;
+  background: var(--pa-accent);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.55;
 }
-.chat-msg--user .chat-bubble {
-  background:#2563eb;
-  color:#fff;
-  border-bottom-right-radius:3px;
+ 
+/* Assistant replies are a readout, not a bubble - an 8-column table
+   inside a 75%-width rounded bubble fights itself. */
+.pa-answer { border-top: 1px solid var(--pa-line); padding-top: 10px; }
+.pa-answer--error .pa-text { color: var(--pa-danger); }
+ 
+.pa-answer-meta { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+ 
+.pa-source {
+  font-family: var(--pa-mono);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding-left: 7px;
+  border-left: 2px solid currentColor;
 }
-.chat-msg--assistant .chat-bubble {
-  background:#fff;
-  color:#1e293b;
-  border:1px solid #e2e8f0;
-  border-bottom-left-radius:3px;
-  box-shadow:0 1px 4px rgba(0,0,0,.06);
+.pa-source--ntsa  { color: var(--pa-ntsa); }
+.pa-source--kenha { color: var(--pa-kenha); }
+.pa-source--model { color: var(--pa-mute); }
+.pa-source--error { color: var(--pa-danger); }
+ 
+.pa-time {
+  font-family: var(--pa-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pa-mute);
 }
-.chat-bubble--error { border-color:#fca5a5 !important; background:#fff5f5 !important; }
-
-.chat-text { white-space:pre-line; }
-
-.msg-time { font-size:10px; color:#94a3b8; margin-top:4px; text-align:right; }
-.chat-msg--user .msg-time { color:#bfdbfe; }
-
-/* Query meta pill */
-.query-meta-pill {
-  display:inline-flex;
-  gap:6px;
-  align-items:center;
-  margin-top:8px;
-  padding:3px 8px;
-  border-radius:20px;
-  background:#f1f5f9;
-  font-size:10px;
+ 
+.pa-text {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--pa-ink);
+  white-space: pre-line;   /* analysePredictions() returns \n bullets */
 }
-.qm-dataset { font-weight:700; color:#0369a1; font-family:monospace; }
-.qm-filters { color:#d97706; }
-.qm-limit   { color:#94a3b8; }
-
-/* Result table */
-.result-wrap { margin-top:10px; }
-.result-header { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+ 
+/* ── Loading ── */
+.pa-loading { display: flex; flex-direction: column; gap: 7px; }
+.pa-loading-label { font-size: 12px; color: var(--pa-ink-soft); }
+.pa-loading-rule { display: block; height: 2px; background: var(--pa-line); overflow: hidden; }
+.pa-loading-rule i {
+  display: block; width: 33%; height: 100%;
+  background: var(--pa-accent);
+  animation: pa-sweep 1.1s ease-in-out infinite;
+}
+@keyframes pa-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+ 
+/* ── Results ── */
+.result-wrap { margin-top: 12px; }
+.result-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+ 
 .result-count-badge {
-  font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px;
-  background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;
+  font-family: var(--pa-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pa-ink-soft);
 }
-.result-dataset-badge {
-  font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px;
-  background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;
-  font-family:monospace;
+.result-count-badge strong { color: var(--pa-ink); font-weight: 700; }
+ 
+.pa-copy {
+  font-size: 11px; font-weight: 500;
+  color: var(--pa-ink-soft);
+  background: none; border: 0; padding: 3px;
+  cursor: pointer;
 }
-.result-table-scroll { overflow-x:auto; max-width:100%; border-radius:6px; border:1px solid #e2e8f0; }
-.result-table { width:100%; border-collapse:collapse; font-size:11px; }
-.result-table thead tr { background:#f1f5f9; }
-.result-table th { padding:5px 8px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#64748b; white-space:nowrap; border-bottom:1px solid #e2e8f0; }
-.result-table tbody tr:nth-child(even) { background:#f8fafc; }
-.result-table tbody tr:hover { background:#eff6ff; }
-.result-cell { padding:4px 8px; color:#1e293b; white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid #f1f5f9; }
-.result-overflow { font-size:11px; color:#94a3b8; padding:6px 2px 0; }
-.result-link { color:#2563eb; text-decoration:underline; }
-.zero-result { font-size:12px; color:#94a3b8; font-style:italic; margin-top:4px; }
+.pa-copy:hover { color: var(--pa-accent); }
+ 
+.result-table-scroll {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--pa-line);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+ 
+.result-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+ 
+.result-table th {
+  position: sticky; top: 0; z-index: 1;   /* header survived nothing before */
+  padding: 6px 8px;
+  text-align: left;
+  font-family: var(--pa-mono);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--pa-ink-soft);
+  background: var(--pa-line-soft);
+  border-bottom: 1px solid var(--pa-line);
+  white-space: nowrap;
+}
+ 
+.result-cell {
+  padding: 5px 8px;
+  color: var(--pa-ink);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis;
+  border-bottom: 1px solid var(--pa-line);
+}
+.result-table tbody tr:last-child .result-cell { border-bottom: 0; }
+.result-table tbody tr:hover .result-cell { background: var(--primary-wash); }
+ 
+/* Numbers read as data, not prose */
+.result-table .is-num {
+  text-align: right;
+  font-family: var(--pa-mono);
+  font-variant-numeric: tabular-nums;
+}
+ 
+.result-overflow { margin: 6px 0 0; font-size: 11px; color: var(--pa-mute); }
+.zero-result { margin: 8px 0 0; font-size: 12px; color: var(--pa-ink-soft); }
+ 
+/* ── Empty state ── */
+.pa-start { max-width: 1080px; margin: 0 auto; }
+.pa-start-lede { margin: 0 0 12px; font-size: 14px; color: var(--pa-ink); }
+ 
+.pa-domains {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+ 
+.pa-domain {
+  display: flex; flex-direction: column; gap: 4px;
+  width: 100%; height: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--pa-line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s;
+}
+.pa-domain:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--pa-mute); }
+.pa-domain:disabled { opacity: .5; cursor: default; }
+/* Source is carried by the agency label's own colour, not a coloured
+   border-left slab. */
+.pa-domain--ntsa  .pa-domain-agency { color: var(--pa-ntsa); }
+.pa-domain--kenha .pa-domain-agency { color: var(--pa-kenha); }
 
-/* Typing animation */
-.typing-dots { display:flex; gap:4px; align-items:center; padding:4px 2px; }
-.typing-dots span {
-  width:7px; height:7px; border-radius:50%; background:#94a3b8;
-  animation:typing-bounce 1.2s infinite ease-in-out;
+.pa-domain-agency { font-family: var(--pa-mono); font-size: 9px; font-weight: 700; letter-spacing: .1em; color: var(--pa-mute); }
+.pa-domain-title  { font-size: 13px; font-weight: 700; color: var(--pa-ink); }
+.pa-domain-blurb  { font-size: 11px; line-height: 1.45; color: var(--pa-ink-soft); }
+.pa-domain-count  { margin-top: 2px; font-family: var(--pa-mono); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--pa-mute); }
+ 
+.pa-start-note {
+  margin: 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--pa-line);
+  font-size: 11px;
+  color: var(--pa-mute);
 }
-.typing-dots span:nth-child(2) { animation-delay:.2s; }
-.typing-dots span:nth-child(3) { animation-delay:.4s; }
-@keyframes typing-bounce {
-  0%, 80%, 100% { transform:scale(0.8); opacity:.5; }
-  40%           { transform:scale(1.1); opacity:1; }
+ 
+/* ── Jump to latest ── */
+.pa-jump {
+  position: absolute;
+  left: 50%; bottom: 106px;
+  transform: translateX(-50%);
+  font-size: 12px; font-weight: 500;
+  padding: 5px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--pa-line);
+  background: var(--surface-2);
+  color: var(--pa-ink);
+  box-shadow: var(--elev-2);
+  cursor: pointer;
+  z-index: 2;
 }
 
-/* Suggestion chips */
+/* ── Composer ── */
+.pa-composer { border-top: 1px solid var(--pa-line); background: var(--surface-2); }
+ 
 .suggestion-row {
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  padding:10px 16px;
-  border-top:1px solid #f1f5f9;
-  background:#fff;
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.suggestion-row::-webkit-scrollbar { display: none; }
+ 
 .suggestion-chip {
-  font-size:12px;
-  padding:4px 12px;
-  border-radius:20px;
-  border:1px solid #cbd5e1;
-  background:#f8fafc;
-  color:#374151;
-  cursor:pointer;
-  font-weight:500;
-  white-space:nowrap;
-  transition:all .15s;
+  flex: 0 0 auto;
+  font-size: 12px; font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-interactive);
+  background: var(--pa-well);
+  color: var(--fg-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
 }
-.suggestion-chip:hover:not(:disabled) { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
-.suggestion-chip:disabled { opacity:.5; cursor:default; }
+.suggestion-chip:hover:not(:disabled) { background: var(--primary-wash); border-color: var(--primary); color: var(--primary); }
+.suggestion-chip:disabled { opacity: .5; cursor: default; }
 
-/* Input bar */
-.chat-input-bar {
-  display:flex;
-  gap:8px;
-  padding:12px 16px;
-  border-top:1px solid #e2e8f0;
-  background:#fff;
-}
+.chat-input-bar { display: flex; align-items: flex-end; gap: 8px; padding: 12px 16px; }
+
 .chat-input {
-  flex:1;
-  padding:8px 14px;
-  border:1px solid #d1d5db;
-  border-radius:8px;
-  font-size:13px;
-  outline:none;
-  transition:border-color .15s;
+  flex: 1;
+  resize: none;
+  min-height: 38px;
+  max-height: 132px;
+  padding: 9px 13px;
+  border: 1px solid var(--border-interactive);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pa-ink);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
 }
-.chat-input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px #dbeafe; }
-.chat-input:disabled { background:#f8fafc; }
+.chat-input::placeholder { color: var(--pa-mute); }
+.chat-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-wash); }
+
 .chat-send-btn {
-  padding:8px 20px;
-  background:#2563eb;
-  color:#fff;
-  border:none;
-  border-radius:8px;
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-  white-space:nowrap;
-  min-width:60px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:background .15s;
+  flex: 0 0 auto;
+  height: 38px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--pa-accent);
+  color: #fff;
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s;
 }
-.chat-send-btn:hover:not(:disabled) { background:#1d4ed8; }
-.chat-send-btn:disabled { opacity:.5; cursor:default; }
-.send-spinner {
-  width:14px; height:14px; border:2px solid rgba(255,255,255,.4);
-  border-top-color:#fff; border-radius:50%;
-  animation:spin .7s linear infinite;
+.chat-send-btn:hover:not(:disabled) { background: var(--primary-dark); }
+.chat-send-btn:disabled { background: var(--pa-line); color: var(--pa-mute); cursor: default; }
+.chat-send-btn--stop { background: var(--primary-dark); }
+.chat-send-btn--stop:hover { background: var(--primary-darker); }
+ 
+@media (max-width: 640px) {
+  .pa-domains { grid-template-columns: 1fr; }
+  .pa-ask { max-width: 100%; }
 }
-@keyframes spin { to { transform:rotate(360deg); } }
+ 
+@media (prefers-reduced-motion: reduce) {
+  .chat-messages { scroll-behavior: auto; }
+  .pa-loading-rule i { animation: none; width: 100%; opacity: .4; }
+  .pa-domain, .pa-domain:hover { transition: none; transform: none; }
+}
 
 /* ── Existing table/model styles ── */
 .model-legend { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-.model-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; background:#f8fafc; border:1px solid #e2e8f0; color:#374151; }
+.model-chip { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; background:var(--surface-1); border:1px solid var(--border-subtle); color:var(--fg-2); }
 .model-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
-.model-legend-note { font-size:11px; color:#94a3b8; margin-left:auto; }
+.model-legend-note { font-size:11px; color:var(--fg-3); margin-left:auto; }
 .model-badge { font-size:11px; padding:2px 8px; border-radius:4px; font-weight:700; border:1px solid transparent; }
-.score-bar-wrap { background:#f1f5f9; border-radius:5px; height:8px; overflow:hidden; margin-bottom:3px; min-width:80px; }
-.score-bar { height:100%; border-radius:5px; transition:width .4s ease; }
-.score-label { font-size:11px; color:#64748b; font-weight:600; font-variant-numeric:tabular-nums; }
+.score-bar-wrap { background:var(--surface-sunken); border-radius:5px; height:8px; overflow:hidden; margin-bottom:3px; min-width:80px; }
+.score-bar { height:100%; width:100%; border-radius:5px; transform-origin:left; transition:transform .4s ease; }
+.score-label { font-size:11px; color:var(--fg-3); font-weight:600; font-variant-numeric:tabular-nums; }
 .factor-chips { display:flex; flex-wrap:wrap; gap:3px; max-width:180px; }
-.factor-chip { font-size:10px; padding:2px 6px; border-radius:4px; background:#f1f5f9; color:#475569; white-space:nowrap; font-weight:500; }
-.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:#1e293b; }
-.num-bold   { font-weight:700; color:#1e293b; }
-.num-cell   { font-size:12px; color:#374151; }
-.dim-cell   { font-size:11px; color:#94a3b8; white-space:nowrap; }
-.ts-cell    { font-size:11px; white-space:nowrap; color:#64748b; }
-.empty-row  { text-align:center; color:#94a3b8; padding:16px; }
-.pax-big    { font-size:15px; font-weight:800; color:#1e293b; font-variant-numeric:tabular-nums; }
-.conf-range { font-size:12px; color:#64748b; font-variant-numeric:tabular-nums; }
+.factor-chip { font-size:10px; padding:2px 6px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; font-weight:500; }
+.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); }
+.num-bold   { font-weight:700; color:var(--fg-1); }
+.num-cell   { font-size:12px; color:var(--fg-2); }
+.dim-cell   { font-size:11px; color:var(--fg-3); white-space:nowrap; }
+.ts-cell    { font-size:11px; white-space:nowrap; color:var(--fg-3); }
+.empty-row  { text-align:center; color:var(--fg-3); padding:16px; }
+.pax-big    { font-size:15px; font-weight:800; color:var(--fg-1); font-variant-numeric:tabular-nums; }
+.conf-range { font-size:12px; color:var(--fg-3); font-variant-numeric:tabular-nums; }
 </style>

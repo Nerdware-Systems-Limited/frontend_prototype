@@ -75,10 +75,11 @@ async function onExportHref() {
 <style scoped>
 .export-btn {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px;
-  border: 1px solid #d1d5db; background: #fff; color: #374151; cursor: pointer;
-  transition: all .15s; white-space: nowrap; text-decoration: none;
+  font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-interactive); background: var(--surface-2); color: var(--fg-1); cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+  white-space: nowrap; text-decoration: none;
 }
-.export-btn:hover:not(:disabled) { border-color: #94a3b8; background: #f8fafc; }
+.export-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-quiet); color: var(--primary); }
 .export-btn:disabled { opacity: .45; cursor: default; }
 </style>

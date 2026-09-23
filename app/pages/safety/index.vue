@@ -22,47 +22,68 @@
     <KpiCard
       label="Incidents (24h)"
       :value="summary ? fmtNum(summary.kpis.total_24h) : '-'"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
+      period="24H"
       sub="All severity levels"
-      source="live" source-title="NTSA IRSMS"
+      status="monitoring"
+      to="#by-severity"
     />
     <KpiCard
       label="Incidents (7d)"
       :value="summary ? fmtNum(summary.kpis.total_7d) : '-'"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
+      period="7D"
       sub="Rolling 7-day window"
-      source="live" source-title="NTSA IRSMS"
+      status="monitoring"
+      to="#by-type"
     />
     <KpiCard
       label="Fatalities (30d)"
       :value="summary ? fmtNum(summary.kpis.fatal_30d) : '-'"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS + NPS feed unavailable'"
+      period="30D"
       sub="Fatal incidents this month"
-      trend-direction="down"
-      source="live" source-title="NTSA IRSMS + NPS"
+      :status="!summary ? undefined : summary.kpis.fatal_30d > 20 ? 'critical' : summary.kpis.fatal_30d > 10 ? 'below' : 'monitoring'"
+      :series="fatalitySeries"
+      to="#fatality-trend"
     />
     <KpiCard
       label="Active Incidents"
       :value="summary ? fmtNum(summary.kpis.active) : '-'"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
+      period="LIVE"
       sub="Currently open & dispatched"
-      :trend-direction="summary && summary.kpis.active > 10 ? 'down' : 'up'"
-      source="live" source-title="NTSA IRSMS"
+      :status="!summary ? undefined : summary.kpis.active > 10 ? 'below' : 'monitoring'"
+      to="/safety/incidents"
     />
     <KpiCard
       label="Active Dispatches"
       :value="summary ? fmtNum(summary.active_dispatches) : '-'"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'NPS / NTSA feed unavailable'"
+      period="LIVE"
       sub="Emergency units deployed"
-      source="live" source-title="NPS / NTSA"
+      status="monitoring"
+      to="/safety/incidents#dispatch-log"
     />
     <KpiCard
       label="Intervention Effectiveness"
       :value="summary ? fmtPct(summary.intervention_effectiveness.average_pct) : '-'"
+      :unavailable="!summary || summary.intervention_effectiveness.total_evaluated === 0"
+      :unavailable-note="!summary ? (loading ? 'Loading…' : 'KeNHA / NTSA feed unavailable') : 'No interventions evaluated yet'"
       :sub="`${summary ? fmtNum(summary.intervention_effectiveness.total_evaluated) : '-'} evaluated`"
-      trend-direction="up"
-      source="batch" source-title="KeNHA / NTSA"
+      :status="!summary ? undefined : summary.intervention_effectiveness.average_pct >= 60 ? 'ontarget' : summary.intervention_effectiveness.average_pct >= 45 ? 'below' : 'critical'"
+      to="#intervention-effectiveness"
     />
   </div>
 
   <!-- 30-day fatality sparkline + severity/type breakdown -->
   <div class="three-col-stats">
-    <div v-if="hasFatalityTrend" class="card">
+    <div v-if="hasFatalityTrend" id="fatality-trend" class="card drill-target">
       <div class="card-header">30-Day Fatality Trend</div>
       <div class="card-body sparkline-wrap">
         <div class="sparkline-bars">
@@ -77,21 +98,23 @@
         </div>
       </div>
       <div class="card-footer-hint">
-        <span class="hint-dot" style="background:#ef4444" /> &gt;5 fatal
-        <span class="hint-dot" style="background:#f59e0b;margin-left:8px" /> 3–5
-        <span class="hint-dot" style="background:#10b981;margin-left:8px" /> 0–2
+        <span class="hint-dot" style="background:var(--destructive)" /> &gt;5 fatal
+        <span class="hint-dot" style="background:var(--warning);margin-left:8px" /> 3–5
+        <span class="hint-dot" style="background:var(--success);margin-left:8px" /> 0–2
       </div>
     </div>
-    <div v-else class="card">
+    <div v-else id="fatality-trend" class="card drill-target">
       <div class="card-header">30-Day Fatality Trend</div>
-      <div class="card-body" style="color:#94a3b8;font-size:13px">
-        {{ loading ? 'Loading…' : (summary?.fatality_trend_30d?.length
+      <EmptyState
+        :loading="loading"
+        :message="summary?.fatality_trend_30d?.length
           ? `Only ${summary.fatality_trend_30d.length} day-bucket(s) of trend data available - too sparse for a daily chart.`
-          : 'No fatality trend data for this period.') }}
-      </div>
+          : 'No fatality trend data for this period.'"
+        compact
+      />
     </div>
 
-    <div v-if="summary?.incidents_by_severity" class="card">
+    <div v-if="summary?.incidents_by_severity" id="by-severity" class="card drill-target">
       <div class="card-header">By Severity</div>
       <div class="card-body">
         <div class="breakdown-list">
@@ -101,7 +124,7 @@
               <div
                 class="breakdown-bar"
                 :style="{
-                  width: `${maxSevCount > 0 ? (count / maxSevCount) * 100 : 0}%`,
+                  transform: `scaleX(${maxSevCount > 0 ? count / maxSevCount : 0})`,
                   background: sevColor(String(sev)),
                 }"
               />
@@ -112,7 +135,7 @@
       </div>
     </div>
 
-    <div v-if="summary?.incidents_by_type" class="card">
+    <div v-if="summary?.incidents_by_type" id="by-type" class="card drill-target">
       <div class="card-header">By Type</div>
       <div class="card-body">
         <div class="breakdown-list">
@@ -122,8 +145,8 @@
               <div
                 class="breakdown-bar"
                 :style="{
-                  width: `${maxTypeCount > 0 ? (count / maxTypeCount) * 100 : 0}%`,
-                  background: '#3b82f6',
+                  transform: `scaleX(${maxTypeCount > 0 ? count / maxTypeCount : 0})`,
+                  background: 'var(--primary-fill)',
                 }"
               />
             </div>
@@ -172,7 +195,7 @@
             <div
               class="tier-bar"
               :style="{
-                width: `${tierPct(tier)}%`,
+                transform: `scaleX(${tierPct(tier) / 100})`,
                 background: tierColor(tier),
               }"
             />
@@ -202,7 +225,7 @@
   <!-- Intervention effectiveness table -->
   <SectionTitle pill="KeNHA / NTSA Batch">Intervention Effectiveness</SectionTitle>
 
-  <div class="card">
+  <div id="intervention-effectiveness" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -217,7 +240,7 @@
           </tr>
         </thead>
         <tbody v-if="interventions.length">
-          <tr v-for="iv in interventions" :key="iv.id">
+          <tr v-for="iv in interventionsPageRows" :key="iv.id">
             <td>{{ iv.segment_road_code ?? '-' }}</td>
             <td><BadgePill variant="info">{{ iv.intervention_type.replace(/_/g,' ') }}</BadgePill></td>
             <td>{{ iv.cost_kes != null ? `KES ${fmtKsh(iv.cost_kes)}` : '-' }}</td>
@@ -235,6 +258,10 @@
           <tr><td colspan="7" class="empty-td">{{ loading ? 'Loading…' : 'No intervention data available' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="interventionsPage" :total-pages="interventionsTotalPages" :total="interventionsTotal"
+        @prev="interventionsPrev" @next="interventionsNext"
+      />
     </div>
   </div>
 
@@ -271,8 +298,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Safety Overview')
-
 import { useSafety, useGis } from '~/composables/api'
 import type { SafetySummary, PredictiveHotspot, BlackSpot, SafetyIntervention } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -287,6 +312,12 @@ const roadsGeo      = ref<GeoJSONFeatureCollection | null>(null)
 const loading       = ref(true)
 const error         = ref<string | null>(null)
 const lastRefreshed = ref('-')
+
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: interventionsPageRows, page: interventionsPage, totalPages: interventionsTotalPages,
+  total: interventionsTotal, next: interventionsNext, prev: interventionsPrev,
+} = usePagination(interventions, 15)
 
 async function load() {
   loading.value = true
@@ -330,7 +361,7 @@ function fmtPct(v: number | null | undefined) {
   return `${v.toFixed(1)}%`
 }
 function fmtKsh(v: number | string | null | undefined) {
-  // cost_kes comes back as a string — DRF serializes DecimalField as string, not number.
+  // cost_kes comes back as a string - DRF serializes DecimalField as string, not number.
   if (v == null) return '-'
   const n = typeof v === 'string' ? parseFloat(v) : v
   if (Number.isNaN(n)) return '-'
@@ -354,17 +385,24 @@ function freshnessLabel(iso: string | undefined) {
 }
 function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1) }
 function effectColor(v: number | null | undefined) {
-  if (v == null) return '#94a3b8'
-  return v >= 50 ? '#22c55e' : v >= 20 ? '#f59e0b' : '#ef4444'
+  if (v == null) return 'var(--border-strong)'
+  return v >= 50 ? 'var(--success)' : v >= 20 ? 'var(--warning)' : 'var(--destructive)'
 }
 
 // ── Derived ────────────────────────────────────────────────────────────
+// Scale against the same last-30 slice the bars render, not the full
+// fetched history - an older, off-screen day would otherwise silently
+// compress every bar actually on screen.
 const maxFatalities = computed(() =>
-  Math.max(1, ...(summary.value?.fatality_trend_30d ?? []).map(d => d.fatalities)),
+  Math.max(1, ...(summary.value?.fatality_trend_30d ?? []).slice(-30).map(d => d.fatalities)),
 )
 // A single day-bucket (or very few) renders as one misleading full-width bar
 // under the flex layout below - require a minimum spread before charting it.
 const hasFatalityTrend = computed(() => (summary.value?.fatality_trend_30d?.length ?? 0) >= 5)
+const fatalitySeries = computed(() => {
+  const t = summary.value?.fatality_trend_30d ?? []
+  return t.length > 1 ? t.map(d => d.fatalities) : undefined
+})
 
 const maxSevCount = computed(() => {
   if (!summary.value?.incidents_by_severity) return 1
@@ -408,8 +446,8 @@ const mapMarkers = computed((): MarkerSpec[] => {
       lon: hs.longitude,
       title: `Risk: ${hs.predicted_risk_score.toFixed(2)}`,
       subtitle: `${hs.risk_tier} · ${hs.horizon_days}d horizon`,
-      color: (hs.risk_tier === 'critical' || hs.risk_tier === 'very_high') ? 'red' : hs.risk_tier === 'high' ? 'orange' : 'yellow',
-      size: (hs.risk_tier === 'critical' || hs.risk_tier === 'very_high') ? 'lg' : 'md',
+      color: hs.risk_tier === 'very_high' ? 'red' : hs.risk_tier === 'high' ? 'orange' : 'yellow',
+      size: hs.risk_tier === 'very_high' ? 'lg' : 'md',
     })
   })
   blackspots.value.forEach(bs => {
@@ -430,10 +468,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
@@ -449,24 +484,24 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .sparkline-bars { display:flex; align-items:flex-end; gap:2px; height:72px; }
 .spark-bar { flex:1; border-radius:2px 2px 0 0; cursor:default; transition:opacity .1s; }
 .spark-bar:hover { opacity:.75; }
-.spark-red   { background:#ef4444; }
-.spark-amber { background:#f59e0b; }
-.spark-green { background:#10b981; }
-.card-footer-hint { font-size:11px; color:#94a3b8; padding:6px 16px 10px; border-top:1px solid #f1f5f9; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.spark-red   { background:var(--destructive); }
+.spark-amber { background:var(--warning); }
+.spark-green { background:var(--success); }
+.card-footer-hint { font-size:11px; color:var(--fg-3); padding:6px 16px 10px; border-top:1px solid var(--border-subtle); display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
 .hint-dot { display:inline-block; width:8px; height:8px; border-radius:50%; }
 
 /* ── Breakdown bars (severity / type) ── */
 .breakdown-list { display:flex; flex-direction:column; gap:9px; }
 .breakdown-row { display:grid; grid-template-columns:90px 1fr 36px; gap:6px; align-items:center; }
-.breakdown-label { font-size:12px; color:#374151; text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.breakdown-bar-wrap { background:#f1f5f9; border-radius:4px; height:8px; overflow:hidden; }
-.breakdown-bar { height:100%; border-radius:4px; transition:width .4s; }
-.breakdown-count { font-size:12px; font-weight:600; color:#1e293b; text-align:right; font-variant-numeric:tabular-nums; }
+.breakdown-label { font-size:12px; color:var(--fg-2); text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.breakdown-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:8px; overflow:hidden; }
+.breakdown-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.breakdown-count { font-size:12px; font-weight:600; color:var(--fg-1); text-align:right; font-variant-numeric:tabular-nums; }
 
 /* ── Map ── */
 .map-card { overflow:hidden; }
-.map-legend-strip { display:flex; gap:16px; flex-wrap:wrap; padding:8px 16px; border-top:1px solid #f1f5f9; background:#fafafa; }
-.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:#64748b; }
+.map-legend-strip { display:flex; gap:16px; flex-wrap:wrap; padding:8px 16px; border-top:1px solid var(--border-subtle); background:var(--surface-1); }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--fg-2); }
 .legend-dot { border-radius:50%; display:inline-block; flex-shrink:0; }
 
 /* ── Tier bars ── */
@@ -477,30 +512,30 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .tier-high     { background:#f97316; }
 .tier-medium   { background:#f59e0b; }
 .tier-low      { background:#22c55e; }
-.tier-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.tier-bar { height:100%; border-radius:4px; transition:width .4s; }
+.tier-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.tier-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .tier-count { font-size:13px; text-align:right; font-weight:600; }
 .tier-legend { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 8px; }
-.section-mini { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; margin:12px 0 6px; }
+.section-mini { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); margin:12px 0 6px; }
 .stat-pair { display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; }
 
 /* ── Hotspot list ── */
 .hotspot-list { display:flex; flex-direction:column; gap:4px; }
-.hotspot-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #f1f5f9; }
+.hotspot-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-subtle); }
 .hotspot-row:last-child { border-bottom:none; }
-.hs-rank { width:28px; font-size:11px; font-weight:700; color:#94a3b8; flex-shrink:0; }
+.hs-rank { width:28px; font-size:11px; font-weight:700; color:var(--fg-3); flex-shrink:0; }
 .hs-info { flex:1; min-width:0; }
 .hs-segment { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
 .hs-factor-chips { display:flex; gap:4px; flex-wrap:wrap; }
-.hs-factor-chip { font-size:10px; padding:1px 5px; border-radius:4px; background:#f1f5f9; color:#475569; white-space:nowrap; }
-.hs-factors { font-size:11px; color:#94a3b8; }
-.hs-score { font-size:14px; font-weight:700; color:#ef4444; min-width:36px; text-align:right; }
-.hs-horizon { font-size:11px; color:#94a3b8; white-space:nowrap; }
-.hs-empty { color:#94a3b8; font-size:13px; padding:8px 0; }
+.hs-factor-chip { font-size:10px; padding:1px 5px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; }
+.hs-factors { font-size:11px; color:var(--fg-3); }
+.hs-score { font-size:14px; font-weight:700; color:var(--danger-fg); min-width:36px; text-align:right; }
+.hs-horizon { font-size:11px; color:var(--fg-3); white-space:nowrap; }
+.hs-empty { color:var(--fg-3); font-size:13px; padding:8px 0; }
 
 /* ── Interventions table ── */
-td.effect-good { color:#16a34a; font-weight:600; }
-td.effect-warn { color:#d97706; font-weight:600; }
-td.effect-bad  { color:#dc2626; font-weight:600; }
-.empty-td { text-align:center; color:#94a3b8; padding:16px; }
+td.effect-good { color:var(--success-fg); font-weight:600; }
+td.effect-warn { color:var(--warning-fg); font-weight:600; }
+td.effect-bad  { color:var(--danger-fg); font-weight:600; }
+.empty-td { text-align:center; color:var(--fg-3); padding:16px; }
 </style>

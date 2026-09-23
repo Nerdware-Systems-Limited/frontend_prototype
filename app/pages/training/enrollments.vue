@@ -14,12 +14,38 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Total Enrollments" :value="fmtNum(enrollments.length)" sub="This page" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Confirmed" :value="fmtNum(byStatus('confirmed') + byStatus('attending'))" sub="Confirmed + Attending" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Registered (Pending)" :value="fmtNum(byStatus('registered'))" sub="Awaiting confirmation" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Fully Paid" :value="fmtNum(byPayment('paid'))" sub="No outstanding balance" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Unpaid" :value="fmtNum(byPayment('unpaid'))" sub="Action required" :trend-direction="byPayment('unpaid') === 0 ? 'up' : 'down'" source="live" source-title="UAPTS Training API" />
-    <KpiCard label="Withdrawn" :value="fmtNum(byStatus('withdrawn'))" sub="Withdrawn / deferred" source="batch" source-title="UAPTS Training API" />
+    <KpiCard
+      label="Total Enrollments" :value="fmtNum(enrollments.length)"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="This page" to="#enrollment-register"
+    />
+    <KpiCard
+      label="Confirmed" :value="fmtNum(byStatus('confirmed') + byStatus('attending'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Confirmed + Attending" to="#enrollment-register"
+    />
+    <KpiCard
+      label="Registered (Pending)" :value="fmtNum(byStatus('registered'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Awaiting confirmation" to="#enrollment-register"
+    />
+    <KpiCard
+      label="Fully Paid" :value="fmtNum(byPayment('paid'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="No outstanding balance" to="#payment-breakdown"
+    />
+    <KpiCard
+      label="Unpaid" :value="fmtNum(byPayment('unpaid'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Action required"
+      :status="loading || !!error ? undefined : byPayment('unpaid') === 0 ? 'healthy' : 'warning'"
+      to="#payment-breakdown"
+    />
+    <KpiCard
+      label="Withdrawn" :value="fmtNum(byStatus('withdrawn'))"
+      :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE" description="Withdrawn / deferred" to="#enrollment-register"
+    />
   </div>
 
   <!-- Filters -->
@@ -50,7 +76,7 @@
 
   <!-- Enrollment table -->
   <SectionTitle>Enrollment Register</SectionTitle>
-  <div class="card">
+  <div id="enrollment-register" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -69,7 +95,7 @@
           </tr>
         </thead>
         <tbody v-if="filtered.length">
-          <tr v-for="e in filtered" :key="e.id">
+          <tr v-for="e in enrollmentsPageRows" :key="e.id">
             <td class="mono-cell">{{ e.national_id }}</td>
             <td class="name-cell">{{ e.full_name || '-' }}</td>
             <td class="mono-cell">{{ e.cohort_detail?.cohort_code ?? e.cohort }}</td>
@@ -95,12 +121,16 @@
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="enrollmentsPage" :total-pages="enrollmentsTotalPages" :total="enrollmentsTotal"
+        @prev="enrollmentsPrev" @next="enrollmentsNext"
+      />
     </div>
   </div>
 
   <!-- Payment summary breakdown -->
   <SectionTitle pill="computed" style="margin-top:20px">Payment Status Breakdown</SectionTitle>
-  <div class="payment-breakdown-grid">
+  <div id="payment-breakdown" class="payment-breakdown-grid drill-target">
     <div v-for="row in paymentBreakdown" :key="row.status" class="breakdown-card">
       <div class="breakdown-count">{{ fmtNum(row.count) }}</div>
       <div class="breakdown-label">
@@ -113,8 +143,6 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Training')
-
 import { useTraining } from '~/composables/api'
 import type { TrainingEnrollment } from '~/composables/api'
 
@@ -160,6 +188,12 @@ const filtered = computed(() => {
     || (e.cohort_detail?.cohort_code ?? '').toLowerCase().includes(q),
   )
 })
+
+// ── Table pagination (max 15 rows visible per table) ────────────────────
+const {
+  pageRows: enrollmentsPageRows, page: enrollmentsPage, totalPages: enrollmentsTotalPages,
+  total: enrollmentsTotal, next: enrollmentsNext, prev: enrollmentsPrev,
+} = usePagination(filtered, 15)
 
 function byStatus(s: string) { return enrollments.value.filter(e => e.status === s).length }
 function byPayment(s: string) { return enrollments.value.filter(e => e.payment_status === s).length }
@@ -216,23 +250,22 @@ function paymentBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.filter-input { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; min-width:180px; }
-.filter-select { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; cursor:pointer; }
-.loading-note { font-size:12px; color:#94a3b8; }
-.result-count { font-size:12px; color:#64748b; margin-left:4px; }
+.filter-input { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; min-width:180px; background:var(--surface-2); color:var(--fg-1); }
+.filter-select { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); color:var(--fg-1); cursor:pointer; }
+.loading-note { font-size:12px; color:var(--fg-3); }
+.result-count { font-size:12px; color:var(--fg-2); margin-left:4px; }
 
-.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; }
-.name-cell  { font-weight:500; color:#1e293b; }
-.num-bold   { font-weight:700; color:#1e293b; }
-.dim-cell   { font-size:12px; color:#64748b; white-space:nowrap; }
-.empty-row  { text-align:center; color:#94a3b8; font-size:13px; padding:24px; }
+.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); white-space:nowrap; }
+.name-cell  { font-weight:500; color:var(--fg-1); }
+.num-bold   { font-weight:700; color:var(--fg-1); }
+.dim-cell   { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.empty-row  { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 
 .payment-breakdown-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:8px; }
-.breakdown-card { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px; text-align:center; }
-.breakdown-count { font-size:28px; font-weight:700; color:#1e293b; margin-bottom:6px; }
+.breakdown-card { background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:8px; padding:16px; text-align:center; }
+.breakdown-count { font-size:28px; font-weight:700; color:var(--fg-1); margin-bottom:6px; }
 .breakdown-label { margin-bottom:8px; }
-.breakdown-amount { font-size:12px; color:#64748b; font-weight:500; }
+.breakdown-amount { font-size:12px; color:var(--fg-2); font-weight:500; }
 </style>

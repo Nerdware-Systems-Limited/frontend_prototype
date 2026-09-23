@@ -28,6 +28,8 @@ export interface AuditEntry {
 
   // what happened
   action: 'create' | 'update' | 'delete' | 'export' | 'login' | 'logout' | 'view' | string
+  outcome: 'success' | 'failure' | 'denied' | 'error' | 'unknown' | string
+  severity: 'debug' | 'info' | 'notice' | 'warning' | 'critical' | string
   resource_type: string               // may be empty string
   resource_id: string                 // may be empty string
   description: string
@@ -67,6 +69,10 @@ export interface AuditQuery {
   /** Exact match on AuditLog.user_id (a user UUID, not an email). */
   user_id?: string
   action?: string
+  /** Exact match on AuditLog.Outcome (success | failure | denied | error | unknown). */
+  outcome?: string
+  /** Exact match on AuditLog.Severity (debug | info | notice | warning | critical). */
+  severity?: string
   /** Exact match on AuditLog.resource_type, e.g. "accounts.User". */
   resource_type?: string
   resource_id?: string

@@ -38,50 +38,8 @@ describe('cleanQuery', () => {
   })
 })
 
-// ── Auth API composable ────────────────────────────────────────────────────
-import { useAuthApi } from '~/composables/api/useAuth'
-
-describe('useAuthApi', () => {
-  let $api: any
-  beforeEach(() => { $api = installNuxtApp() })
-
-  it('login POSTs to /api/v1/auth/login/ with credentials', async () => {
-    $api.mockResolvedValueOnce({ access: 'A', refresh: 'R', user: { id: '1' } })
-    const out = await useAuthApi().login({ email: 'a@b.c', password: 'pw' })
-    expect($api).toHaveBeenCalledWith('/api/v1/auth/login/', { method: 'POST', body: { email: 'a@b.c', password: 'pw' } })
-    expect(out.access).toBe('A')
-  })
-
-  it('refresh POSTs the refresh token', async () => {
-    $api.mockResolvedValueOnce({ access: 'NEW_A' })
-    await useAuthApi().refresh('OLD_R')
-    expect($api).toHaveBeenCalledWith('/api/v1/auth/token/refresh/', { method: 'POST', body: { refresh: 'OLD_R' } })
-  })
-
-  it('logout attaches the access token to Authorization header', async () => {
-    $api.mockResolvedValueOnce({})
-    await useAuthApi().logout('R', 'A')
-    expect($api).toHaveBeenCalledWith('/api/v1/auth/logout/', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer A' },
-      body: { refresh: 'R' },
-    })
-  })
-
-  it('register / changePassword / passwordReset map to their endpoints', async () => {
-    $api.mockResolvedValue({})
-    const api = useAuthApi()
-    await api.register({ email: 'x@y.z', password1: 'a', password2: 'a' })
-    await api.changePassword({ old_password: 'o', new_password1: 'n', new_password2: 'n' })
-    await api.requestPasswordReset({ email: 'x@y.z' })
-    await api.confirmPasswordReset({ uid: 'u', token: 't', new_password1: 'n', new_password2: 'n' })
-
-    expect($api.mock.calls[0][0]).toBe('/api/v1/auth/register/')
-    expect($api.mock.calls[1][0]).toBe('/api/v1/auth/password/change/')
-    expect($api.mock.calls[2][0]).toBe('/api/v1/auth/password/reset/')
-    expect($api.mock.calls[3][0]).toBe('/api/v1/auth/password/reset/confirm/')
-  })
-})
+// Auth flows live in the `useAuthStore` Pinia store (app/stores/auth.ts),
+// not a `useAuth` API composable - see tests/unit/store.test.ts for coverage.
 
 // ── Accounts API composables ────────────────────────────────────────────────
 import { useAgencies, useUsers } from '~/composables/api/useAccounts'
@@ -126,7 +84,7 @@ describe('useUsers', () => {
 // ── Domain API composables ──────────────────────────────────────────────────
 import { useTraffic } from '~/composables/api/useTraffic'
 import { usePublicTransport } from '~/composables/api/usePublicTransport'
-import { useIncidents } from '~/composables/api/useIncidents'
+import { useSafety } from '~/composables/api/useSafety'
 import { useAudit } from '~/composables/api/useAudit'
 import { useNotifications } from '~/composables/api/useNotifications'
 import { useReports } from '~/composables/api/useReports'
@@ -182,25 +140,25 @@ describe('domain composables - endpoint mapping', () => {
       expect($api).toHaveBeenLastCalledWith('/api/v1/public-transport/feeds/feed-1/publish/', { method: 'POST' })
     })
 
-  it('useIncidents.report POSTs to /incidents/ and kpis/blackspots work', async () => {
+  it('useSafety.createIncident POSTs to /incidents/ and kpis/blackspots list', async () => {
     $api.mockResolvedValue({ id: 'i' })
-    const inc = useIncidents()
-    await inc.report({ mode: 'road', severity: 'high', title: 'Crash' })
-    expect($api).toHaveBeenLastCalledWith('/api/v1/incidents/',
-      { method: 'POST', body: { mode: 'road', severity: 'high', title: 'Crash' } })
+    const safety = useSafety()
+    await safety.createIncident({ incident_type: 'road', severity: 'serious', title: 'Crash' } as any)
+    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/incidents/',
+      { method: 'POST', body: { incident_type: 'road', severity: 'serious', title: 'Crash' } })
 
-    await inc.kpis('NTSA')
-    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/kpis/NTSA/')
+    await safety.kpis({ agency: 'NTSA' } as any)
+    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/kpis/', { query: { agency: 'NTSA' } })
 
-    await inc.blackspots()
-    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/blackspots/')
+    await safety.blackspots()
+    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/black-spots/', { query: {} })
   })
 
-  it('useAudit.exportUrl builds a query string', () => {
-    const url = useAudit().exportUrl({ action: 'login', date_from: '2026-06-01' })
-    expect(url).toContain('/api/v1/audit/export/')
-    expect(url).toContain('action=login')
-    expect(url).toContain('date_from=2026-06-01')
+  it('useAudit.list fetches the audit log page', async () => {
+    $api.mockResolvedValue({ count: 0, results: [] })
+    await useAudit().list({ action: 'login', date_from: '2026-06-01' } as any)
+    expect($api).toHaveBeenLastCalledWith('/api/v1/audit/logs/',
+      { query: { action: 'login', date_from: '2026-06-01' } })
   })
 
   it('useNotifications - list, unread count, mark one read, mark all read', async () => {
@@ -223,14 +181,17 @@ describe('domain composables - endpoint mapping', () => {
     expect($api).toHaveBeenLastCalledWith('/api/v1/notifications/read-all/', { method: 'POST', body: {} })
   })
 
-  it('useReports.generate and downloadUrl', async () => {
-    $api.mockResolvedValue({ id: 'r1' })
+  it('useReports.generate POSTs and run() finds the run by id', async () => {
     const r = useReports()
+    $api.mockResolvedValueOnce({ id: 'r1' })
     await r.generate({ template_id: 't1', format: 'pdf' })
     expect($api).toHaveBeenLastCalledWith('/api/v1/reports/generate/',
       { method: 'POST', body: { template_id: 't1', format: 'pdf' } })
 
-    expect(r.downloadUrl('r1')).toBe('/api/v1/reports/r1/download/')
+    $api.mockResolvedValueOnce({ count: 1, results: [{ id: 'r1' }] })
+    const found = await r.run('r1')
+    expect($api).toHaveBeenLastCalledWith('/api/v1/reports/runs/', { query: { page_size: 50 } })
+    expect(found.id).toBe('r1')
   })
 
   it('useIntegrations.trigger / pause / resume', async () => {
@@ -244,17 +205,17 @@ describe('domain composables - endpoint mapping', () => {
     expect($api).toHaveBeenLastCalledWith('/api/v1/integrations/int1/resume/', { method: 'POST' })
   })
 
-  it('useFleet.positions / history / maintenance', async () => {
+  it('useFleet.summary / vehicles / tripPath', async () => {
     $api.mockResolvedValue({ results: [] })
     const f = useFleet()
-    await f.positions({ mode: 'rail' })
-    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/positions/', { query: { mode: 'rail' } })
+    await f.summary()
+    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/summary/')
 
-    await f.history('v1')
-    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/v1/history/', { query: {} })
+    await f.vehicles({ status: 'active' } as any)
+    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/vehicles/', { query: { status: 'active' } })
 
-    await f.maintenance('v1')
-    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/v1/maintenance/')
+    await f.tripPath('trip-1')
+    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/trip-playbacks/trip-1/path/')
   })
 
   it('useSystemApi.banner / health / schema', async () => {

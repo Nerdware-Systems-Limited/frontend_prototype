@@ -5,10 +5,7 @@
     subtitle="KAA · KCAA · KMD - Real-time ADS-B flight tracking, OTP, passenger volumes, cargo, KMD weather advisories, and KCAA safety oversight"
   >
     <template #actions>
-      
-      <div class="day-filter">
-        <button v-for="d in [7, 14, 30]" :key="d" class="btn" :class="{ 'btn-active': days === d }" @click="days = d; load()">{{ d }}d</button>
-      </div>
+      <DayRangeToggle v-model="days" :options="[7, 14, 30]" @update:model-value="load" />
       <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing →</NuxtLink>
       <NuxtLink to="/aviation/passenger-stats" class="btn-primary">Passenger Stats →</NuxtLink>
     </template>
@@ -21,52 +18,72 @@
     <KpiCard
       label="Total Airports"
       :value="summary ? fmtNum(summary.kpis.total_airports) : '-'"
-      sub="KAA managed"
-      source="batch" source-title="KAA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      period="LIVE"
+      description="KAA managed"
     />
     <KpiCard
       label="Active Airlines"
       :value="summary ? fmtNum(summary.kpis.total_airlines) : '-'"
-      sub="AOC valid operators"
-      source="batch" source-title="KCAA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'"
+      period="LIVE"
+      description="AOC valid operators"
     />
     <KpiCard
       label="Aircraft in Service"
       :value="summary ? fmtNum(summary.kpis.aircraft_in_service) : '-'"
-      sub="Airworthy fleet"
-      source="batch" source-title="KCAA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'"
+      period="LIVE"
+      description="Airworthy fleet"
     />
     <KpiCard
       label="Flights"
       :value="summary ? fmtNum(summary.kpis.flights_total) : '-'"
-      :sub="summary ? `${fmtNum(summary.kpis.flights_delayed)} delayed · ${fmtNum(summary.kpis.flights_cancelled)} cancelled` : '-'"
-      source="live" source-title="KAA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'"
+      :period="`${days}D`"
+      :description="summary ? `${fmtNum(summary.kpis.flights_delayed)} delayed · ${fmtNum(summary.kpis.flights_cancelled)} cancelled` : ''"
+      to="#recent-flights"
     />
     <KpiCard
       label="On-Time Performance"
       :value="summary ? `${summary.kpis.otp_pct.toFixed(1)}%` : '-'"
-      :sub="summary ? `Avg delay ${summary.kpis.avg_delay_min.toFixed(0)} min` : '-'"
-      :trend-direction="summary && summary.kpis.otp_pct >= 80 ? 'up' : 'down'"
-      source="live" source-title="KAA ATC"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'"
+      :period="`${days}D`"
+      :description="summary ? `Avg delay ${summary.kpis.avg_delay_min.toFixed(0)} min` : ''"
+      :status="!summary ? undefined : summary.kpis.otp_pct >= 80 ? 'healthy' : 'warning'"
+      to="#otp-card"
     />
     <KpiCard
       label="Passengers"
       :value="summary ? fmtNum(summary.kpis.pax_total) : '-'"
-      sub="All airports"
-      source="batch" source-title="KAA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="All airports"
+      to="#passenger-traffic"
     />
     <KpiCard
       label="Cargo Throughput"
       :value="summary?.kpis.cargo_kg_total ? `${(summary.kpis.cargo_kg_total / 1000).toFixed(0)} t` : '-'"
-      sub="All airports"
-      source="batch" source-title="KAA"
+      :unavailable="!summary"
+      :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
+      :period="`${days}D`"
+      description="All airports"
+      to="#cargo-by-commodity"
     />
     <KpiCard
       label="Safety Reports"
       :value="safetyStats ? fmtNum(safetyStats.total_reports) : '-'"
-      :sub="safetyStats ? `${fmtNum(safetyStats.fatal)} fatal · ${fmtNum(safetyStats.casualties)} casualties` : '-'"
-      :trend-direction="safetyStats && safetyStats.fatal === 0 ? 'up' : 'down'"
-      source="batch" source-title="KCAA"
+      :unavailable="loading || safetyError"
+      :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'"
+      period="365D"
+      :description="safetyStats ? `${fmtNum(safetyStats.fatal)} fatal · ${fmtNum(safetyStats.casualties)} casualties` : ''"
+      :status="loading || safetyError ? undefined : safetyStats && safetyStats.fatal === 0 ? 'healthy' : 'critical'"
     />
   </div>
 
@@ -92,12 +109,12 @@
 
     <div class="right-col">
       <!-- OTP card -->
-      <div class="card" v-if="otp">
+      <div id="otp-card" class="card drill-target" v-if="otp">
         <div class="card-header">On-Time Performance ({{ days }}d)</div>
         <div class="card-body">
           <div class="otp-big">{{ otp.on_time_pct.toFixed(1) }}%</div>
           <div class="otp-bar-wrap">
-            <div class="otp-bar" :style="{ width: `${otp.on_time_pct}%`, background: otp.on_time_pct >= 85 ? '#22c55e' : otp.on_time_pct >= 70 ? '#f59e0b' : '#ef4444' }" />
+            <div class="otp-bar" :style="{ transform: `scaleX(${otp.on_time_pct / 100})`, background: otp.on_time_pct >= 85 ? 'var(--success)' : otp.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)' }" />
           </div>
           <div class="otp-stats">
             <div><span class="stat-label">Total</span><span>{{ fmtNum(otp.total_flights) }}</span></div>
@@ -115,30 +132,30 @@
             <div v-for="s in statusDist" :key="s.status" class="cong-row">
               <span class="cong-label">{{ s.status.replace(/_/g,' ') }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" :style="{ width: `${maxStatusCount > 0 ? (s.c / maxStatusCount) * 100 : 0}%`, background: statusColor(s.status) }" />
+                <div class="cong-bar" :style="{ transform: `scaleX(${maxStatusCount > 0 ? s.c / maxStatusCount : 0})`, background: statusColor(s.status) }" />
               </div>
               <span class="cong-val">{{ fmtNum(s.c) }}</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No status data' }}</div>
+          <EmptyState v-else :loading="loading" message="No status data" compact />
         </div>
       </div>
 
       <!-- Cargo by commodity -->
-      <div class="card" style="margin-top:12px">
+      <div id="cargo-by-commodity" class="card drill-target" style="margin-top:12px">
         <div class="card-header">Cargo by Commodity ({{ days }}d)</div>
         <div class="card-body">
           <div v-if="cargo.length" class="cong-list">
             <div v-for="c in cargo.slice(0,6)" :key="c.commodity" class="cong-row">
               <span class="cong-label">{{ c.commodity.replace(/_/g,' ') }}</span>
               <div class="cong-bar-wrap">
-                <div class="cong-bar" style="background:#a855f7"
-                  :style="{ width: `${maxCargo > 0 ? (c.total_kg / maxCargo) * 100 : 0}%` }" />
+                <div class="cong-bar"
+                  :style="{ transform: `scaleX(${maxCargo > 0 ? c.total_kg / maxCargo : 0})`, background: '#a855f7' }" />
               </div>
               <span class="cong-val">{{ (c.total_kg / 1000).toFixed(0) }}t</span>
             </div>
           </div>
-          <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No cargo data' }}</div>
+          <EmptyState v-else :loading="loading" message="No cargo data" compact />
         </div>
       </div>
     </div>
@@ -147,7 +164,7 @@
   <!-- Passenger volumes by airport -->
   <SectionTitle :pill="`KAA · ${days}d`">Passenger Traffic by Airport</SectionTitle>
 
-  <div class="card">
+  <div id="passenger-traffic" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -162,7 +179,7 @@
           </tr>
         </thead>
         <tbody v-if="pax.length">
-          <tr v-for="p in pax" :key="p.airport__iata_code">
+          <tr v-for="p in paxPageRows" :key="p.airport__iata_code">
             <td style="font-weight:600">{{ p.airport__name }}</td>
             <td style="font-family:monospace;font-weight:700">{{ p.airport__iata_code }}</td>
             <td style="font-weight:700">{{ fmtNum(p.total_pax) }}</td>
@@ -170,8 +187,8 @@
             <td>{{ fmtNum(p.intl) }}</td>
             <td>
               <div class="comp-bar-wrap">
-                <div class="comp-bar" style="background:#3b82f6"
-                  :style="{ width: `${p.total_pax > 0 ? (p.intl / p.total_pax) * 100 : 0}%` }" />
+                <div class="comp-bar"
+                  :style="{ transform: `scaleX(${p.total_pax > 0 ? p.intl / p.total_pax : 0})`, background: 'var(--primary-fill)' }" />
               </div>
               <span style="font-size:11px">{{ p.total_pax > 0 ? ((p.intl / p.total_pax) * 100).toFixed(0) : 0 }}%</span>
             </td>
@@ -179,16 +196,20 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No passenger data.' }}</td></tr>
+          <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No passenger data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="paxPage" :total-pages="paxTotalPages" :total="paxTotal"
+        @prev="paxPrev" @next="paxNext"
+      />
     </div>
   </div>
 
   <!-- Flight log preview -->
   <SectionTitle pill="KAA ATC · Live">Recent Flights</SectionTitle>
 
-  <div class="card">
+  <div id="recent-flights" class="card drill-target">
     <div class="card-header">
       Latest Movements
       <NuxtLink to="/aviation/flights" class="link-sm">Full flight log →</NuxtLink>
@@ -205,20 +226,24 @@
           </tr>
         </thead>
         <tbody v-if="flights.length">
-          <tr v-for="f in flights.slice(0, 8)" :key="f.id">
+          <tr v-for="f in recentFlightsPageRows" :key="f.id">
             <td style="font-family:monospace;font-weight:700">{{ f.schedule_flight_number }}</td>
             <td style="font-size:12px">{{ f.origin_code }} → {{ f.destination_code }}</td>
             <td><BadgePill :variant="flightBadge(f.status)">{{ f.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td :style="{ color: f.delay_departure_min > 30 ? '#ef4444' : f.delay_departure_min > 0 ? '#f59e0b' : '#22c55e', fontWeight:'600' }">
+            <td :style="{ color: f.delay_departure_min > 30 ? 'var(--danger-fg)' : f.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ f.delay_departure_min > 0 ? `+${f.delay_departure_min} min` : 'On time' }}
             </td>
             <td>{{ f.passengers_actual != null ? fmtNum(f.passengers_actual) : fmtNum(f.passengers_booked) }}</td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading flights…' : 'No flights match current filters.' }}</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading flights…' : 'No flights match current filters.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="recentFlightsPage" :total-pages="recentFlightsTotalPages" :total="recentFlightsTotal"
+        @prev="recentFlightsPrev" @next="recentFlightsNext"
+      />
     </div>
   </div>
 
@@ -230,23 +255,21 @@
       <div v-if="metObs.length" class="met-grid">
         <div v-for="m in metObs" :key="m.id ?? m.station_code" class="met-card">
           <div style="font-weight:700;font-size:13px">{{ m.station_name ?? m.station_code }}</div>
-          <div style="font-size:12px;color:#64748b">
+          <div style="font-size:12px;color:var(--fg-2)">
             {{ m.temperature_c != null ? `${m.temperature_c.toFixed(0)}°C` : '' }}
             {{ m.wind_speed_kt != null ? `· ${m.wind_speed_kt.toFixed(0)} kt` : '' }}
             {{ m.visibility_m != null ? `· ${(m.visibility_m / 1000).toFixed(1)} km vis` : '' }}
           </div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px">{{ (m.flight_category || m.sea_state || '')?.replace(/_/g,' ') }}</div>
+          <div style="font-size:11px;color:var(--fg-3);margin-top:4px">{{ (m.flight_category || m.sea_state || '')?.replace(/_/g,' ') }}</div>
         </div>
       </div>
-      <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No meteorological data available.' }}</div>
+      <EmptyState v-else :loading="loading" message="No meteorological data available." compact />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Aviation')
-
 import { useAviationMaritime } from '~/composables/api'
 import type {
   AviationSummary, Airport, Airline, Flight, FlightOTP, CargoByCommodity, PassengerByAirport,
@@ -266,8 +289,12 @@ const metObs     = ref<any[]>([])
 const safetyStats = ref<{ total_reports: number; fatal: number; serious: number; casualties: number } | null>(null)
 const loading    = ref(true)
 const error      = ref<string | null>(null)
+const safetyError = ref(false)
 const lastRefreshed  = ref('-')
-const days           = ref(7)
+
+const route = useRoute()
+const queryWindow = Number.parseInt(String(route.query.window ?? ''), 10)
+const days = ref([7, 14, 30].includes(queryWindow) ? queryWindow : 7)
 
 async function load() {
   loading.value = true
@@ -306,6 +333,8 @@ async function load() {
   if (metRes.status === 'fulfilled') metObs.value      = (metRes.value as any).results ?? []
   if (sfRes.status  === 'fulfilled') safetyStats.value = sfRes.value
 
+  safetyError.value = sfRes.status === 'rejected'
+
   if ([sumRes, flRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Aviation API.'
 
@@ -336,6 +365,17 @@ const airportMarkers = computed((): MarkerSpec[] =>
 const maxStatusCount = computed(() => Math.max(1, ...statusDist.value.map(s => s.c)))
 const maxCargo       = computed(() => Math.max(1, ...cargo.value.map(c => c.total_kg)))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: paxPageRows, page: paxPage, totalPages: paxTotalPages,
+  total: paxTotal, next: paxNext, prev: paxPrev,
+} = usePagination(pax, 15)
+
+const {
+  pageRows: recentFlightsPageRows, page: recentFlightsPage, totalPages: recentFlightsTotalPages,
+  total: recentFlightsTotal, next: recentFlightsNext, prev: recentFlightsPrev,
+} = usePagination(flights, 15)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
@@ -359,36 +399,30 @@ function statusColor(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
-.link-sm { font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600; }
+.link-sm { font-size:12px; color:var(--link); text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
-.day-filter { display:flex; gap:4px; }
-.btn-active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1100px) { .two-col-map { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
-.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid #f1f5f9; }
+.map-key { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; padding:8px 14px; border-top:1px solid var(--border-subtle); }
 .mk { display:flex; align-items:center; gap:4px; }
 .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .right-col { display:flex; flex-direction:column; gap:0; overflow-y:auto; max-height:520px; }
 .otp-big { font-size:32px; font-weight:800; text-align:center; padding:8px 0 4px; }
-.otp-bar-wrap { background:#f1f5f9; border-radius:6px; height:12px; overflow:hidden; margin:4px 0 8px; }
-.otp-bar { height:100%; border-radius:6px; transition:width .5s; }
+.otp-bar-wrap { background:var(--surface-sunken); border-radius:6px; height:12px; overflow:hidden; margin:4px 0 8px; }
+.otp-bar { height:100%; width:100%; border-radius:6px; transform-origin:left; transition:transform .5s; }
 .otp-stats { display:flex; justify-content:space-around; }
-.stat-label { font-size:10px; display:block; color:#94a3b8; }
+.stat-label { font-size:10px; display:block; color:var(--fg-3); }
 .cong-list { display:flex; flex-direction:column; gap:7px; }
 .cong-row { display:grid; grid-template-columns:90px 1fr 44px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; text-transform:capitalize; }
-.cong-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.cong-bar { height:100%; border-radius:4px; transition:width .4s; }
+.cong-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.cong-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .cong-val { font-size:11px; text-align:right; }
-.comp-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.comp-bar { height:100%; border-radius:4px; }
+.comp-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.comp-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .met-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
-.met-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; }
+.met-card { background:var(--surface-1); border:1px solid var(--border-subtle); border-radius:6px; padding:10px 12px; }
 </style>

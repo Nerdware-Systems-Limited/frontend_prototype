@@ -17,22 +17,22 @@
 
   <!-- Real registry KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Registered Airports" :value="fmtNum(airports.length)" :sub="`${fmtNum(internationalCount)} international`" source="live" source-title="KAA Registry" />
-    <KpiCard label="Total Runways" :value="fmtNum(totalRunways)" sub="Across all registered airports" source="live" source-title="KAA Registry" />
-    <KpiCard label="Design Capacity" :value="`${fmtNum(totalDesignCapacity)}/yr`" sub="Sum of registered passenger design capacity" source="live" source-title="KAA Registry" />
-    <KpiCard label="Active Airports" :value="fmtNum(activeCount)" :sub="`of ${fmtNum(airports.length)} registered`" source="live" source-title="KAA Registry" />
+    <KpiCard label="Registered Airports" :value="fmtNum(airports.length)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`${fmtNum(internationalCount)} international`" to="#airport-registry" />
+    <KpiCard label="Total Runways" :value="fmtNum(totalRunways)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" description="Across all registered airports" to="#airport-registry" />
+    <KpiCard label="Design Capacity" :value="`${fmtNum(totalDesignCapacity)}/yr`" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" description="Sum of registered passenger design capacity" to="#terminal-capacity" />
+    <KpiCard label="Active Airports" :value="fmtNum(activeCount)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`of ${fmtNum(airports.length)} registered`" to="#airport-registry" />
   </div>
 
   <!-- TBD infra KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Runway Availability" :value="infra ? pct(infra.kpis.runway_availability_pct) : '-'" sub="Operational runways" :trend-direction="(infra?.kpis.runway_availability_pct ?? 0) >= 95 ? 'up' : 'down'" source="batch" source-title="KCAA AMS" />
-    <KpiCard label="Navaid Availability" :value="infra ? pct(infra.kpis.navaid_operational_pct) : '-'" sub="VOR/ILS/NDB/DME uptime" source="batch" source-title="KCAA AMS" />
-    <KpiCard label="ATC Infra Health" :value="infra ? pct(infra.kpis.atc_infra_health_pct) : '-'" sub="Air traffic control systems" source="batch" source-title="KCAA AMS" />
-    <KpiCard label="Terminals Over Capacity" :value="infra ? fmtNum(infra.kpis.terminals_over_capacity) : fmtNum(overCapacityAirports.length)" sub="Utilisation above design" trend-direction="down" source="batch" source-title="KAA AMS" />
-    <KpiCard label="Fuel Farms Degraded" :value="infra ? fmtNum(infra.kpis.fuel_farms_degraded) : '-'" sub="Below operational status" trend-direction="down" source="batch" source-title="KAA AMS" />
-    <KpiCard label="Open Work Orders" :value="infra ? fmtNum(infra.kpis.open_work_orders) : fmtNum(openCapitalWorks.length)" sub="Infrastructure maintenance" source="batch" source-title="KAA AMS" />
-    <KpiCard label="Capital Works Value" :value="capitalWorksValue ? `KES ${fmtKES(capitalWorksValue)}` : (infra ? `KES ${fmtKES(infra.kpis.capital_works_value_kes)}` : '-')" sub="Active investment pipeline" source="batch" source-title="KAA / National Treasury" />
-    <KpiCard label="ICAO Annex 14 Compliance" :value="infra ? pct(infra.kpis.icao_annex14_compliance_pct) : '-'" sub="Aerodrome safety standards" :trend-direction="(infra?.kpis.icao_annex14_compliance_pct ?? 0) >= 90 ? 'up' : 'down'" source="batch" source-title="KCAA" />
+    <KpiCard label="Runway Availability" :value="infra ? pct(infra.kpis.runway_availability_pct) : '-'" :unavailable="!infra" :unavailable-note="loading ? 'Loading…' : 'KCAA AMS feed unavailable'" period="LIVE" description="Operational runways" :status="!infra ? undefined : infra.kpis.runway_availability_pct >= 95 ? 'healthy' : 'warning'" to="#runway-condition" />
+    <KpiCard label="Navaid Availability" :value="infra ? pct(infra.kpis.navaid_operational_pct) : '-'" :unavailable="!infra" :unavailable-note="loading ? 'Loading…' : 'KCAA AMS feed unavailable'" period="LIVE" description="VOR/ILS/NDB/DME uptime" to="#navaids" />
+    <KpiCard label="ATC Infra Health" :value="infra ? pct(infra.kpis.atc_infra_health_pct) : '-'" :unavailable="!infra" :unavailable-note="loading ? 'Loading…' : 'KCAA AMS feed unavailable'" period="LIVE" description="Air traffic control systems" to="#terminal-facilities" />
+    <KpiCard label="Terminals Over Capacity" :value="infra ? fmtNum(infra.kpis.terminals_over_capacity) : fmtNum(overCapacityAirports.length)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA AMS feed unavailable'" period="LIVE" description="Utilisation above design" :status="loading || apError ? undefined : (infra ? infra.kpis.terminals_over_capacity : overCapacityAirports.length) > 0 ? 'warning' : 'healthy'" to="#terminal-capacity" />
+    <KpiCard label="Fuel Farms Degraded" :value="infra ? fmtNum(infra.kpis.fuel_farms_degraded) : '-'" :unavailable="!infra" :unavailable-note="loading ? 'Loading…' : 'KAA AMS feed unavailable'" period="LIVE" description="Below operational status" :status="!infra ? undefined : infra.kpis.fuel_farms_degraded === 0 ? 'healthy' : 'warning'" to="#terminal-facilities" />
+    <KpiCard label="Open Work Orders" :value="infra ? fmtNum(infra.kpis.open_work_orders) : fmtNum(openCapitalWorks.length)" :unavailable="loading || cwError" :unavailable-note="loading ? 'Loading…' : 'KAA AMS feed unavailable'" period="LIVE" description="Infrastructure maintenance" to="#capital-works" />
+    <KpiCard label="Capital Works Value" :value="capitalWorksValue ? `KES ${fmtKES(capitalWorksValue)}` : (infra ? `KES ${fmtKES(infra.kpis.capital_works_value_kes)}` : '-')" :unavailable="loading || cwError" :unavailable-note="loading ? 'Loading…' : 'KAA / National Treasury feed unavailable'" period="LIVE" description="Active investment pipeline" to="#capital-works" />
+    <KpiCard label="ICAO Annex 14 Compliance" :value="infra ? pct(infra.kpis.icao_annex14_compliance_pct) : '-'" :unavailable="!infra" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Aerodrome safety standards" :status="!infra ? undefined : infra.kpis.icao_annex14_compliance_pct >= 90 ? 'healthy' : 'warning'" to="#runway-condition" />
   </div>
 
   <!-- Capacity utilisation -->
@@ -43,21 +43,25 @@
         <table>
           <thead><tr><th>Airport</th><th>IATA</th><th>Design Capacity/yr</th><th>Annualised Actual (est.)</th><th>Utilisation</th></tr></thead>
           <tbody v-if="capacityUtilisation.length">
-            <tr v-for="c in capacityUtilisation" :key="c.iata">
+            <tr v-for="c in capUtilPageRows" :key="c.iata">
               <td style="font-weight:600">{{ c.name }}</td>
               <td style="font-family:monospace">{{ c.iata }}</td>
               <td>{{ fmtNum(c.designCapacity) }}</td>
               <td>{{ c.annualisedActual != null ? fmtNum(c.annualisedActual) : '-' }}</td>
               <td>
                 <div v-if="c.utilizationPct != null" class="util-bar-wrap">
-                  <div class="util-bar" :style="{ width: `${Math.min(100, c.utilizationPct)}%`, background: c.utilizationPct > 100 ? '#ef4444' : c.utilizationPct >= 70 ? '#f59e0b' : '#22c55e' }" />
+                  <div class="util-bar" :style="{ transform: `scaleX(${Math.min(100, c.utilizationPct) / 100})`, background: c.utilizationPct > 100 ? 'var(--destructive)' : c.utilizationPct >= 70 ? 'var(--warning)' : 'var(--success)' }" />
                 </div>
                 <span style="font-size:11px">{{ c.utilizationPct != null ? `${c.utilizationPct.toFixed(0)}%` : '-' }}</span>
               </td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'No passenger-stats data available to estimate utilisation.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No passenger-stats data available to estimate utilisation.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="capUtilPage" :total-pages="capUtilTotalPages" :total="capUtilTotal"
+          @prev="capUtilPrev" @next="capUtilNext"
+        />
       </div>
       <div class="source-note">Annualised actual is estimated by scaling the {{ paxDays }}-day passenger total to a full year - directional only, not a reported annual figure.</div>
     </div>
@@ -97,7 +101,7 @@
         <table>
           <thead><tr><th>Airport</th><th>IATA/ICAO</th><th>City</th><th>Type</th><th>Runways</th><th>Elevation (ft)</th><th>Operator</th><th>International</th><th>Status</th></tr></thead>
           <tbody v-if="filteredAirports.length">
-            <tr v-for="a in filteredAirports" :key="a.id">
+            <tr v-for="a in airportsPageRows" :key="a.id">
               <td style="font-weight:600">{{ a.name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ a.iata_code }} / {{ a.icao_code }}</td>
               <td style="font-size:12px">{{ a.city }}</td>
@@ -109,8 +113,12 @@
               <td><BadgePill :variant="a.active ? 'success' : 'neutral'">{{ a.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading airports…' : 'No airports match the current filters.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading airports…' : 'No airports match the current filters.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="airportsPage" :total-pages="airportsTotalPages" :total="airportsTotal"
+          @prev="airportsPrev" @next="airportsNext"
+        />
       </div>
     </div>
   </div>
@@ -123,7 +131,7 @@
         <table>
           <thead><tr><th>Airport</th><th>Runway</th><th>Length (m)</th><th>Surface</th><th>PCN Rating</th><th>Status</th><th>Last Inspection</th><th>Next Inspection</th><th>Defect Notes</th></tr></thead>
           <tbody v-if="runways.length">
-            <tr v-for="r in runways" :key="r.id">
+            <tr v-for="r in runwaysPageRows" :key="r.id">
               <td style="font-weight:600;font-family:monospace">{{ r.airport_iata }}</td>
               <td>{{ r.runway_id }}</td>
               <td>{{ r.length_m }}</td>
@@ -135,8 +143,12 @@
               <td style="font-size:12px">{{ r.defect_notes ?? '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Runway condition/PCN survey data has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Runway condition/PCN survey data has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="runwaysPage" :total-pages="runwaysTotalPages" :total="runwaysTotal"
+          @prev="runwaysPrev" @next="runwaysNext"
+        />
       </div>
     </div>
   </div>
@@ -149,7 +161,7 @@
         <table>
           <thead><tr><th>Airport</th><th>Type</th><th>Status</th><th>Last Calibration</th><th>Next Calibration</th></tr></thead>
           <tbody v-if="navaids.length">
-            <tr v-for="n in navaids" :key="n.id">
+            <tr v-for="n in navaidsPageRows" :key="n.id">
               <td style="font-weight:600;font-family:monospace">{{ n.airport_iata }}</td>
               <td><BadgePill variant="info">{{ n.navaid_type.toUpperCase() }}</BadgePill></td>
               <td><BadgePill :variant="facilityStatusBadge(n.status)">{{ n.status.replace(/_/g,' ') }}</BadgePill></td>
@@ -157,8 +169,12 @@
               <td style="font-size:11px">{{ fmtDate(n.next_calibration) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Navaid status has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Navaid status has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="navaidsPage" :total-pages="navaidsTotalPages" :total="navaidsTotal"
+          @prev="navaidsPrev" @next="navaidsNext"
+        />
       </div>
     </div>
   </div>
@@ -171,7 +187,7 @@
         <table>
           <thead><tr><th>Airport</th><th>Facility</th><th>Type</th><th>Status</th><th>Capacity/hr</th><th>Utilisation</th><th>Maintenance Due</th></tr></thead>
           <tbody v-if="facilities.length">
-            <tr v-for="f in facilities" :key="f.id">
+            <tr v-for="f in facilitiesPageRows" :key="f.id">
               <td style="font-weight:600;font-family:monospace">{{ f.airport_iata }}</td>
               <td style="font-size:12px">{{ f.name }}</td>
               <td><BadgePill variant="info">{{ f.facility_type.replace(/_/g,' ') }}</BadgePill></td>
@@ -181,8 +197,12 @@
               <td style="font-size:11px">{{ fmtDate(f.maintenance_due) }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Terminal/ATC/fuel-farm facility status has not been integrated from KAA asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Terminal/ATC/fuel-farm facility status has not been integrated from KAA asset management yet.' }}</td></tr></tbody>
         </table>
+        <TablePagination
+          :page="facilitiesPage" :total-pages="facilitiesTotalPages" :total="facilitiesTotal"
+          @prev="facilitiesPrev" @next="facilitiesNext"
+        />
       </div>
     </div>
   </div>
@@ -194,7 +214,7 @@
       <table>
         <thead><tr><th>Project</th><th>Airport</th><th>Contractor</th><th>Scope</th><th>Physical</th><th>Financial</th><th>Capacity Impact</th></tr></thead>
         <tbody v-if="capitalWorks.length">
-          <tr v-for="c in capitalWorks" :key="c.id">
+          <tr v-for="c in capitalWorksPageRows" :key="c.id">
             <td style="font-weight:600;font-size:12px">{{ c.project_name }}</td>
             <td style="font-family:monospace">{{ c.airport_iata }}</td>
             <td style="font-size:12px">{{ c.contractor ?? '-' }}</td>
@@ -204,16 +224,18 @@
             <td style="font-size:12px">{{ c.expected_capacity_impact ?? '-' }}</td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">{{ loading ? 'Loading…' : 'Capital-works pipeline has not been integrated from KAA/National Treasury yet.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Capital-works pipeline has not been integrated from KAA/National Treasury yet.' }}</td></tr></tbody>
       </table>
+      <TablePagination
+        :page="capitalWorksPage" :total-pages="capitalWorksTotalPages" :total="capitalWorksTotal"
+        @prev="capitalWorksPrev" @next="capitalWorksNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Aviation Infrastructure')
-
 import { useAviationMaritime, useAviationInfrastructure } from '~/composables/api'
 import type { Airport, PassengerByAirport, Runway, Navaid, AviationFacility, AviationCapitalWork, AviationInfraSummary } from '~/composables/api'
 
@@ -228,6 +250,8 @@ const capitalWorks = ref<AviationCapitalWork[]>([])
 const infra        = ref<AviationInfraSummary | null>(null)
 const loading      = ref(true)
 const error        = ref<string | null>(null)
+const apError      = ref(false)
+const cwError      = ref(false)
 const paxDays       = ref(30)
 
 const search     = ref('')
@@ -257,7 +281,9 @@ async function load() {
   if (cwRes.status  === 'fulfilled') capitalWorks.value = (cwRes.value as any).results ?? []
   if (sumRes.status === 'fulfilled') infra.value        = sumRes.value
 
-  if (apRes.status === 'rejected')
+  apError.value = apRes.status === 'rejected'
+  cwError.value = cwRes.status === 'rejected'
+  if (apError.value)
     error.value = 'Unable to reach the UAPTS Aviation API.'
 
   loading.value = false
@@ -293,6 +319,32 @@ const capacityUtilisation = computed(() => pax.value.map(p => {
 
 const overCapacityAirports = computed(() => capacityUtilisation.value.filter(c => (c.utilizationPct ?? 0) > 100))
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: capUtilPageRows, page: capUtilPage, totalPages: capUtilTotalPages,
+  total: capUtilTotal, next: capUtilNext, prev: capUtilPrev,
+} = usePagination(capacityUtilisation, 15)
+
+const {
+  pageRows: runwaysPageRows, page: runwaysPage, totalPages: runwaysTotalPages,
+  total: runwaysTotal, next: runwaysNext, prev: runwaysPrev,
+} = usePagination(runways, 15)
+
+const {
+  pageRows: navaidsPageRows, page: navaidsPage, totalPages: navaidsTotalPages,
+  total: navaidsTotal, next: navaidsNext, prev: navaidsPrev,
+} = usePagination(navaids, 15)
+
+const {
+  pageRows: facilitiesPageRows, page: facilitiesPage, totalPages: facilitiesTotalPages,
+  total: facilitiesTotal, next: facilitiesNext, prev: facilitiesPrev,
+} = usePagination(facilities, 15)
+
+const {
+  pageRows: capitalWorksPageRows, page: capitalWorksPage, totalPages: capitalWorksTotalPages,
+  total: capitalWorksTotal, next: capitalWorksNext, prev: capitalWorksPrev,
+} = usePagination(capitalWorks, 15)
+
 const airportMarkers = computed((): MarkerSpec[] =>
   airports.value
     .filter(a => a.latitude != null && a.longitude != null)
@@ -316,6 +368,11 @@ const filteredAirports = computed(() => airports.value.filter(a => {
   if (typeFilter.value && a.airport_type !== typeFilter.value) return false
   return true
 }))
+
+const {
+  pageRows: airportsPageRows, page: airportsPage, totalPages: airportsTotalPages,
+  total: airportsTotal, next: airportsNext, prev: airportsPrev,
+} = usePagination(filteredAirports, 15)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -346,13 +403,11 @@ function facilityStatusBadge(s: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .map-card { overflow:hidden; margin-bottom:16px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .table-scroll { overflow-x:auto; }
-.util-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.util-bar { height:100%; border-radius:4px; transition:width .4s; }
-.source-note { margin-top:10px; font-size:11px; color:#94a3b8; border-top:1px solid #f1f5f9; padding-top:10px; }
+.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.util-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }
 </style>

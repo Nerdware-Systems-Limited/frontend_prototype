@@ -17,39 +17,56 @@
     <KpiCard
       label="Active Courses"
       :value="fmtNum(activeCourses.length)"
-      sub="Across all institutes"
-      source="live" source-title="UAPTS Training API"
+      :unavailable="loading || coursesError"
+      :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE"
+      description="Across all institutes"
+      to="#course-catalogue"
     />
     <KpiCard
       label="Cohorts Running"
       :value="fmtNum(ongoingCohorts.length)"
-      sub="In session now"
-      source="live" source-title="UAPTS Training API"
+      :unavailable="loading || cohortsError"
+      :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE"
+      description="In session now"
+      to="#upcoming-cohorts"
     />
     <KpiCard
       label="Scheduled Cohorts"
       :value="fmtNum(scheduledCohorts.length)"
-      sub="Upcoming - not started"
-      source="live" source-title="UAPTS Training API"
+      :unavailable="loading || cohortsError"
+      :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE"
+      description="Upcoming - not started"
+      to="#upcoming-cohorts"
     />
     <KpiCard
       label="Total Enrolled"
       :value="fmtNum(enrollments.length)"
-      sub="Latest page · all statuses"
-      source="live" source-title="UAPTS Training API"
+      :unavailable="loading || enrollmentsError"
+      :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE"
+      description="Latest page · all statuses"
     />
     <KpiCard
       label="Pass Rate"
       :value="passRateLabel"
-      sub="Completions · pass + distinction"
-      :trend-direction="passRate >= 70 ? 'up' : 'down'"
-      source="batch" source-title="UAPTS Training API"
+      :unavailable="loading || completionsError"
+      :unavailable-note="loading ? 'Loading…' : 'UAPTS Training API feed unavailable'"
+      period="LIVE"
+      description="Completions · pass + distinction"
+      :status="loading || completionsError ? undefined : passRate >= 70 ? 'healthy' : 'warning'"
+      to="#recent-completions"
     />
     <KpiCard
       label="Certificates Issued"
       :value="fmtNum(validCerts.length)"
-      sub="Valid & active"
-      source="batch" source-title="NTSA / KCAA / KMA"
+      :unavailable="loading || completionsError"
+      :unavailable-note="loading ? 'Loading…' : 'NTSA / KCAA / KMA feed unavailable'"
+      period="LIVE"
+      description="Valid & active"
+      to="#recent-completions"
     />
   </div>
 
@@ -75,7 +92,7 @@
     </select>
     <button class="btn" @click="loadCourses">Apply</button>
   </div>
-  <div class="card" style="margin-bottom:16px">
+  <div id="course-catalogue" class="card drill-target" style="margin-bottom:16px">
     <div class="card-body">
       <table>
         <thead>
@@ -92,7 +109,7 @@
           </tr>
         </thead>
         <tbody v-if="courses.length">
-          <tr v-for="c in courses" :key="c.id">
+          <tr v-for="c in coursesPageRows" :key="c.id">
             <td class="mono-cell">{{ c.course_code }}</td>
             <td class="name-cell">{{ c.name }}</td>
             <td>{{ c.institute_name }}</td>
@@ -114,12 +131,16 @@
           <tr><td colspan="9" class="empty-row">{{ loading ? 'Loading…' : 'No courses found.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="coursesPage" :total-pages="coursesTotalPages" :total="coursesTotal"
+        @prev="coursesPrev" @next="coursesNext"
+      />
     </div>
   </div>
 
   <!-- Upcoming cohorts -->
   <SectionTitle>Upcoming & Running Cohorts</SectionTitle>
-  <div class="card" style="margin-bottom:16px">
+  <div id="upcoming-cohorts" class="card drill-target" style="margin-bottom:16px">
     <div class="card-body">
       <table>
         <thead>
@@ -136,7 +157,7 @@
           </tr>
         </thead>
         <tbody v-if="recentCohorts.length">
-          <tr v-for="h in recentCohorts" :key="h.id">
+          <tr v-for="h in cohortsPageRows" :key="h.id">
             <td class="mono-cell">{{ h.cohort_code }}</td>
             <td class="name-cell">{{ h.course_detail?.name ?? '-' }}</td>
             <td class="dim-cell">{{ h.course_detail?.institute_name ?? '-' }}</td>
@@ -145,7 +166,7 @@
             <td>{{ h.enrolled_count }} / {{ h.capacity }}</td>
             <td>
               <div class="fill-bar-wrap">
-                <div class="fill-bar" :style="{ width: Math.min(h.fill_rate_pct, 100) + '%', background: fillColor(h.fill_rate_pct) }" />
+                <div class="fill-bar" :style="{ transform: `scaleX(${Math.min(h.fill_rate_pct, 100) / 100})`, background: fillColor(h.fill_rate_pct) }" />
               </div>
               <span class="dim-cell">{{ h.fill_rate_pct?.toFixed(0) }}%</span>
             </td>
@@ -159,12 +180,16 @@
           <tr><td colspan="9" class="empty-row">{{ loading ? 'Loading…' : 'No cohorts found.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="cohortsPage" :total-pages="cohortsTotalPages" :total="cohortsTotal"
+        @prev="cohortsPrev" @next="cohortsNext"
+      />
     </div>
   </div>
 
   <!-- Recent completions snapshot -->
   <SectionTitle>Recent Certificate Issuances</SectionTitle>
-  <div class="card">
+  <div id="recent-completions" class="card drill-target">
     <div class="card-body">
       <table>
         <thead>
@@ -181,7 +206,7 @@
           </tr>
         </thead>
         <tbody v-if="completions.length">
-          <tr v-for="cp in completions.slice(0, 10)" :key="cp.id">
+          <tr v-for="cp in completionsPageRows" :key="cp.id">
             <td class="mono-cell">{{ cp.certificate_number || '-' }}</td>
             <td class="name-cell">{{ cp.enrollment_detail?.full_name ?? cp.enrollment }}</td>
             <td>
@@ -203,14 +228,16 @@
           <tr><td colspan="9" class="empty-row">{{ loading ? 'Loading…' : 'No completions data.' }}</td></tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="completionsPage" :total-pages="completionsTotalPages" :total="completionsTotal"
+        @prev="completionsPrev" @next="completionsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Training')
-
 import { useTraining } from '~/composables/api'
 import type { TrainingCourse, TrainingCohort, TrainingEnrollment, TrainingCompletion } from '~/composables/api'
 
@@ -220,6 +247,10 @@ const enrollments = ref<TrainingEnrollment[]>([])
 const completions = ref<TrainingCompletion[]>([])
 const loading     = ref(true)
 const error       = ref<string | null>(null)
+const coursesError     = ref(false)
+const cohortsError     = ref(false)
+const enrollmentsError = ref(false)
+const completionsError = ref(false)
 
 // Filters
 const courseSearch   = ref('')
@@ -255,6 +286,11 @@ async function load() {
   if (eRes.status  === 'fulfilled') enrollments.value = (eRes.value  as any).results ?? []
   if (cpRes.status === 'fulfilled') completions.value = (cpRes.value as any).results ?? []
 
+  coursesError.value     = cRes.status  === 'rejected'
+  cohortsError.value     = hRes.status  === 'rejected'
+  enrollmentsError.value = eRes.status  === 'rejected'
+  completionsError.value = cpRes.status === 'rejected'
+
   if ([cRes, hRes, eRes, cpRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Training API.'
 
@@ -278,6 +314,22 @@ const passRate    = computed(() => {
   return total ? Math.round((passedCerts.value.length / total) * 100) : 0
 })
 const passRateLabel = computed(() => completions.value.length ? passRate.value + '%' : '-')
+
+// ── Table pagination (max 15 rows visible per table) ────────────────────
+const {
+  pageRows: coursesPageRows, page: coursesPage, totalPages: coursesTotalPages,
+  total: coursesTotal, next: coursesNext, prev: coursesPrev,
+} = usePagination(courses, 15)
+
+const {
+  pageRows: cohortsPageRows, page: cohortsPage, totalPages: cohortsTotalPages,
+  total: cohortsTotal, next: cohortsNext, prev: cohortsPrev,
+} = usePagination(recentCohorts, 15)
+
+const {
+  pageRows: completionsPageRows, page: completionsPage, totalPages: completionsTotalPages,
+  total: completionsTotal, next: completionsNext, prev: completionsPrev,
+} = usePagination(completions, 15)
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -321,9 +373,9 @@ function cohortBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function fillColor(pct: number) {
-  if (pct >= 90) return '#22c55e'
-  if (pct >= 60) return '#f59e0b'
-  return '#ef4444'
+  if (pct >= 90) return 'var(--success)'
+  if (pct >= 60) return 'var(--warning)'
+  return 'var(--destructive)'
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -341,21 +393,20 @@ function outcomeBadge(o: string) {
 </script>
 
 <style scoped>
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
 
 .filter-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.filter-input { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; min-width:160px; }
-.filter-select { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; cursor:pointer; }
+.filter-input { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; min-width:160px; background:var(--surface-2); color:var(--fg-1); }
+.filter-select { padding:6px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); color:var(--fg-1); cursor:pointer; }
 
-.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; }
-.name-cell  { font-weight:500; color:#1e293b; max-width:220px; }
-.num-bold   { font-weight:700; color:#1e293b; }
-.dim-cell   { font-size:12px; color:#64748b; white-space:nowrap; }
-.empty-row  { text-align:center; color:#94a3b8; font-size:13px; padding:24px; }
+.mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); white-space:nowrap; }
+.name-cell  { font-weight:500; color:var(--fg-1); max-width:220px; }
+.num-bold   { font-weight:700; color:var(--fg-1); }
+.dim-cell   { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.empty-row  { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 
-.cert-chip { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; }
+.cert-chip { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); border:1px solid color-mix(in srgb, var(--info-fg) 30%, transparent); }
 
-.fill-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; width:80px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:6px; }
-.fill-bar { height:100%; border-radius:4px; transition:width .3s ease; }
+.fill-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; width:80px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:6px; }
+.fill-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .3s ease; }
 </style>

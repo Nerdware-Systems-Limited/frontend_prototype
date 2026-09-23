@@ -17,41 +17,41 @@
     <KpiCard
       label="Open Orders"
       :value="fmtNum(countByStatus('planned'))"
-      sub="Not yet started"
-      source="live" source-title="KeNHA MMS"
+      :unavailable="loading || ordersError" :unavailable-note="loading ? 'Loading…' : 'KeNHA MMS feed unavailable'"
+      period="LIVE" description="Not yet started" to="#work-orders-table"
     />
     <KpiCard
       label="In Progress"
       :value="fmtNum(countByStatus('in_progress'))"
-      sub="Active works on-site"
-      trend-direction="up"
-      source="live" source-title="KeNHA MMS"
+      :unavailable="loading || ordersError" :unavailable-note="loading ? 'Loading…' : 'KeNHA MMS feed unavailable'"
+      period="LIVE" description="Active works on-site" to="#work-orders-table"
     />
     <KpiCard
       label="Completed"
       :value="fmtNum(countByStatus('completed'))"
-      sub="This period"
-      trend-direction="up"
-      source="live" source-title="KeNHA MMS"
+      :unavailable="loading || ordersError" :unavailable-note="loading ? 'Loading…' : 'KeNHA MMS feed unavailable'"
+      period="LIVE" description="This period" to="#work-orders-table"
     />
     <KpiCard
       label="Urgent Priority"
       :value="fmtNum(urgentCount)"
-      sub="Immediate action required"
-      trend-direction="down"
-      source="live" source-title="KeNHA MMS"
+      :unavailable="loading || ordersError" :unavailable-note="loading ? 'Loading…' : 'KeNHA MMS feed unavailable'"
+      period="LIVE" description="Immediate action required"
+      :status="loading || ordersError ? undefined : urgentCount > 0 ? 'warning' : 'healthy'"
+      to="#work-orders-table"
     />
     <KpiCard
       label="Total Cost (Open)"
       :value="openCost ? `KES ${fmtKES(openCost)}` : '-'"
-      sub="Estimated outstanding value"
-      source="batch" source-title="KeNHA MMS"
+      :unavailable="loading || ordersError" :unavailable-note="loading ? 'Loading…' : 'KeNHA MMS feed unavailable'"
+      period="LIVE" description="Estimated outstanding value" to="#work-orders-table"
     />
     <KpiCard
       label="Budget Utilization"
       :value="summary?.budget.utilization_pct != null ? `${summary.budget.utilization_pct.toFixed(1)}%` : '-'"
-      :sub="summary ? `FY${summary.budget.fiscal_year}` : '-'"
-      source="batch" source-title="National Treasury"
+      :unavailable="loading || summaryError" :unavailable-note="loading ? 'Loading…' : 'National Treasury feed unavailable'"
+      period="LIVE" :description="summary ? `FY${summary.budget.fiscal_year}` : ''"
+      to="#maintenance-budgets"
     />
   </div>
 
@@ -69,46 +69,44 @@
             <span class="type-val">{{ fmtNum(t.count ?? t.total ?? 0) }}</span>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No work type data.' }}</div>
+        <EmptyState v-else :loading="loading" message="No work type data." compact />
       </div>
     </div>
 
-    <div class="card">
+    <div id="maintenance-budgets" class="card drill-target">
       <div class="card-header">Maintenance Budgets</div>
       <div class="card-body">
         <div v-if="budgets.length" class="budget-list">
           <div v-for="b in budgets" :key="b.id" class="budget-item">
             <div class="bi-header">
               <span style="font-weight:600">FY{{ b.fiscal_year }}</span>
-              <span style="font-size:11px;color:#64748b">{{ b.agency_code ?? 'All agencies' }}</span>
+              <span style="font-size:11px;color:var(--fg-2)">{{ b.agency_code ?? 'All agencies' }}</span>
               <BadgePill :variant="utilBadge(b.utilization_pct)">{{ b.utilization_pct.toFixed(0) }}%</BadgePill>
             </div>
             <div class="bi-bars">
               <div class="bi-bar-row">
                 <span>Allocated</span>
-                <div class="bi-bar-wrap"><div class="bi-bar" style="background:#3b82f6;width:100%" /></div>
+                <div class="bi-bar-wrap"><div class="bi-bar" :style="{ background: 'var(--primary-fill)', transform: 'scaleX(1)' }" /></div>
                 <span>KES {{ fmtKES(b.allocated_kes) }}</span>
               </div>
               <div class="bi-bar-row">
                 <span>Disbursed</span>
                 <div class="bi-bar-wrap">
-                  <div class="bi-bar" style="background:#22c55e"
-                    :style="{ width: `${budgetPct(b.disbursed_kes, b.allocated_kes)}%` }" />
+                  <div class="bi-bar" :style="{ background: 'var(--success)', transform: `scaleX(${budgetPct(b.disbursed_kes, b.allocated_kes) / 100})` }" />
                 </div>
                 <span>KES {{ fmtKES(b.disbursed_kes) }}</span>
               </div>
               <div class="bi-bar-row">
                 <span>Committed</span>
                 <div class="bi-bar-wrap">
-                  <div class="bi-bar" style="background:#f59e0b"
-                    :style="{ width: `${budgetPct(b.committed_kes, b.allocated_kes)}%` }" />
+                  <div class="bi-bar" :style="{ background: 'var(--warning)', transform: `scaleX(${budgetPct(b.committed_kes, b.allocated_kes) / 100})` }" />
                 </div>
                 <span>KES {{ fmtKES(b.committed_kes) }}</span>
               </div>
             </div>
           </div>
         </div>
-        <div v-else style="color:#94a3b8;font-size:13px">{{ loading ? 'Loading…' : 'No budget data.' }}</div>
+        <EmptyState v-else :loading="loading" message="No budget data." compact />
       </div>
     </div>
   </div>
@@ -116,7 +114,7 @@
   <!-- Orders table -->
   <SectionTitle>Work Orders</SectionTitle>
 
-  <div class="card">
+  <div id="work-orders-table" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="orderSearch" class="select-sm" placeholder="Search road name…" style="min-width:180px" />
@@ -162,10 +160,10 @@
           </tr>
         </thead>
         <tbody v-if="filteredOrders.length">
-          <tr v-for="o in filteredOrders" :key="o.id">
+          <tr v-for="o in ordersPageRows" :key="o.id">
             <td>
               <div style="font-weight:600;font-size:13px">{{ o.segment_road_name ?? o.segment_road_code ?? '-' }}</div>
-              <div v-if="o.description" style="font-size:11px;color:#94a3b8">{{ o.description.slice(0,60) }}{{ o.description.length > 60 ? '…' : '' }}</div>
+              <div v-if="o.description" style="font-size:11px;color:var(--fg-3)">{{ o.description.slice(0,60) }}{{ o.description.length > 60 ? '…' : '' }}</div>
             </td>
             <td><BadgePill variant="info">{{ o.work_type.replace(/_/g,' ') }}</BadgePill></td>
             <td><BadgePill :variant="statusBadge(o.status)">{{ o.status.replace(/_/g,' ') }}</BadgePill></td>
@@ -173,7 +171,7 @@
             <td style="font-size:12px">{{ o.contractor_name || '-' }}</td>
             <td>
               <div v-if="o.status === 'in_progress'" class="prog-wrap">
-                <div class="prog-bar" :style="{ width: `${o.progress_pct ?? 0}%`, background: progColor(o.progress_pct) }" />
+                <div class="prog-bar" :style="{ transform: `scaleX(${(o.progress_pct ?? 0) / 100})`, background: progColor(o.progress_pct) }" />
               </div>
               <span style="font-size:11px">
                 {{ o.progress_pct != null ? `${o.progress_pct.toFixed(0)}%` : '-' }}
@@ -187,12 +185,16 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+            <td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading orders…' : 'No orders match the current filters.' }}
             </td>
           </tr>
         </tbody>
       </table>
+      <TablePagination
+        :page="ordersPage" :total-pages="ordersTotalPages" :total="ordersTotal"
+        @prev="ordersPrev" @next="ordersNext"
+      />
     </div>
   </div>
 
@@ -220,7 +222,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredAtRisk.length">
-            <tr v-for="f in filteredAtRisk" :key="f.id">
+            <tr v-for="f in atRiskPageRows" :key="f.id">
               <td style="font-weight:600;font-family:monospace;font-size:12px">{{ f.segment_road_code ?? f.segment }}</td>
               <td style="font-size:12px"><BadgePill variant="info">{{ f.model_name }}</BadgePill></td>
               <td><BadgePill :variant="condBadge(f.predicted_condition_class ?? '')">{{ f.predicted_condition_class ?? '-' }}</BadgePill></td>
@@ -237,13 +239,17 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ loading ? 'Loading forecasts…' : 'No at-risk segments match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="atRiskPage" :total-pages="atRiskTotalPages" :total="atRiskTotal"
+        @prev="atRiskPrev" @next="atRiskNext"
+      />
     </div>
   </div>
 
@@ -277,7 +283,7 @@
             </tr>
           </thead>
           <tbody v-if="filteredSignalFaults.length">
-            <tr v-for="sig in filteredSignalFaults" :key="sig.id">
+            <tr v-for="sig in signalsPageRows" :key="sig.id">
               <td style="font-weight:600">{{ sig.intersection_name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ sig.intersection_code }}</td>
               <td><BadgePill :variant="sigBadge(sig.status)">{{ sig.status }}</BadgePill></td>
@@ -288,21 +294,23 @@
           </tbody>
           <tbody v-else>
             <tr>
-              <td colspan="6" style="text-align:center;color:#94a3b8;padding:16px">
+              <td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">
                 {{ loading ? 'Loading signals…' : 'No signal faults match the current filters.' }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <TablePagination
+        :page="signalsPage" :total-pages="signalsTotalPages" :total="signalsTotal"
+        @prev="signalsPrev" @next="signalsNext"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useNavSubtitle('Maintenance Orders')
-
 import { useInfrastructure } from '~/composables/api'
 import type { MaintenanceOrder, MaintenanceBudget, InfrastructureSummary, DeteriorationForecast, TrafficSignal } from '~/composables/api'
 
@@ -314,6 +322,8 @@ const atRisk       = ref<DeteriorationForecast[]>([])
 const signalFaults = ref<TrafficSignal[]>([])
 const loading = ref(true)
 const error   = ref<string | null>(null)
+const ordersError  = ref(false)
+const summaryError = ref(false)
 const lastRefreshed  = ref('-')
 const orderSearch    = ref('')
 const statusFilter   = ref('')
@@ -343,6 +353,9 @@ async function load() {
   if (sumRes.status  === 'fulfilled') summary.value = sumRes.value
   if (riskRes.status === 'fulfilled') atRisk.value       = (riskRes.value as any).results ?? []
   if (sigRes.status  === 'fulfilled') signalFaults.value = (sigRes.value as any).results ?? []
+
+  ordersError.value  = ordRes.status === 'rejected'
+  summaryError.value = sumRes.status === 'rejected'
 
   if ([ordRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
@@ -413,6 +426,22 @@ const signalExportColumns = [
   { key: 'last_status_change_at', label: 'Last Change' },
 ]
 
+// ── Table pagination (max 15 rows visible per table) ───────────────────
+const {
+  pageRows: ordersPageRows, page: ordersPage, totalPages: ordersTotalPages,
+  total: ordersTotal, next: ordersNext, prev: ordersPrev,
+} = usePagination(filteredOrders, 15)
+
+const {
+  pageRows: atRiskPageRows, page: atRiskPage, totalPages: atRiskTotalPages,
+  total: atRiskTotal, next: atRiskNext, prev: atRiskPrev,
+} = usePagination(filteredAtRisk, 15)
+
+const {
+  pageRows: signalsPageRows, page: signalsPage, totalPages: signalsTotalPages,
+  total: signalsTotal, next: signalsNext, prev: signalsPrev,
+} = usePagination(filteredSignalFaults, 15)
+
 function countByStatus(s: string) { return orders.value.filter(o => o.status === s).length }
 const urgentCount = computed(() => orders.value.filter(o => o.priority === 'urgent').length)
 const openCost    = computed(() =>
@@ -449,8 +478,8 @@ function priorityBadge(s: string) {
   return m[s] ?? 'neutral'
 }
 function progColor(pct: number | null | undefined) {
-  if (pct == null) return '#94a3b8'
-  return pct >= 80 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#3b82f6'
+  if (pct == null) return 'var(--border-strong)'
+  return pct >= 80 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--info)'
 }
 function utilBadge(pct: number) {
   return pct >= 80 ? 'success' : pct >= 50 ? 'fair' : 'warning'
@@ -465,8 +494,8 @@ function condBadge(cls: string) {
   return m[cls] ?? 'neutral'
 }
 function failColor(p: number | null | undefined) {
-  if (p == null) return '#94a3b8'
-  return p >= 0.7 ? '#ef4444' : p >= 0.4 ? '#f59e0b' : '#22c55e'
+  if (p == null) return 'var(--fg-3)'
+  return p >= 0.7 ? 'var(--danger-fg)' : p >= 0.4 ? 'var(--warning-fg)' : 'var(--success-fg)'
 }
 function sigBadge(s: string) {
   const m: Record<string,string> = { operational:'success', fault:'danger', degraded:'warning', maintenance:'warning', offline:'neutral' }
@@ -475,27 +504,23 @@ function sigBadge(s: string) {
 </script>
 
 <style scoped>
-.freshness-badge { font-size:11px; padding:3px 8px; border-radius:4px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
-.freshness-badge.loading { background:#fefce8; color:#854d0e; border-color:#fef08a; }
-.error-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:#fef9c3; border:1px solid #ca8a04; font-size:13px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.select-sm { padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; background:#fff; }
 .type-list { display:flex; flex-direction:column; gap:8px; }
 .type-row { display:grid; grid-template-columns:110px 1fr 40px; align-items:center; gap:8px; }
 .type-label { font-size:12px; text-transform:capitalize; }
-.type-bar-wrap { background:#f1f5f9; border-radius:4px; height:10px; overflow:hidden; }
-.type-bar { height:100%; background:#3b82f6; border-radius:4px; }
+.type-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }
+.type-bar { height:100%; background:var(--primary-fill); border-radius:4px; }
 .type-val { font-size:11px; text-align:right; }
 .budget-list { display:flex; flex-direction:column; gap:14px; }
-.budget-item { border:1px solid #f1f5f9; border-radius:6px; padding:10px 12px; }
+.budget-item { border:1px solid var(--border-subtle); border-radius:6px; padding:10px 12px; }
 .bi-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
 .bi-bars { display:flex; flex-direction:column; gap:5px; }
 .bi-bar-row { display:grid; grid-template-columns:60px 1fr 80px; align-items:center; gap:6px; font-size:11px; }
-.bi-bar-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; }
-.bi-bar { height:100%; border-radius:4px; transition:width .4s; }
-.prog-wrap { background:#f1f5f9; border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
-.prog-bar { height:100%; border-radius:4px; transition:width .4s; }
+.bi-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; }
+.bi-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
+.prog-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.prog-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 </style>
