@@ -1,7 +1,7 @@
 <template>
   <!--
     Raw preview table (from uploads.preview()) with row/cell-level error
-    highlighting. Sheet tabs and paging live in the page around this —
+    highlighting. Sheet tabs and paging live in the page around this -
     this component is just the grid.
 
     Cell-level highlighting is best-effort: validation_report's errors are
@@ -47,7 +47,7 @@ import type { FieldError } from '~/composables/api'
 const props = defineProps<{
   columns: string[]
   rows: unknown[][]
-  /** File row number (source_row) of rows[0] — offset + DATA_START_ROW(2). */
+  /** File row number (source_row) of rows[0] - offset + DATA_START_ROW(2). */
   startRowNumber: number
   /** source_row -> field errors, from DataUploadDetail.validation_report. */
   rowErrors: Record<number, FieldError[]>

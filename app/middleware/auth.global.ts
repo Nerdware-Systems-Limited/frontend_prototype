@@ -22,6 +22,7 @@
  */
 
 import { useAuthStore } from '~/stores/auth'
+import { useAccessPolicyStore } from '~/stores/accessPolicy'
 
 const PUBLIC_ROUTES = ['/login', '/forgot-password']
 
@@ -36,17 +37,27 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // Already have a live access token
-  if (auth.isAuthenticated) return resolveScope(to.path)
+  if (auth.isAuthenticated) return resolveScopeWithPolicy(to.path)
 
   // Try a silent refresh using the stored refresh token
   if (auth.refreshToken) {
     const newToken = await auth.refreshAccessToken()
-    if (newToken) return resolveScope(to.path)
+    if (newToken) return resolveScopeWithPolicy(to.path)
   }
 
   // Nothing worked - go to login, preserving the intended destination
   return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
 })
+
+/**
+ * The saved Module Access policy comes from the server and needs the access
+ * token, so it can only be fetched here, after authentication. ensureLoaded()
+ * is a no-op after the first navigation of a session (and never throws).
+ */
+async function resolveScopeWithPolicy(path: string) {
+  await useAccessPolicyStore().ensureLoaded()
+  return resolveScope(path)
+}
 
 function resolveScope(path: string) {
   const access = useAccessControl()

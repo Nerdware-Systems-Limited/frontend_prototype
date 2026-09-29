@@ -8,7 +8,7 @@
 //   /summary/.
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Domain enums ────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ export function useSafety() {
 
   return {
     // ── Dashboard / summary ────────────────────────────────────────
-    summary: () => api<SafetySummary>(`${S}/summary/`),
+    summary: (params?: SummaryFilterParams) => api<SafetySummary>(`${S}/summary/`, { query: cleanQuery(params) }),
 
     // ── Incidents ──────────────────────────────────────────────────
     incidents: (q?: SafetyQuery) =>
@@ -342,7 +342,7 @@ export function useSafety() {
     // ── Black spots ────────────────────────────────────────────────
     blackspots: (q?: SafetyQuery) =>
       api<Paged<BlackSpot>>(`${S}/black-spots/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    topBlackspots: () => api<Paged<BlackSpot>>(`${S}/black-spots/top/`),
+    topBlackspots: (params?: SummaryFilterParams) => api<Paged<BlackSpot>>(`${S}/black-spots/top/`, { query: cleanQuery(params) }),
 
     // ── Dispatches ─────────────────────────────────────────────────
     dispatches: (q?: SafetyQuery) =>

@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // Single source of truth for DataUpload.status → label/phase/variant.
 // Every status pill, filter chip, and progress bar across the
-// Integration Hub (pages 1–3) reads from this map — see the redesign
+// Integration Hub (pages 1–3) reads from this map - see the redesign
 // brief §3. Auto-imported (Nuxt `app/utils/` convention), no explicit
 // import needed at call sites.
 // ─────────────────────────────────────────────────────────────────────
@@ -19,13 +19,13 @@ export interface StatusMeta {
   variant: IngestVariant
   /** Poll while true. */
   inFlight: boolean
-  /** Needs a human before the pipeline moves again — surfaces in the
+  /** Needs a human before the pipeline moves again - surfaces in the
    *  "needs attention" filter/KPI. */
   actionRequired: boolean
 }
 
 const STATUS_MAP: Record<DataUploadStatus, StatusMeta> = {
-  // Template-late intake — file stored, no template chosen yet. Needs a
+  // Template-late intake - file stored, no template chosen yet. Needs a
   // human to route it (POST /uploads/<id>/route/) before anything else
   // can happen, so it counts as "needs attention" but is never in-flight.
   unrouted: { label: 'Unrouted', phase: 'staged', variant: 'warning', inFlight: false, actionRequired: true },
@@ -53,13 +53,13 @@ export function needsAttention(status: DataUploadStatus): boolean {
   return STATUS_MAP[status].actionRequired
 }
 
-/** null = indeterminate (render an animated bar, no number) — there is no
+/** null = indeterminate (render an animated bar, no number) - there is no
  *  parse-progress field on the backend, so anything still in the reading
  *  phase can't report a real percentage. Once parsing has produced a
  *  result (validated/needs_mapping/rejected/committing onward) reading
  *  is done, full stop. */
 export function readPct(u: Pick<DataUpload, 'status'>): number | null {
-  // An un-routed file was never read against a template — there's no
+  // An un-routed file was never read against a template - there's no
   // "read" to show a bar for. Callers render a dash instead.
   if (u.status === 'unrouted') return 0
   if (u.status === 'pending' || u.status === 'validating') return null

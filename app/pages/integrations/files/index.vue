@@ -28,7 +28,7 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPI ribbon — sums over the current filter set (DataUploadInboxView's
+  <!-- KPI ribbon - sums over the current filter set (DataUploadInboxView's
        aggregates), not all time and not just the loaded page. -->
   <div class="ih-ribbon ih-rise">
     <KpiTile label="Batches" :value="total.toLocaleString('en-KE')" sub="matching current filters" :state="ribbonState" />
@@ -54,7 +54,7 @@
 
   <!-- ── Files segment ────────────────────────────────────────────── -->
   <template v-if="segment === 'files'">
-    <!-- Routing queue — files that arrived before their format was
+    <!-- Routing queue - files that arrived before their format was
          templated. A jump-chip, not just another status option, because
          these are a backlog someone owns, not a passing pipeline state. -->
     <button
@@ -228,7 +228,7 @@ definePageMeta({ layout: 'default' })
 import { useIntegrations } from '~/composables/api'
 import type { DataSource, DataUpload, DataUploadStatus, UploadInboxAggregates } from '~/composables/api'
 import { useAgencies } from '~/composables/api/useAccounts'
-// Explicit import — see the note in integrations.vue for why this isn't
+// Explicit import - see the note in integrations.vue for why this isn't
 // left to the app/utils auto-import for template-only references.
 import { isInFlight, readPct, statusMeta, writePct } from '~/utils/ingestStatus'
 
@@ -248,7 +248,7 @@ const DATE_FIELDS = [
 
 const segment = ref<'files' | 'feeds'>(route.query.segment === 'feeds' ? 'feeds' : 'files')
 
-// ── Files segment filters — synced to the URL query string so a filtered
+// ── Files segment filters - synced to the URL query string so a filtered
 // view is shareable and survives a refresh. ─────────────────────────────
 const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const agencyCode = ref(typeof route.query.agency_code === 'string' ? route.query.agency_code : '')
@@ -268,17 +268,17 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 // Total un-routed files across every agency, independent of the current
-// filter set — drives the "N in the routing queue" jump-chip. Cheap
+// filter set - drives the "N in the routing queue" jump-chip. Cheap
 // (page_size 1, we only read .count).
 const unroutedCount = ref(0)
 async function loadUnroutedCount() {
   try {
     unroutedCount.value = (await api.uploads.inbox({ status: 'unrouted', page_size: 1 })).count
-  } catch { /* the chip just doesn't show — non-blocking */ }
+  } catch { /* the chip just doesn't show - non-blocking */ }
 }
 
 // A failed fetch is a genuinely different state from "still loading" or a
-// real, confirmed zero — never render error.value's stale/absent
+// real, confirmed zero - never render error.value's stale/absent
 // aggregates as "0 rows parsed".
 const ribbonState = computed(() => error.value ? 'unavailable' : (loading.value && !aggregates.value) ? 'loading' : 'ok')
 
@@ -339,7 +339,7 @@ async function load() {
 // backoff/visibility/hard-stop mechanics all live in the composable.
 const poll = useUploadPoll(load, () => uploads.value.some(u => isInFlight(u.status)))
 
-/** User-driven reload (filter/page change) — resets the poll backoff,
+/** User-driven reload (filter/page change) - resets the poll backoff,
  *  unlike the poll's own internal ticks (which call load() directly). */
 async function refetch() {
   await load()
@@ -384,7 +384,7 @@ function feedStatusVariant(s: string) {
   return m[s] ?? 'neutral'
 }
 
-// ── Feeds segment — client-side search/filter + pagination over the same
+// ── Feeds segment - client-side search/filter + pagination over the same
 // list() fetch used for the filter dropdowns / new-upload menu, no second
 // request. Mirrors the feed-status chips on the analytics page. ──────────
 const feedSearch = ref('')
@@ -419,7 +419,7 @@ onMounted(async () => {
     agencies.value = agencyRes.results
     allSources.value = sourceRes.results
   } catch {
-    // filter option lists / feeds segment are a nice-to-have — the Files
+    // filter option lists / feeds segment are a nice-to-have - the Files
     // segment still works with free-text filters if these fail to load
   } finally {
     sourcesLoading.value = false

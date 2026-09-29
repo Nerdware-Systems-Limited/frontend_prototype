@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { defineStore } from 'pinia'
+import { apiBaseUrl } from '~/utils/apiBase'
 import type {
   AuthUser,
   DetailResponse,
@@ -81,8 +82,7 @@ function normaliseUser(raw: Partial<User> & { email?: string }): AuthUser {
 
 // ── Store ────────────────────────────────────────────────────────────────────
 export const useAuthStore = defineStore('auth', () => {
-  const config   = useRuntimeConfig()
-  const BASE_URL = config.public.apiBase
+  const BASE_URL = apiBaseUrl()
 
   // ── State ──────────────────────────────────────────────────────────────────
   const accessToken  = ref<string | null>(null)

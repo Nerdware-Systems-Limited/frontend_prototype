@@ -1,6 +1,6 @@
 <template>
   <!--
-    Thin wrapper around theme.css's .progress/.progress-bar — this was
+    Thin wrapper around theme.css's .progress/.progress-bar - this was
     previously hand-rolled three separate times (infrastructure/maintenance.vue,
     infrastructure/projects.vue, UploadModal.vue's byte-upload bar), each
     with its own near-identical markup. One component from here on.

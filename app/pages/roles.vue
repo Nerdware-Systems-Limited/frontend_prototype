@@ -1,5 +1,6 @@
 <template>
   <PageHeader
+    class="header-actions-fill"
     eyebrow="Access Control"
     title="Roles & Permissions"
     subtitle="RBAC role assignments, user status management, and organisational departments across UAPTS agencies"
@@ -30,18 +31,17 @@
   </SectionTitle>
 
   <!-- Filter toolbar -->
-  <div class="filter-bar">
+  <div class="filter-bar filter-bar--grid">
     <input
       v-model="search"
-      class="select-sm"
+      class="select-sm filter-input filter-span"
       placeholder="Search by email…"
       aria-label="Search by email"
-      style="min-width:220px;flex:1 1 220px"
       @keyup.enter="applyFilters"
     />
     <select v-model="roleFilter" class="select-sm" aria-label="Filter by role">
       <option value="">All roles</option>
-      <option value="super_admin">super_admin</option>
+      <option v-if="canViewRole(viewerScope, 'super_admin')" value="super_admin">super_admin</option>
       <option value="admin">admin</option>
       <option value="analyst">analyst</option>
       <option value="operator">operator</option>
@@ -65,8 +65,7 @@
       <option value="false">No MFA</option>
     </select>
     <button class="btn" @click="resetFilters">Reset</button>
-    <span style="flex:1" />
-    <div class="mini-pager">
+    <div class="mini-pager filter-span">
       <span class="result-count">{{ userTableTotal }} users · Page {{ userTablePage }} of {{ userTableTotalPages }}</span>
       <button type="button" class="icon-btn" :disabled="userTablePage <= 1" aria-label="Previous page" @click="userTablePrev">‹</button>
       <button type="button" class="icon-btn" :disabled="userTablePage >= userTableTotalPages" aria-label="Next page" @click="userTableNext">›</button>
@@ -75,7 +74,7 @@
 
   <div id="users-table" class="card drill-target">
     <div class="card-body">
-      <table class="users-table">
+      <table class="users-table stack-table">
         <thead>
           <tr>
             <th>Email</th>
@@ -93,7 +92,7 @@
 
             <!-- ── Normal row ── -->
             <tr v-if="editingId !== u.id" :class="{ 'row-inactive': u.is_active === false }">
-              <td>
+              <td class="stack-title">
                 <span class="email-cell" :title="u.email">{{ u.email }}</span>
                 <span v-if="u.is_staff" class="staff-pip" title="Has Django admin / staff access">★</span>
               </td>
@@ -117,10 +116,11 @@
                 <BadgePill :variant="u.is_staff ? 'warning' : 'neutral'">{{ u.is_staff ? 'Staff' : 'No' }}</BadgePill>
               </td>
               <td class="dim date-cell" data-label="Joined">{{ fmtDate(u.created_at) }}</td>
-              <td>
+              <td class="stack-actions">
                 <div class="action-group">
-                  <button class="btn btn-sm" @click="startEdit(u)">Edit</button>
+                  <button v-if="canManageUsers" class="btn btn-sm" @click="startEdit(u)">Edit</button>
                   <button
+                    v-if="canManageUsers"
                     type="button"
                     class="btn btn-sm row-menu-trigger"
                     aria-haspopup="true"
@@ -134,7 +134,7 @@
 
             <!-- ── Editing row ── -->
             <tr v-else class="row-editing">
-              <td>
+              <td class="stack-title">
                 <span class="email-cell" :title="u.email">{{ u.email }}</span>
               </td>
               <td data-label="Agency">
@@ -142,12 +142,12 @@
                 <span v-else class="dim">-</span>
               </td>
               <td data-label="Role">
-                <select v-model="editForm.role_type" class="select-inline">
-                  <option value="super_admin">super_admin</option>
-                  <option value="admin">admin</option>
-                  <option value="analyst">analyst</option>
-                  <option value="operator">operator</option>
-                  <option value="public">public</option>
+                <select
+                  v-model="editForm.role_type" class="select-inline" aria-label="Role"
+                  :disabled="roleOptionsFor(u).length < 2"
+                  :title="roleOptionsFor(u).length < 2 ? 'Only a super_admin can change a super_admin account\'s role' : undefined"
+                >
+                  <option v-for="r in roleOptionsFor(u)" :key="r" :value="r">{{ r }}</option>
                 </select>
               </td>
               <td data-label="Status">
@@ -166,7 +166,7 @@
                 </label>
               </td>
               <td class="dim date-cell" data-label="Joined">{{ fmtDate(u.created_at) }}</td>
-              <td>
+              <td class="stack-actions">
                 <div class="action-group">
                   <button
                     class="btn btn-sm btn-primary-sm"
@@ -244,7 +244,7 @@
       id="tab-roles" type="button" role="tab" class="subtab"
       :class="{ active: orgTab === 'roles' }" :aria-selected="orgTab === 'roles'" aria-controls="panel-roles"
       @click="orgTab = 'roles'"
-    >Roles ({{ roles.length }})</button>
+    >Roles ({{ visibleRoles.length }})</button>
     <button
       id="tab-departments" type="button" role="tab" class="subtab"
       :class="{ active: orgTab === 'departments' }" :aria-selected="orgTab === 'departments'" aria-controls="panel-departments"
@@ -257,7 +257,7 @@
   <!-- Role Catalog -->
   <div v-show="orgTab === 'roles'" id="panel-roles" role="tabpanel" aria-labelledby="tab-roles" class="card">
     <div class="card-body">
-      <table class="compact-table">
+      <table class="compact-table stack-table">
         <thead>
           <tr>
             <th>Role</th>
@@ -267,18 +267,18 @@
             <th></th>
           </tr>
         </thead>
-        <tbody v-if="roles.length">
+        <tbody v-if="visibleRoles.length">
           <tr v-for="r in rolesPageRows" :key="r.id">
-            <td style="font-weight:600">
+            <td class="stack-title" style="font-weight:600">
               <BadgePill :variant="roleBadge(r.role_name)">{{ r.role_name }}</BadgePill>
             </td>
-            <td class="num" style="text-align:center;font-weight:700;color:var(--fg-1)">{{ userCountForRole(r.role_name) }}</td>
-            <td>
+            <td class="num" data-label="Users" style="text-align:center;font-weight:700;color:var(--fg-1)">{{ userCountForRole(r.role_name) }}</td>
+            <td data-label="Type">
               <BadgePill v-if="isBuiltinRole(r.role_name)" variant="info"    size="sm">built-in</BadgePill>
               <BadgePill v-else                             variant="neutral" size="sm">custom</BadgePill>
             </td>
-            <td class="dim perm-desc">{{ rolePermDesc(r.role_name) }}</td>
-            <td>
+            <td class="dim perm-desc stack-block" data-label="Permissions">{{ rolePermDesc(r.role_name) }}</td>
+            <td :class="isBuiltinRole(r.role_name) ? 'role-lock' : 'stack-actions'">
               <button
                 v-if="!isBuiltinRole(r.role_name)"
                 class="btn btn-sm btn-tone-danger"
@@ -316,7 +316,7 @@
   <!-- Departments -->
   <div v-show="orgTab === 'departments'" id="panel-departments" role="tabpanel" aria-labelledby="tab-departments" class="card">
     <div class="card-body">
-      <table class="compact-table">
+      <table class="compact-table stack-table">
         <thead>
           <tr>
             <th>Department</th>
@@ -327,10 +327,10 @@
         </thead>
         <tbody v-if="departments.length">
           <tr v-for="d in departmentsPageRows" :key="d.id">
-            <td style="font-weight:600">{{ d.department_name }}</td>
-            <td class="mono-sm">{{ d.department_code }}</td>
-            <td><BadgePill variant="neutral">{{ d.agency_code ?? d.agency }}</BadgePill></td>
-            <td class="dim" style="font-size:12px">{{ d.parent_department ?? '-' }}</td>
+            <td class="stack-title" style="font-weight:600">{{ d.department_name }}</td>
+            <td class="mono-sm" data-label="Code">{{ d.department_code }}</td>
+            <td data-label="Agency"><BadgePill variant="neutral">{{ d.agency_code ?? d.agency }}</BadgePill></td>
+            <td class="dim" data-label="Parent" style="font-size:12px">{{ d.parent_department ?? '-' }}</td>
           </tr>
         </tbody>
         <tbody v-else>
@@ -349,7 +349,10 @@
 definePageMeta({ layout: 'default' })
 import { useRoles as _useRoles, useDepartments as _useDepartments, useUsers as _useUsers } from '~/composables/api'
 import type { Role, Department, User } from '~/types/uapts'
-import { isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, canManageUser } from '~/composables/useAgencyScope'
+import {
+  isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, canManageUser,
+  canChangeRole, assignableRoleTypes, canViewRole,
+} from '~/composables/useAgencyScope'
 
 // ── Agency scoping ───────────────────────────────────────────────────────
 // Same gap /users.vue already closed: an agency admin manages only their
@@ -360,6 +363,9 @@ import { isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, canManageUser } 
 // check in this app - the backend list() calls are the real gate via
 // agencyListQueryFor()'s `agency` filter.
 const { user: viewer } = useAuth()
+// Editing, (de)activating and deleting accounts also needs the `manage_users` capability (Module Access).
+const { canManageUsers } = usePermissions()
+const MANAGE_USERS_OFF = 'Managing users is switched off for your role in this agency.'
 const viewerScope  = computed(() => viewer.value as any)
 const unscoped     = computed(() => isUnscopedAdmin(viewerScope.value))
 const ownAgencyCode = computed(() => scopedAgencyCode(viewerScope.value))
@@ -488,6 +494,9 @@ const filteredUsers = computed(() =>
   }),
 )
 
+/** The catalog omits super_admin for anyone who isn't one - they shouldn't even see it exists. */
+const visibleRoles = computed(() => roles.value.filter(r => canViewRole(viewerScope.value, r.role_name)))
+
 // ── Table pagination (max 15 rows visible per table) ───────────────────
 const {
   pageRows: userTablePageRows, page: userTablePage, totalPages: userTableTotalPages,
@@ -497,7 +506,7 @@ const {
 const {
   pageRows: rolesPageRows, page: rolesPage, totalPages: rolesTotalPages,
   total: rolesTotal, next: rolesNext, prev: rolesPrev,
-} = usePagination(roles, 15)
+} = usePagination(visibleRoles, 15)
 
 const {
   pageRows: departmentsPageRows, page: departmentsPage, totalPages: departmentsTotalPages,
@@ -568,7 +577,17 @@ function toggleMenu(u: User, ev: MouseEvent) {
   }
   menuTriggerEl.value = btn
   openMenuId.value = u.id
-  nextTick(() => menuPopRef.value?.querySelector<HTMLElement>('.row-menu-item')?.focus())
+  nextTick(() => {
+    const pop = menuPopRef.value
+    if (!pop) return
+    // Rows near the bottom of a short (phone) viewport would clip the menu -
+    // measure it once rendered and open upward instead when there's no room below.
+    const h = pop.offsetHeight
+    if (rect.bottom + 4 + h > window.innerHeight - 8 && rect.top - 4 - h > 8) {
+      menuPos.value = { ...menuPos.value, top: `${rect.top - 4 - h}px` }
+    }
+    pop.querySelector<HTMLElement>('.row-menu-item')?.focus()
+  })
 }
 /** `refocus` returns focus to the trigger - only wanted for a keyboard-driven
  *  close (Escape); an outside click, a scroll, or a background reload
@@ -608,6 +627,7 @@ onUnmounted(() => {
 // ── Row editing ────────────────────────────────────────────────────────
 
 function startEdit(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   closeMenu()
   editingId.value     = u.id
   editForm.role_type  = u.role_type
@@ -619,8 +639,17 @@ function startEdit(u: User) {
 
 function cancelEdit() { editingId.value = null }
 
+/** Roles the viewer may pick for `u` - super_admin is only offered to (and only changeable by) a super_admin. */
+function roleOptionsFor(u: User) { return assignableRoleTypes(viewerScope.value, u.role_type) }
+
 async function saveEdit(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
+  // The dropdown already hides this, but the row's form state is plain data - re-check before it reaches the API.
+  if (!canChangeRole(viewerScope.value, u.role_type, editForm.role_type)) {
+    actionError.value = 'Only a super_admin can grant, revoke or change the super_admin role.'
+    return
+  }
   savingId.value = u.id
   actionError.value = null
   try {
@@ -641,6 +670,7 @@ async function saveEdit(u: User) {
 }
 
 async function toggleActive(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   savingId.value = u.id
   actionError.value = null
@@ -658,6 +688,7 @@ async function toggleActive(u: User) {
 }
 
 async function deleteUser(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   savingId.value = u.id
   actionError.value = null
@@ -804,33 +835,14 @@ function fmtDate(d?: string | null) {
 .section-title { margin: 18px 0 8px; }
 .section-title:first-of-type { margin-top: 14px; }
 
-/* Metric strip - one flat row with dividers, replaces six separate KPI cards */
-.metric-strip {
-  display:flex; flex-wrap:wrap;
-  background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius);
-  margin-bottom:14px;
-}
-.metric-item {
-  flex:1 1 150px; min-width:130px;
-  padding:10px 16px;
-  border-left:1px solid var(--border-subtle);
-  display:flex; flex-direction:column; gap:2px;
-}
-.metric-item:first-child { border-left:0; }
-.metric-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
-.metric-value { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--fg-1); line-height:1.15; }
-.metric-sub   { font-size:10.5px; color:var(--fg-3); }
-@media (max-width:640px) {
-  .metric-strip { display:grid; grid-template-columns:1fr 1fr; }
-  .metric-item  { border-left:0; border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); }
-  .metric-item:nth-child(2n)      { border-right:0; }
-  .metric-item:nth-last-child(-n+2) { border-bottom:0; }
-}
-
 /* Filters */
 .filter-bar   { padding:8px 12px; margin-bottom:10px; }
 .result-count { font-size:12px; color:var(--fg-2); white-space:nowrap; }
-.mini-pager   { display:flex; align-items:center; gap:8px; }
+.mini-pager   { display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
+/* Desktop widths only - on phones .filter-bar--grid (theme.css) owns the layout. */
+@media (min-width:769px) {
+  .filter-input { flex:1 1 220px; min-width:220px; }
+}
 .icon-btn {
   width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
   border:1px solid var(--border-interactive); border-radius:var(--r-sm);
@@ -866,35 +878,6 @@ function fmtDate(d?: string | null) {
   .users-table th:nth-child(5), .users-table td:nth-child(5) { display:none; } /* MFA */
 }
 
-/* Mobile - each row becomes a compact record, email first, all fields kept */
-@media (max-width:640px) {
-  .users-table thead { display:none; }
-  .users-table, .users-table tbody { display:block; width:100%; }
-  .users-table tr {
-    display:block; width:100%; margin-bottom:8px; padding:10px 12px;
-    background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
-  }
-  .users-table td {
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:4px 0; border:0; font-size:12.5px;
-  }
-  .users-table td::before {
-    content:attr(data-label); flex-shrink:0;
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3);
-  }
-  .users-table td:nth-child(5), .users-table td:nth-child(6) { display:flex; } /* MFA/Staff back on mobile cards */
-  .users-table td:first-child {
-    display:block; font-size:14px; font-weight:700;
-    padding:0 0 8px; margin-bottom:6px; border-bottom:1px solid var(--border-subtle);
-  }
-  .users-table td:first-child::before { content:none; }
-  .users-table td:last-child {
-    display:flex; justify-content:flex-start;
-    padding:8px 0 0; margin-top:4px; border-top:1px solid var(--border-subtle);
-  }
-  .users-table td:last-child::before { content:none; }
-}
-
 /* Action buttons */
 .action-group    { display:flex; gap:4px; flex-wrap:wrap; }
 .btn-primary-sm  { background:var(--primary-fill); color:#fff; border-color:var(--primary-fill); }
@@ -925,7 +908,7 @@ function fmtDate(d?: string | null) {
 
 /* Role & Organization - tab switcher between the two secondary panels */
 .subtab-bar {
-  display:flex; align-items:center; gap:18px;
+  display:flex; flex-wrap:wrap; align-items:center; gap:0 18px;
   border-bottom:1px solid var(--border-subtle); margin-bottom:12px;
 }
 .subtab {
@@ -948,8 +931,29 @@ function fmtDate(d?: string | null) {
 .lock-icon { font-size:12px; color:var(--fg-3); opacity:.8; cursor:default; }
 .mono-sm   { font-family:var(--font-mono); font-size:11.5px; font-variant-numeric:tabular-nums; }
 
-.add-role-footer { display:flex; gap:8px; align-items:center; }
+.add-role-footer { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+@media (max-width:480px) {
+  .add-role-footer input { min-height:40px; font-size:16px; }
+  .add-role-footer .btn  { min-height:40px; }
+}
 
 /* Empty states */
 .empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
+
+/* Mobile - the stacked-card layout itself is .stack-table (theme.css). The
+   MFA/Staff columns are hidden on tablet above, so bring them back for cards. */
+@media (max-width:768px) {
+  .users-table td:nth-child(5), .users-table td:nth-child(6) { display:flex; }
+  /* Row-state tints live on the <tr>; the shared card background outranks the
+     plain class rules above, so restate them at card specificity. */
+  .users-table > tbody > tr.row-editing  { background:var(--warning-bg); }
+  .users-table > tbody > tr.row-inactive { background:var(--surface-1); }
+  .email-cell { max-width:calc(100% - 22px); }
+  .select-inline { min-height:36px; font-size:16px; }
+  .toggle-label  { min-height:36px; }
+  .action-group  { gap:8px; }
+  .row-menu-item { padding:11px 12px; font-size:14px; }
+  .perm-desc     { max-width:none; width:auto; font-size:12px; }
+  .compact-table > tbody > tr > td.role-lock { display:none; } /* built-in roles: the badge already says so */
+}
 </style>

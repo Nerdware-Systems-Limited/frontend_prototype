@@ -15,8 +15,9 @@
 //    <a href> would skip the Bearer-token header entirely and 401.
 //  - :rows/:columns -> client-side CSV built from the page's already-loaded,
 //    already-filtered records, for registries with no backend export route.
-// Renders nothing at all below `minRole` - export is opt-in per role, not
-// hidden-but-reachable.
+// Renders nothing at all below `minRole`, or when the viewer's role has the
+// `export` capability switched off (Module Access) - export is opt-in per
+// role, not hidden-but-reachable.
 import { useApi } from '~/composables/api/_client'
 
 const props = withDefaults(defineProps<{
@@ -37,10 +38,11 @@ const props = withDefaults(defineProps<{
   minRole: 'analyst',
 })
 
-const { hasMinRole } = usePermissions()
+const { hasMinRole, hasCapability } = usePermissions()
 const { exportCsv } = useCsvExport()
 const api = useApi()
-const canExport = computed(() => hasMinRole(props.minRole))
+// The tier gate (`minRole`) AND the `export` capability: an agency can switch export off for a role.
+const canExport = computed(() => hasMinRole(props.minRole) && hasCapability('export'))
 const downloadName = computed(() => props.filename.endsWith('.csv') ? props.filename : `${props.filename}.csv`)
 const busy = ref(false)
 

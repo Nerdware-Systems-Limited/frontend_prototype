@@ -209,7 +209,10 @@ describe('domain composables - endpoint mapping', () => {
     $api.mockResolvedValue({ results: [] })
     const f = useFleet()
     await f.summary()
-    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/summary/')
+    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/summary/', { query: {} })
+    // Dashboard filters are forwarded as query params (empty values dropped).
+    await f.summary({ county: 'Kiambu', road: '' })
+    expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/summary/', { query: { county: 'Kiambu' } })
 
     await f.vehicles({ status: 'active' } as any)
     expect($api).toHaveBeenLastCalledWith('/api/v1/fleet/vehicles/', { query: { status: 'active' } })

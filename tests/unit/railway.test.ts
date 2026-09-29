@@ -75,10 +75,10 @@ describe('useRailway - summary + actions', () => {
   let $api: any
   beforeEach(() => { $api = installNuxtApp() })
 
-  it('summary() hits /api/v1/railway/summary/ with no body', async () => {
+  it('summary() hits /api/v1/railway/summary/ with no body, forwarding only given filter params', async () => {
     $api.mockResolvedValueOnce({ kpis: {}, live_operations: [], on_time_30d: {} })
     await useRailway().summary()
-    expect($api).toHaveBeenCalledWith('/api/v1/railway/summary/')
+    expect($api).toHaveBeenCalledWith('/api/v1/railway/summary/', { query: {} })
   })
 
   it('liveOperations() hits /operations/live/', async () => {

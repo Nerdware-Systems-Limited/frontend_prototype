@@ -13,11 +13,12 @@
  */
 
 import { useAuthStore } from '~/stores/auth'
+import { apiBaseUrl } from '~/utils/apiBase'
 
 
 export default defineNuxtPlugin((nuxtApp) => {
-  const config = useRuntimeConfig()
-  const BASE_URL = config.public.apiBase
+  // '' in dev (same-origin, proxied by the Nuxt dev server), the backend URL otherwise.
+  const BASE_URL = apiBaseUrl()
 
   // Internal flag so we only attempt one refresh per 401 wave
   let isRefreshing = false

@@ -1,5 +1,6 @@
 <template>
   <PageHeader
+    class="header-actions-fill"
     eyebrow="Access Control"
     title="Agencies"
     :subtitle="canWrite ? 'Platform-wide agency directory (tbl_agencies) - create and adjust the agencies UAPTS tracks' : 'Platform-wide agency directory - read-only for your role, contact a Super Admin to make changes'"
@@ -24,20 +25,19 @@
   </div>
 
   <SectionTitle>Agency Directory</SectionTitle>
-  <div class="filter-bar">
+  <div class="filter-bar filter-bar--grid">
     <input
       v-model="search"
-      class="select-sm filter-input"
+      class="select-sm filter-input filter-span"
       placeholder="Search code or name…"
       aria-label="Search by agency code or name"
     />
-    <span style="flex:1" />
-    <span class="result-count">{{ filteredAgencies.length }} of {{ agencies.length }} · Page {{ agenciesPage }} of {{ agenciesTotalPages }}</span>
+    <span class="result-count filter-span">{{ filteredAgencies.length }} of {{ agencies.length }} · Page {{ agenciesPage }} of {{ agenciesTotalPages }}</span>
   </div>
 
   <div id="agency-directory" class="card drill-target">
     <div class="card-body">
-      <table class="agencies-table">
+      <table class="agencies-table stack-table">
         <thead>
           <tr>
             <th>Code</th>
@@ -48,13 +48,13 @@
         </thead>
         <tbody v-if="filteredAgencies.length">
           <tr v-for="a in agenciesPageRows" :key="a.id">
-            <td data-label="Code"><BadgePill variant="neutral">{{ a.agency_code }}</BadgePill></td>
-            <td data-label="Agency Name">{{ a.agency_name }}</td>
-            <td data-label="Contact Email">
+            <td class="stack-title"><BadgePill variant="neutral">{{ a.agency_code }}</BadgePill></td>
+            <td class="stack-block" data-label="Agency Name">{{ a.agency_name }}</td>
+            <td class="stack-block" data-label="Contact Email">
               <span v-if="a.contact_email">{{ a.contact_email }}</span>
               <span v-else class="dim">-</span>
             </td>
-            <td v-if="canWrite" data-label="Actions">
+            <td v-if="canWrite" class="stack-actions">
               <div class="action-group">
                 <button class="btn btn-sm" :disabled="actionId === a.id" @click="openEdit(a)">Edit</button>
                 <button class="btn btn-sm btn-danger-outline" :disabled="actionId === a.id" @click="confirmDeleteAgency(a)">Delete</button>
@@ -345,31 +345,14 @@ function flash(msg: string) {
 .action-error   { background:var(--danger-bg); border-color:color-mix(in srgb, var(--danger-fg) 40%, transparent); color:var(--danger-fg); }
 .success-banner { margin:8px 0 12px; padding:10px 16px; border-radius:6px; background:var(--success-bg); border:1px solid color-mix(in srgb, var(--success-fg) 40%, transparent); font-size:13px; color:var(--success-fg); }
 
-.metric-strip {
-  display:flex; flex-wrap:wrap;
-  background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius);
-  margin-bottom:14px;
+.filter-bar   { padding:8px 12px; margin-bottom:10px; gap:10px; }
+.filter-input { min-width:0; }
+/* Desktop width only - on phones .filter-bar--grid (theme.css) owns the layout;
+   a flex-basis left active there would size the control's height, not its width. */
+@media (min-width:769px) {
+  .filter-input { width:220px; flex:0 1 220px; }
 }
-.metric-item {
-  flex:1 1 150px; min-width:130px;
-  padding:10px 16px;
-  border-left:1px solid var(--border-subtle);
-  display:flex; flex-direction:column; gap:2px;
-}
-.metric-item:first-child { border-left:0; }
-.metric-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
-.metric-value { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--fg-1); line-height:1.15; }
-.metric-sub   { font-size:10.5px; color:var(--fg-3); }
-@media (max-width:640px) {
-  .metric-strip { display:grid; grid-template-columns:1fr 1fr; }
-  .metric-item  { border-left:0; border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); }
-  .metric-item:nth-child(2n)        { border-right:0; }
-  .metric-item:nth-last-child(-n+2) { border-bottom:0; }
-}
-
-.filter-bar   { padding:8px 12px; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
-.filter-input { width:220px; flex:0 1 220px; min-width:0; }
-.result-count { font-size:12px; color:var(--fg-2); white-space:nowrap; }
+.result-count { font-size:12px; color:var(--fg-2); white-space:nowrap; margin-left:auto; }
 
 #agency-directory .card-body { padding:0; }
 #agency-directory :deep(.table-pagination) { padding-left:12px; padding-right:12px; }
@@ -379,23 +362,6 @@ function flash(msg: string) {
 .action-group { display:flex; gap:6px; }
 .btn-danger-outline { color:var(--danger-fg); border-color:color-mix(in srgb, var(--danger-fg) 40%, transparent); }
 .btn-danger-outline:hover { background:var(--danger-bg); }
-
-@media (max-width:640px) {
-  .agencies-table thead { display:none; }
-  .agencies-table, .agencies-table tbody { display:block; width:100%; }
-  .agencies-table tr {
-    display:block; width:100%; margin-bottom:8px; padding:10px 12px;
-    background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
-  }
-  .agencies-table td {
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:4px 0; border:0; font-size:12.5px;
-  }
-  .agencies-table td::before {
-    content:attr(data-label); flex-shrink:0;
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3);
-  }
-}
 
 .empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 
@@ -418,4 +384,20 @@ function flash(msg: string) {
 .hint       { font-weight:400; color:var(--fg-3); }
 .required   { color:var(--danger-fg); }
 .api-error  { font-size:12px; color:var(--danger-fg); padding:8px 12px; background:var(--danger-bg); border-radius:6px; border:1px solid color-mix(in srgb, var(--danger-fg) 30%, transparent); }
+
+/* Phones - the stacked-card layout itself is .stack-table (theme.css). */
+@media (max-width:768px) {
+  .action-group { gap:8px; }
+}
+@media (max-width:600px) {
+  .modal-backdrop { padding:8px; }
+  .modal          { width:100%; max-height:calc(100dvh - 16px); }
+  /* Header and footer stay put; only the form scrolls, and it never outgrows the
+     screen when the on-screen keyboard shrinks the viewport. */
+  .modal-body     { max-height:none; flex:1 1 auto; min-height:0; padding:16px; }
+  .modal-header, .modal-footer { padding-left:16px; padding-right:16px; }
+  .modal-close    { padding:6px 10px; }
+  .input-full     { min-height:40px; font-size:16px; } /* 16px stops iOS zooming on focus */
+  .modal-footer .btn, .modal-footer .btn-primary { min-height:40px; }
+}
 </style>

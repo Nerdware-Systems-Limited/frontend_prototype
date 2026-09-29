@@ -25,6 +25,7 @@
 
 import { ref } from 'vue'
 import { useAuthStore } from '~/stores/auth'
+import { wsUrl } from '~/utils/apiBase'
 
 export type NotificationDoc = {
   id: string
@@ -52,7 +53,8 @@ export function useNotificationSocket(wsBaseUrl?: string) {
   const authStore = useAuthStore()
 
   // Allow explicit override; fall back to runtimeConfig; fall back to hard default.
-  const baseUrl = wsBaseUrl ?? config.public.notificationsWsUrl ?? 'ws://127.0.0.1:8000/ws/notifications/'
+  // Direct to the backend, not through the dev proxy (see wsUrl).
+  const baseUrl = wsUrl(wsBaseUrl ?? (config.public.notificationsWsUrl as string) ?? 'ws://127.0.0.1:8000/ws/notifications/')
 
   // ── Reactive state ──────────────────────────────────────────────
   const notifications = ref<NotificationDoc[]>([])

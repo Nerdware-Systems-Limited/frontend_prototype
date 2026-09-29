@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+import { createPinia } from 'pinia'
 // AgencyCommandCentre calls Nuxt's auto-imported useAccessControl() in
 // setup. Outside Nuxt's build there's no auto-import, so wire the *real*
 // composable through globalThis (not a mock) - these tests exist to prove
@@ -54,6 +55,11 @@ beforeEach(() => { userRef.value = null; vi.clearAllMocks() })
 const mountCentre = () =>
   mount(AgencyCommandCentre, {
     global: {
+      // Installed on the app (not just setActivePinia globally), matching
+      // how Nuxt wires it in production - otherwise useAccessControl()'s
+      // getActivePinia() check finds a pinia but the component's own inject
+      // still misses it, and Vue warns about a missing pinia injection.
+      plugins: [createPinia()],
       components: { KpiCard, EmptyState, SectionTitle },
       stubs: { NuxtLink: true, Sparkline: true },
       // Every tile now carries `:to`, so KpiCard's root becomes a

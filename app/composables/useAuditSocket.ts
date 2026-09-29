@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
+import { wsUrl } from '~/utils/apiBase'
 
 export type AuditLog = {
   _id: string
@@ -93,7 +94,8 @@ export function useAuditSocket(urlOverride?: string) {
     return `${wsBase.replace(/\/$/, '')}/ws/audit/`
   }
 
-  const baseUrl = urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase()
+  // Direct to the backend, not through the dev proxy (see wsUrl).
+  const baseUrl = wsUrl(urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase())
 
   const logs = ref<AuditLog[]>([])
   const metrics = ref<Metrics | null>(null)

@@ -11,10 +11,11 @@ import { useAuthStore } from '~/stores/auth'
 export function useAuth() {
   const store = useAuthStore()
   const router = useRouter()
-  const route  = useRoute()
 
   function redirectAfterLogin() {
-    const redirect = (route.query.redirect as string) || '/dashboard'
+    // Read the route when it's needed, not at setup: useAuth is also reached from
+    // route middleware (via useAccessControl), where useRoute() is unreliable (NUXT_E2005).
+    const redirect = (router.currentRoute.value.query.redirect as string) || '/dashboard'
     return navigateTo(redirect)
   }
 

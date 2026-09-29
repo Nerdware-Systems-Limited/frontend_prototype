@@ -125,7 +125,7 @@ async function load() {
     const info = await api.uploads.routeInfo(props.uploadId)
     candidates.value = info.candidates
     fetchedHeaders.value = info.detected_headers
-    // Pre-select the top candidate only when it's an unambiguous winner —
+    // Pre-select the top candidate only when it's an unambiguous winner -
     // a clear column-overlap lead over the next one. Never when it's a
     // toss-up; the point is a deliberate human choice.
     const [first, second] = info.candidates

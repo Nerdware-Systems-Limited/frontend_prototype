@@ -46,3 +46,34 @@ export function canManageUser(viewer: AgencyScopeUser | null, target: { agency_c
   if (isUnscopedAdmin(viewer)) return true
   return !!target.agency_code && target.agency_code === viewer.agency_code
 }
+
+/** Every built-in role_type, most-privileged first. */
+export const ROLE_TYPES = ['super_admin', 'admin', 'analyst', 'operator', 'public'] as const
+
+/**
+ * Whether the viewer may move an account from role `from` to role `to` (`from`
+ * is null when creating one). super_admin is the platform-wide bypass, so any
+ * change with super_admin on either side - granting it to someone else, to
+ * themselves, or demoting an existing super_admin - is super_admin-only.
+ * Leaving the role as it is always passes.
+ */
+export function canChangeRole(viewer: AgencyScopeUser | null, from: string | null, to: string): boolean {
+  if (!viewer) return false
+  if (from === to) return true
+  if (isUnscopedAdmin(viewer)) return true
+  return from !== 'super_admin' && to !== 'super_admin'
+}
+
+/** Whether the viewer may see `role` listed at all (catalog, filters) - super_admin is invisible to everyone else. */
+export function canViewRole(viewer: AgencyScopeUser | null, role: string): boolean {
+  return role !== 'super_admin' || isUnscopedAdmin(viewer)
+}
+
+/**
+ * Role types to offer in a role dropdown for an account currently on
+ * `current` (null when creating). The account's current role stays in the
+ * list so a locked row still renders its own value instead of a blank select.
+ */
+export function assignableRoleTypes(viewer: AgencyScopeUser | null, current: string | null = null): string[] {
+  return ROLE_TYPES.filter(role => role === current || canChangeRole(viewer, current, role))
+}

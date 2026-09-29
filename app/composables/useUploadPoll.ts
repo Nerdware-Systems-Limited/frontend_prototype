@@ -2,12 +2,12 @@
 // ─────────────────────────────────────────────────────────────────────
 // One polling implementation for pages 1–3 of the Integration Hub,
 // replacing three near-identical hand-rolled pollers (UploadModal.vue,
-// the old uploads/[id].vue, the old uploads/index.vue) — the last of
+// the old uploads/[id].vue, the old uploads/index.vue) - the last of
 // which re-created its setInterval on every single tick (load() called
 // maybePoll(), which cleared+rebuilt the interval, and load() was itself
 // the interval callback).
 //
-// This uses a chain of setTimeout calls instead of setInterval — there is
+// This uses a chain of setTimeout calls instead of setInterval - there is
 // only ever one live timer, it backs off (3s → 5s → 10s, then holds), it
 // pauses while the tab is backgrounded (no point burning a poll the user
 // can't see), and it stops for good once the caller's isInFlight()
@@ -39,7 +39,7 @@ export function useUploadPoll(fetcher: () => Promise<void>, isInFlight: () => bo
 
   function scheduleNext() {
     if (stopped || !isInFlight()) return
-    // Backgrounded tab: don't arm a timer at all — visibilitychange below
+    // Backgrounded tab: don't arm a timer at all - visibilitychange below
     // resumes with an immediate fetch once it's visible again, rather
     // than a burst of missed ticks firing all at once on return.
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -54,7 +54,7 @@ export function useUploadPoll(fetcher: () => Promise<void>, isInFlight: () => bo
       return
     }
     if (!stopped && isInFlight() && !timer) {
-      // Resume immediately (not after another backoff wait) — the last
+      // Resume immediately (not after another backoff wait) - the last
       // known state could be several minutes stale by the time the tab
       // comes back.
       timer = setTimeout(async () => {

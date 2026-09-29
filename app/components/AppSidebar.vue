@@ -185,7 +185,7 @@
       </details>
 
       <!-- M10 · User Management & Access Control - /api/v1/accounts/* + audit -->
-      <details v-if="canSeeModule('M10')" class="sidebar-group" :open="groupIsOpen(['/agencies', '/users', '/roles', '/audit'])">
+      <details v-if="canSeeModule('M10')" class="sidebar-group" :open="groupIsOpen(['/agencies', '/users', '/roles', '/access-policies', '/admin/dashboards', '/audit'])">
         <summary class="sidebar-group-title">
           Access Control<span class="sidebar-caret">▾</span>
         </summary>
@@ -193,6 +193,8 @@
           <NuxtLink v-if="canSee('/agencies')" class="sidebar-link" to="/agencies" :class="{ active: isActive('/agencies') }">Agencies</NuxtLink>
           <NuxtLink v-if="canSee('/users')" class="sidebar-link" to="/users" :class="{ active: isActive('/users') }">User Management</NuxtLink>
           <NuxtLink v-if="canSee('/roles')" class="sidebar-link" to="/roles" :class="{ active: isActive('/roles') }">Roles & Permissions</NuxtLink>
+          <NuxtLink v-if="canSee('/access-policies')" class="sidebar-link" to="/access-policies" :class="{ active: isActive('/access-policies') }">Module Access</NuxtLink>
+          <NuxtLink v-if="canManageDashboardsAny" class="sidebar-link" to="/admin/dashboards" :class="{ active: isActive('/admin/dashboards', false) }">Dashboard Manager</NuxtLink>
           <NuxtLink v-if="canSee('/audit')" class="sidebar-link" to="/audit" :class="{ active: isActive('/audit') }">Audit Trail</NuxtLink>
         </div>
       </details>
@@ -240,6 +242,10 @@ const auth = useAuth()
 const access = useAccessControl()
 const canSee = access.canAccessRoute
 const canSeeModule = access.canAccessModule
+// Dashboard Manager: route access plus a manage permission (same rule as middleware/dashboard-manager.global.ts).
+const { canManageDashboards, canManageAgencyDashboards } = useViewerContext()
+const canManageDashboardsAny = computed(() =>
+  canSee('/admin/dashboards') && (canManageDashboards.value || canManageAgencyDashboards.value))
 
 const loggingOut = ref(false)
 async function handleLogout() {

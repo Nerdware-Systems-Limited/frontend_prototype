@@ -223,7 +223,7 @@ function contribPct(records: number): number {
   return Math.max(2, Math.round((records / maxContribution.value) * 100))
 }
 
-// ── Feed health table — independent of the window selector ─────────────
+// ── Feed health table - independent of the window selector ─────────────
 const FEED_CHIPS = [
   { key: 'all', label: 'All', tone: '' },
   { key: 'connected', label: 'Connected', tone: 'feed-filter-chip--good' },

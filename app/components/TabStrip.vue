@@ -1,7 +1,7 @@
 <template>
   <!--
     Generic section-tab switcher. No reusable Tabs component existed
-    before this — every page that needed a mode switch hand-rolled its
+    before this - every page that needed a mode switch hand-rolled its
     own (see query-builder.vue's .mode-tab, the closest prior art, whose
     visual pattern this borrows).
   -->

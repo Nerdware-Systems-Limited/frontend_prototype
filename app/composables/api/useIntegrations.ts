@@ -19,13 +19,14 @@
 //   POST /uploads/{id}/commit/           → 202, enqueues async commit
 //
 // Upload/commit both run as backend Celery tasks now (files can be
-// multi-GB) rather than synchronously in the request — the POST calls
+// multi-GB) rather than synchronously in the request - the POST calls
 // below return immediately with status="pending"/"committing"; callers
 // must poll uploads.detail() until status reaches a terminal value.
 // ─────────────────────────────────────────────────────────────────────
 
 import { useAuthStore } from '~/stores/auth'
 import { useApi, cleanQuery } from './_client'
+import { apiBaseUrl } from '~/utils/apiBase'
 import type { Paged } from '~/types/uapts'
 
 // ── DataSource - mirrors the read-only registry serializer ────────────
@@ -46,7 +47,7 @@ export interface DataSource {
    *  CSV uploads have no embedded _meta sheet, so this is sent back as
    *  declared_schema_version on upload. */
   schema_version: string | null
-  /** Register-an-API console fields (views.RegisterDataSourceView) — blank
+  /** Register-an-API console fields (views.RegisterDataSourceView) - blank
    *  for legacy/seeded feeds never registered through the console. */
   protocol: RegisterProtocol | ''
   auth_method: RegisterAuthMethod | ''
@@ -70,19 +71,19 @@ export interface RegisterFeedPayload {
   endpoint_value: string
   reconcile_cron?: string
   system_source?: string
-  /** Pull-style only — the third party's credential; encrypted at rest,
+  /** Pull-style only - the third party's credential; encrypted at rest,
    *  ignored (server generates its own) for push-style protocols. */
   credentials?: Record<string, string>
 }
 
 /** issued_secret is present ONLY in the direct response to a successful
- *  push-style registration — copy it now, it's never returned again. */
+ *  push-style registration - copy it now, it's never returned again. */
 export interface RegisterFeedResult extends DataSource {
   issued_secret?: string
 }
 
 export interface TestConnectionPayload {
-  /** Re-test an already-registered feed — protocol/endpoint_value below
+  /** Re-test an already-registered feed - protocol/endpoint_value below
    *  are ignored server-side in favour of what's actually stored on that
    *  DataSource, and the result is persisted to last_test_at/last_test_ok.
    *  Omit for pre-save form testing (register-console step 4). */
@@ -95,7 +96,7 @@ export interface TestConnectionResult {
   ok: boolean
   detail: string
   latency_ms: number | null
-  /** Present only when source_id was given — the persisted timestamp. */
+  /** Present only when source_id was given - the persisted timestamp. */
   last_test_at?: string
 }
 
@@ -109,7 +110,7 @@ export type DataUploadStatus =
   | 'committing' | 'committed' | 'partial' | 'failed' | 'superseded'
 
 /** column is '' for a cross-field constraint not attributable to a single
- *  header (see xlsx_templates.TemplateSpec.row_validator's docstring) —
+ *  header (see xlsx_templates.TemplateSpec.row_validator's docstring) -
  *  SampleGrid falls back to a whole-row highlight for those. */
 export interface FieldError {
   column: string
@@ -123,10 +124,10 @@ export interface UploadRowError {
 
 export interface DataUpload {
   id: string
-  /** null while the upload is "unrouted" (template-late intake) — a feed
+  /** null while the upload is "unrouted" (template-late intake) - a feed
    *  is assigned via POST /uploads/<id>/route/. */
   source_id: string | null
-  /** Submitting agency — a direct FK on DataUpload now (not source.agency),
+  /** Submitting agency - a direct FK on DataUpload now (not source.agency),
    *  so it's set even for an un-routed upload with no source. NOT
    *  necessarily who the data is about: KRB submits funding data about
    *  KeNHA. See the inbox's agency_code (submitted-by) vs. covers_agency
@@ -146,10 +147,10 @@ export interface DataUpload {
   /** "template" = strict header match; "mapped" = Track B, a column_map
    *  was applied (human-supplied or auto-applied from a saved UploadMapping). */
   source_track: 'template' | 'mapped'
-  /** The actual header row found — only populated once status has been
+  /** The actual header row found - only populated once status has been
    *  "needs_mapping" (see xlsx_templates.HeaderMismatch). */
   detected_headers: string[]
-  /** {expected_header: actual_header} once mapped — empty for a normal
+  /** {expected_header: actual_header} once mapped - empty for a normal
    *  template upload. */
   column_map: Record<string, string>
   validation_report: UploadRowError[]
@@ -169,14 +170,14 @@ export interface DataUpload {
   created_at: string
 }
 
-/** DataUploadDetailView's response — DataUpload plus a per-target_model
+/** DataUploadDetailView's response - DataUpload plus a per-target_model
  *  breakdown ("written to: MaintenanceOrder 874, MaintenanceBudget 4"),
  *  computed only for the detail view (not the paginated inbox/history
  *  list, to avoid an aggregate query per row there). */
 export interface DataUploadDetail extends DataUpload {
   written_to: { target_model: string; count: number }[]
   /** Who this upload's *data* is about (payload.road_agency_code),
-   *  distinct from agency_code/agency_name above (who submitted it) —
+   *  distinct from agency_code/agency_name above (who submitted it) -
    *  only meaningful for sources whose payload carries a subject agency;
    *  harmlessly empty otherwise. */
   covers_breakdown: { payload__road_agency_code: string; count: number }[]
@@ -184,7 +185,7 @@ export interface DataUploadDetail extends DataUpload {
   superseded_by: string | null
 }
 
-/** One field the strict template expects — GET .../expected-columns/,
+/** One field the strict template expects - GET .../expected-columns/,
  *  used to build the column-mapping form without hardcoding template
  *  knowledge on the frontend. */
 export interface ExpectedColumn {
@@ -193,9 +194,9 @@ export interface ExpectedColumn {
   example: string
 }
 
-/** One candidate feed for an un-routed upload — GET /uploads/<id>/route/.
+/** One candidate feed for an un-routed upload - GET /uploads/<id>/route/.
  *  Ranked server-side by header overlap; the frontend orders the list but
- *  never auto-picks (locked-template design — see DataUploadRouteView). */
+ *  never auto-picks (locked-template design - see DataUploadRouteView). */
 export interface RouteCandidate {
   source_id: string
   system_source: string
@@ -212,9 +213,9 @@ export interface RouteInfo {
   candidates: RouteCandidate[]
 }
 
-/** DataUploadInboxView's response — Paged<DataUpload> plus sums over the
+/** DataUploadInboxView's response - Paged<DataUpload> plus sums over the
  *  *filtered* (pre-pagination) queryset, for the Files list's KPI ribbon
- *  (Integration Hub redesign §4, Page 2) — "batches / rows parsed / rows
+ *  (Integration Hub redesign §4, Page 2) - "batches / rows parsed / rows
  *  written / needs attention" has to reflect the current filter set, not
  *  just the 20 rows on the loaded page. */
 export interface UploadInboxAggregates {
@@ -238,7 +239,7 @@ export interface AgencyContribution {
 
 // ── IngestedRecord - raw audit trail row ─────────────────────────────
 // upload/source_row/row_status/row_errors/target_model/target_pk are
-// file-upload-only (blank for live-push rows) — see the model docstring.
+// file-upload-only (blank for live-push rows) - see the model docstring.
 // This same shape drives both the API feed page's raw-payload viewer and
 // a file upload's Rows tab (?upload_id=&row_status=).
 
@@ -257,7 +258,7 @@ export interface IngestedRecord {
   source_row: number | null
   row_status: IngestedRowStatus
   row_errors: FieldError[]
-  target_model: string    // e.g. "infrastructure.MaintenanceOrder" — blank if nothing was written
+  target_model: string    // e.g. "infrastructure.MaintenanceOrder" - blank if nothing was written
   target_pk: string
 }
 
@@ -268,13 +269,15 @@ export interface IntegrationQuery {
   page_size?: number
   search?: string
   ordering?: string
+  /** Only this agency's feeds (the backend filters on agency__agency_code). */
+  agency_code?: string
 }
 
 export interface RecordsQuery {
   source_id?: string      // filter by source_id (backend query param is `source_id`, not `source`)
   upload_id?: string
   row_status?: IngestedRowStatus
-  /** File detail page's DB matches tab — e.g. "infrastructure.MaintenanceOrder". */
+  /** File detail page's DB matches tab - e.g. "infrastructure.MaintenanceOrder". */
   target_model?: string
   page?: number
   page_size?: number
@@ -287,10 +290,10 @@ export interface UploadHistoryQuery {
   page_size?: number
 }
 
-/** Cross-agency uploads inbox filters — see DataUploadInboxView. */
+/** Cross-agency uploads inbox filters - see DataUploadInboxView. */
 export interface UploadInboxQuery {
   agency_code?: string      // submitted-by agency (source.agency)
-  covers_agency?: string    // agency a row's data is *about* — a different facet, see DataUpload docs
+  covers_agency?: string    // agency a row's data is *about* - a different facet, see DataUpload docs
   source_id?: string
   status?: DataUploadStatus
   date_field?: 'uploaded' | 'committed' | 'period'
@@ -322,15 +325,15 @@ export interface HandlerErrorGroup {
   count: number
 }
 
-/** API feed page, Phase 1 reconciliation — see DataSourceStatsView. */
+/** API feed page, Phase 1 reconciliation - see DataSourceStatsView. */
 export interface DataSourceStats {
   received_24h: number
   received_7d: number
-  /** One entry per day, oldest first, zero-filled — 7 entries. */
+  /** One entry per day, oldest first, zero-filled - 7 entries. */
   daily_received: { date: string; count: number }[]
   /** A handler ran for this record, whether it wrote something or failed. */
   attempted: number
-  /** Handler succeeded — target_model set. The number that actually
+  /** Handler succeeded - target_model set. The number that actually
    *  matters: a feed can be green and "attempted"=100% while writing 0
    *  domain rows if every record's handler is silently failing. */
   domain_rows_created: number
@@ -347,16 +350,16 @@ export interface SilentFailure {
   written: number
 }
 
-/** Ingestion Analytics page (Integration Hub redesign §4) — one call
+/** Ingestion Analytics page (Integration Hub redesign §4) - one call
  *  replacing a feedStats() per source. See PlatformIntegrationStatsView. */
 export interface PlatformStats {
   window: '24h' | '7d' | '30d' | 'all'
-  /** Non-null (= the cap) when total_sources_considered exceeds it — the
+  /** Non-null (= the cap) when total_sources_considered exceeds it - the
    *  funnel/silent_failures below only cover the busiest N sources. */
   scoped_to_top_n: number | null
   total_sources_considered: number
   funnel: { received: number; attempted: number; written: number }
-  /** Sources where received > 0 but written === 0 — green and syncing,
+  /** Sources where received > 0 but written === 0 - green and syncing,
    *  writing nothing. Sorted by records lost (= received) descending. */
   silent_failures: SilentFailure[]
   top_handler_errors: HandlerErrorGroup[]
@@ -372,7 +375,7 @@ interface ApiEnvelope<T> {
 /**
  * DataUploadDetailView/DataUploadCommitView/the create-upload response all
  * use the platform's {success, data, message} envelope (views.ok_response)
- * — unlike the ViewSet-based endpoints elsewhere in this composable
+ * - unlike the ViewSet-based endpoints elsewhere in this composable
  * (DataSourceViewSet, IngestedRecordViewSet), which return raw serializer
  * data straight through $api with no wrapping. Unwrap explicitly here
  * rather than assuming one convention app-wide.
@@ -384,19 +387,19 @@ function unwrapEnvelope<T>(res: ApiEnvelope<T>): T {
 
 /**
  * Raw multipart POST for a file upload, via XMLHttpRequest rather than
- * $fetch/ofetch — this is the one call in the Integration Hub that needs
+ * $fetch/ofetch - this is the one call in the Integration Hub that needs
  * upload.onprogress (ofetch's fetch-based body has no equivalent) and so
  * can't go through the $api plugin. Auth header is attached manually here
- * to match what plugins/api.ts does for every other call — the previous
+ * to match what plugins/api.ts does for every other call - the previous
  * version of this code skipped that entirely (bypassed $fetch directly),
  * which meant an access token expiring mid-upload just failed silently
  * with no refresh attempt. There's no 401-refresh-and-retry here (that
  * needs to resend the whole file, which for a multi-GB upload isn't
- * something to do silently) — a 401 just rejects; the caller shows the
+ * something to do silently) - a 401 just rejects; the caller shows the
  * error and the user re-selects the file after logging in again.
  */
 /** `path` is relative to apiBase, e.g. `/api/v1/integrations/{sourceId}/uploads/`
- *  or `/api/v1/integrations/uploads/{id}/replace/` — same XHR mechanics
+ *  or `/api/v1/integrations/uploads/{id}/replace/` - same XHR mechanics
  *  serve both the initial upload and a replace-with-new-file. */
 function uploadFileWithProgress(
   path: string,
@@ -404,8 +407,7 @@ function uploadFileWithProgress(
   onProgress?: (pct: number) => void,
 ): Promise<DataUpload> {
   const auth = useAuthStore()
-  const config = useRuntimeConfig()
-  const base = (config.public.apiBase as string).replace(/\/$/, '')
+  const base = apiBaseUrl()
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -433,12 +435,11 @@ function uploadFileWithProgress(
   })
 }
 
-/** GET a binary response with the auth header attached — see the
+/** GET a binary response with the auth header attached - see the
  *  download() method below for why this can't go through useApi(). */
 async function downloadBlobWithAuth(path: string): Promise<Blob> {
   const auth = useAuthStore()
-  const config = useRuntimeConfig()
-  const base = (config.public.apiBase as string).replace(/\/$/, '')
+  const base = apiBaseUrl()
 
   const res = await fetch(`${base}${path}`, {
     headers: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {},
@@ -482,7 +483,7 @@ export function useIntegrations() {
         }),
 
       /**
-       * Upload a file. Returns immediately (202) with status="pending" —
+       * Upload a file. Returns immediately (202) with status="pending" -
        * caller must poll detail() until status is a terminal value
        * (validated/rejected/failed). declaredSchemaVersion is required
        * for .csv uploads (source.schema_version) and ignored for .xlsx
@@ -496,7 +497,7 @@ export function useIntegrations() {
       },
 
       /**
-       * Template-late intake — POST /api/v1/integrations/uploads/.
+       * Template-late intake - POST /api/v1/integrations/uploads/.
        * With `sourceId` this is identical to create(); without one the
        * file is accepted with no feed assigned (status="unrouted") and
        * waits in the routing queue. The agency is resolved server-side
@@ -516,7 +517,7 @@ export function useIntegrations() {
         return uploadFileWithProgress('/api/v1/integrations/uploads/', form, onProgress)
       },
 
-      /** Cross-agency inbox — every upload, every manual source, un-routed included. */
+      /** Cross-agency inbox - every upload, every manual source, un-routed included. */
       inbox: (q?: UploadInboxQuery) =>
         api<UploadInboxResult>('/api/v1/integrations/uploads/', { query: cleanQuery(q as Record<string, unknown>) }),
 
@@ -524,7 +525,7 @@ export function useIntegrations() {
       routeInfo: (uploadId: string) =>
         api<ApiEnvelope<RouteInfo>>(`/api/v1/integrations/uploads/${uploadId}/route/`).then(unwrapEnvelope),
 
-      /** Assign a feed to an un-routed upload — 202, then poll detail(). */
+      /** Assign a feed to an un-routed upload - 202, then poll detail(). */
       route: (uploadId: string, sourceId: string) =>
         api<ApiEnvelope<DataUpload>>(`/api/v1/integrations/uploads/${uploadId}/route/`, {
           method: 'POST',
@@ -535,28 +536,28 @@ export function useIntegrations() {
       detail: (uploadId: string) =>
         api<ApiEnvelope<DataUploadDetail>>(`/api/v1/integrations/uploads/${uploadId}/`).then(unwrapEnvelope),
 
-      /** Sheets tab — re-parses the stored file fresh on every call. */
+      /** Sheets tab - re-parses the stored file fresh on every call. */
       preview: (uploadId: string, q?: PreviewQuery) =>
         api<ApiEnvelope<PreviewResult>>(`/api/v1/integrations/uploads/${uploadId}/preview/`, {
           query: cleanQuery(q as Record<string, unknown>),
         }).then(unwrapEnvelope),
 
-      /** Original file as a Blob — caller wires it to an <a download> click.
+      /** Original file as a Blob - caller wires it to an <a download> click.
        *  Not through useApi() (its ApiOptions type pins responseType to
        *  'json'); attaches the auth header manually like the XHR upload
        *  helper above, since DataUploadDownloadView requires auth. */
       download: (uploadId: string) => downloadBlobWithAuth(`/api/v1/integrations/uploads/${uploadId}/download/`),
 
-      /** Enqueue commit of a validated upload. Returns 202 — poll detail(). */
+      /** Enqueue commit of a validated upload. Returns 202 - poll detail(). */
       commit: (uploadId: string) =>
         api<ApiEnvelope<DataUpload>>(`/api/v1/integrations/uploads/${uploadId}/commit/`, { method: 'POST' })
           .then(unwrapEnvelope),
 
       /**
-       * "Upload a correction" — not-yet-committed uploads are cleanly
+       * "Upload a correction" - not-yet-committed uploads are cleanly
        * superseded (old row -> status="superseded", nothing to undo yet);
        * already-committed uploads keep their domain writes untouched (no
-       * revert option exists here on purpose — see DataUploadReplaceView).
+       * revert option exists here on purpose - see DataUploadReplaceView).
        */
       replace: (uploadId: string, file: File, declaredSchemaVersion?: string | null, onProgress?: (pct: number) => void) => {
         const form = new FormData()
@@ -566,20 +567,20 @@ export function useIntegrations() {
       },
 
       /** One file-level toggle ("Include N duplicate row(s)") rather than
-       *  per-row selection — only while status="validated". */
+       *  per-row selection - only while status="validated". */
       includeDuplicates: (uploadId: string) =>
         api<ApiEnvelope<DataUpload>>(`/api/v1/integrations/uploads/${uploadId}/include-duplicates/`, {
           method: 'POST',
         }).then(unwrapEnvelope),
 
-      /** The template's expected fields — Track B mapping form's "our
+      /** The template's expected fields - Track B mapping form's "our
        *  field" list (see uploads.applyMapping). */
       expectedColumns: (sourceId: string) =>
         api<ApiEnvelope<ExpectedColumn[]>>(`/api/v1/integrations/${sourceId}/expected-columns/`)
           .then(unwrapEnvelope),
 
       /**
-       * Track B — apply a column mapping to an upload stuck on
+       * Track B - apply a column mapping to an upload stuck on
        * status="needs_mapping" and re-enqueue validation. saveForAgency
        * upserts a reusable UploadMapping so the next mismatched upload
        * from this agency auto-applies it instead of stopping again.
@@ -590,7 +591,7 @@ export function useIntegrations() {
           body: { column_map: columnMap, save_for_agency: saveForAgency },
         }).then(unwrapEnvelope),
 
-      /** The current locked .xlsx template for a manual source — routed
+      /** The current locked .xlsx template for a manual source - routed
        *  through the auth-attached blob helper (see downloadBlobWithAuth)
        *  rather than a bare $fetch, which silently sent no apiBase/auth
        *  header and broke against any backend other than the dev proxy. */
@@ -602,21 +603,21 @@ export function useIntegrations() {
     feedStats: (sourceId: string) =>
       api<ApiEnvelope<DataSourceStats>>(`/api/v1/integrations/${sourceId}/stats/`).then(unwrapEnvelope),
 
-    /** Per-agency IngestedRecord counts — the analytics dashboard's
+    /** Per-agency IngestedRecord counts - the analytics dashboard's
      *  "records they contribute" panel. */
     agencyContributions: (window: '24h' | '7d' | '30d' | 'all' = '30d') =>
       api<ApiEnvelope<AgencyContribution[]>>('/api/v1/integrations/agency-contributions/', {
         query: { window },
       }).then(unwrapEnvelope),
 
-    /** Ingestion Analytics page (Page 4) — one aggregate call across every
+    /** Ingestion Analytics page (Page 4) - one aggregate call across every
      *  source rather than one feedStats() per source. */
     platformStats: (window: '24h' | '7d' | '30d' | 'all' = '7d') =>
       api<ApiEnvelope<PlatformStats>>('/api/v1/integrations/stats/', {
         query: { window },
       }).then(unwrapEnvelope),
 
-    /** Register-an-API console (Page 1) — admin-only server-side (403 for
+    /** Register-an-API console (Page 1) - admin-only server-side (403 for
      *  anyone else; see core.permissions.IsAdminRole). Push-style protocols
      *  return `issued_secret` once; pull-style protocols encrypt and store
      *  `credentials` for a not-yet-built scheduled puller. */

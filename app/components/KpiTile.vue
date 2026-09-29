@@ -2,7 +2,7 @@
   <!--
     Label / big mono number / sub-label, same visual footprint as
     KpiCard.vue but with an explicit tri-state: loading / unavailable / ok.
-    A failed fetch must never render as "0" — that's a real number meaning
+    A failed fetch must never render as "0" - that's a real number meaning
     "confirmed zero", not "we don't know". Introduced for the Integration
     Hub redesign; KpiCard itself is left alone since other pages rely on
     its always-a-value contract.

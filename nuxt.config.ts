@@ -1,4 +1,11 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// Backend address (set NUXT_PUBLIC_API_BASE in .env). In dev the browser
+// talks only to the Nuxt dev server, which proxies these prefixes to the
+// backend - see app/utils/apiBase.ts.
+const API_TARGET = (process.env.NUXT_PUBLIC_API_BASE ?? 'https://uapts.eu.cc').replace(/\/$/, '')
+const DEV = process.env.NODE_ENV !== 'production'
+
 export default defineNuxtConfig({
   // SSR off - SPA dashboard, same as the reference prototype
   // ssr: false,
@@ -15,25 +22,40 @@ export default defineNuxtConfig({
   routeRules: {
     '/**': { ssr: false },
     '/': { redirect: '/dashboard' },
-    // Integration Hub redesign — a couple of old static paths kept
+    // Integration Hub redesign - a couple of old static paths kept
     // working for bookmarks. These MUST stay static: a `:param` rule here
     // (e.g. `/integrations/:source_id`) is matched by Nitro *before* the
     // file-based routes, so it silently swallows real pages like
     // `/integrations/files` and `/integrations/analytics` and 307s them
     // (Nitro also doesn't interpolate the param into the redirect target).
     // Old per-source deep links (`/integrations/<source_id>`) are handled
-    // in-app instead — see app/pages/integrations/index.vue.
+    // in-app instead - see app/pages/integrations/index.vue.
     '/integrations/uploads': { redirect: '/integrations/files' },
-    // Static prefix, no `:param` at the top level — safe. (`/uploads/<id>`
+    // Static prefix, no `:param` at the top level - safe. (`/uploads/<id>`
     // has no page of its own, so this shadows nothing.)
     '/integrations/uploads/:id': { redirect: '/integrations/files/:id' },
   },
 
   modules: ['@nuxtjs/tailwindcss', '@vueuse/nuxt', '@pinia/nuxt'],
 
+  // Dev-only same-origin proxy to the backend (it's on another host and we
+  // can't change its CORS/CSRF settings). Auth is a Bearer header, which the
+  // proxy forwards untouched; changeOrigin sets Host to the backend's.
+  nitro: {
+    devProxy: {
+      '/api': { target: `${API_TARGET}/api`, changeOrigin: true },
+      // No '/ws' entry: Nitro's dev proxy doesn't handle socket errors on
+      // upgraded connections, so one reset WebSocket crashed and restarted
+      // `nuxi dev` (read ECONNRESET). WebSockets connect to the backend directly.
+      '/media': { target: `${API_TARGET}/media`, changeOrigin: true },
+    },
+  },
+
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'https://uapts.eu.cc',
+      apiBase: API_TARGET,
+      // true in `nuxi dev`: requests use relative /api paths through the proxy above.
+      apiProxy: DEV,
       // Left unset by default (rather than a hardcoded prod placeholder) so
       // useAuditSocket can derive a same-host ws(s):// URL from `apiBase`
       // when this isn't explicitly configured - see useAuditSocket.ts.

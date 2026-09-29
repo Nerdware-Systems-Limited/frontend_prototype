@@ -1,7 +1,7 @@
 <template>
   <!--
     declared -> parsed -> valid -> written (file uploads) or
-    received -> attempted -> written (API feeds) — same component either
+    received -> attempted -> written (API feeds) - same component either
     way, driven entirely by the stages/branches props. The spine of both
     the file-detail page and the API-feed page (design doc §1.2).
   -->

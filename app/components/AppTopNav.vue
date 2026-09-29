@@ -159,7 +159,7 @@ const userInitials = computed(() => {
 })
 
 const alertCount = computed(() => notificationStore.unreadCount)
-// Real-time feed state — the "Live" pill must reflect the actual socket, not
+// Real-time feed state - the "Live" pill must reflect the actual socket, not
 // assert a steady live state during an outage.
 const liveConnected = computed(() => notificationStore.isConnected)
 
@@ -276,6 +276,8 @@ const searchItems: SearchItem[] = [
   { label: 'Agencies', group: 'Access Control', to: '/agencies', icon: Users },
   { label: 'User Management', group: 'Access Control', to: '/users', icon: Users },
   { label: 'Roles & Permissions', group: 'Access Control', to: '/roles', icon: Users },
+  { label: 'Module Access', group: 'Access Control', to: '/access-policies', icon: Users },
+  { label: 'Dashboard Manager', group: 'Access Control', to: '/admin/dashboards', icon: Users },
   { label: 'Audit Trail', group: 'Access Control', to: '/audit', icon: Users },
 ]
 
@@ -284,7 +286,11 @@ const globalSearch = ref('')
 const searchSelection = ref(0)
 const searchInputEl = ref<HTMLInputElement | null>(null)
 
-const reachableSearchItems = computed(() => searchItems.filter(item => access.canAccessRoute(item.to)))
+// The Dashboard Manager also needs a manage permission, not just route access.
+const { canManageDashboards, canManageAgencyDashboards } = useViewerContext()
+const reachableSearchItems = computed(() => searchItems.filter(item =>
+  access.canAccessRoute(item.to)
+  && (item.to !== '/admin/dashboards' || canManageDashboards.value || canManageAgencyDashboards.value)))
 
 const filteredSearchItems = computed(() => {
   const query = globalSearch.value.trim().toLowerCase()

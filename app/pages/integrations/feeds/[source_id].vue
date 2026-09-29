@@ -16,7 +16,7 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- ── Connection details — only for feeds registered through the
+  <!-- ── Connection details - only for feeds registered through the
        Register-an-API console (blank protocol = legacy/seeded feed). ─── -->
   <div v-if="source?.protocol" class="ih-card ih-rise">
     <div class="ih-card-head">
@@ -149,7 +149,7 @@ const source = ref<DataSource | null>(null)
 const stats = ref<DataSourceStats | null>(null)
 const error = ref<string | null>(null)
 
-// Mirrors apps.integrations.protocols — see that module's docstring for
+// Mirrors apps.integrations.protocols - see that module's docstring for
 // why this isn't fetched dynamically. Only the bits this page needs
 // (labels + push/pull direction); the richer register-console copy
 // lives in app/pages/integrations/index.vue.
@@ -231,11 +231,11 @@ async function load() {
 }
 
 // ── Registry control actions (no-ops server-side; real scheduler picks
-// them up — see DataSourceViewSet) ─────────────────────────────────────
+// them up - see DataSourceViewSet) ─────────────────────────────────────
 const actionBusy = ref(false)
 async function trigger() {
   actionBusy.value = true
-  try { await api.trigger(sourceId); await load() } catch { /* transient — leave prior state visible */ } finally { actionBusy.value = false }
+  try { await api.trigger(sourceId); await load() } catch { /* transient - leave prior state visible */ } finally { actionBusy.value = false }
 }
 async function pause() {
   actionBusy.value = true

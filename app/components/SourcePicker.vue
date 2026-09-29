@@ -1,6 +1,6 @@
 <template>
   <!--
-    "Choose the feed" — manual DataSources grouped by agency. Resolves the
+    "Choose the feed" - manual DataSources grouped by agency. Resolves the
     Integration Hub redesign mockup's "Agency" dropdown: the API has no
     concept of picking an agency first and a feed second, so this presents
     it that way while still emitting a plain source_id underneath.
@@ -58,7 +58,7 @@ const groups = computed(() => {
   return [...byAgency.values()].sort((a, b) => a.agencyCode.localeCompare(b.agencyCode))
 })
 
-// Auto-select the moment there's exactly one manual feed for an agency —
+// Auto-select the moment there's exactly one manual feed for an agency -
 // resolves the mockup's "Agency" dropdown when there's nothing to actually
 // choose between at the feed level.
 watch(() => props.sources, (list) => {

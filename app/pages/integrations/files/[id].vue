@@ -35,7 +35,7 @@
     <NuxtLink :to="`/integrations/files/${upload.superseded_by}`">View the replacement</NuxtLink>
   </div>
 
-  <!-- KPI ribbon — status+elapsed · rows parsed · written to DB · duplicates · rejected.
+  <!-- KPI ribbon - status+elapsed · rows parsed · written to DB · duplicates · rejected.
        An un-routed file has none of those numbers yet; show what it does have. -->
   <div v-if="upload && upload.status === 'unrouted'" class="ih-ribbon ih-rise">
     <div class="status-elapsed-tile" aria-live="polite">
@@ -319,7 +319,7 @@ definePageMeta({ layout: 'default' })
 
 import { useIntegrations } from '~/composables/api'
 import type { DataUploadDetail, ExpectedColumn, FieldError, IngestedRecord, IngestedRowStatus, PreviewResult } from '~/composables/api'
-// Explicit import — see the note in integrations.vue for why this isn't
+// Explicit import - see the note in integrations.vue for why this isn't
 // left to the app/utils auto-import for template-only references.
 import { isInFlight, statusMeta } from '~/utils/ingestStatus'
 
@@ -389,7 +389,7 @@ const poll = useUploadPoll(load, () => !!upload.value && isInFlight(upload.value
 
 let openedDefaultTab = false
 watch(() => upload.value?.status, (statusNow) => {
-  // "unrouted" has no tabs — RoutePanel owns the whole main column.
+  // "unrouted" has no tabs - RoutePanel owns the whole main column.
   if (!openedDefaultTab && statusNow && statusNow !== 'unrouted') {
     openedDefaultTab = true
     activeTab.value = statusNow === 'needs_mapping' ? 'mapping' : 'sample'
@@ -397,7 +397,7 @@ watch(() => upload.value?.status, (statusNow) => {
   if (statusNow === 'needs_mapping') loadMappingForm()
 })
 
-// RoutePanel just assigned a feed — the upload is now "pending" and will
+// RoutePanel just assigned a feed - the upload is now "pending" and will
 // march through validating → validated. Reload and resume polling so the
 // page follows it without a manual refresh.
 async function onRouted() {
@@ -405,7 +405,7 @@ async function onRouted() {
   poll.start()
 }
 
-// ── Mapping tab (Track B) — client-side best-guess only, always
+// ── Mapping tab (Track B) - client-side best-guess only, always
 // human-editable before applying. See app/pages/integrations/files/[id].vue
 // history for the original inline version this was ported from verbatim.
 const expectedColumns = ref<ExpectedColumn[]>([])
@@ -693,7 +693,7 @@ onMounted(async () => {
 .row-filter-btn { font-size: 11.5px; padding: 4px 10px; }
 .row-filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* Validation / DB-matches tabs pack multi-line cell content — top-align
+/* Validation / DB-matches tabs pack multi-line cell content - top-align
    overrides the shared .ih-table's middle-align for this page only. */
 .ih-table td { vertical-align: top; }
 .row-status.success { color: var(--success-fg); }

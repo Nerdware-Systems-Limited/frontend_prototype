@@ -21,6 +21,15 @@ export interface ApiOptions extends Omit<FetchOptions<'json'>, 'body'> {
   query?: Record<string, string | number | boolean | undefined | null>
 }
 
+/**
+ * Dashboard filter params a domain summary helper forwards as query params
+ * (the Dashboard Manager sends these). Each backend endpoint honours only
+ * some of them - see DOMAIN_FILTERS in ~/utils/metricRegistry.
+ */
+export type SummaryFilterParams = Partial<Record<
+  'county' | 'road' | 'severity' | 'agency' | 'vehicle_class' | 'date_from' | 'date_to', string
+>>
+
 /** Typed wrapper around the $api plugin. */
 export function useApi() {
   const { $api } = useNuxtApp() as unknown as {

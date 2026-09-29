@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <!-- KPI ribbon — real numbers only; loading/unavailable/ok render
+  <!-- KPI ribbon - real numbers only; loading/unavailable/ok render
        differently, a failed fetch never shows as a fabricated zero. -->
   <div class="ih-ribbon ih-rise">
     <KpiTile
@@ -86,7 +86,7 @@
 
           <div v-if="fileError" class="upload-banner upload-banner-error">⚠ {{ fileError }}</div>
 
-          <!-- ── Inline result — never redirect-and-lose-the-file ─────── -->
+          <!-- ── Inline result - never redirect-and-lose-the-file ─────── -->
           <div v-if="uploadResult" class="upload-result" aria-live="polite">
             <template v-if="uploadResult.status === 'validated'">
               <p class="upload-result-main">✓ {{ uploadResult.valid_rows.toLocaleString('en-KE') }} row(s) ready.</p>
@@ -121,7 +121,7 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════
-           REGISTER API TAB — POST .../register/ + .../test-connection/,
+           REGISTER API TAB - POST .../register/ + .../test-connection/,
            admin-only server-side. Push feeds get a generated secret
            shown once; pull feeds get a real SSRF-guarded reachability
            test. See the script header comment for the full picture.
@@ -320,7 +320,7 @@ import type {
   RegisterAuthMethod, RegisterProtocol, RegisterFeedResult,
 } from '~/composables/api'
 import { useAgencies } from '~/composables/api/useAccounts'
-// Explicit import (not just relying on Nuxt's app/utils auto-import) —
+// Explicit import (not just relying on Nuxt's app/utils auto-import) -
 // vue-tsc's template-only global resolution lagged the freshly generated
 // .nuxt types for a template-only reference; this sidesteps that outright.
 import { isInFlight, statusMeta } from '~/utils/ingestStatus'
@@ -330,7 +330,7 @@ const api = useIntegrations()
 const config = useRuntimeConfig()
 const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
 const auth = useAuth()
-// Server-side enforcement is core.permissions.IsAdminRole — this is only a
+// Server-side enforcement is core.permissions.IsAdminRole - this is only a
 // UX nicety so a non-admin doesn't fill out the whole form before hitting
 // a 403; the real boundary is the backend either way.
 const isAdmin = computed(() => {
@@ -342,7 +342,7 @@ const tab = ref<'upload' | 'api'>('upload')
 
 // ── Feed picker ──────────────────────────────────────────────────────
 const sourceId = ref(typeof route.query.source_id === 'string' ? route.query.source_id : '')
-// Template-late intake: submit a file with no feed assigned — it lands in
+// Template-late intake: submit a file with no feed assigned - it lands in
 // the routing queue (status="unrouted") for someone to give it a template.
 const templateLateMode = ref(false)
 function enterTemplateLateMode() {
@@ -402,7 +402,7 @@ async function onFileSelected(file: File) {
 
   const isCsv = file.name.toLowerCase().endsWith('.csv')
   // Known feed: a CSV must declare the feed's current template version.
-  // Routing-queue mode: there's no feed and no version to declare — the
+  // Routing-queue mode: there's no feed and no version to declare - the
   // version check happens later, when a template is assigned.
   const declaredSchemaVersion = (!templateLateMode.value && isCsv)
     ? selectedSource.value!.schema_version
@@ -436,7 +436,7 @@ async function pollUpload() {
   try {
     uploadResult.value = await api.uploads.detail(uploadResult.value.id)
   } catch {
-    // transient — keep trying until the poll's own backoff/stop logic gives up
+    // transient - keep trying until the poll's own backoff/stop logic gives up
   }
 }
 const poll = useUploadPoll(pollUpload, () => !!uploadResult.value && isInFlight(uploadResult.value.status))
@@ -448,7 +448,7 @@ function resetUpload() {
   state.value = 'idle'
 }
 
-// ── Ribbon KPIs — loading/ok/unavailable are three different states; a
+// ── Ribbon KPIs - loading/ok/unavailable are three different states; a
 // failed fetch must never render as "0" (a real, confirmed count). ──────
 const filesInPipeline = ref<number | null>(null)
 const pipelineFailed = ref(false)
@@ -491,7 +491,7 @@ async function loadRecentUploads() {
   try {
     recentUploads.value = (await api.uploads.inbox({ page_size: 6 })).results
   } catch {
-    // right-rail nice-to-have — the console still works without it
+    // right-rail nice-to-have - the console still works without it
   } finally {
     recentUploadsLoading.value = false
   }
@@ -519,7 +519,7 @@ onMounted(async () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════
-// Register an API — POST /api/v1/integrations/register/ + .../test-connection/
+// Register an API - POST /api/v1/integrations/register/ + .../test-connection/
 // (views.RegisterDataSourceView / TestConnectionView, admin-only). See
 // those docstrings for the push-vs-pull distinction this UI mirrors:
 // push credentials are generated server-side and shown once; pull
@@ -546,7 +546,7 @@ interface Protocol {
   auth: AuthMethodId[]; endpointLabel: string; endpointPlaceholder: string
 }
 // ids match apps.integrations.protocols.PROTOCOL_* exactly (not fetched
-// dynamically — kept in sync by hand, see that module's own docstring).
+// dynamically - kept in sync by hand, see that module's own docstring).
 const PROTOCOLS: Protocol[] = [
   { id: 'rest_push', name: 'REST push', meta: 'agency POSTs batches to us', direction: 'push', auth: ['api_key', 'hmac'], endpointLabel: 'Feed key (source_id)', endpointPlaceholder: 'kws-park-traffic' },
   { id: 'webhook', name: 'Webhook', meta: 'event-driven push', direction: 'push', auth: ['hmac', 'bearer'], endpointLabel: 'Feed key (source_id)', endpointPlaceholder: 'kaa-flight-events' },
@@ -585,7 +585,7 @@ function pickProtocol(id: RegisterProtocol) {
 }
 function fieldKey(id: string) { return `${protocol.value.id}:${authMethod.value}:${id}` }
 
-/** {field id: value}, dropping anything blank — sent as-is to the backend
+/** {field id: value}, dropping anything blank - sent as-is to the backend
  *  (ignored server-side for push protocols, which generate their own). */
 const currentCredentials = computed(() => {
   const out: Record<string, string> = {}
@@ -648,7 +648,7 @@ async function copySecret() {
     secretCopied.value = true
     setTimeout(() => { secretCopied.value = false }, 2000)
   } catch {
-    // Clipboard API unavailable (permissions/non-secure context) — the
+    // Clipboard API unavailable (permissions/non-secure context) - the
     // value is still visible and selectable in the banner either way.
   }
 }
@@ -668,7 +668,7 @@ const curlExample = computed(() => {
   const p = protocol.value
   if (p.direction === 'push') {
     // Every push credential is a plain generated API key under the hood
-    // regardless of the auth_method label — see step 2's note and
+    // regardless of the auth_method label - see step 2's note and
     // RegisterDataSourceView's docstring.
     const key = registerSourceId.value.trim() || '<source_id>'
     return `curl -X POST ${apiBase}/api/v1/integrations/${key}/ingest/ \\\n  -H "X-API-Key: ••••" -H "Content-Type: application/json" \\\n  -d '{"records":[{ "record_type": "…", … }]}'`
@@ -687,7 +687,7 @@ const curlExample = computed(() => {
 .hub-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .hub-layout { grid-template-columns: 1fr; } }
 
-/* Numbered stepper — CSS counter so a hidden step 2 (no template feed /
+/* Numbered stepper - CSS counter so a hidden step 2 (no template feed /
    routing-queue mode) renumbers the rest automatically. */
 .flow-steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
 .flow-step {
@@ -763,7 +763,7 @@ const curlExample = computed(() => {
 .recent-upload-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-1); }
 .recent-upload-link:hover .recent-upload-name { color: var(--primary); text-decoration: underline; }
 
-/* ── Register API — protocol grid, auth pills, fields, curl ──────────── */
+/* ── Register API - protocol grid, auth pills, fields, curl ──────────── */
 .protocol-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @media (max-width: 640px) { .protocol-grid { grid-template-columns: repeat(2, 1fr); } }
 .protocol {

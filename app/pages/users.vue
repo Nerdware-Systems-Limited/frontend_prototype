@@ -1,5 +1,6 @@
 <template>
   <PageHeader
+    class="header-actions-fill"
     eyebrow="User Management"
     title="Users"
     :subtitle="unscoped ? 'Platform account directory - create accounts, manage status, and view profiles across all UAPTS agencies' : `Account directory for ${ownAgencyCode} - create accounts, manage status, and view profiles within your own agency`"
@@ -7,7 +8,7 @@
     <template #actions>
       <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-accounts" label="Export" />
       <NuxtLink to="/roles" class="btn">Roles & Permissions →</NuxtLink>
-      <button class="btn-primary" @click="openCreate">+ Create User</button>
+      <button v-if="canManageUsers" class="btn-primary" @click="openCreate">+ Create User</button>
     </template>
   </PageHeader>
 
@@ -26,10 +27,10 @@
 
   <!-- Filters -->
   <SectionTitle>Account Directory</SectionTitle>
-  <div class="filter-bar">
+  <div class="filter-bar filter-bar--grid">
     <input
       v-model="search"
-      class="select-sm filter-input"
+      class="select-sm filter-input filter-span"
       placeholder="Search email…"
       aria-label="Search by email"
       @keyup.enter="applyFilters"
@@ -43,7 +44,7 @@
     </select>
     <select v-model="roleFilter" class="select-sm filter-select" aria-label="Filter by role">
       <option value="">All roles</option>
-      <option value="super_admin">Super Admin</option>
+      <option v-if="canViewRole(viewerScope, 'super_admin')" value="super_admin">Super Admin</option>
       <option value="admin">Admin</option>
       <option value="analyst">Analyst</option>
       <option value="operator">Operator</option>
@@ -60,7 +61,7 @@
       <option value="false">No MFA</option>
     </select>
     <button class="btn" @click="resetFilters">Reset</button>
-    <div class="mini-pager">
+    <div class="mini-pager filter-span">
       <span class="result-count">{{ usersTotal }} of {{ users.length }} · Page {{ usersPage }} of {{ usersTotalPages }}</span>
       <button type="button" class="icon-btn" :disabled="usersPage <= 1" aria-label="Previous page" @click="usersPrev">‹</button>
       <button type="button" class="icon-btn" :disabled="usersPage >= usersTotalPages" aria-label="Next page" @click="usersNext">›</button>
@@ -70,7 +71,7 @@
   <!-- User directory table -->
   <div id="account-directory" class="card drill-target">
     <div class="card-body">
-      <table class="users-table">
+      <table class="users-table stack-table">
         <thead>
           <tr>
             <th></th>
@@ -93,7 +94,7 @@
               @click="expanded = expanded === u.id ? null : u.id"
               style="cursor:pointer"
             >
-              <td class="expand-cell" data-label="" @click.stop>
+              <td class="expand-cell" @click.stop>
                 <button
                   type="button"
                   class="expand-toggle"
@@ -104,7 +105,7 @@
                   <span class="expand-icon" aria-hidden="true">{{ expanded === u.id ? '▾' : '▸' }}</span>
                 </button>
               </td>
-              <td>
+              <td class="stack-title">
                 <span class="email-cell" :title="u.email">{{ u.email }}</span>
                 <span v-if="u.is_staff" class="staff-pip" title="Has Django admin / staff access">★</span>
               </td>
@@ -127,8 +128,9 @@
               </td>
               <td class="dim date-cell" data-label="Created">{{ fmtDate(u.created_at) }}</td>
               <td class="dim date-cell" data-label="Last Login">{{ fmtLastLogin(u) }}</td>
-              <td @click.stop>
+              <td class="stack-actions" @click.stop>
                 <button
+                  v-if="canManageUsers"
                   type="button"
                   class="btn btn-sm row-menu-trigger"
                   aria-haspopup="true"
@@ -277,11 +279,7 @@
           <div class="form-group">
             <label>Role type <span class="required">*</span></label>
             <select v-model="form.role_type" class="input-full">
-              <option value="analyst">Analyst - read + reports</option>
-              <option value="operator">Operator - operations</option>
-              <option value="admin">Admin - full access</option>
-              <option value="super_admin">Super Admin - full platform bypass</option>
-              <option value="public">Public - read only</option>
+              <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
             </select>
           </div>
           <div class="form-group">
@@ -327,7 +325,10 @@
 definePageMeta({ layout: 'default' })
 import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit } from '~/composables/api'
 import type { User, Agency } from '~/types/uapts'
-import { isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOptions, canManageUser } from '~/composables/useAgencyScope'
+import {
+  isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOptions, canManageUser,
+  canChangeRole, assignableRoleTypes, canViewRole,
+} from '~/composables/useAgencyScope'
 
 // ── Agency scoping ───────────────────────────────────────────────────────
 // An agency admin manages only their own tenant's accounts; super_admin is
@@ -337,6 +338,9 @@ import { isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOpt
 // other RBAC check in this app - the backend list() call is the real gate
 // via agencyListQueryFor()'s `agency` filter.
 const { user: viewer } = useAuth()
+// Creating, (de)activating and deleting accounts also needs the `manage_users` capability (Module Access).
+const { canManageUsers } = usePermissions()
+const MANAGE_USERS_OFF = 'Managing users is switched off for your role in this agency.'
 const viewerScope = computed(() => viewer.value as any)
 const unscoped = computed(() => isUnscopedAdmin(viewerScope.value))
 const ownAgencyCode = computed(() => scopedAgencyCode(viewerScope.value))
@@ -366,6 +370,21 @@ const creating     = ref(false)
 const createApiError = ref<string | null>(null)
 const form         = ref({ email: '', role_type: 'analyst', agency: '', department: '', is_active: true, is_staff: false })
 const formErrors   = ref({ email: '' })
+
+const ROLE_OPTION_LABELS: Record<string, string> = {
+  analyst:     'Analyst - read + reports',
+  operator:    'Operator - operations',
+  admin:       'Admin - full access',
+  super_admin: 'Super Admin - full platform bypass',
+  public:      'Public - read only',
+}
+/** Only a super_admin is offered super_admin here - nobody else can hand out the platform bypass. */
+const createRoleOptions = computed(() => {
+  const allowed = new Set(assignableRoleTypes(viewerScope.value))
+  return Object.entries(ROLE_OPTION_LABELS)
+    .filter(([value]) => allowed.has(value))
+    .map(([value, label]) => ({ value, label }))
+})
 
 // The User record has no reliable last-login field of its own (see
 // fmtLastLogin() below) - derived instead from the audit log's real
@@ -540,7 +559,17 @@ function toggleMenu(u: User, ev: MouseEvent) {
   }
   menuTriggerEl.value = btn
   openMenuId.value = u.id
-  nextTick(() => menuPopRef.value?.querySelector<HTMLElement>('.row-menu-item')?.focus())
+  nextTick(() => {
+    const pop = menuPopRef.value
+    if (!pop) return
+    // Rows near the bottom of a short (phone) viewport would clip the menu -
+    // measure it once rendered and open upward instead when there's no room below.
+    const h = pop.offsetHeight
+    if (rect.bottom + 4 + h > window.innerHeight - 8 && rect.top - 4 - h > 8) {
+      menuPos.value = { ...menuPos.value, top: `${rect.top - 4 - h}px` }
+    }
+    pop.querySelector<HTMLElement>('.row-menu-item')?.focus()
+  })
 }
 /** `refocus` returns focus to the trigger - only wanted for a keyboard-driven
  *  close (Escape); an outside click, a scroll, or a background reload
@@ -581,6 +610,7 @@ onUnmounted(() => {
 // ── Actions ────────────────────────────────────────────────────────────
 
 async function toggleActive(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   actionId.value    = u.id
   actionError.value = null
@@ -596,6 +626,7 @@ async function toggleActive(u: User) {
 }
 
 async function deleteUser(u: User) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
   actionId.value    = u.id
   actionError.value = null
@@ -655,6 +686,7 @@ async function runConfirmAction() {
 // ── Create user ────────────────────────────────────────────────────────
 
 function openCreate() {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   form.value = { email: '', role_type: 'analyst', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
   formErrors.value = { email: '' }
   createApiError.value = null
@@ -666,10 +698,15 @@ function closeModal() { showModal.value = false }
 async function doCreate() {
   formErrors.value.email = ''
   createApiError.value   = null
+  if (!canManageUsers.value) { createApiError.value = MANAGE_USERS_OFF; return }
   if (!form.value.email) { formErrors.value.email = 'Email is required.'; return }
   if (!form.value.email.includes('@')) { formErrors.value.email = 'Enter a valid email address.'; return }
   if (!unscoped.value && form.value.agency !== (viewerScope.value?.agency ?? '')) {
     createApiError.value = 'You can only create accounts in your own agency.'
+    return
+  }
+  if (!canChangeRole(viewerScope.value, null, form.value.role_type)) {
+    createApiError.value = 'Only a super_admin can create a super_admin account.'
     return
   }
 
@@ -743,30 +780,6 @@ function fmtLastLogin(u: User) {
 .section-title { margin: 18px 0 8px; }
 .section-title:first-of-type { margin-top: 14px; }
 
-/* Metric strip - one flat row with dividers, replaces six separate KPI cards */
-.metric-strip {
-  display:flex; flex-wrap:wrap;
-  background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius);
-  margin-bottom:14px;
-}
-.metric-item {
-  flex:1 1 150px; min-width:130px;
-  padding:10px 16px;
-  border-left:1px solid var(--border-subtle);
-  display:flex; flex-direction:column; gap:2px;
-}
-.metric-item:first-child { border-left:0; }
-.metric-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
-.metric-value { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--fg-1); line-height:1.15; }
-.metric-value.is-warn { color:var(--warning-fg); }
-.metric-sub   { font-size:10.5px; color:var(--fg-3); }
-@media (max-width:640px) {
-  .metric-strip { display:grid; grid-template-columns:1fr 1fr; }
-  .metric-item  { border-left:0; border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); }
-  .metric-item:nth-child(2n)        { border-right:0; }
-  .metric-item:nth-last-child(-n+2) { border-bottom:0; }
-}
-
 /* Filters - every control gets min-width:0 so it can actually shrink below
    its content's natural width (the flexbox default is min-width:auto, which
    silently blocks shrinking and forces the whole row - pager included - to
@@ -775,9 +788,15 @@ function fmtLastLogin(u: User) {
 .result-count { font-size:12px; color:var(--fg-2); white-space:nowrap; }
 .filter-bar   { padding:8px 12px; margin-bottom:10px; }
 .filter-bar > * { min-width:0; }
-.filter-input  { width:180px; flex:0 1 180px; }
-.filter-select { flex:0 1 130px; max-width:130px; text-overflow:ellipsis; }
-.filter-select--agency { flex-basis:170px; max-width:170px; }
+.filter-select { text-overflow:ellipsis; }
+/* Desktop widths only. Left active under 769px these flex-basis values would
+   size the controls' HEIGHT (the bar becomes a column) - .filter-bar--grid in
+   theme.css owns the phone layout. */
+@media (min-width:769px) {
+  .filter-input  { width:180px; flex:0 1 180px; }
+  .filter-select { flex:0 1 130px; max-width:130px; }
+  .filter-select--agency { flex-basis:170px; max-width:170px; }
+}
 .mini-pager   { display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto; }
 .icon-btn {
   width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
@@ -821,40 +840,6 @@ function fmtLastLogin(u: User) {
   .users-table th:nth-child(7), .users-table td:nth-child(7) { display:none; } /* Created */
 }
 
-/* Mobile - each row becomes a compact record, email first, all fields kept */
-@media (max-width:640px) {
-  .users-table thead { display:none; }
-  .users-table, .users-table tbody { display:block; width:100%; }
-  .users-table tr {
-    position:relative; display:block; width:100%; margin-bottom:8px; padding:10px 12px;
-    background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
-  }
-  .users-table td {
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:4px 0; border:0; font-size:12.5px;
-  }
-  .users-table td::before {
-    content:attr(data-label); flex-shrink:0;
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3);
-  }
-  .users-table td:nth-child(7), .users-table td:nth-child(8) { display:flex; } /* Created/Last Login back on mobile cards */
-  .users-table td.expand-cell {
-    position:absolute; top:8px; right:8px; padding:0; margin:0; border:0; width:auto;
-  }
-  .users-table td.expand-cell::before { content:none; }
-  .users-table td:nth-child(2) {
-    display:block; font-size:14px; font-weight:700;
-    padding:0 28px 8px 0; margin-bottom:6px; border-bottom:1px solid var(--border-subtle);
-  }
-  .users-table td:last-child {
-    display:flex; justify-content:flex-start;
-    padding:8px 0 0; margin-top:4px; border-top:1px solid var(--border-subtle);
-  }
-  /* The expanded detail panel keeps its own grid layout - it is not a data row. */
-  .users-table tr.detail-row { border:0; background:none; padding:0; margin-bottom:8px; }
-  .users-table .detail-row td { display:block; padding:0; }
-}
-
 /* Action buttons */
 .row-menu-trigger { color:var(--fg-2); }
 
@@ -882,7 +867,7 @@ function fmtLastLogin(u: User) {
 }
 .detail-grid {
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));
   gap:10px 24px;
   margin-bottom:12px;
 }
@@ -920,4 +905,37 @@ function fmtLastLogin(u: User) {
 
 /* Empty */
 .empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
+
+/* Phones - the stacked-card layout itself is .stack-table (theme.css). What's
+   left here is specific to this page: the expand toggle pinned to the card's
+   corner, the columns tablet hides coming back, and the detail panel/modal. */
+@media (max-width:768px) {
+  .users-table td:nth-child(7), .users-table td:nth-child(8) { display:flex; } /* Created / Last Login back on cards */
+  /* Row-state tints belong on the card (<tr>), not on each cell - a per-cell
+     background leaves a stripe inside the card's padding. */
+  .users-table > tbody > tr.row-inactive { background:var(--surface-1); }
+  .users-table > tbody > tr.row-expanded { background:var(--surface-1); }
+  .users-table .row-expanded > td        { background:transparent; }
+  .users-table td.expand-cell { position:absolute; top:2px; right:2px; padding:0; margin:0; border:0; width:auto; }
+  .expand-toggle { padding:12px; margin:0; }
+  .expand-icon   { font-size:13px; }
+  .email-cell    { max-width:calc(100% - 56px); } /* room for the corner toggle and the staff star */
+  .action-group  { gap:8px; }
+  .row-menu-item { padding:11px 12px; font-size:14px; }
+  .detail-panel  { padding:12px; }
+  .detail-footer .btn { width:100%; justify-content:center; }
+}
+@media (max-width:600px) {
+  .modal-backdrop { padding:8px; }
+  .modal          { width:100%; max-height:calc(100dvh - 16px); }
+  /* Header and footer stay put; only the form scrolls, and it never outgrows the
+     screen when the on-screen keyboard shrinks the viewport. */
+  .modal-body     { max-height:none; flex:1 1 auto; min-height:0; padding:16px; }
+  .modal-header, .modal-footer { padding-left:16px; padding-right:16px; }
+  .modal-close    { padding:6px 10px; }
+  .form-row       { grid-template-columns:1fr; }
+  .input-full     { min-height:40px; font-size:16px; } /* 16px stops iOS zooming on focus */
+  .check-label    { min-height:32px; }
+  .modal-footer .btn, .modal-footer .btn-primary { min-height:40px; }
+}
 </style>

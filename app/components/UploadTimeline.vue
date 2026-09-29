@@ -1,7 +1,7 @@
 <template>
   <!--
-    Vertical step timeline — real timestamps only. A step with no
-    timestamp yet renders as pending with an em dash rather than a
+    Vertical step timeline - real timestamps only. A step with no
+    timestamp yet renders as pending with an hyphen rather than a
     fabricated time; there is no backend field for "queued at" or
     "validated at" etc., only created_at/commit_started_at/committed_at
     (see DataUpload), so this only ever renders exactly what's passed in.
@@ -12,7 +12,7 @@
       <span v-if="i < steps.length - 1" class="upload-timeline-line" aria-hidden="true" />
       <div class="upload-timeline-body">
         <div class="upload-timeline-label">{{ step.label }}</div>
-        <div class="upload-timeline-time">{{ step.at ? fmt(step.at) : '—' }}</div>
+        <div class="upload-timeline-time">{{ step.at ? fmt(step.at) : '-' }}</div>
       </div>
     </li>
   </ol>

@@ -3,7 +3,7 @@
     Drag/drop + click-to-browse file picker with client-side validation and
     an upload-progress state, extracted from the old upload.vue/UploadModal.vue
     (both hand-rolled the same thing). Keyboard-reachable and announced as a
-    button — the previous versions were a bare <div> with a click handler and
+    button - the previous versions were a bare <div> with a click handler and
     no tabindex/role, invisible to keyboard/screen-reader use entirely.
   -->
   <div
@@ -59,7 +59,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   /** A file passed client-side validation and is ready to upload. */
   file: [File]
-  /** Client-side validation failed — extension or size. */
+  /** Client-side validation failed - extension or size. */
   error: [string]
 }>()
 

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * UAPTS — main.css
+ * UAPTS - main.css
  *
  * Minimal reset + global hooks. The design system (tokens, components,
  * light/dark) lives in theme.css. This file must NOT re-skin components:
@@ -33,7 +33,7 @@ body {
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; }
 
-/* Accessibility floor — baseline focus ring + reduced-motion.
+/* Accessibility floor - baseline focus ring + reduced-motion.
    theme.css owns the themed versions; these are the fallbacks. */
 :focus-visible {
   outline: 2px solid var(--primary, #0D4C8B);

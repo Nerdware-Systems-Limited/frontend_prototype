@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor,
-  visibleAgencyOptions, canManageUser,
+  visibleAgencyOptions, canManageUser, canChangeRole, assignableRoleTypes, canViewRole,
 } from '~/composables/useAgencyScope'
 
 const kenhaAdmin  = { role_type: 'admin', agency: 'agency-uuid-kenha', agency_code: 'KENHA' }
@@ -61,5 +61,65 @@ describe('useAgencyScope', () => {
 
   it('canManageUser: no viewer means no permission', () => {
     expect(canManageUser(null, { agency_code: 'KENHA' })).toBe(false)
+  })
+
+  // ── super_admin role assignment ──────────────────────────────────────
+
+  it('canChangeRole: a non-super_admin cannot grant super_admin to someone else', () => {
+    expect(canChangeRole(kenhaAdmin, 'analyst', 'super_admin')).toBe(false)
+    expect(canChangeRole(kenhaAdmin, 'admin', 'super_admin')).toBe(false)
+  })
+
+  it('canChangeRole: a non-super_admin cannot grant super_admin to themselves', () => {
+    expect(canChangeRole(kenhaAdmin, kenhaAdmin.role_type, 'super_admin')).toBe(false)
+  })
+
+  it('canChangeRole: a non-super_admin cannot create a super_admin (from = null)', () => {
+    expect(canChangeRole(kenhaAdmin, null, 'super_admin')).toBe(false)
+    expect(canChangeRole(kenhaAdmin, null, 'analyst')).toBe(true)
+  })
+
+  it('canChangeRole: a non-super_admin cannot demote an existing super_admin', () => {
+    expect(canChangeRole(kenhaAdmin, 'super_admin', 'admin')).toBe(false)
+  })
+
+  it('canChangeRole: a no-op change always passes, so editing other fields on a super_admin row is not blocked by this rule', () => {
+    expect(canChangeRole(kenhaAdmin, 'super_admin', 'super_admin')).toBe(true)
+  })
+
+  it('canChangeRole: ordinary role changes between non-super_admin roles still work', () => {
+    expect(canChangeRole(kenhaAdmin, 'public', 'operator')).toBe(true)
+    expect(canChangeRole(kenhaAdmin, 'operator', 'admin')).toBe(true)
+  })
+
+  it('canChangeRole: super_admin may grant, create and revoke super_admin', () => {
+    expect(canChangeRole(superAdmin, 'admin', 'super_admin')).toBe(true)
+    expect(canChangeRole(superAdmin, null, 'super_admin')).toBe(true)
+    expect(canChangeRole(superAdmin, 'super_admin', 'admin')).toBe(true)
+  })
+
+  it('canChangeRole: no viewer means no permission', () => {
+    expect(canChangeRole(null, 'analyst', 'operator')).toBe(false)
+    expect(canChangeRole(null, null, 'super_admin')).toBe(false)
+  })
+
+  it('assignableRoleTypes: super_admin is offered only to a super_admin', () => {
+    expect(assignableRoleTypes(kenhaAdmin)).not.toContain('super_admin')
+    expect(assignableRoleTypes(kenhaAdmin, 'analyst')).toEqual(['admin', 'analyst', 'operator', 'public'])
+    expect(assignableRoleTypes(superAdmin, 'analyst')).toContain('super_admin')
+    expect(assignableRoleTypes(superAdmin)).toHaveLength(5)
+  })
+
+  it('assignableRoleTypes: a super_admin row is locked to its own role for a non-super_admin viewer', () => {
+    expect(assignableRoleTypes(kenhaAdmin, 'super_admin')).toEqual(['super_admin'])
+  })
+
+  it('canViewRole: super_admin is listed only for a super_admin, every other role for everyone', () => {
+    expect(canViewRole(kenhaAdmin, 'super_admin')).toBe(false)
+    expect(canViewRole(null, 'super_admin')).toBe(false)
+    expect(canViewRole(superAdmin, 'super_admin')).toBe(true)
+    for (const role of ['admin', 'analyst', 'operator', 'public', 'custom-role']) {
+      expect(canViewRole(kenhaAdmin, role)).toBe(true)
+    }
   })
 })

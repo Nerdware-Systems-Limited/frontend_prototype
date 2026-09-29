@@ -1,5 +1,5 @@
 <template>
-  <!-- Thin wrapper around BadgePill driven by app/utils/ingestStatus.ts —
+  <!-- Thin wrapper around BadgePill driven by app/utils/ingestStatus.ts -
        the single source of truth for a DataUpload status's label/variant,
        so every pill across the Integration Hub agrees with every filter
        chip and KPI. -->

@@ -25,7 +25,7 @@
 //
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Domain types ──────────────────────────────────────────────────────
@@ -383,7 +383,7 @@ export function useRailway() {
       api<Paged<RailTicket>>('/api/v1/railway/tickets/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     // ── One-shot dashboard ────────────────────────────────────────
-    summary: () => api<RailwaySummary>('/api/v1/railway/summary/'),
+    summary: (params?: SummaryFilterParams) => api<RailwaySummary>('/api/v1/railway/summary/', { query: cleanQuery(params) }),
 
     // ── Custom actions (FR-M08-*) ────────────────────────────────
     liveOperations: () =>

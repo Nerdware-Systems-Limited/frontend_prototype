@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   UAPTS — Instrument Panel theme
+   UAPTS - Instrument Panel theme
    ---------------------------------------------------------------------------
    One dense, hairline-ruled surface. Monospaced figures. Status as a 1px
-   signal. Institutional blue (#0D4C8B) is the brand everywhere — actions,
+   signal. Institutional blue (#0D4C8B) is the brand everywhere - actions,
    active nav, links, focus, chart primary. Light + dark via data-theme.
 
    Every class name here is load-bearing for ~68 pages; values change, names
@@ -12,12 +12,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   TOKENS — light (default)
+   TOKENS - light (default)
    ───────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
 
-  /* Brand — institutional blue. --primary reads well on the page in this
+  /* Brand - institutional blue. --primary reads well on the page in this
      theme AND fills with white text; --primary-fill is the dark-safe fill. */
   --primary:        #0D4C8B;
   --primary-fill:   #0D4C8B;
@@ -31,12 +31,12 @@
   --brand-darker:   #06294D;
   --link:           #0D4C8B;
 
-  /* Accent — Kenyan-institutional amber/gold. Fill only; text uses --warning-fg. */
+  /* Accent - Kenyan-institutional amber/gold. Fill only; text uses --warning-fg. */
   --accent:      #FDB913;
   --accent-dark: #D99A0F;
   --accent-fg:   #1A1A1E;
 
-  /* Surfaces — cool paper, silent */
+  /* Surfaces - cool paper, silent */
   --surface-page:   #EEF1F5;
   --bg:             #EEF1F5;
   --bg2:            #E4E9F0;
@@ -55,13 +55,13 @@
   --fg-3: #5B6773;
   --text-muted: #3F4C5C;
 
-  /* Borders — hairlines */
+  /* Borders - hairlines */
   --border:             #D9E0EA;
   --border-subtle:      #D9E0EA;
   --border-strong:      #C3CDDA;
   --border-interactive: #AEB9C8;
 
-  /* Status — text tones (AA on --surface-1/2 and --bg) */
+  /* Status - text tones (AA on --surface-1/2 and --bg) */
   --success-fg: #146C33;
   --warning-fg: #8A5A00;
   --danger-fg:  #B42318;
@@ -72,7 +72,7 @@
   --success:    #1A9C52;
   --warning:    #C77E00;
 
-  /* Status — washes for pill / rail backgrounds */
+  /* Status - washes for pill / rail backgrounds */
   --success-bg: rgba(20, 108, 51, .12);
   --warning-bg: rgba(138, 90, 0, .12);
   --danger-bg:  rgba(180, 35, 24, .12);
@@ -86,7 +86,7 @@
   --traffic-orange: #E06B18;
   --traffic-red:    #DA3B30;
 
-  /* Radius — tight. Instruments, not pillows. */
+  /* Radius - tight. Instruments, not pillows. */
   --radius: 4px;
   --r-xs:   2px;
   --r-sm:   4px;
@@ -94,7 +94,7 @@
   --r-lg:   10px;
   --r-pill: 999px;
 
-  /* Elevation — near-flat; every shadow carries offset + soft blur */
+  /* Elevation - near-flat; every shadow carries offset + soft blur */
   --elev-0: none;
   --elev-1: 0 1px 2px rgba(16, 24, 35, .05);
   --elev-2: 0 2px 8px rgba(16, 24, 35, .09), 0 1px 2px rgba(16, 24, 35, .05);
@@ -127,7 +127,7 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   TOKENS — dark. Applies on explicit choice, or on OS preference when no
+   TOKENS - dark. Applies on explicit choice, or on OS preference when no
    explicit light choice is set. Leans on border contrast, not shadow.
    ───────────────────────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
@@ -289,7 +289,7 @@ body {
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; }
 
-/* Browser surfaces — themed, not defaulted */
+/* Browser surfaces - themed, not defaulted */
 ::selection { background: var(--primary-wash-strong); color: var(--fg-1); }
 :root { accent-color: var(--primary); caret-color: var(--primary); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -313,13 +313,13 @@ button { font-family: inherit; }
 @keyframes uaptsSpin { to { transform: rotate(360deg); } }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   TOP NAVIGATION — institutional-blue gradient bar, gold underline.
+   TOP NAVIGATION - institutional-blue gradient bar, gold underline.
    Branded chrome above the neutral instrument-panel workspace.
    ═════════════════════════════════════════════════════════════════════════ */
 .top-nav {
   position: fixed; top: 0; left: 0; right: 0;
   height: var(--nav-h);
-  /* Fixed institutional blue in BOTH themes — this is white-text chrome,
+  /* Fixed institutional blue in BOTH themes - this is white-text chrome,
      it does not follow the light/dark token swap. */
   background: linear-gradient(135deg, #0D4C8B, #093A6B);
   border-bottom: 4px solid #FDB913;
@@ -352,7 +352,7 @@ button { font-family: inherit; }
 }
 .top-nav-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
-/* Live indicator + clock — on the blue bar */
+/* Live indicator + clock - on the blue bar */
 .live-indicator {
   display: flex; align-items: center; gap: 8px;
   color: rgba(255, 255, 255, .85); font-size: 11px; font-weight: 600;
@@ -411,7 +411,7 @@ button { font-family: inherit; }
   border: 1px solid rgba(255, 255, 255, .2);
 }
 
-/* Security badge — on the blue bar (the general .sec-badge for content
+/* Security badge - on the blue bar (the general .sec-badge for content
    surfaces is defined in the v2 section below). */
 .top-nav .sec-badge {
   color: #fff; background: rgba(34, 197, 94, .18);
@@ -483,7 +483,7 @@ button { font-family: inherit; }
 @media (max-width: 900px) { .topnav-search { display: none; } }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   SIDEBAR — hairline groups, 2px blue active rail
+   SIDEBAR - hairline groups, 2px blue active rail
    ═════════════════════════════════════════════════════════════════════════ */
 .sidebar-toggle, .hamburger-btn {
   appearance: none; background: transparent;
@@ -494,7 +494,7 @@ button { font-family: inherit; }
   transition: background-color .15s var(--ease-standard);
 }
 .sidebar-toggle { display: inline-flex; margin-right: 8px; }
-/* Hamburger is a mobile-only affordance — the sidebar is persistent on desktop. */
+/* Hamburger is a mobile-only affordance - the sidebar is persistent on desktop. */
 .hamburger-btn { display: none; }
 .sidebar-toggle:hover, .hamburger-btn:hover { background: rgba(255, 255, 255, .1); }
 
@@ -791,7 +791,7 @@ body.sidebar-collapsed main, body.sidebar-collapsed .main-content { margin-left:
 .page-content { display: flex; flex-direction: column; gap: 14px; }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   TABLES — sticky mono headers, 1px rules, blue-wash hover
+   TABLES - sticky mono headers, 1px rules, blue-wash hover
    ═════════════════════════════════════════════════════════════════════════ */
 table, .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, .data-table th {
@@ -1017,6 +1017,18 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
 .nlq-bar .nlq-suggestions span { background: var(--surface-1); border: 1px solid var(--border-subtle); color: var(--fg-2); padding: 3px 9px; border-radius: var(--r-xs); font-size: 11px; cursor: pointer; }
 .nlq-bar .nlq-suggestions span:hover { border-color: var(--primary); color: var(--primary); }
 
+/* Info-toned notice: same wash + tinted-border formula as .error-banner, in the info hue.
+   Markup: <div class="notice" role="note"><Info class="notice-icon" /><p>…</p></div> */
+.notice {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 0 0 12px; padding: 10px 14px; border-radius: var(--r-sm);
+  background: var(--info-bg); border: 1px solid color-mix(in srgb, var(--info-fg) 22%, transparent);
+  color: var(--fg-2); font-size: 12.5px; line-height: 1.5;
+}
+.notice p { margin: 0; }
+.notice strong { color: var(--fg-1); font-weight: 600; }
+.notice-icon { flex-shrink: 0; margin-top: 2px; color: var(--info-fg); }
+
 /* ═════════════════════════════════════════════════════════════════════════
    BADGES
    ═════════════════════════════════════════════════════════════════════════ */
@@ -1071,7 +1083,7 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
 .seg-toggle button.on { background: var(--primary-fill); color: #fff; }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   v2 additions — tenant switcher, security badge, MFA, source chip, persona
+   v2 additions - tenant switcher, security badge, MFA, source chip, persona
    ═════════════════════════════════════════════════════════════════════════ */
 .tenant-switcher { position: relative; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-1); border: 1px solid var(--border-subtle); color: var(--fg-1); font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: var(--r-sm); cursor: pointer; text-transform: uppercase; letter-spacing: .04em; }
 .tenant-switcher:hover { background: var(--surface-quiet); border-color: var(--border-interactive); }
@@ -1232,7 +1244,7 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
 .event-log-icon--danger { color: var(--danger-fg); }
 .event-log-message { font-size: .84rem; color: var(--fg-1); }
 
-/* GIS (map pages keep a dark canvas in both themes — it is a data surface) */
+/* GIS (map pages keep a dark canvas in both themes - it is a data surface) */
 .gis-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg-3); font-size: 13px; background: var(--surface-sunken); }
 .gis-legend { position: absolute; top: 16px; right: 16px; z-index: 5; background: var(--surface-2); color: var(--fg-1); border: 1px solid var(--border-strong); padding: 12px; border-radius: var(--r-md); min-width: 180px; box-shadow: var(--elev-2); }
 .gis-legend span { width: 10px; height: 10px; display: inline-block; border-radius: var(--r-pill); margin-right: 8px; }
@@ -1251,7 +1263,7 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
   .top-nav-title { font-size: 15px; }
   .sidebar { transform: translateX(-100%); box-shadow: none; }
   .sidebar.mobile-open { transform: translateX(0); box-shadow: var(--elev-3); z-index: 960; }
-  /* Mobile safety net: a stray wide descendant never scrolls the page —
+  /* Mobile safety net: a stray wide descendant never scrolls the page -
      wide tables get their own scroll via .card-body{overflow-x:auto}. */
   main, .main-content { margin-left: 0 !important; padding: 14px 12px; overflow-x: hidden; min-width: 0; }
   .two-col, .charts-row, .grid-2, .agency-grid { grid-template-columns: 1fr !important; }
@@ -1298,4 +1310,112 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   ACCESS-CONTROL PAGES - shared responsive pieces (Agencies, Users, Roles,
+   Audit Trail). Everything here is opt-in via a class, so no other page's
+   tables or filter bars change behaviour.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Metric strip - one flat row with dividers instead of separate KPI cards */
+.metric-strip {
+  display: flex; flex-wrap: wrap;
+  background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.metric-item {
+  flex: 1 1 150px; min-width: 130px; padding: 10px 16px;
+  border-left: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.metric-item:first-child { border-left: 0; }
+.metric-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3); }
+.metric-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: var(--fg-1); line-height: 1.15; }
+.metric-value.is-warn { color: var(--warning-fg); }
+.metric-sub { font-size: 10.5px; color: var(--fg-3); }
+@media (max-width: 640px) {
+  /* Two-up grid whose 1px gap shows the container colour as the divider, so
+     an odd item count (Agencies has three) needs no per-cell border logic. */
+  .metric-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border-subtle); overflow: hidden; }
+  .metric-item { min-width: 0; padding: 10px 12px; border-left: 0; background: var(--surface-2); }
+  .metric-item:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* Filter bar - on phones the controls sit in a two-column grid (search and
+   anything marked .filter-span take a full row) instead of one tall column.
+   Each page keeps its desktop control widths inside @media (min-width:769px):
+   a `flex: 0 1 180px` left active in the stacked column layout would set the
+   control's HEIGHT to 180px, not its width. */
+@media (max-width: 768px) {
+  .filter-bar--grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+  .filter-bar--grid > * { min-width: 0; max-width: none; width: 100%; flex: none; }
+  .filter-bar--grid > .filter-span { grid-column: 1 / -1; }
+  .filter-bar--grid > .btn { width: auto; justify-self: start; }
+  .filter-bar--grid > .mini-pager { justify-content: space-between; }
+  .filter-bar--grid > .mini-pager > .icon-btn { width: 36px; height: 36px; }
+  /* A captioned field (the audit date range) puts its caption above the input
+     so the input keeps the whole half-width cell - beside it, a date is clipped. */
+  .filter-bar--grid > .filter-group { flex-direction: column; align-items: stretch; gap: 2px; }
+  .filter-bar--grid > .filter-group > input { width: 100%; min-width: 0; }
+  /* 16px stops iOS Safari zooming the page on focus; 40px is a real tap target.
+     The padding also evens out the global .filter-select class, which pads its
+     selects taller than .select-sm does. */
+  .filter-bar--grid input, .filter-bar--grid select { min-height: 40px; padding: 8px 12px; font-size: 16px; }
+}
+
+/* Page-header actions - on phones the header is a column, and its button row
+   would otherwise shrink to its own content width (two buttons then sit narrower
+   than the three on the next page). Opt in with class="header-actions-fill" on
+   <PageHeader>: the row spans the header and the buttons share it evenly. */
+@media (max-width: 600px) {
+  .header-actions-fill .header-btns { align-self: stretch; }
+  .header-actions-fill .header-btns > * { flex: 1 1 130px; justify-content: center; min-height: 40px; }
+}
+
+/* Stacked-card tables - at 768px and below (the same point the rest of the
+   mobile CSS above switches on, so there is no in-between state) each <tr>
+   becomes a compact record with the column header shown as a data-label
+   caption. Child combinators keep a nested table inside a cell (the audit
+   diff) out of it.
+     .stack-title    the record's heading cell (no caption)
+     .stack-block    caption above the value instead of beside it (long text)
+     .stack-actions  the action-button row, ruled off at the bottom
+   The td[colspan] rule covers empty-state and expanded-detail rows.
+   Every selector is prefixed with .card-body on purpose: the pages' own scoped
+   cell rules (`.users-table td` and friends, specificity 0,2,1) would otherwise
+   outrank these and put desktop cell padding back inside the cards. */
+@media (max-width: 768px) {
+  /* Beat the 480px scroll floor the 768px block gives every .card-body table. */
+  .card-body .stack-table { min-width: 0; }
+  .card-body .stack-table > thead { display: none; }
+  .card-body .stack-table, .card-body .stack-table > tbody { display: block; width: 100%; }
+  .card-body .stack-table > tbody > tr {
+    position: relative; display: block; width: 100%; margin-bottom: 8px; padding: 10px 12px;
+    background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  }
+  /* A tap leaves :hover stuck on touch screens - no hover wash on cards. */
+  .card-body .stack-table > tbody > tr:hover > td { background: transparent; }
+  .card-body .stack-table > tbody > tr > td {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-width: 0; padding: 4px 0; border: 0; font-size: 12.5px; white-space: normal;
+  }
+  .card-body .stack-table > tbody > tr > td::before {
+    content: attr(data-label); flex-shrink: 0;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3);
+  }
+  .card-body .stack-table > tbody > tr > td:not([data-label])::before { content: none; }
+  .card-body .stack-table > tbody > tr > td[colspan] { display: block; }
+  .card-body .stack-table > tbody > tr > td.stack-block { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .card-body .stack-table > tbody > tr > td.stack-title {
+    display: block; padding: 0 0 8px; margin-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle); font-size: 14px; font-weight: 700;
+  }
+  .card-body .stack-table > tbody > tr > td.stack-actions {
+    justify-content: flex-start; padding: 8px 0 0; margin-top: 4px; border-top: 1px solid var(--border-subtle);
+  }
+  .card-body .stack-table > tbody > tr > td.stack-actions::before { content: none; }
+  .card-body .stack-table > tbody > tr.detail-row { padding: 0; background: none; border: 0; }
+  .card-body .stack-table > tbody > tr.detail-row > td { padding: 0; }
+  .card-body .stack-table .btn-sm { min-height: 36px; padding: 6px 14px; }
 }

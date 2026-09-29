@@ -2,7 +2,7 @@
   <!--
     Like ProgressBar, but accepts pct=null for "we genuinely don't know
     yet" (a file mid-read has no byte-level parse progress from the
-    backend — see app/utils/ingestStatus.ts's readPct) rather than forcing
+    backend - see app/utils/ingestStatus.ts's readPct) rather than forcing
     every caller to invent a number. null renders an indeterminate sweep;
     a real number renders the normal fixed-width bar.
   -->

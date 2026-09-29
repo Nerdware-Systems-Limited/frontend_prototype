@@ -1,7 +1,7 @@
 <template>
   <!--
     Segmented date-type control (e.g. Uploaded / Committed / Period) plus
-    a from/to range. Nothing like this existed — every other page in the
+    a from/to range. Nothing like this existed - every other page in the
     app uses two bare <input type="date"> fields with no way to say which
     date column they mean.
   -->

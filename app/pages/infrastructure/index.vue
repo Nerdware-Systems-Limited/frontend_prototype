@@ -143,8 +143,8 @@
       <div class="card-header">Road Network Map ({{ agencyLabel }})</div>
       <ClientOnly>
         <UaptsMap
-          :markers="segmentMarkers"
-          :roads="roadsGeo"
+          :roads-tiles-url="roadsTilesUrl"
+          :roads-agency-filter="selectedAgency"
           :center="[-1.286, 36.817]"
           :zoom="7"
           height="440px"
@@ -152,14 +152,14 @@
         />
       </ClientOnly>
       <div class="map-key">
-        <span class="mk"><span class="dot" style="background:#22c55e" /> Good</span>
-        <span class="mk"><span class="dot" style="background:#84cc16" /> Fair</span>
-        <span class="mk"><span class="dot" style="background:#f59e0b" /> Poor</span>
-        <span class="mk"><span class="dot" style="background:#ef4444" /> Critical</span>
-        <span class="mk"><span class="dot" style="background:#7f1d1d" /> Failed</span>
+        <span class="mk"><span class="dot" style="background:#16a34a" /> Good</span>
+        <span class="mk"><span class="dot" style="background:#f59e0b" /> Fair</span>
+        <span class="mk"><span class="dot" style="background:#dc2626" /> Poor</span>
+        <span class="mk"><span class="dot" style="background:#2563eb" /> Under construction</span>
+        <span class="mk"><span class="dot" style="background:#94a3b8" /> No data</span>
       </div>
-      <div v-if="!segmentMarkers.length" class="map-note">
-        The road-segment registry does not yet return per-segment coordinates - showing the OSM road network as context. Condition-colored pins will appear automatically once the API adds segment geometry.
+      <div class="map-note">
+        Roads are coloured by their worst recorded surface condition (KRB / RICS road-condition data) and drawn thicker for higher road classes. This is a separate dataset from the segment registry below, which has no stored geometry, so individual segments are not pinned.
       </div>
     </div>
 
@@ -388,9 +388,12 @@
 definePageMeta({ layout: 'default' })
 import { useInfrastructure, useGis, useAgencies } from '~/composables/api'
 import type { InfrastructureSummary, DeteriorationForecast, TrafficSignal, RoadSegment, Bridge, MaintenanceBudget } from '~/composables/api'
-import type { GeoJSONFeatureCollection } from '~/composables/api'
 
-type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+// The road-condition map streams the KRB + RICS roads.pmtiles archive - the same
+// layer the GIS page uses - rather than plotting registry segments as pins: the
+// registry has no stored geometry, and its condition-map endpoint fills the gap
+// with made-up coordinates, so nothing built on those may be drawn as a location.
+const roadsTilesUrl = useGis().roadsPmtilesUrl()
 
 const route  = useRoute()
 const router = useRouter()
@@ -418,7 +421,6 @@ const onMapIds     = ref<Set<string>>(new Set())
 const atRisk       = ref<DeteriorationForecast[]>([])
 const signalFaults = ref<TrafficSignal[]>([])
 const agencyNames  = ref<Record<string, string>>({})
-const roadsGeo     = ref<GeoJSONFeatureCollection | null>(null)
 const loading      = ref(true)
 const error        = ref<string | null>(null)
 
@@ -445,17 +447,15 @@ async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
-  const gis   = useGis()
   const agenciesApi = useAgencies()
 
-  const [sumRes, sampleRes, bridgeRes, budgetRes, riskRes, sigRes, roadsRes, agencyRes] = await Promise.allSettled([
+  const [sumRes, sampleRes, bridgeRes, budgetRes, riskRes, sigRes, agencyRes] = await Promise.allSettled([
     infra.summary(),
     infra.segments({ page_size: 300 }),
     infra.bridges({ page_size: 200 }),
     infra.budgets({ page_size: 50 }),
     infra.atRiskForecasts(),
     infra.signalFaults(),
-    gis.roads({ limit: 500, simplify: 0.02 }),
     agenciesApi.list({ page_size: 50 }),
   ])
 
@@ -471,7 +471,6 @@ async function load() {
   if (budgetRes.status === 'fulfilled') budgets.value  = (budgetRes.value as any).results ?? []
   if (riskRes.status === 'fulfilled') atRisk.value       = (riskRes.value as any).results ?? []
   if (sigRes.status  === 'fulfilled') signalFaults.value = (sigRes.value as any).results ?? []
-  if (roadsRes.status === 'fulfilled') roadsGeo.value    = roadsRes.value
   if (agencyRes.status === 'fulfilled') {
     const list = (agencyRes.value as any).results ?? []
     agencyNames.value = Object.fromEntries(list.map((a: any) => [a.agency_code, a.agency_name]))
@@ -532,7 +531,10 @@ async function loadConditionMap() {
   const infra = useInfrastructure()
   try {
     const res = await infra.segmentConditionMap({ page_size: 500 }) as any
-    onMapIds.value = new Set((res.results ?? []).map((r: any) => r.id))
+    // Only rows with coordinates count. Today the API returns a (fabricated) position
+    // for every segment, so this is a no-op; once it returns null for segments with
+    // no stored geometry, the "on map" column and Missing Geometry panel become truthful.
+    onMapIds.value = new Set((res.results ?? []).filter((r: any) => r.latitude != null && r.longitude != null).map((r: any) => r.id))
   } catch { /* leave onMapIds as-is */ }
 }
 
@@ -781,26 +783,6 @@ const {
   pageRows: missingGeometryPageRows, page: missingGeometryPage, totalPages: missingGeometryTotalPages,
   total: missingGeometryTotal, next: missingGeometryNext, prev: missingGeometryPrev,
 } = usePagination(computed(() => qualityChecks.value.missingGeometry), 15)
-
-// ── Map markers (only plotted when the API returns real coordinates) ────
-const segmentMarkers = computed((): MarkerSpec[] => {
-  const raw = segments.value as any[]
-  return raw
-    .filter(s => s.latitude != null && s.longitude != null)
-    .map(s => ({
-      id: `seg-${s.id}`,
-      lat: s.latitude,
-      lon: s.longitude,
-      title: `${s.road_name} (${s.road_code})`,
-      subtitle: `${s.condition_class} · IRI ${s.iri_value ?? '-'} · PCI ${s.pci_value ?? '-'}`,
-      color: (s.condition_class === 'good' || s.condition_class === 'very_good') ? 'green'
-           : s.condition_class === 'fair' ? 'yellow'
-           : s.condition_class === 'poor' ? 'orange'
-           : s.condition_class === 'very_poor' ? 'red'
-           : 'gray',
-      size: 'sm',
-    }))
-})
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {

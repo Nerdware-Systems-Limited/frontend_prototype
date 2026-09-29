@@ -5,7 +5,11 @@
     subtitle="Browse the gisdb schema, compose a query visually or in raw SQL, preview it, and run it"
   >
     <template #actions>
-      <button class="btn-primary" :disabled="!canRun || busy" @click="runQuery">
+      <button
+        class="btn-primary" :disabled="!canRun || busy"
+        :title="canUseQueryBuilder ? undefined : QUERY_BUILDER_OFF"
+        @click="runQuery"
+      >
         <Play :size="14" /> {{ busy ? 'Running…' : 'Run Query' }}
       </button>
     </template>
@@ -154,7 +158,7 @@
                       {{ c }}
                       <button class="chip-x" @click="removeField(c)"><X :size="11" /></button>
                     </span>
-                    <span v-if="!selectedFields.length" class="qc-empty sm">No columns picked — switching back to *.</span>
+                    <span v-if="!selectedFields.length" class="qc-empty sm">No columns picked - switching back to *.</span>
                     <button class="chip chip-add" @click="selectMenuOpen = !selectMenuOpen"><Plus :size="11" /> column</button>
                   </template>
 
@@ -170,7 +174,7 @@
               </div>
             </div>
 
-            <!-- ══ INSERT — values ══ -->
+            <!-- ══ INSERT - values ══ -->
             <div v-else-if="command === 'INSERT'" class="qc">
               <div class="qc-head">
                 <span class="qc-title">Values</span>
@@ -190,7 +194,7 @@
               </div>
             </div>
 
-            <!-- ══ UPDATE — SET ══ -->
+            <!-- ══ UPDATE - SET ══ -->
             <div v-else-if="command === 'UPDATE'" class="qc">
               <div class="qc-head">
                 <span class="qc-title">Set</span>
@@ -324,7 +328,7 @@
               </div>
               <div class="qc-body">
                 <div v-if="!filters.length" class="qc-empty sm">
-                  {{ command === 'SELECT' ? 'No filters — every row is returned.' : 'No WHERE — affects every row.' }}
+                  {{ command === 'SELECT' ? 'No filters - every row is returned.' : 'No WHERE - affects every row.' }}
                 </div>
 
                 <template v-for="(f, idx) in filters" :key="f.id">
@@ -385,7 +389,7 @@
                   <button class="qc-add" :disabled="limitEnabled" @click="limitEnabled = true"><Plus :size="14" /></button>
                 </div>
                 <div class="qc-body">
-                  <div v-if="!limitEnabled" class="qc-empty sm">No cap — click + to limit the result set.</div>
+                  <div v-if="!limitEnabled" class="qc-empty sm">No cap - click + to limit the result set.</div>
                   <div v-else class="limit-row">
                     <input v-model.number="limitValue" type="number" min="1" step="50" class="ctl" />
                     <span class="limit-unit">rows max</span>
@@ -466,7 +470,7 @@
 
             <p class="sqled-note">
               <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>↵</kbd> runs. The whole script executes in one
-              transaction against <strong>{{ dbName || 'the database' }}</strong> — unrestricted, DDL included.
+              transaction against <strong>{{ dbName || 'the database' }}</strong> - unrestricted, DDL included.
               Every run is audit-logged.
             </p>
           </div>
@@ -551,7 +555,7 @@
               <tr v-for="(s, i) in rawResult?.statements ?? []" :key="i">
                 <td>{{ i + 1 }}</td>
                 <td><span class="pill pill-info">{{ s.command }}</span></td>
-                <td>{{ s.rowcount < 0 ? '—' : s.rowcount }}</td>
+                <td>{{ s.rowcount < 0 ? '-' : s.rowcount }}</td>
                 <td class="stmt-sql">{{ s.sql }}</td>
               </tr>
             </tbody>
@@ -563,7 +567,7 @@
         <template v-else>
           <div v-if="rawResult?.truncated" class="trunc-banner">
             <TriangleAlert :size="12" />
-            Showing the first {{ fmtNum(rawResult?.rows.length ?? 0) }} rows — raise the limit / “max rows” to fetch more.
+            Showing the first {{ fmtNum(rawResult?.rows.length ?? 0) }} rows - raise the limit / “max rows” to fetch more.
           </div>
           <table class="res-table">
             <thead>
@@ -579,7 +583,7 @@
             <tbody>
               <tr v-for="(row, i) in displayRows" :key="i">
                 <td v-for="col in displayColumns" :key="col">
-                  <span v-if="row[col] === null || row[col] === undefined" class="c-null">—</span>
+                  <span v-if="row[col] === null || row[col] === undefined" class="c-null">-</span>
                   <span v-else-if="isPillCol(col)" class="pill" :class="'pill-' + pillVariant(row[col])">{{ row[col] }}</span>
                   <span v-else-if="isUuidCol(col)" class="c-mono" :title="String(row[col])">{{ String(row[col]) }}</span>
                   <span v-else-if="isDateCol(col)" class="c-mono">{{ fmtDate(row[col]) }}</span>
@@ -858,8 +862,8 @@ const whereConds = computed(() => filters.value.map(filterSql).filter(Boolean) a
 const hasWhere = computed(() => whereConds.value.length > 0)
 const dangerNote = computed(() => {
   const c = command.value
-  if (c === 'DELETE' && !hasWhere.value) return 'No WHERE — this deletes every row in the table.'
-  if (c === 'UPDATE' && !hasWhere.value) return 'No WHERE — this updates every row in the table.'
+  if (c === 'DELETE' && !hasWhere.value) return 'No WHERE - this deletes every row in the table.'
+  if (c === 'UPDATE' && !hasWhere.value) return 'No WHERE - this updates every row in the table.'
   if (c === 'DROP') return 'DROP permanently removes the table and all of its data.'
   if (c === 'TRUNCATE') return `TRUNCATE empties the table${truncCascade.value ? ' and cascades to referencing tables' : ''}.`
   return ''
@@ -1147,9 +1151,13 @@ const page = ref(1)
 const pageSize = ref(25)
 const resultsMaximized = ref(false)
 
+// Running a query needs the `query_builder` capability (Module Access) on top of the route's tier gate.
+const { canUseQueryBuilder } = usePermissions()
+const QUERY_BUILDER_OFF = 'Running queries is switched off for your role in this agency.'
+
 const busy = computed(() => rawExecuting.value)
 const canRun = computed(() =>
-  builderMode.value === 'sql' ? !!sqlDraft.value.trim() : visualValid.value,
+  canUseQueryBuilder.value && (builderMode.value === 'sql' ? !!sqlDraft.value.trim() : visualValid.value),
 )
 const hasResult = computed(() => !!rawResult.value)
 const isAffected = computed(() => rawResult.value?.row_type === 'affected')
@@ -1180,7 +1188,7 @@ const displayRows = computed<Record<string, unknown>[]>(() => {
 })
 const displayElapsed = computed(() => {
   const ms = rawResult.value?.duration_ms
-  return ms == null ? '—' : `${(ms / 1000).toFixed(2)}s`
+  return ms == null ? '-' : `${(ms / 1000).toFixed(2)}s`
 })
 const totalPages = computed(() => Math.max(1, Math.ceil(displayTotal.value / pageSize.value)))
 const pageNumbers = computed<(number | '…')[]>(() => {
@@ -1199,6 +1207,8 @@ const pageNumbers = computed<(number | '…')[]>(() => {
 })
 
 function runQuery() {
+  // The button is disabled, but Ctrl/Cmd+Enter reaches here too.
+  if (!canUseQueryBuilder.value) return
   if (builderMode.value === 'sql') runRaw()
   else runVisual()
 }
@@ -1227,7 +1237,7 @@ async function runVisual() {
     })
     page.value = 1
     rawSortCol.value = ''
-    // A committed schema change makes the browser stale — refresh it.
+    // A committed schema change makes the browser stale - refresh it.
     if (!readOnly && DDL_COMMANDS.has(command.value)) loadSchema()
   } catch (e: any) {
     rawResult.value = null
@@ -1292,9 +1302,9 @@ function fmtDate(v: unknown) {
     return d.toISOString().slice(0, 19).replace('T', ' ')
   } catch { return String(v) }
 }
-function fmtNum(v: number | null | undefined) { return v == null ? '—' : v.toLocaleString() }
+function fmtNum(v: number | null | undefined) { return v == null ? '-' : v.toLocaleString() }
 function formatCell(v: unknown) {
-  if (v == null) return '—'
+  if (v == null) return '-'
   if (typeof v === 'object') return JSON.stringify(v)
   const s = String(v)
   return s.length > 120 ? `${s.slice(0, 120)}…` : s

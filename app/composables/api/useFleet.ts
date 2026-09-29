@@ -10,7 +10,7 @@
 //   /speed-governor-status/, /utilization/, /summary/.
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Common shapes ────────────────────────────────────────────────────
@@ -322,7 +322,7 @@ export function useFleet() {
 
   return {
     // ── Dashboard / summary ────────────────────────────────────────
-    summary: () => api<FleetSummary>(`${F}/summary/`),
+    summary: (params?: SummaryFilterParams) => api<FleetSummary>(`${F}/summary/`, { query: cleanQuery(params) }),
 
     // ── Vehicles ───────────────────────────────────────────────────
     vehicles: (q?: FleetQuery) =>

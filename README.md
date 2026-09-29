@@ -6,7 +6,8 @@ The Unified Analytics and Predictive Transport System dashboard SPA.
 
 - **Nuxt 4** with file-based routing under `app/pages/`
 - **Vue 3** Composition API throughout
-- **Pinia** for the auth store (`app/stores/auth.ts`)
+- **Pinia** for the auth store (`app/stores/auth.ts`), notifications, and
+  Module Access overrides (`app/stores/accessPolicy.ts`)
 - **Tailwind CSS** for base/utilities, plus a custom institutional-blue
   design system in `app/assets/css/theme.css` (tokens, top nav, sidebar, KPI
   cards, agency cards, alerts, modals) with light and dark themes - see
@@ -81,7 +82,9 @@ Routes live under `app/pages/`, grouped by module:
 - `/maritime` and subpages (`vessels`, `port-ops`, `infrastructure`, `services`, `cargo`, `waterways`, `accidents`, `green-transport`, `performance`, `imports-exports`) - M07b
 - `/railway` and subpages (`live`, `freight`, `schedules`, `infrastructure`, `network-inventory`, `safety`) - M08
 - `/analytics`, `/query-builder`, `/reports` - M09/M15
-- `/agencies`, `/users`, `/roles`, `/audit` - M10 access control
+- `/agencies`, `/users`, `/roles`, `/access-policies`, `/audit` - M10 access control
+  (`/access-policies` is "Module Access": per-agency and per-role module, page,
+  data-category and capability access; see `Reference.md` §9.7)
 - `/notifications`, `/notifications/rules` - M11
 - `/integrations` - M12
 - `/gis` - M13

@@ -11,7 +11,7 @@
 // maritime/operations/) that powers the dashboard.
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Domain types ──────────────────────────────────────────────────────
@@ -391,8 +391,8 @@ export function useAviationMaritime() {
       api<Paged<any>>(`${AV}/met-observations/`, { query: cleanQuery(q as Record<string, unknown>) }),
     metObservationsLatest: () =>
       api<{ results: any[] }>(`${AV}/met-observations/latest/`),
-    aviationSummary: (days = 7) =>
-      api<AviationSummary>(`${AV}/summary/?days=${days}`),
+    aviationSummary: (days = 7, params?: SummaryFilterParams) =>
+      api<AviationSummary>(`${AV}/summary/`, { query: cleanQuery({ ...params, days }) }),
 
     // ── Maritime catalog ──────────────────────────────────────────
     ports: (q?: { port_type?: string }) =>
@@ -426,7 +426,7 @@ export function useAviationMaritime() {
       api<{ days: number; total_incidents: number; fatal_incidents: number; casualties: number; pollution_tons: number }>(
         `${MA}/maritime-incidents/stats/?days=${days}`,
       ),
-    maritimeOperations: (days = 30) =>
-      api<MaritimeOps>(`${MA}/operations/?days=${days}`),
+    maritimeOperations: (days = 30, params?: SummaryFilterParams) =>
+      api<MaritimeOps>(`${MA}/operations/`, { query: cleanQuery({ ...params, days }) }),
   }
 }

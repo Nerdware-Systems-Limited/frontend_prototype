@@ -9,7 +9,7 @@
 //   /traffic-signals/, /rural-road-status/, /asset-snapshots/, /summary/.
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Enums ───────────────────────────────────────────────────────────
@@ -387,8 +387,9 @@ export function useInfrastructure() {
     // `agency` (Agency UUID, same as segments()' `agency` param) scopes the
     // network/bridges/streetlights blocks to that agency instead of the
     // whole network - omit for the network-wide aggregate.
-    summary: (q?: { agency?: string }) =>
-      api<InfrastructureSummary>(`${I}/summary/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    // `agency` here is an Agency UUID, not a code.
+    summary: (params?: SummaryFilterParams) =>
+      api<InfrastructureSummary>(`${I}/summary/`, { query: cleanQuery(params) }),
 
     // ── Road segments ──────────────────────────────────────────────
     segments: (q?: InfrastructureQuery) =>

@@ -204,34 +204,41 @@
       <div class="map-wrap-head">
         Predictive risk hotspots &amp; black spot clusters
         <span class="map-head-meta">
-          {{ hotspots.length }} hotspots · {{ blackspots.filter(b => b.centroid_latitude != null).length }} black spots
+          <template v-if="loading">Loading…</template>
+          <template v-else>{{ hotspotsSummary }} · {{ blackspotsSummary }}</template>
           <template v-if="roads"> · road network</template>
         </span>
         <NuxtLink to="/safety/blackspots" class="section-link">Full blackspot analysis &amp; map →</NuxtLink>
       </div>
-      <ClientOnly>
-        <UaptsMap
-          :markers="mapMarkers"
-          :roads="roads ?? undefined"
-          :center="[-0.5, 37.5]"
-          :zoom="6"
-          height="300px"
-        />
-        <template #fallback>
-          <div style="height:300px;background:var(--surface-sunken);display:flex;align-items:center;justify-content:center;">
-            <span style="font-size:11px;color:var(--fg-3)">Loading map…</span>
-          </div>
-        </template>
-      </ClientOnly>
+      <div class="map-stage">
+        <ClientOnly>
+          <UaptsMap
+            :markers="mapMarkers"
+            :roads="roads ?? undefined"
+            :center="[-0.5, 37.5]"
+            :zoom="6"
+            height="300px"
+          />
+          <template #fallback>
+            <div style="height:300px;background:var(--surface-sunken);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:11px;color:var(--fg-3)">Loading map…</span>
+            </div>
+          </template>
+        </ClientOnly>
+        <!-- An empty map that just shows roads reads as broken - say why it is empty. -->
+        <div v-if="mapEmptyMessage" class="map-empty" role="status">{{ mapEmptyMessage }}</div>
+      </div>
       <!-- Risk tier legend -->
       <div class="map-legend-strip">
         <span class="map-legend-title">Risk tier</span>
-        <span class="map-legend-item"><span class="map-dot" style="background:var(--destructive)"></span>Critical</span>
+        <span class="map-legend-item"><span class="map-dot" style="background:var(--destructive)"></span>Very high / critical</span>
         <span class="map-legend-item"><span class="map-dot" style="background:#f97316"></span>High</span>
         <span class="map-legend-item"><span class="map-dot" style="background:var(--warning)"></span>Medium</span>
         <span class="map-legend-item"><span class="map-dot" style="background:var(--border-strong)"></span>Low</span>
         <span class="map-legend-sep"></span>
-        <span class="map-legend-item map-legend-dim"><span class="map-dot map-dot-sm" style="background:#f97316"></span>Black spot</span>
+        <!-- Tier is the colour; the kind of spot is the size. -->
+        <span class="map-legend-item map-legend-dim"><span class="map-dot" style="background:var(--fg-3)"></span>Predicted hotspot</span>
+        <span class="map-legend-item map-legend-dim"><span class="map-dot map-dot-sm" style="background:var(--fg-3)"></span>Black spot</span>
         <template v-if="roads">
           <span class="map-legend-sep"></span>
           <span class="map-legend-item map-legend-dim"><span class="map-dash" style="background:var(--fg-2)"></span>Roads</span>
@@ -703,6 +710,10 @@ const integrations = ref<Integration[]>([])
 const agencyContributions = ref<AgencyContribution[]>([])
 const hotspots     = ref<PredictiveHotspot[]>([])
 const blackspots   = ref<BlackSpot[]>([])
+// Real row counts from the API - `hotspots`/`blackspots` are only a page (top N by
+// risk / accident count), so `.length` is never the total.
+const hotspotsTotal   = ref(0)
+const blackspotsTotal = ref(0)
 const roads        = ref<GeoJSONFeatureCollection | null>(null)
 
 const loading       = ref(true)
@@ -711,6 +722,7 @@ const lastRefreshed = ref('-')
 
 // ── Per-domain failure flags - drive the "data unavailable" KPI caption ──
 const safetyFailed    = ref(false)
+const hotspotFeedsFailed = ref(false)   // both hotspot + black-spot requests failed - the map has nothing to plot
 const fleetFailed     = ref(false)
 const railFailed      = ref(false)
 const aviationFailed  = ref(false)
@@ -762,8 +774,15 @@ async function load() {
   if (infraRes.status      === 'fulfilled') infra.value        = infraRes.value
   if (intsRes.status       === 'fulfilled') integrations.value = (intsRes.value as any).results ?? []
   if (agencyContribRes.status === 'fulfilled') agencyContributions.value = agencyContribRes.value
-  if (hotspotsRes.status   === 'fulfilled') hotspots.value     = (hotspotsRes.value as any).results ?? []
-  if (blackspotsRes.status === 'fulfilled') blackspots.value   = (blackspotsRes.value as any).results ?? []
+  if (hotspotsRes.status   === 'fulfilled') {
+    hotspots.value      = (hotspotsRes.value as any).results ?? []
+    hotspotsTotal.value = (hotspotsRes.value as any).count ?? hotspots.value.length
+  }
+  if (blackspotsRes.status === 'fulfilled') {
+    blackspots.value      = (blackspotsRes.value as any).results ?? []
+    blackspotsTotal.value = (blackspotsRes.value as any).count ?? blackspots.value.length
+  }
+  hotspotFeedsFailed.value = hotspotsRes.status === 'rejected' && blackspotsRes.status === 'rejected'
   if (roadsRes.status      === 'fulfilled') roads.value        = roadsRes.value
 
   safetyFailed.value   = safetyRes.status   === 'rejected'
@@ -1290,12 +1309,34 @@ const activeAlerts = computed((): AlertEntry[] => {
 })
 
 // ── Map markers ────────────────────────────────────────────────────────
+// Only rows with a usable position can be drawn - one null/NaN coordinate makes
+// Leaflet throw and would take every other marker down with it.
+const hasPosition = (lat: number | null | undefined, lon: number | null | undefined) =>
+  Number.isFinite(lat) && Number.isFinite(lon)
+const plottedHotspots   = computed(() => hotspots.value.filter(h => hasPosition(h.latitude, h.longitude)))
+const plottedBlackspots = computed(() => blackspots.value.filter(b => hasPosition(b.centroid_latitude, b.centroid_longitude)))
+
+/** "12 hotspots", or "top 30 of 412 hotspots" when the API holds more than the page we plotted. */
+function plottedSummary(shown: number, total: number, noun: string) {
+  const label = `${noun}${shown === 1 ? '' : 's'}`
+  return total > shown ? `top ${fmtNum(shown)} of ${fmtNum(total)} ${label}` : `${fmtNum(shown)} ${label}`
+}
+const hotspotsSummary   = computed(() => plottedSummary(plottedHotspots.value.length, hotspotsTotal.value, 'hotspot'))
+const blackspotsSummary = computed(() => plottedSummary(plottedBlackspots.value.length, blackspotsTotal.value, 'black spot'))
+
+const mapEmptyMessage = computed(() => {
+  if (loading.value || mapMarkers.value.length) return null
+  return hotspotFeedsFailed.value
+    ? 'Hotspot and black-spot feed unavailable - retry to refresh'
+    : `No predictive hotspots or black spots yet - the road-safety models have not produced any results.${roads.value ? ' Road network shown for context.' : ''}`
+})
+
 const mapMarkers = computed((): MarkerSpec[] => {
   const markers: MarkerSpec[] = []
 
   const cap = (s: string) => s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
-  for (const h of hotspots.value) {
+  for (const h of plottedHotspots.value) {
     const color: MarkerSpec['color'] =
       h.risk_tier === 'very_high' ? 'red'
       : h.risk_tier === 'high'   ? 'orange'
@@ -1321,12 +1362,12 @@ const mapMarkers = computed((): MarkerSpec[] => {
     })
   }
 
-  for (const b of blackspots.value) {
-    if (b.centroid_latitude == null || b.centroid_longitude == null) continue
+  for (const b of plottedBlackspots.value) {
     const color: MarkerSpec['color'] =
       b.ranking_tier === 'critical' ? 'red'
       : b.ranking_tier === 'high'   ? 'orange'
-      : 'yellow'
+      : b.ranking_tier === 'medium' ? 'yellow'
+      : 'gray' // low / unranked - the legend's "Low" swatch, not the medium yellow
     const rows: Array<{ label: string; value: string }> = [
       { label: 'Tier',               value: cap(b.ranking_tier ?? 'unranked') },
       { label: 'Accidents (rolling)', value: String(b.accident_count_rolling) },
@@ -1337,8 +1378,8 @@ const mapMarkers = computed((): MarkerSpec[] => {
     if (b.window_days)           rows.push({ label: 'Window',        value: `${b.window_days} days` })
     markers.push({
       id:    `bs-${b.id}`,
-      lat:   b.centroid_latitude,
-      lon:   b.centroid_longitude,
+      lat:   b.centroid_latitude!,
+      lon:   b.centroid_longitude!,
       badge: 'Accident Black Spot',
       title: b.segment_road_name ?? b.segment_road_code ?? 'Black Spot Cluster',
       rows,
@@ -1608,6 +1649,18 @@ const mapMarkers = computed((): MarkerSpec[] => {
   font-family: var(--font-mono);
   text-transform: none;
   letter-spacing: 0;
+}
+.map-stage { position: relative; }
+.map-empty {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 800; /* above Leaflet's panes (400-700), below its controls */
+  max-width: min(360px, calc(100% - 32px));
+  padding: 10px 14px; text-align: center;
+  font-size: 12px; line-height: 1.45; color: var(--fg-2);
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  box-shadow: var(--elev-2);
+  pointer-events: none; /* the map underneath stays pannable */
 }
 .map-legend-strip {
   display: flex;

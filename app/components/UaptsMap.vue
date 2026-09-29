@@ -35,6 +35,7 @@
  * import time and the page is SSR-rendered.
  */
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { apiBaseUrl } from '~/utils/apiBase'
 
 // ── Public types ─────────────────────────────────────────────────────
 // Re-exported so composables (useTraffic/usePublicTransport) can
@@ -346,7 +347,7 @@ async function renderCatalogLayer(Lc: any, key: string) {
   const meta = LAYER_CATALOG[key]
   if (!meta) return
   if (layerStates.value.find(s => s.key === key)) return  // already rendered
-  const apiBase = (useRuntimeConfig().public.apiBase as string)
+  const apiBase = apiBaseUrl()
   let data: any
   try {
     data = await authedFetch(apiBase + meta.endpoint)
