@@ -289,10 +289,15 @@ async function handleLogin() {
     }
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status
+    const detail = (err as { data?: { detail?: string } })?.data?.detail
     // dj-rest-auth's LoginSerializer returns 400 (not 401) for bad
     // credentials - handle both in case that ever changes upstream.
     if (status === 400 || status === 401) loginError.value = 'Invalid email/username or password.'
     else if (status === 429) loginError.value = 'Too many attempts. Please wait and try again.'
+    // Any other status the server answers with (e.g. 403 mfa_setup_overdue,
+    // a locked account) comes with a real, user-actionable detail message -
+    // show that instead of masking it as a connectivity problem.
+    else if (detail) loginError.value = detail
     else loginError.value = 'Unable to reach the server. Check your connection.'
   }
 }

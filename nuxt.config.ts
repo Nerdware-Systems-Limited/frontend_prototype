@@ -41,12 +41,16 @@ export default defineNuxtConfig({
   // Dev-only same-origin proxy to the backend (it's on another host and we
   // can't change its CORS/CSRF settings). Auth is a Bearer header, which the
   // proxy forwards untouched; changeOrigin sets Host to the backend's.
+  //
+  // No `/ws` entry: `nuxi dev` runs Vite's own HMR WebSocket server on the
+  // same underlying HTTP server, which claims every `upgrade` event before
+  // this proxy's `ws: true` handling ever sees it, so a proxied `/ws/*` never
+  // actually upgrades (confirmed - it comes back as a plain HTTP 200).
+  // WebSockets connect straight to the backend instead - see wsUrl() in
+  // app/utils/apiBase.ts for why that's safe to do (no CORS/CSRF concern).
   nitro: {
     devProxy: {
       '/api': { target: `${API_TARGET}/api`, changeOrigin: true },
-      // No '/ws' entry: Nitro's dev proxy doesn't handle socket errors on
-      // upgraded connections, so one reset WebSocket crashed and restarted
-      // `nuxi dev` (read ECONNRESET). WebSockets connect to the backend directly.
       '/media': { target: `${API_TARGET}/media`, changeOrigin: true },
     },
   },

@@ -20,7 +20,7 @@
 import type { User } from '~/types/uapts'
 import {
   BASE_SETTINGS, EMPTY_OVERRIDES, capabilitiesFor, resolveFor,
-  type AccessTier, type PolicyOverrides, type RouteResolution, type ScopeLevel,
+  type AccessSubject, type AccessTier, type PolicyOverrides, type RouteResolution, type ScopeLevel,
 } from '~/utils/resolveAccess'
 import { getActivePinia } from 'pinia'
 import { useAccessPolicyStore } from '~/stores/accessPolicy'
@@ -43,6 +43,16 @@ export function useAccessControl() {
 
   const agencyCode = computed(() => subject.value?.agency_code?.toUpperCase() || null)
   const roleTier = computed<AccessTier>(() => (subject.value?.role_type as AccessTier) ?? 'public')
+  // A custom Role's own name always differs from role_type (the built-in
+  // mirror every account otherwise has is named exactly role_type - see
+  // User.save() on the backend) - no extra field needed to tell them apart.
+  const customRole = computed(() => {
+    const u = subject.value
+    return u?.role_name && u.role_name !== u.role_type ? u.role_name : null
+  })
+  const accessSubject = computed<AccessSubject | null>(() => (
+    subject.value ? { ...subject.value, custom_role: customRole.value } : null
+  ))
   const isSuperAdmin = computed(
     () => roleTier.value === 'super_admin' || !!settings.roles[roleTier.value]?.bypassScope,
   )
@@ -62,7 +72,7 @@ export function useAccessControl() {
   const landingRoute = computed(() => agency.value?.landing ?? safeSpace.value.route)
 
   function resolveRoute(path: string): RouteResolution {
-    return resolveFor(overrides.value, subject.value, path)
+    return resolveFor(overrides.value, accessSubject.value, path)
   }
 
   function canAccessRoute(path: string): boolean {

@@ -110,6 +110,7 @@ const filtering = computed(() => isFilterActive(activeFilter.value))
 const visible = computed(() => filterModules(
   props.overrides, props.code, activeFilter.value,
   key => raw('ceiling', key) !== null || raw('enabled', key) !== null,
+  !props.canEditCeiling,
 ))
 
 // While filtering, matching modules start open (so "fleet" shows its pages);

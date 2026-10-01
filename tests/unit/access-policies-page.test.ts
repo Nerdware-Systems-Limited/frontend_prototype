@@ -111,8 +111,9 @@ describe('access-policies page - agency access', () => {
     expect(w.find('#agency-select').exists()).toBe(false)
     expect(w.find('.agency-name').text()).toContain('Kenya Ports Authority')
     expect(btn(w, 'ceiling-M12', 'none').attributes('disabled')).toBeDefined()
-    // KPA's JSON denies M02, so its ceiling is none and Enabled can't go above it.
-    expect(btn(w, 'enabled-M02', 'read').attributes('disabled')).toBeDefined()
+    // KPA's JSON denies M02 entirely (ceiling 'none') - nothing an agency
+    // admin could do with it, so unlike M12 it isn't listed for them at all.
+    expect(w.find('[data-testid="ceiling-M02"]').exists()).toBe(false)
     expect(btn(w, 'enabled-M12', 'read').attributes('disabled')).toBeUndefined()
   })
 
@@ -160,8 +161,19 @@ describe('access-policies page - role permissions', () => {
     const headers = w.findAll('.role-grid th').map((th: any) => th.text())
     expect(headers).toEqual(expect.arrayContaining(['admin', 'analyst', 'operator']))
     expect(btn(w, 'role-operator-M02', 'full').attributes('disabled')).toBeUndefined()
-    // KENHA's JSON denies M04, so no role can be given it.
-    expect(btn(w, 'role-operator-M04', 'read').attributes('disabled')).toBeDefined()
+    // KENHA's JSON denies M04 entirely (ceiling 'none') - an agency admin
+    // can't do anything with a module like that, so it isn't even listed.
+    expect(w.find('[data-testid="role-operator-M04"]').exists()).toBe(false)
+  })
+
+  it('still lists a fully-denied module for super_admin, who can change the ceiling', async () => {
+    signIn(null, 'super_admin')
+    const w = mountPage()
+    await flushPromises()
+    await openTab(w, 'Role permissions')
+    // super_admin owns the ceiling layer, so M04 being capped at 'none'
+    // for KENHA is exactly what they're there to see and change.
+    expect(w.find('[data-testid="role-operator-M04"]').exists()).toBe(true)
   })
 
   it('applies a role limit to the draft', async () => {

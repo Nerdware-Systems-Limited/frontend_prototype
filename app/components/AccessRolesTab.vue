@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
   BASE_SETTINGS, CAPABILITIES, agencyRoleTiers, capabilitySet, editableModules, editableRoutes, moduleSummary, pageScope,
   type PolicyOverrides, type ScopeLevel,
@@ -126,6 +126,8 @@ import {
 import { capabilityLabel } from '~/utils/accessLabels'
 import type { AccessEdit, EditableLayer } from '~/utils/accessEdits'
 import { EMPTY_FILTER, filterModules, isFilterActive, type ModuleFilter } from '~/utils/accessFilter'
+import { useRoles } from '~/composables/api'
+import type { Role } from '~/types/uapts'
 
 const props = defineProps<{
   code: string
@@ -137,7 +139,20 @@ const props = defineProps<{
 const emit = defineEmits<{ edit: [AccessEdit] }>()
 
 const modules = editableModules()
-const tiers = computed(() => agencyRoleTiers(props.code))
+
+// Custom, per-agency roles (Roles & Permissions page) are a more specific
+// key into this same per-agency "roles" override layer - see the backend's
+// Role model docstring. Fetched once (agency-scoped server-side for an
+// agency admin, every agency for a super_admin) and filtered per `code`
+// here rather than re-fetched on every agency switch.
+const allRoles = ref<Role[]>([])
+onMounted(async () => {
+  try { allRoles.value = (await useRoles().list({ page_size: 200 })).results } catch { /* custom tiers just won't show */ }
+})
+const customTierNames = computed(() =>
+  allRoles.value.filter(r => r.base_tier && r.agency_code?.toUpperCase() === props.code.toUpperCase()).map(r => r.role_name),
+)
+const tiers = computed<string[]>(() => [...agencyRoleTiers(props.code), ...customTierNames.value])
 
 const activeFilter = computed(() => props.filter ?? EMPTY_FILTER)
 const filtering = computed(() => isFilterActive(activeFilter.value))
@@ -145,6 +160,7 @@ const filtering = computed(() => isFilterActive(activeFilter.value))
 const visible = computed(() => filterModules(
   props.overrides, props.code, activeFilter.value,
   key => tiers.value.some(t => rawRole(t, key) !== null),
+  !props.canEditCeiling,
 ))
 
 // While filtering, matching modules start open; the set then records the ones

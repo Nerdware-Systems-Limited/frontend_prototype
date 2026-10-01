@@ -48,9 +48,11 @@ export function useAuth() {
     isAuthenticated: computed(() => store.isAuthenticated),
     isLoading:       computed(() => store.isLoading),
     userInitials:    computed(() => store.userInitials),
+    showMfaNudge:    computed(() => store.showMfaNudge),
     // actions
     login,
     logout,
+    dismissMfaNudge: store.dismissMfaNudge,
     fetchMe: store.fetchMe,
     mfaVerify,
     mfaResend: store.mfaResend,

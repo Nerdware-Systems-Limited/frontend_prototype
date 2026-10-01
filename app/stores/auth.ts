@@ -37,8 +37,14 @@ function getItem(key: string): string | null {
 
 function setItem(key: string, value: string, prefer: 'local' | 'session') {
   if (typeof window === 'undefined') return
-  const storage = prefer === 'local' ? localStorage : sessionStorage
+  const [storage, other] = prefer === 'local' ? [localStorage, sessionStorage] : [sessionStorage, localStorage]
   storage.setItem(key, value)
+  // getItem() prefers localStorage over sessionStorage - a stale copy left in
+  // the other storage (e.g. from an earlier "remember me" login) would keep
+  // winning over this fresh one after every hard reload, silently
+  // re-authenticating as whoever that old token belonged to while the just-
+  // stored user profile (this call) displays correctly. Only one can be live.
+  other.removeItem(key)
 }
 
 function removeItem(key: string) {
@@ -89,6 +95,14 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string | null>(null)
   const user         = ref<AuthUser | null>(null)
   const isLoading    = ref(false)
+
+  // Set true by a successful login (not by hydrate() restoring an existing
+  // session on page reload) when the account has no MFA enrolled - prompts
+  // the "Secure Your Account" nudge once per fresh sign-in. Memory-only by
+  // design: a reload naturally clears it rather than re-showing on every
+  // page view, and dismissing it just for this session is exactly "skip".
+  const showMfaNudge = ref(false)
+  function dismissMfaNudge() { showMfaNudge.value = false }
 
   // "Remember me" as chosen on the login form - captured when a login comes
   // back as an MFA challenge (no tokens yet) so mfaVerify() can honour the
@@ -144,7 +158,9 @@ export const useAuthStore = defineStore('auth', () => {
         pendingRemember = remember
         return { mfaRequired: true, otpId: res.otp_id, channel: res.channel }
       }
-      _storeTokens(res.access, res.refresh ?? '', normaliseUser(res.user), remember)
+      const loggedInUser = normaliseUser(res.user)
+      _storeTokens(res.access, res.refresh ?? '', loggedInUser, remember)
+      showMfaNudge.value = !loggedInUser.mfa_active
       return { mfaRequired: false }
     } finally {
       isLoading.value = false
@@ -300,8 +316,15 @@ export const useAuthStore = defineStore('auth', () => {
       })
       accessToken.value = res.access
       if (res.refresh) {
+        // Rotation (SIMPLE_JWT.ROTATE_REFRESH_TOKENS) must preserve the
+        // original "remember me" choice, not silently promote a session-only
+        // login into a persistent one - _persistRefresh's own default is
+        // `true`, which did exactly that on the very first refresh of every
+        // non-remembered session. Persist the rotated token to wherever the
+        // one it's replacing already lives.
+        const remember = preferLocal() === 'local'
         refreshToken.value = res.refresh
-        _persistRefresh(res.refresh)
+        _persistRefresh(res.refresh, remember)
       }
       return res.access
     } catch {
@@ -343,7 +366,7 @@ export const useAuthStore = defineStore('auth', () => {
     setItem('uapts_user', JSON.stringify(userData), remember ? 'local' : 'session')
   }
 
-  function _persistRefresh(token: string, remember = true) {
+  function _persistRefresh(token: string, remember: boolean) {
     if (!token) return
     setItem('uapts_refresh', token, remember ? 'local' : 'session')
   }
@@ -352,14 +375,16 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value  = null
     refreshToken.value = null
     user.value         = null
+    showMfaNudge.value = false
     removeItem('uapts_refresh')
     removeItem('uapts_user')
   }
 
   return {
-    accessToken, refreshToken, user, isLoading,
+    accessToken, refreshToken, user, isLoading, showMfaNudge,
     isAuthenticated, userInitials,
     hydrate, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
+    dismissMfaNudge,
     mfaVerify, mfaResend, mfaEnroll, mfaEnrollVerify, mfaDisable,
     requestPasswordReset, confirmPasswordReset, changePassword,
   }

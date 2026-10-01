@@ -164,10 +164,11 @@
 
 <script setup lang="ts">
 import { Archive, ArrowLeft, Copy, Eye, History, PencilLine, Redo2, TriangleAlert, Undo2 } from 'lucide-vue-next'
-import type { DashboardDefinition, DashboardRecord, DashboardStatus, DashboardSummary, ViewerContext, WidgetInstance } from '~/types/dashboard'
+import type { DashboardAssignment, DashboardDefinition, DashboardRecord, DashboardStatus, DashboardSummary, ViewerContext, WidgetInstance } from '~/types/dashboard'
 import { WIDGETS_BY_TYPE, widgetFilterFields } from '~/utils/widgetRegistry'
 import { findSpot, newId, settle, compact } from '~/utils/layoutEngine'
-import { describeScope } from '~/utils/resolveDashboard'
+import { describeScope as describeScopeRaw } from '~/utils/resolveDashboard'
+import { useUserEmailLookup } from '~/composables/useUserEmailLookup'
 import { useDashboardApi, toDashboardApiError, type DashboardVersionInfo } from '~/composables/useDashboardApi'
 import { provideDashboardFilters } from '~/composables/useDashboardFilters'
 import DashboardRenderer from '~/components/dashboard/DashboardRenderer.vue'
@@ -187,6 +188,15 @@ const STATUS_LABEL: Record<DashboardStatus, string> = { published: 'Published', 
 const STATUS_CLASS: Record<DashboardStatus, string> = { published: 'success', draft: '', archived: 'pill-muted' }
 
 const record = ref<DashboardRecord>(props.initial)
+
+// ── user-assignment emails (the backend only stores the raw user id) ──
+const { emailFor, ensure: ensureEmails } = useUserEmailLookup()
+function describeScope(a: Pick<DashboardAssignment, 'scopeType' | 'scopeValue'>) { return describeScopeRaw(a, emailFor) }
+watchEffect(() => {
+  const ids = record.value.assignments.filter(a => a.scopeType === 'user').map(a => a.scopeValue.split(':')[0]!)
+  if (ids.length) ensureEmails(ids)
+})
+
 const def = ref<DashboardDefinition>(structuredClone(toRaw(props.initial.definition)))
 const name = ref(props.initial.name)
 const description = ref(props.initial.description)

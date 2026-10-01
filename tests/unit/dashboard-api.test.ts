@@ -74,11 +74,14 @@ describe('apiBase helpers', () => {
     expect(apiBaseUrl()).toBe('http://test.local:8000')
     expect(wsUrl('ws://192.168.0.110:8000/ws/audit/')).toBe('ws://192.168.0.110:8000/ws/audit/')
   })
-  it('proxies HTTP but connects WebSockets directly when the dev proxy is on', () => {
+  it('HTTP goes same-origin when the dev proxy is on, but WebSockets always go straight to the backend', () => {
     const original = (globalThis as any).useRuntimeConfig
     ;(globalThis as any).useRuntimeConfig = () => ({ public: { apiBase: 'http://192.168.0.110:8000', apiProxy: true } })
     try {
       expect(apiBaseUrl()).toBe('')
+      // Not rewritten to this page's own host: nuxi dev's WS proxy never
+      // upgrades the connection (Vite's own HMR WebSocket server claims the
+      // `upgrade` event first), so wsUrl() is a passthrough - see its docstring.
       expect(wsUrl('ws://192.168.0.110:8000/ws/notifications/')).toBe('ws://192.168.0.110:8000/ws/notifications/')
     } finally {
       ;(globalThis as any).useRuntimeConfig = original

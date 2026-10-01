@@ -121,8 +121,19 @@ export const SCOPE_LABELS: Record<ScopeType, string> = {
   global: 'Everyone',
 }
 
-/** Human-readable audience, e.g. "Analysts in KeNHA · Maintenance". */
-export function describeScope(a: Pick<DashboardAssignment, 'scopeType' | 'scopeValue'>): string {
+/**
+ * Human-readable audience, e.g. "Analysts in KeNHA · Maintenance".
+ *
+ * `emailFor` resolves a 'user' assignment's scopeValue (the backend only
+ * stores the raw user UUID) to that person's email - see
+ * useUserEmailLookup(). Callers that haven't resolved it yet (or can't -
+ * a user outside the viewer's own agency, or since deleted) fall back to
+ * showing the id, same as before that lookup existed.
+ */
+export function describeScope(
+  a: Pick<DashboardAssignment, 'scopeType' | 'scopeValue'>,
+  emailFor?: (userId: string) => string | undefined,
+): string {
   const p = a.scopeValue.split(':')
   switch (a.scopeType) {
     case 'global': return 'Everyone'
@@ -130,6 +141,6 @@ export function describeScope(a: Pick<DashboardAssignment, 'scopeType' | 'scopeV
     case 'role': return p.length === 1 ? `Every ${p[0]}` : `${p[1]}s in ${p[0]}`
     case 'department': return `${p[0]} · ${p[1]}`
     case 'role_in_department': return `${p[2]}s in ${p[0]} · ${p[1]}`
-    case 'user': return `User ${p[0]}`
+    case 'user': return emailFor?.(p[0]!) ?? `User ${p[0]}`
   }
 }

@@ -94,7 +94,8 @@ export function useAuditSocket(urlOverride?: string) {
     return `${wsBase.replace(/\/$/, '')}/ws/audit/`
   }
 
-  // Direct to the backend, not through the dev proxy (see wsUrl).
+  // wsUrl() is currently a passthrough - see its own docstring for why
+  // WebSockets connect straight to the backend instead of through the dev proxy.
   const baseUrl = wsUrl(urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase())
 
   const logs = ref<AuditLog[]>([])

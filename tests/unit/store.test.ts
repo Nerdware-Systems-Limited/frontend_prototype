@@ -81,7 +81,9 @@ describe('useAuthStore', () => {
     expect(sessionStorage.getItem('uapts_refresh')).toBe('R')
   })
 
-  it('refreshAccessToken() updates access token, persists rotated refresh', async () => {
+  it('refreshAccessToken() updates access token, persists the rotated refresh to wherever the old one lived', async () => {
+    // localStorage ("remember me"): rotation must stay in localStorage.
+    localStorage.setItem('uapts_refresh', 'OLD_REFRESH')
     const s = useAuthStore()
     s.accessToken = 'OLD_ACCESS'
     s.refreshToken = 'OLD_REFRESH'
@@ -93,6 +95,24 @@ describe('useAuthStore', () => {
     expect(s.accessToken).toBe('NEW_ACCESS')
     expect(s.refreshToken).toBe('NEW_REFRESH')
     expect(localStorage.getItem('uapts_refresh')).toBe('NEW_REFRESH')
+    expect(sessionStorage.getItem('uapts_refresh')).toBeNull()
+  })
+
+  it('refreshAccessToken() never promotes a session-only login into a persistent one', async () => {
+    // A non-"remember me" login only ever wrote to sessionStorage - rotation
+    // must not silently move it to localStorage (the bug: _persistRefresh's
+    // old default of `remember = true` did exactly that on the very first
+    // refresh of every session-only login).
+    sessionStorage.setItem('uapts_refresh', 'OLD_REFRESH')
+    const s = useAuthStore()
+    s.accessToken = 'OLD_ACCESS'
+    s.refreshToken = 'OLD_REFRESH'
+
+    $fetchMock.mockResolvedValueOnce({ access: 'NEW_ACCESS', refresh: 'NEW_REFRESH' })
+
+    await s.refreshAccessToken()
+    expect(sessionStorage.getItem('uapts_refresh')).toBe('NEW_REFRESH')
+    expect(localStorage.getItem('uapts_refresh')).toBeNull()
   })
 
   it('refreshAccessToken() returns null and clears state on failure', async () => {

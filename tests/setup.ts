@@ -30,8 +30,8 @@ import { ref, computed, reactive, onMounted } from 'vue'
 ;(globalThis as any).onMounted = onMounted
 ;(globalThis as any).useRuntimeConfig = () => ({
   public: {
-    apiBase: process.env.UAPTS_API_BASE ?? 'http://test.local:8000',
-    wsUrl: 'ws://test.local:8000/ws/audit/',
+    apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'http://test.local:8000',
+    wsUrl: process.env.NUXT_PUBLIC_WS_URL ?? 'ws://test.local:8000/ws/audit/',
   },
 })
 ;(globalThis as any).useNuxtApp = () => ({ $api: (globalThis as any).$api })

@@ -41,11 +41,7 @@
     />
     <select v-model="roleFilter" class="select-sm" aria-label="Filter by role">
       <option value="">All roles</option>
-      <option v-if="canViewRole(viewerScope, 'super_admin')" value="super_admin">super_admin</option>
-      <option value="admin">admin</option>
-      <option value="analyst">analyst</option>
-      <option value="operator">operator</option>
-      <option value="public">public</option>
+      <option v-for="r in visibleRoles" :key="r.id" :value="r.role_name">{{ r.role_name }}</option>
     </select>
     <select
       v-model="agencyFilter" class="select-sm" aria-label="Filter by agency"
@@ -143,11 +139,16 @@
               </td>
               <td data-label="Role">
                 <select
-                  v-model="editForm.role_type" class="select-inline" aria-label="Role"
-                  :disabled="roleOptionsFor(u).length < 2"
+                  v-model="editForm.roleSelection" class="select-inline" aria-label="Role"
+                  :disabled="roleOptionsFor(u).length < 2 && !customRoleOptionsFor(u).length"
                   :title="roleOptionsFor(u).length < 2 ? 'Only a super_admin can change a super_admin account\'s role' : undefined"
                 >
-                  <option v-for="r in roleOptionsFor(u)" :key="r" :value="r">{{ r }}</option>
+                  <optgroup label="Built-in">
+                    <option v-for="r in roleOptionsFor(u)" :key="r" :value="r">{{ r }}</option>
+                  </optgroup>
+                  <optgroup v-if="customRoleOptionsFor(u).length" label="Custom">
+                    <option v-for="r in customRoleOptionsFor(u)" :key="r.id" :value="r.id">{{ r.role_name }}</option>
+                  </optgroup>
                 </select>
               </td>
               <td data-label="Status">
@@ -261,6 +262,7 @@
         <thead>
           <tr>
             <th>Role</th>
+            <th v-if="unscoped">Agency</th>
             <th style="text-align:center">Users</th>
             <th>Type</th>
             <th>Permissions</th>
@@ -270,17 +272,33 @@
         <tbody v-if="visibleRoles.length">
           <tr v-for="r in rolesPageRows" :key="r.id">
             <td class="stack-title" style="font-weight:600">
-              <BadgePill :variant="roleBadge(r.role_name)">{{ r.role_name }}</BadgePill>
+              <BadgePill :variant="roleBadge(r)">{{ r.role_name }}</BadgePill>
+            </td>
+            <td v-if="unscoped" data-label="Agency">
+              <BadgePill v-if="r.agency_code" variant="neutral">{{ r.agency_code }}</BadgePill>
+              <span v-else class="dim">All agencies</span>
             </td>
             <td class="num" data-label="Users" style="text-align:center;font-weight:700;color:var(--fg-1)">{{ userCountForRole(r.role_name) }}</td>
             <td data-label="Type">
-              <BadgePill v-if="isBuiltinRole(r.role_name)" variant="info"    size="sm">built-in</BadgePill>
-              <BadgePill v-else                             variant="neutral" size="sm">custom</BadgePill>
+              <BadgePill v-if="isBuiltinRole(r)" variant="info"    size="sm">built-in</BadgePill>
+              <BadgePill v-else                   variant="neutral" size="sm">custom</BadgePill>
             </td>
-            <td class="dim perm-desc stack-block" data-label="Permissions">{{ rolePermDesc(r.role_name) }}</td>
-            <td :class="isBuiltinRole(r.role_name) ? 'role-lock' : 'stack-actions'">
+            <td class="dim perm-desc stack-block" data-label="Permissions">
+              <div v-if="!isBuiltinRole(r) && !r.base_tier" class="set-base-tier">
+                <span>No base tier yet - not assignable.</span>
+                <select :value="pendingBaseTier[r.id] ?? ''" class="select-sm" aria-label="`Base tier for ${r.role_name}`" @change="pendingBaseTier[r.id] = ($event.target as HTMLSelectElement).value">
+                  <option value="" disabled>Base tier…</option>
+                  <option v-for="t in CUSTOM_ROLE_BASE_TIERS" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <button class="btn btn-sm" :disabled="!pendingBaseTier[r.id] || settingBaseTierId === r.id" @click="setBaseTier(r)">
+                  {{ settingBaseTierId === r.id ? 'Setting…' : 'Set' }}
+                </button>
+              </div>
+              <template v-else>{{ rolePermDesc(r) }}</template>
+            </td>
+            <td :class="isBuiltinRole(r) ? 'role-lock' : 'stack-actions'">
               <button
-                v-if="!isBuiltinRole(r.role_name)"
+                v-if="!isBuiltinRole(r)"
                 class="btn btn-sm btn-tone-danger"
                 :disabled="deletingRoleId === r.id"
                 @click="confirmDeleteRole(r)"
@@ -290,7 +308,7 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="5" class="empty-row">{{ loading ? 'Loading roles…' : 'No roles found.' }}</td></tr>
+          <tr><td :colspan="unscoped ? 6 : 5" class="empty-row">{{ loading ? 'Loading roles…' : 'No roles found.' }}</td></tr>
         </tbody>
       </table>
       <TablePagination
@@ -305,9 +323,14 @@
         placeholder="New custom role name…"
         aria-label="New custom role name"
         style="flex:1;min-width:160px"
-        @keyup.enter="createRole"
+        @keyup.enter="canCreateRole && createRole()"
       />
-      <button class="btn" :disabled="!newRoleName.trim() || creatingRole" @click="createRole">
+      <select v-if="unscoped" v-model="newRoleAgencyId" class="select-sm" aria-label="Agency">
+        <option value="" disabled>Agency…</option>
+        <option v-for="a in agencies" :key="a.id" :value="a.id">{{ a.agency_code }} - {{ a.agency_name }}</option>
+      </select>
+      <span v-else class="dim" style="font-size:12px">for {{ ownAgencyCode }}</span>
+      <button class="btn" :disabled="!canCreateRole" @click="createRole">
         {{ creatingRole ? 'Creating…' : '+ Add Role' }}
       </button>
     </div>
@@ -342,17 +365,44 @@
         @prev="departmentsPrev" @next="departmentsNext"
       />
     </div>
+    <div class="card-footer add-role-footer">
+      <input
+        v-model="newDeptName"
+        class="select-sm"
+        placeholder="New department name…"
+        aria-label="New department name"
+        style="flex:1;min-width:160px"
+        @keyup.enter="canCreateDept && createDepartment()"
+      />
+      <input
+        v-model="newDeptCode"
+        class="select-sm mono-sm"
+        placeholder="Code (e.g. ENG)"
+        aria-label="New department code"
+        style="width:120px"
+        @keyup.enter="canCreateDept && createDepartment()"
+      />
+      <select v-if="unscoped" v-model="newDeptAgencyId" class="select-sm" aria-label="Agency">
+        <option value="" disabled>Agency…</option>
+        <option v-for="a in agencies" :key="a.id" :value="a.id">{{ a.agency_code }} - {{ a.agency_name }}</option>
+      </select>
+      <span v-else class="dim" style="font-size:12px">for {{ ownAgencyCode }}</span>
+      <button class="btn" :disabled="!canCreateDept" @click="createDepartment">
+        {{ creatingDept ? 'Creating…' : '+ Add Department' }}
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-import { useRoles as _useRoles, useDepartments as _useDepartments, useUsers as _useUsers } from '~/composables/api'
-import type { Role, Department, User } from '~/types/uapts'
+import { useRoles as _useRoles, useDepartments as _useDepartments, useUsers as _useUsers, useAgencies as _useAgencies } from '~/composables/api'
+import type { Role, Department, User, Agency } from '~/types/uapts'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, canManageUser,
-  canChangeRole, assignableRoleTypes, canViewRole,
+  canChangeRole, assignableRoleTypes, canViewRole, ROLE_TYPES,
 } from '~/composables/useAgencyScope'
+import { roleBadgeVariant, roleSummary } from '~/utils/accessLabels'
 
 // ── Agency scoping ───────────────────────────────────────────────────────
 // Same gap /users.vue already closed: an agency admin manages only their
@@ -375,6 +425,8 @@ const ownAgencyCode = computed(() => scopedAgencyCode(viewerScope.value))
 const roles       = ref<Role[]>([])
 const users       = ref<User[]>([])
 const departments = ref<Department[]>([])
+/** Full agency list, for super_admin's "which agency owns this role" picker only - not fetched (or needed) for a scoped viewer. */
+const agencies    = ref<Agency[]>([])
 const loading     = ref(true)
 const error       = ref<string | null>(null)
 const actionError  = ref<string | null>(null)
@@ -391,11 +443,35 @@ const mfaFilter    = ref('')
 
 const editingId = ref<string | null>(null)
 const savingId  = ref<string | null>(null)
-const editForm  = reactive({ role_type: 'public', is_active: true, is_staff: false })
+// roleSelection is either a built-in role_type ('admin', ...) or a custom
+// Role's id - saveEdit() below resolves it back to role_type + role.
+const editForm  = reactive({ roleSelection: 'public' as string, is_active: true, is_staff: false })
 
 const newRoleName    = ref('')
+const newRoleAgencyId = ref('')
+// A custom role can be based on any built-in tier except super_admin (already
+// bypasses everything - a "custom" sub-role adds nothing) and public (the
+// resolver hard-denies it unconditionally - see the Role model's docstring
+// on the backend, apps/accounts/models.py). Derived from ROLE_TYPES, not a
+// separately maintained list.
+const CUSTOM_ROLE_BASE_TIERS = ROLE_TYPES.filter(t => t !== 'super_admin' && t !== 'public')
+// A role is always created without a base tier - it's set afterward via the
+// inline "Set" control below (setBaseTier), keeping the creation form to
+// just a name (and agency, for a super_admin). Not assignable to a user
+// until it has one.
+const canCreateRole = computed(() =>
+  !!newRoleName.value.trim() && (!unscoped.value || !!newRoleAgencyId.value) && !creatingRole.value,
+)
 const creatingRole   = ref(false)
 const deletingRoleId = ref<string | null>(null)
+
+const newDeptName     = ref('')
+const newDeptCode     = ref('')
+const newDeptAgencyId = ref('')
+const canCreateDept = computed(() =>
+  !!newDeptName.value.trim() && !!newDeptCode.value.trim() && (!unscoped.value || !!newDeptAgencyId.value) && !creatingDept.value,
+)
+const creatingDept = ref(false)
 
 /** Role Catalog / Departments live as tabs below the Users hero. */
 const orgTab = ref<'roles' | 'departments'>('roles')
@@ -412,7 +488,7 @@ async function load() {
   // Scoped admins can't drift the filter to another tenant on a reload.
   if (!unscoped.value) agencyFilter.value = ownAgencyCode.value ?? ''
 
-  const [rRes, uRes, dRes] = await Promise.allSettled([
+  const [rRes, uRes, dRes, aRes] = await Promise.allSettled([
     _useRoles().list({ page_size: 100 }),
     _useUsers().list({
       page_size: 100,
@@ -422,6 +498,7 @@ async function load() {
       ...agencyListQueryFor(viewerScope.value),
     }),
     _useDepartments().list({ page_size: 100, ...agencyListQueryFor(viewerScope.value) }),
+    unscoped.value ? _useAgencies().list({ page_size: 200 }) : Promise.resolve(null),
   ])
 
   if (rRes.status === 'fulfilled') roles.value       = (rRes.value as any).results ?? rRes.value ?? []
@@ -430,6 +507,7 @@ async function load() {
     hasMore.value = !!((uRes.value as any).next)
   }
   if (dRes.status === 'fulfilled') departments.value = (dRes.value as any).results ?? dRes.value ?? []
+  if (aRes.status === 'fulfilled' && aRes.value) agencies.value = (aRes.value as any).results ?? aRes.value ?? []
 
   usersError.value = uRes.status === 'rejected'
 
@@ -480,7 +558,8 @@ const filteredUsers = computed(() =>
       const q = search.value.toLowerCase()
       if (!u.email.toLowerCase().includes(q)) return false
     }
-    if (roleFilter.value   && u.role_type     !== roleFilter.value)   return false
+    // Matches either the built-in tier (role_type) or a specific custom role's own name (role_name).
+    if (roleFilter.value && u.role_type !== roleFilter.value && u.role_name !== roleFilter.value) return false
     if (agencyFilter.value && u.agency_code   !== agencyFilter.value) return false
     if (activeFilter.value) {
       const want = activeFilter.value === 'true'
@@ -517,17 +596,22 @@ function byRoleType(rt: string) { return users.value.filter(u => u.role_type ===
 function userCountForRole(name: string) {
   return users.value.filter(u => u.role_name === name || u.role_type === name).length
 }
-function isBuiltinRole(name: string) { return ['super_admin', 'admin', 'analyst', 'operator', 'public'].includes(name) }
+/** Not a per-agency custom role - either one of the 5 base tiers, or a platform-level one (ministry_admin, auditor, ...) neither agency admins nor super_admin manage from here. */
+function isBuiltinRole(r: Role) { return r.agency == null }
 
 // ── Metric strip ─────────────────────────────────────────────────────────
 
 const metricsUnavailable = computed(() => loading.value || usersError.value)
+// One tile per assignable built-in tier (CUSTOM_ROLE_BASE_TIERS, not a
+// separate hardcoded set) - counts every account on that tier OR on a
+// custom role based on it, since role_type is always the base tier
+// (see the Role model's docstring on the backend).
 const metrics = computed(() => [
   { label: 'Total Users',  value: users.value.length,                                    sub: 'Platform accounts' },
   { label: 'Active',       value: users.value.filter(u => u.is_active !== false).length,  sub: 'Enabled accounts' },
-  { label: 'Admins',       value: byRoleType('admin'),                                    sub: 'Full access' },
-  { label: 'Analysts',     value: byRoleType('analyst'),                                  sub: 'Read + report' },
-  { label: 'Operators',    value: byRoleType('operator'),                                 sub: 'Operational access' },
+  ...CUSTOM_ROLE_BASE_TIERS.map(t => ({
+    label: `${t.charAt(0).toUpperCase()}${t.slice(1)}s`, value: byRoleType(t), sub: 'Incl. custom roles based on it',
+  })),
   { label: 'MFA Enrolled', value: users.value.filter(u => u.mfa_active).length,            sub: '2FA active' },
 ])
 
@@ -626,27 +710,38 @@ onUnmounted(() => {
 
 // ── Row editing ────────────────────────────────────────────────────────
 
+/** `u`'s current custom role, if `role_name` doesn't just mirror `role_type` (see User.save() on the backend). */
+function customRoleOf(u: Pick<User, 'role' | 'role_name' | 'role_type'>): Role | null {
+  return u.role && u.role_name && u.role_name !== u.role_type
+    ? (roles.value.find(r => r.id === u.role) ?? null)
+    : null
+}
+
 function startEdit(u: User) {
   if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   closeMenu()
-  editingId.value     = u.id
-  editForm.role_type  = u.role_type
-  editForm.is_active  = u.is_active !== false
-  editForm.is_staff   = u.is_staff ?? false
-  actionError.value   = null
-  actionSuccess.value = null
+  editingId.value        = u.id
+  editForm.roleSelection = customRoleOf(u)?.id ?? u.role_type
+  editForm.is_active     = u.is_active !== false
+  editForm.is_staff      = u.is_staff ?? false
+  actionError.value      = null
+  actionSuccess.value    = null
 }
 
 function cancelEdit() { editingId.value = null }
 
-/** Roles the viewer may pick for `u` - super_admin is only offered to (and only changeable by) a super_admin. */
+/** Built-in role_types the viewer may pick for `u` - super_admin is only offered to (and only changeable by) a super_admin. */
 function roleOptionsFor(u: User) { return assignableRoleTypes(viewerScope.value, u.role_type) }
+/** Custom roles the viewer may pick for `u` - always its own agency's, never another's. */
+function customRoleOptionsFor(u: User) { return roles.value.filter(r => r.base_tier && r.agency_code === u.agency_code) }
 
 async function saveEdit(u: User) {
   if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
   if (!canManageUser(viewerScope.value, u)) { actionError.value = 'You can only manage accounts in your own agency.'; return }
+  const customRole = roles.value.find(r => r.id === editForm.roleSelection && r.base_tier) ?? null
+  const roleType = (customRole ? customRole.base_tier : editForm.roleSelection) as User['role_type']
   // The dropdown already hides this, but the row's form state is plain data - re-check before it reaches the API.
-  if (!canChangeRole(viewerScope.value, u.role_type, editForm.role_type)) {
+  if (!canChangeRole(viewerScope.value, u.role_type, roleType)) {
     actionError.value = 'Only a super_admin can grant, revoke or change the super_admin role.'
     return
   }
@@ -654,14 +749,18 @@ async function saveEdit(u: User) {
   actionError.value = null
   try {
     const updated = await _useUsers().update(u.id, {
-      role_type: editForm.role_type as User['role_type'],
+      role_type: roleType,
+      // Explicit even when null: reverting to a plain tier must clear a
+      // previous custom-role assignment, not leave it looking still-valid
+      // because its base_tier happens to match the new role_type.
+      role: customRole?.id ?? null,
       is_active: editForm.is_active,
       is_staff:  editForm.is_staff,
     }) as User
     const idx = users.value.findIndex(x => x.id === u.id)
     if (idx !== -1) users.value[idx] = { ...users.value[idx], ...updated }
     editingId.value = null
-    flash(`${u.email} updated - role: ${editForm.role_type}.`)
+    flash(`${u.email} updated - role: ${customRole ? customRole.role_name : roleType}.`)
   } catch (err: any) {
     actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to update user.'
   } finally {
@@ -753,18 +852,72 @@ async function runConfirmAction() {
 
 async function createRole() {
   const name = newRoleName.value.trim()
-  if (!name) return
+  if (!canCreateRole.value || !name) return
   creatingRole.value = true
   actionError.value  = null
   try {
-    const role = await _useRoles().create({ role_name: name }) as Role
+    // agency is only meaningful from a super_admin - an agency admin's own
+    // agency is filled in server-side regardless of what's sent, so it's
+    // simplest to just always send what we have (undefined when scoped).
+    const role = await _useRoles().create({
+      role_name: name,
+      agency: unscoped.value ? newRoleAgencyId.value : undefined,
+    }) as Role
     roles.value.push(role)
     newRoleName.value = ''
-    flash(`Role "${name}" created.`)
+    newRoleAgencyId.value = ''
+    flash(`Role "${name}" created${role.agency_code ? ` for ${role.agency_code}` : ''}.`)
   } catch (err: any) {
     actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to create role.'
   } finally {
     creatingRole.value = false
+  }
+}
+
+async function createDepartment() {
+  const name = newDeptName.value.trim()
+  const code = newDeptCode.value.trim()
+  if (!canCreateDept.value || !name || !code) return
+  creatingDept.value = true
+  actionError.value  = null
+  try {
+    // Same pattern as createRole() - agency is only meaningful from a
+    // super_admin, an agency admin's own agency is filled in server-side.
+    const dept = await _useDepartments().create({
+      department_name: name,
+      department_code: code,
+      agency: unscoped.value ? newDeptAgencyId.value : undefined,
+    }) as Department
+    departments.value.push(dept)
+    newDeptName.value = ''
+    newDeptCode.value = ''
+    newDeptAgencyId.value = ''
+    flash(`Department "${name}" created${dept.agency_code ? ` for ${dept.agency_code}` : ''}.`)
+  } catch (err: any) {
+    actionError.value = err?.data?.detail ?? err?.data?.department_code?.[0] ?? err?.message ?? 'Failed to create department.'
+  } finally {
+    creatingDept.value = false
+  }
+}
+
+// ── Setting a base tier after the fact (role was created without one) ──
+const pendingBaseTier = reactive<Record<string, string>>({})
+const settingBaseTierId = ref<string | null>(null)
+async function setBaseTier(r: Role) {
+  const baseTier = pendingBaseTier[r.id]
+  if (!baseTier) return
+  settingBaseTierId.value = r.id
+  actionError.value = null
+  try {
+    const updated = await _useRoles().update(r.id, { base_tier: baseTier as Role['base_tier'] }) as Role
+    const idx = roles.value.findIndex(x => x.id === r.id)
+    if (idx !== -1) roles.value[idx] = { ...roles.value[idx], ...updated }
+    delete pendingBaseTier[r.id]
+    flash(`"${r.role_name}" is now based on ${baseTier} - it can be assigned to users.`)
+  } catch (err: any) {
+    actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to set the base tier.'
+  } finally {
+    settingBaseTierId.value = null
   }
 }
 
@@ -802,22 +955,8 @@ function flash(msg: string) {
   flashTimeout = setTimeout(() => { actionSuccess.value = null }, 4000)
 }
 
-const ROLE_DEFS = [
-  { key: 'super_admin', description: 'Full platform bypass - every module, every agency, all scope restrictions lifted.' },
-  { key: 'admin',    description: 'Manage users, configure integrations, access all modules and administration.' },
-  { key: 'analyst',  description: 'Read data, run ad-hoc queries, generate and download reports.' },
-  { key: 'operator', description: 'Update incident status, dispatch resources, trigger feed sync.' },
-  { key: 'public',   description: 'Read-only access to published dashboards and public data.' },
-]
-
-function rolePermDesc(name: string) {
-  return ROLE_DEFS.find(r => r.key === name)?.description ?? 'Custom role - permissions configured server-side.'
-}
-
-function roleBadge(r: string) {
-  const m: Record<string, string> = { super_admin: 'danger', admin: 'danger', analyst: 'info', operator: 'warning', public: 'neutral' }
-  return m[r] ?? 'neutral'
-}
+const rolePermDesc = roleSummary
+const roleBadge = roleBadgeVariant
 
 function fmtDate(d?: string | null) {
   if (!d) return '-'
@@ -928,6 +1067,9 @@ function fmtDate(d?: string | null) {
 .compact-table { width:100%; }
 .compact-table th, .compact-table td { padding:6px 10px; font-size:12px; }
 .perm-desc { font-size:11px; max-width:1px; width:100%; }
+.set-base-tier { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.set-base-tier span { color:var(--warning-fg); white-space:nowrap; }
+.set-base-tier select { height:26px; font-size:11px; }
 .lock-icon { font-size:12px; color:var(--fg-3); opacity:.8; cursor:default; }
 .mono-sm   { font-family:var(--font-mono); font-size:11.5px; font-variant-numeric:tabular-nums; }
 

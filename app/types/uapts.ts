@@ -30,6 +30,12 @@ export interface Department {
 export interface Role {
   id: string
   role_name: string
+  /** UUID of the owning agency. null for the 5 built-ins (super_admin/admin/analyst/operator/public). */
+  agency: string | null
+  /** Convenience: owning agency's short code, or null. */
+  agency_code: string | null
+  /** Which built-in tier this custom role inherits baseline behavior from. null for the 5 built-ins. */
+  base_tier: 'admin' | 'analyst' | 'operator' | null
 }
 
 /** A platform user / account. */

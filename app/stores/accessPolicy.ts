@@ -13,6 +13,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '~/stores/auth'
+import { useRoles } from '~/composables/api'
 import { AccessPolicyStorageError, localAccessPolicyStorage, type AccessPolicyStorage } from '~/utils/accessPolicyStorage'
 import {
   BASE_SETTINGS, EMPTY_OVERRIDES, adminCanManagePolicy, isCategoryLocked, partitionStale, resolveFor, type PolicyOverrides,
@@ -48,6 +49,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   const saveError = ref<string | null>(null)
   /** Change log across all agencies, newest first (see historyFor). */
   const history = ref<HistoryEntry[]>([])
+  /** {agency_code: [role_name, ...]} - custom roles (Roles & Permissions page) with a base_tier set, for partitionStale's extraRoleTiers. */
+  const customRoleTiers = ref<Record<string, string[]>>({})
 
   const viewer = computed(() => auth.user as unknown as PolicyViewer | null)
   const isSuperAdmin = computed(() => viewer.value?.role_type === 'super_admin')
@@ -60,7 +63,7 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   // Based on the draft, not saved overrides, so clearing stale keys (which
   // edits the draft) makes the note disappear right away rather than only
   // after Save.
-  const staleKeys = computed(() => partitionStale(draft.value).stale)
+  const staleKeys = computed(() => partitionStale(draft.value, customRoleTiers.value).stale)
 
   /**
    * super_admin: any agency. Agency admin: only their own, and only when
@@ -106,7 +109,7 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
 
   function clearStale() {
     if (!isSuperAdmin.value) throw new AccessPolicyError('Only super admin can clear stale settings.')
-    draft.value = pruneOverrides(partitionStale(draft.value).cleaned)
+    draft.value = pruneOverrides(partitionStale(draft.value, customRoleTiers.value).cleaned)
   }
 
   async function load() {
@@ -120,6 +123,17 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
       history.value = (await storage.loadHistory?.()) ?? []
     } catch (err) {
       console.warn('[access-policy] could not load change history', err)
+    }
+    try {
+      const roles = (await useRoles().list({ page_size: 200 })).results
+      const byAgency: Record<string, string[]> = {}
+      for (const r of roles) {
+        if (!r.base_tier || !r.agency_code) continue
+        ;(byAgency[r.agency_code] ??= []).push(r.role_name)
+      }
+      customRoleTiers.value = byAgency
+    } catch (err) {
+      console.warn('[access-policy] could not load custom roles - their Module Access rows will look stale', err)
     }
     draft.value = cloneOverrides(overrides.value)
     loadedFor.value = viewer.value?.id ?? null

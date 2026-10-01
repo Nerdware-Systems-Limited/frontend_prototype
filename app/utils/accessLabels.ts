@@ -3,7 +3,15 @@
  * capabilities and enforcement modes by machine id; admins read these
  * instead. Unknown ids fall back to a de-underscored version of the id, so a
  * new capability or enforcement mode added to the JSON still renders.
+ *
+ * roleBadgeVariant/roleSummary below serve the same purpose for roles.vue
+ * and users.vue - a role's badge colour and one-line description come from
+ * access-control.json's roles catalog (or, for a custom role, from its own
+ * base_tier), not a separately maintained per-page list.
  */
+
+import { BASE_SETTINGS } from '~/utils/resolveAccess'
+import type { Role } from '~/types/uapts'
 
 const CAPABILITY_LABELS: Record<string, string> = {
   export: 'Export data',
@@ -44,4 +52,32 @@ export function capabilityLabel(id: string): string {
 
 export function enforcementLabel(id: string): string {
   return ENFORCEMENT_LABELS[id] ?? humanise(id)
+}
+
+/** Badge colour by tier rank - a custom role follows whichever built-in tier it's based on. */
+export function roleBadgeVariant(roleOrTier: Pick<Role, 'role_name' | 'base_tier'> | string): string {
+  const tier = typeof roleOrTier === 'string' ? roleOrTier : (roleOrTier.base_tier ?? roleOrTier.role_name)
+  const rank = BASE_SETTINGS.roles[tier ?? '']?.tier ?? 0
+  if (rank >= 40) return 'danger'    // super_admin, admin
+  if (rank >= 30) return 'info'      // analyst
+  if (rank >= 20) return 'warning'   // operator
+  return 'neutral'                   // public, or unranked (a custom role with no base tier yet)
+}
+
+/** A built-in tier's permissions, read straight from access-control.json - a
+ * capability added/removed there is reflected here with no code change. */
+export function builtinRoleSummary(roleName: string): string {
+  const def = BASE_SETTINGS.roles[roleName]
+  if (!def) return 'Platform-level role - not managed from here.'
+  if (def.bypassScope) return 'Full platform bypass - every module, every agency, all scope restrictions lifted.'
+  if (def.capabilities?.length) return `Can ${def.capabilities.map(c => capabilityLabel(c).toLowerCase()).join(', ')}.`
+  return 'Read-only access, scoped by Module Access - no platform-wide capabilities.'
+}
+
+/** A role's one-line permission summary: a built-in tier's from the JSON, a custom role's from its own base_tier. */
+export function roleSummary(r: Pick<Role, 'role_name' | 'agency' | 'base_tier'>): string {
+  if (r.agency == null) return builtinRoleSummary(r.role_name)
+  return r.base_tier
+    ? `Custom - based on ${r.base_tier}. Set its own module access in the Role permissions tab.`
+    : 'Custom - no base tier yet, so not assignable to anyone. Set one below.'
 }

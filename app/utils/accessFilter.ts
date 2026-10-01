@@ -8,7 +8,7 @@
  * any level one of its pages has.
  */
 
-import { BASE_SETTINGS, editableModules, editableRoutes, pageScope, type PolicyOverrides, type ScopeLevel } from '~/utils/resolveAccess'
+import { BASE_SETTINGS, editableModules, editableRoutes, moduleSummary, pageScope, type PolicyOverrides, type ScopeLevel } from '~/utils/resolveAccess'
 
 export type AccessFilterLevel = 'any' | ScopeLevel
 export type SourceFilter = 'all' | 'inherited' | 'custom'
@@ -36,10 +36,16 @@ export function filterModules(
   code: string,
   filter: ModuleFilter,
   isCustom: (key: string) => boolean,
+  hideFullyRestricted = false,
 ): FilteredModule[] {
   const q = filter.query.trim().toLowerCase()
   const result: FilteredModule[] = []
   for (const moduleId of editableModules()) {
+    // A module the super admin has capped at 'none' agency-wide (every page
+    // in it) isn't just uneditable for an agency admin - it doesn't exist as
+    // far as they're concerned. Only skip this for viewers who can't edit
+    // the ceiling themselves; a super admin still needs to see it to change it.
+    if (hideFullyRestricted && moduleSummary(ov, code, 'ceiling', null, moduleId).scope === 'none') continue
     const label = BASE_SETTINGS.modules[moduleId]?.label ?? moduleId
     const moduleMatchesQuery = !q || `${label} ${moduleId}`.toLowerCase().includes(q)
     const moduleCustom = isCustom(moduleId)

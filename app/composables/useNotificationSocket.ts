@@ -53,7 +53,8 @@ export function useNotificationSocket(wsBaseUrl?: string) {
   const authStore = useAuthStore()
 
   // Allow explicit override; fall back to runtimeConfig; fall back to hard default.
-  // Direct to the backend, not through the dev proxy (see wsUrl).
+  // wsUrl() is currently a passthrough - see its own docstring for why
+  // WebSockets connect straight to the backend instead of through the dev proxy.
   const baseUrl = wsUrl(wsBaseUrl ?? (config.public.notificationsWsUrl as string) ?? 'ws://127.0.0.1:8000/ws/notifications/')
 
   // ── Reactive state ──────────────────────────────────────────────

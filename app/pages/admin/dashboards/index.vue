@@ -232,11 +232,12 @@
 
 <script setup lang="ts">
 import { Archive, Copy, Eye, Info, Lock, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
-import type { DashboardStatus, DashboardSummary } from '~/types/dashboard'
+import type { DashboardAssignment, DashboardStatus, DashboardSummary } from '~/types/dashboard'
 import { TEMPLATES } from '~/utils/dashboardTemplates'
-import { describeScope, resolveDashboard } from '~/utils/resolveDashboard'
+import { describeScope as describeScopeRaw, resolveDashboard } from '~/utils/resolveDashboard'
 import { useDashboardApi, toDashboardApiError } from '~/composables/useDashboardApi'
 import { useDashboardDirectory } from '~/composables/useDashboardDirectory'
+import { useUserEmailLookup } from '~/composables/useUserEmailLookup'
 import type { OverflowMenuItem } from '~/components/OverflowMenu.vue'
 
 definePageMeta({ layout: 'default' })
@@ -265,6 +266,14 @@ async function load() {
   try { dashboards.value = await api.list() } catch (e) { error.value = `Couldn't load dashboards: ${toDashboardApiError(e).message}` } finally { loading.value = false }
 }
 onMounted(() => { if (allowed.value) load() })
+
+// ── user-assignment emails (the backend only stores the raw user id) ──
+const { emailFor, ensure: ensureEmails } = useUserEmailLookup()
+function describeScope(a: Pick<DashboardAssignment, 'scopeType' | 'scopeValue'>) { return describeScopeRaw(a, emailFor) }
+watchEffect(() => {
+  const ids = dashboards.value.flatMap(d => d.assignments).filter(a => a.scopeType === 'user').map(a => a.scopeValue.split(':')[0]!)
+  if (ids.length) ensureEmails(ids)
+})
 
 const counts = computed(() => {
   const c = { published: 0, draft: 0, archived: 0 }
@@ -371,7 +380,14 @@ const coverageAgency = ref('')
 onMounted(async () => {
   if (!allowed.value) return
   await loadDirectory()
-  coverageAgency.value = realViewer.value?.agencyCode ?? directory.value?.agencies[0]?.code ?? ''
+  // useAccessControl's agencyCode is upper-cased for display; Agency.agency_code
+  // (and every dropdown option here) keeps its real casing (e.g. "KeNHA"), so
+  // match case-insensitively and use the directory's own casing for the value -
+  // an exact-case mismatch left the select bound to a value with no matching
+  // option, and coverageRows' own exact match then always came up empty.
+  const own = (realViewer.value?.agencyCode ?? '').toLowerCase()
+  const match = directory.value?.agencies.find(a => a.code.toLowerCase() === own)
+  coverageAgency.value = match?.code ?? directory.value?.agencies[0]?.code ?? ''
 })
 const coverageRoles = computed(() => (directory.value?.roles ?? []).filter(r => !r.agency || r.agency === coverageAgency.value))
 const coverageRows = computed(() => {

@@ -13,6 +13,7 @@
       <slot />
     </main>
     <BackToTop />
+    <MfaNudgeDialog />
   </div>
 </template>
 

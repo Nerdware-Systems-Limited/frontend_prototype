@@ -44,11 +44,7 @@
     </select>
     <select v-model="roleFilter" class="select-sm filter-select" aria-label="Filter by role">
       <option value="">All roles</option>
-      <option v-if="canViewRole(viewerScope, 'super_admin')" value="super_admin">Super Admin</option>
-      <option value="admin">Admin</option>
-      <option value="analyst">Analyst</option>
-      <option value="operator">Operator</option>
-      <option value="public">Public</option>
+      <option v-for="r in visibleRoles" :key="r.id" :value="r.role_name">{{ r.role_name }}</option>
     </select>
     <select v-model="activeFilter" class="select-sm filter-select" aria-label="Filter by account status">
       <option value="">All statuses</option>
@@ -115,6 +111,7 @@
               </td>
               <td data-label="Role">
                 <BadgePill :variant="roleBadge(u.role_type)">{{ u.role_type }}</BadgePill>
+                <span v-if="u.role_name && u.role_name !== u.role_type" class="role-sub">{{ u.role_name }}</span>
               </td>
               <td data-label="Status">
                 <BadgePill :variant="u.is_active !== false ? 'success' : 'danger'">
@@ -277,9 +274,14 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Role type <span class="required">*</span></label>
-            <select v-model="form.role_type" class="input-full">
-              <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
+            <label>Role <span class="required">*</span></label>
+            <select v-model="form.roleSelection" class="input-full">
+              <optgroup label="Built-in">
+                <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
+              </optgroup>
+              <optgroup v-if="createCustomRoleOptions.length" label="Custom">
+                <option v-for="r in createCustomRoleOptions" :key="r.id" :value="r.id">{{ r.role_name }}</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-group">
@@ -294,8 +296,12 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Department UUID <span class="hint">(optional)</span></label>
-          <input v-model="form.department" class="input-full" placeholder="Leave blank to skip" />
+          <label>Department <span class="hint">(optional)</span></label>
+          <select v-if="createDeptOptions.length" v-model="form.department" class="input-full">
+            <option value="">No department</option>
+            <option v-for="d in createDeptOptions" :key="d.id" :value="d.id">{{ d.department_name }}</option>
+          </select>
+          <span v-else class="dim" style="font-size:12px">No departments set up yet for this agency - add one from Roles &amp; Permissions.</span>
         </div>
         <div class="form-check-row">
           <label class="check-label">
@@ -323,12 +329,13 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit } from '~/composables/api'
-import type { User, Agency } from '~/types/uapts'
+import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit, useRoles as _useRoles, useDepartments as _useDepartments } from '~/composables/api'
+import type { User, Agency, Role, Department } from '~/types/uapts'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOptions, canManageUser,
   canChangeRole, assignableRoleTypes, canViewRole,
 } from '~/composables/useAgencyScope'
+import { roleBadgeVariant } from '~/utils/accessLabels'
 
 // ── Agency scoping ───────────────────────────────────────────────────────
 // An agency admin manages only their own tenant's accounts; super_admin is
@@ -345,11 +352,15 @@ const viewerScope = computed(() => viewer.value as any)
 const unscoped = computed(() => isUnscopedAdmin(viewerScope.value))
 const ownAgencyCode = computed(() => scopedAgencyCode(viewerScope.value))
 const visibleAgencies = computed(() => visibleAgencyOptions(agencies.value, viewerScope.value))
+/** The role catalog for the filter dropdown - super_admin is invisible to everyone else, same as elsewhere. */
+const visibleRoles = computed(() => roles.value.filter(r => canViewRole(viewerScope.value, r.role_name)))
 
 // ── State ──────────────────────────────────────────────────────────────
 
-const users    = ref<User[]>([])
-const agencies = ref<Agency[]>([])
+const users       = ref<User[]>([])
+const agencies    = ref<Agency[]>([])
+const roles       = ref<Role[]>([])
+const departments = ref<Department[]>([])
 const loading  = ref(true)
 const error    = ref<string | null>(null)
 const actionError    = ref<string | null>(null)
@@ -368,22 +379,22 @@ const expanded     = ref<string | null>(null)
 const showModal    = ref(false)
 const creating     = ref(false)
 const createApiError = ref<string | null>(null)
-const form         = ref({ email: '', role_type: 'analyst', agency: '', department: '', is_active: true, is_staff: false })
+// roleSelection is either a built-in role_type ('admin', ...) or a custom
+// Role's id - doCreate() below resolves it back to role_type + role.
+const form         = ref({ email: '', roleSelection: 'analyst' as string, agency: '', department: '', is_active: true, is_staff: false })
 const formErrors   = ref({ email: '' })
 
-const ROLE_OPTION_LABELS: Record<string, string> = {
-  analyst:     'Analyst - read + reports',
-  operator:    'Operator - operations',
-  admin:       'Admin - full access',
-  super_admin: 'Super Admin - full platform bypass',
-  public:      'Public - read only',
-}
+function tierLabel(t: string) { return t.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') }
 /** Only a super_admin is offered super_admin here - nobody else can hand out the platform bypass. */
-const createRoleOptions = computed(() => {
-  const allowed = new Set(assignableRoleTypes(viewerScope.value))
-  return Object.entries(ROLE_OPTION_LABELS)
-    .filter(([value]) => allowed.has(value))
-    .map(([value, label]) => ({ value, label }))
+const createRoleOptions = computed(() => assignableRoleTypes(viewerScope.value).map(value => ({ value, label: tierLabel(value) })))
+/** Custom roles belonging to whichever agency the form currently targets. */
+const createCustomRoleOptions = computed(() => roles.value.filter(r => r.base_tier && r.agency === form.value.agency))
+/** Departments belonging to whichever agency the form currently targets - empty (and hidden) until one's picked. */
+const createDeptOptions = computed(() => departments.value.filter(d => d.agency === form.value.agency))
+// A custom role or department picked for one agency doesn't carry over to another.
+watch(() => form.value.agency, () => {
+  if (!createCustomRoleOptions.value.some(r => r.id === form.value.roleSelection)) form.value.roleSelection = 'analyst'
+  if (!createDeptOptions.value.some(d => d.id === form.value.department)) form.value.department = ''
 })
 
 // The User record has no reliable last-login field of its own (see
@@ -403,9 +414,11 @@ async function load() {
   // Scoped admins can't drift the filter to another tenant on a reload.
   if (!unscoped.value) agencyFilter.value = ownAgencyCode.value ?? ''
 
-  const [uRes, aRes, auditRes] = await Promise.allSettled([
+  const [uRes, aRes, rRes, dRes, auditRes] = await Promise.allSettled([
     _useUsers().list({ page_size: 100, ordering: '-created_at', ...agencyListQueryFor(viewerScope.value) }),
     _useAgencies().list({ page_size: 100 }),
+    _useRoles().list({ page_size: 100 }),
+    _useDepartments().list({ page_size: 100, ...agencyListQueryFor(viewerScope.value) }),
     // Most-recent-first isn't guaranteed by the API contract, so this
     // reduces to the true max per user rather than trusting result order.
     // 300 covers this registry's ~44 accounts many times over even if
@@ -418,7 +431,9 @@ async function load() {
     users.value   = (uRes.value as any).results ?? []
     hasMore.value = !!((uRes.value as any).next)
   }
-  if (aRes.status === 'fulfilled') agencies.value = (aRes.value as any).results ?? aRes.value ?? []
+  if (aRes.status === 'fulfilled') agencies.value    = (aRes.value as any).results ?? aRes.value ?? []
+  if (rRes.status === 'fulfilled') roles.value       = (rRes.value as any).results ?? rRes.value ?? []
+  if (dRes.status === 'fulfilled') departments.value = (dRes.value as any).results ?? dRes.value ?? []
   if (uRes.status === 'rejected') error.value = 'Unable to reach the UAPTS Accounts API.'
 
   if (auditRes.status === 'fulfilled') {
@@ -476,7 +491,8 @@ const filteredUsers = computed(() =>
       if (!u.email.toLowerCase().includes(q)) return false
     }
     if (agencyFilter.value && u.agency_code !== agencyFilter.value) return false
-    if (roleFilter.value   && u.role_type   !== roleFilter.value)   return false
+    // Matches either the built-in tier (role_type) or a specific custom role's own name (role_name).
+    if (roleFilter.value && u.role_type !== roleFilter.value && u.role_name !== roleFilter.value) return false
     if (activeFilter.value) {
       const want = activeFilter.value === 'true'
       if (want !== (u.is_active !== false)) return false
@@ -687,7 +703,7 @@ async function runConfirmAction() {
 
 function openCreate() {
   if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
-  form.value = { email: '', role_type: 'analyst', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
+  form.value = { email: '', roleSelection: 'analyst', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
   formErrors.value = { email: '' }
   createApiError.value = null
   showModal.value = true
@@ -705,7 +721,9 @@ async function doCreate() {
     createApiError.value = 'You can only create accounts in your own agency.'
     return
   }
-  if (!canChangeRole(viewerScope.value, null, form.value.role_type)) {
+  const customRole = roles.value.find(r => r.id === form.value.roleSelection && r.base_tier)
+  const roleType = customRole ? customRole.base_tier! : form.value.roleSelection
+  if (!canChangeRole(viewerScope.value, null, roleType)) {
     createApiError.value = 'Only a super_admin can create a super_admin account.'
     return
   }
@@ -714,17 +732,18 @@ async function doCreate() {
   try {
     const payload: Record<string, unknown> = {
       email:     form.value.email,
-      role_type: form.value.role_type,
+      role_type: roleType,
       is_active: form.value.is_active,
       is_staff:  form.value.is_staff,
     }
+    if (customRole) payload.role = customRole.id
     if (form.value.agency)     payload.agency     = form.value.agency
     if (form.value.department) payload.department = form.value.department
 
     const created = await _useUsers().create(payload as any) as User
     users.value.unshift(created)
     closeModal()
-    flash(`Account ${created.email} created: a welcome email with a set-password link is on its way.`)
+    flash(`Account ${created.email} created: a welcome email with a temporary password is on its way.`)
   } catch (err: any) {
     createApiError.value = err?.data?.detail
       ?? (err?.data?.errors?.[0]?.message)
@@ -742,10 +761,7 @@ function flash(msg: string) {
   flashTimer = setTimeout(() => { actionSuccess.value = null }, 4000)
 }
 
-function roleBadge(r: string) {
-  const m: Record<string, string> = { admin: 'danger', analyst: 'info', operator: 'warning', public: 'neutral' }
-  return m[r] ?? 'neutral'
-}
+const roleBadge = roleBadgeVariant
 
 function fmtDate(d?: string | null) {
   if (!d) return '-'
@@ -829,6 +845,7 @@ function fmtLastLogin(u: User) {
   white-space:nowrap; vertical-align:middle;
 }
 .staff-pip   { margin-left:5px; font-size:11px; color:var(--warning-fg); }
+.role-sub    { display:block; font-size:11px; color:var(--fg-3); margin-top:2px; }
 .date-cell   { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11.5px; white-space:nowrap; }
 .dim         { color:var(--fg-3); }
 

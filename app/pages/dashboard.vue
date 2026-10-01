@@ -64,7 +64,7 @@
 <script setup lang="ts">
 import type { ResolvedDashboard, WidgetInstance } from '~/types/dashboard'
 import { useDashboardApi, toDashboardApiError } from '~/composables/useDashboardApi'
-import { describeScope } from '~/utils/resolveDashboard'
+import { describeScope as describeScopeRaw } from '~/utils/resolveDashboard'
 import DashboardRenderer from '~/components/dashboard/DashboardRenderer.vue'
 import PersonalCanvas from '~/components/dashboard/PersonalCanvas.vue'
 
@@ -74,6 +74,13 @@ const { isSuperAdmin, agencyCode, agency } = useAccessControl()
 const showNational = computed(() => isSuperAdmin.value || agencyCode.value === 'SDT')
 const { canManageDashboards, canManageAgencyDashboards } = useViewerContext()
 const canManage = computed(() => canManageDashboards.value || canManageAgencyDashboards.value)
+
+// A 'user' assignment matched here can only ever be the viewer themselves -
+// no lookup needed, we already have their own email.
+const { user } = useAuth()
+function describeScope(a: Parameters<typeof describeScopeRaw>[0]) {
+  return describeScopeRaw(a, id => (id === user.value?.id ? user.value?.email : undefined))
+}
 
 const api = useDashboardApi()
 const route = useRoute()

@@ -96,6 +96,15 @@ export interface PolicyOverrides {
 export interface AccessSubject {
   agency_code?: string | null
   role_type?: string | null
+  /**
+   * A custom, per-agency Role's name (its base_tier must match role_type -
+   * see the backend's Role model docstring), or null/undefined. More
+   * specific than role_type for page/module scope only - resolveFor() uses
+   * it in place of role_type there; capabilities and the route's minTier
+   * gate stay on role_type alone. Mirrors
+   * apps/access_control/resolver.py Subject.custom_role - keep both in sync.
+   */
+  custom_role?: string | null
 }
 /** Drop one layer's own module or page value - what an "Inherit" option displays. */
 export interface IgnoreOverride {
@@ -355,8 +364,10 @@ export function resolveFor(ov: PolicyOverrides, subject: AccessSubject | null, p
   if (!moduleId) return denyResult('route has no module mapping')
 
   // Steps 4-6 (JSON domain bundle, grants, denials) become the ceiling; then
-  // the agency's enabled layer (5b) and the role limit (6b) narrow it.
-  const scope = pageScope(ov, code, 'role', roleTier, routeKey)
+  // the agency's enabled layer (5b) and the role limit (6b) narrow it. A
+  // custom role governs this in place of roleTier when assigned - see
+  // AccessSubject.custom_role.
+  const scope = pageScope(ov, code, 'role', subject.custom_role || roleTier, routeKey)
 
   // Restricted categories mask fields, they never block the whole route. Two
   // independent reasons: a tier gate that applies even inside the owning
@@ -417,8 +428,20 @@ function cleanLayer<T extends LayerOverride>(layer: T, path: string, stale: stri
   return out as T
 }
 
-/** Splits overrides into keys the JSON still knows and ones it doesn't (renamed/removed agencies, modules, routes...). */
-export function partitionStale(ov: PolicyOverrides): { stale: string[]; cleaned: PolicyOverrides } {
+/**
+ * Splits overrides into keys the JSON still knows and ones it doesn't
+ * (renamed/removed agencies, modules, routes...).
+ *
+ * `extraRoleTiers`: `{agency_code: [role_name, ...]}` - custom, per-agency
+ * roles (Roles & Permissions page; base_tier set) are valid "roles" keys for
+ * their own agency alongside the baseline's built-in tiers, but this module
+ * only knows the static JSON, so the caller (stores/accessPolicy.ts) passes
+ * in whichever ones are relevant. Mirrors apps/access_control/resolver.py
+ * partition_stale's extra_role_tiers - keep both in sync.
+ */
+export function partitionStale(
+  ov: PolicyOverrides, extraRoleTiers?: Record<string, Iterable<string>>,
+): { stale: string[]; cleaned: PolicyOverrides } {
   const stale: string[] = []
   const cleaned: PolicyOverrides = { version: 1, agencies: {} }
   for (const [code, a] of Object.entries(ov.agencies)) {
@@ -430,8 +453,9 @@ export function partitionStale(ov: PolicyOverrides): { stale: string[]; cleaned:
     if (a.enabled) out.enabled = cleanLayer(a.enabled, `${code}.enabled`, stale)
     if (a.roles) {
       out.roles = {}
+      const knownTiers = new Set([...Object.keys(S.roles), ...(extraRoleTiers?.[code] ?? [])])
       for (const [tier, role] of Object.entries(a.roles)) {
-        if (!S.roles[tier]) { stale.push(`${code}.roles.${tier}`); continue }
+        if (!knownTiers.has(tier)) { stale.push(`${code}.roles.${tier}`); continue }
         out.roles[tier] = cleanLayer(role, `${code}.roles.${tier}`, stale)
       }
     }

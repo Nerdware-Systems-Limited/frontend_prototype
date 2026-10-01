@@ -57,7 +57,8 @@ export function useDepartments() {
   return {
     list:  (opts?: ListOpts & { agency?: string; parent_department?: string }) => list<Department>('/api/v1/accounts/departments/', opts),
     get:   (id: string)                                                          => get<Department>(`/api/v1/accounts/departments/${id}/`),
-    create:(body: Pick<Department, 'agency' | 'department_name' | 'department_code'> & Partial<Department>) =>
+    /** `agency` is only meaningful from a super_admin - an agency admin's own agency is filled in server-side regardless of what's sent. */
+    create:(body: Pick<Department, 'department_name' | 'department_code'> & { agency?: string | null } & Partial<Department>) =>
       create<Department>('/api/v1/accounts/departments/', body),
     update:(id: string, body: Partial<Department>)                               => update<Department>(`/api/v1/accounts/departments/${id}/`, body),
     remove:(id: string)                                                          => remove(`/api/v1/accounts/departments/${id}/`),
@@ -68,9 +69,14 @@ export function useDepartments() {
 
 export function useRoles() {
   return {
-    list:  (opts?: ListOpts)        => list<Role>('/api/v1/accounts/roles/', opts),
+    list:  (opts?: ListOpts & { agency?: string }) => list<Role>('/api/v1/accounts/roles/', opts),
     get:   (id: string)             => get<Role>(`/api/v1/accounts/roles/${id}/`),
-    create:(body: Pick<Role, 'role_name'>) => create<Role>('/api/v1/accounts/roles/', body),
+    /** `agency` is only meaningful from a super_admin - an agency admin's own agency is filled in server-side regardless of what's sent. */
+    create:(body: Pick<Role, 'role_name'> & { agency?: string | null; base_tier?: Role['base_tier'] }) =>
+      create<Role>('/api/v1/accounts/roles/', body),
+    /** Mainly for setting base_tier after creation - see the Role type's own docstring for why it can start unset. */
+    update:(id: string, body: Partial<Pick<Role, 'role_name' | 'base_tier'>>) =>
+      update<Role>(`/api/v1/accounts/roles/${id}/`, body),
     remove:(id: string)             => remove(`/api/v1/accounts/roles/${id}/`),
   }
 }

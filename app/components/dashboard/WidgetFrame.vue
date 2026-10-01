@@ -20,10 +20,9 @@
 
     <div ref="bodyEl" class="wf-body">
       <div v-if="crashed" class="wf-crash" role="alert">
-        <strong>{{ chunkFailed ? "This widget couldn't be downloaded." : 'This widget failed to render.' }}</strong>
-        <span class="wf-crash-detail">{{ chunkFailed ? 'The app may have been updated, or the connection dropped. Reloading fetches it again.' : crashed }}</span>
-        <button v-if="chunkFailed" type="button" class="btn btn-sm" @click="reloadPage">Reload page</button>
-        <button v-else type="button" class="btn btn-sm" @click="retry">Retry</button>
+        <strong>This widget failed to render.</strong>
+        <span>{{ crashed }}</span>
+        <button type="button" class="btn btn-sm" @click="retry">Retry</button>
       </div>
       <component
         :is="comp" v-else-if="comp" :key="renderKey"
@@ -79,10 +78,6 @@ onErrorCaptured((err) => {
   return false // stop propagation: the rest of the dashboard keeps rendering
 })
 function retry() { crashed.value = null; renderKey.value++ }
-// A failed dynamic import is cached by the browser for the page's lifetime,
-// so Retry can't recover it (e.g. stale chunks after a deploy); only a reload can.
-const chunkFailed = computed(() => !!crashed.value && /dynamically imported module|importing a module script failed|loading chunk/i.test(crashed.value))
-function reloadPage() { window.location.reload() }
 </script>
 
 <style scoped>
@@ -123,5 +118,4 @@ function reloadPage() { window.location.reload() }
   text-align: center; font-size: 11.5px; color: var(--fg-3); padding: 12px;
 }
 .wf-crash strong { color: var(--danger-fg); font-size: 12px; }
-.wf-crash-detail { max-width: 36ch; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

@@ -124,9 +124,10 @@
 import { Eye, X } from 'lucide-vue-next'
 import type { DashboardAssignment, DashboardSummary, ScopeType, ViewerContext } from '~/types/dashboard'
 import { SCOPE_PRECEDENCE } from '~/types/dashboard'
-import { SCOPE_LABELS, describeScope, resolveDashboard } from '~/utils/resolveDashboard'
+import { SCOPE_LABELS, describeScope as describeScopeRaw, resolveDashboard } from '~/utils/resolveDashboard'
 import { useDashboardApi, toDashboardApiError } from '~/composables/useDashboardApi'
 import { useDashboardDirectory } from '~/composables/useDashboardDirectory'
+import { useUserEmailLookup } from '~/composables/useUserEmailLookup'
 
 type Draft = Omit<DashboardAssignment, 'id' | 'dashboardId'> & { id?: string }
 
@@ -160,6 +161,16 @@ watch(() => props.dashboard.assignments, (list) => {
 const dirty = computed(() => JSON.stringify(draft.value) !== original.value)
 function patch(i: number, p: Partial<Draft>) { draft.value = draft.value.map((a, j) => (j === i ? { ...a, ...p } : a)) }
 function removeAt(i: number) { draft.value = draft.value.filter((_, j) => j !== i) }
+
+// ── user-assignment emails (the backend only stores the raw user id) ──
+const { emailFor, ensure: ensureEmails } = useUserEmailLookup()
+function describeScope(a: Pick<DashboardAssignment, 'scopeType' | 'scopeValue'>) { return describeScopeRaw(a, emailFor) }
+watchEffect(() => {
+  const ids = [...draft.value, ...props.allDashboards.flatMap(d => d.assignments)]
+    .filter(a => a.scopeType === 'user')
+    .map(a => a.scopeValue.split(':')[0]!)
+  if (ids.length) ensureEmails(ids)
+})
 
 // ── add form ──
 const form = reactive({ scopeType: 'agency' as ScopeType, agency: '', dept: '', role: '', user: '', userLabel: '' })

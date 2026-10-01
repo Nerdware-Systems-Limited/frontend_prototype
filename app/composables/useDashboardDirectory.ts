@@ -50,7 +50,9 @@ export function useDashboardDirectory() {
     }
     return {
       agencies: list,
-      roles: roles.results.map(r => ({ code: r.role_name, name: r.role_name.replace(/_/g, ' '), agency: null })),
+      // agency: null means every agency (the 5 built-ins) - a custom role
+      // is scoped to its own agency_code, same as the departments above.
+      roles: roles.results.map(r => ({ code: r.role_name, name: r.role_name.replace(/_/g, ' '), agency: r.agency_code })),
       source: 'accounts',
     }
   }

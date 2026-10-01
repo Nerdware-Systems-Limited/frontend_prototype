@@ -10,6 +10,8 @@
  * without a second round of reactivity to reason about.
  */
 
+import { BASE_SETTINGS } from '~/utils/resolveAccess'
+
 export interface AgencyScopeUser {
   role_type: string
   agency: string | null
@@ -47,8 +49,16 @@ export function canManageUser(viewer: AgencyScopeUser | null, target: { agency_c
   return !!target.agency_code && target.agency_code === viewer.agency_code
 }
 
-/** Every built-in role_type, most-privileged first. */
-export const ROLE_TYPES = ['super_admin', 'admin', 'analyst', 'operator', 'public'] as const
+/**
+ * Every built-in role_type, most-privileged first - derived from
+ * access-control.json's roles catalog (the platform's actual RBAC config),
+ * not a separately maintained list, so adding/renaming a tier there doesn't
+ * need a matching code change here. 'oversight' is a capability bucket that
+ * JSON also tracks, not a real User.role_type value - excluded.
+ */
+export const ROLE_TYPES: string[] = Object.keys(BASE_SETTINGS.roles)
+  .filter(r => r !== 'oversight')
+  .sort((a, b) => (BASE_SETTINGS.roles[b]?.tier ?? 0) - (BASE_SETTINGS.roles[a]?.tier ?? 0))
 
 /**
  * Whether the viewer may move an account from role `from` to role `to` (`from`
