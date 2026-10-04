@@ -1,7 +1,7 @@
 // tests/unit/access-control.test.ts
 // ─────────────────────────────────────────────────────────────────────
 // Sanity-checks useAccessControl() against outcomes the RBAC spec
-// states explicitly (Reference.md section 9 / the Role-Based Access
+// states explicitly (docs/Reference.md section 9 / the Role-Based Access
 // Control Specification), not against the JSON we wrote ourselves -
 // each case below cites the spec passage it's checking.
 //

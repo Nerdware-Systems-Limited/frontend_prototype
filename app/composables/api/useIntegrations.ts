@@ -364,6 +364,22 @@ export interface PlatformStats {
   silent_failures: SilentFailure[]
   top_handler_errors: HandlerErrorGroup[]
   unrecognised_record_types: string[]
+  /** File-upload counters over the same window + tenant scope. */
+  uploads: UploadStats
+  /** "platform" for super_admin / ministry tier, "agency" for everyone
+   *  else (numbers cover only the viewer's own agency). */
+  scope: 'platform' | 'agency'
+}
+
+export interface UploadStats {
+  total: number
+  by_status: Partial<Record<DataUploadStatus, number>>
+  total_rows: number
+  valid_rows: number
+  domain_records_created: number
+  total_size_bytes: number
+  needs_attention: number
+  top_sources: { source_id: string; count: number }[]
 }
 
 interface ApiEnvelope<T> {
@@ -615,6 +631,13 @@ export function useIntegrations() {
     platformStats: (window: '24h' | '7d' | '30d' | 'all' = '7d') =>
       api<ApiEnvelope<PlatformStats>>('/api/v1/integrations/stats/', {
         query: { window },
+      }).then(unwrapEnvelope),
+
+    /** Upload counters only (`?only=uploads`) - cheap enough for the hub
+     *  ribbon on every load; one call instead of a count query per status. */
+    uploadStats: (window: '24h' | '7d' | '30d' | 'all' = 'all') =>
+      api<ApiEnvelope<Pick<PlatformStats, 'window' | 'scope' | 'uploads'>>>('/api/v1/integrations/stats/', {
+        query: { window, only: 'uploads' },
       }).then(unwrapEnvelope),
 
     /** Register-an-API console (Page 1) - admin-only server-side (403 for

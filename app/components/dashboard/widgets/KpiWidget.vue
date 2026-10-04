@@ -25,12 +25,18 @@ const props = defineProps<{ instance: WidgetInstance; config: Record<string, unk
 
 const metric = computed(() => METRICS_BY_KEY[String(props.config.metricKey)] ?? null)
 const { context } = useWidgetFilters(() => props.instance.id)
-const { data, error, loading } = useDomainData(() => metric.value?.domain ?? null, () => context.value)
+const { data, failure, loading } = useDomainData(() => metric.value?.domain ?? null, () => context.value)
+
+const FAILURE_REASON = {
+  'not-integrated': (src: string) => `Not yet integrated - appears once the ${src} feed is onboarded`,
+  'forbidden': (src: string) => `Your role doesn't have access to ${src} data`,
+  'error': (src: string) => `${src} feed unavailable - retry to refresh`,
+} as const
 
 const view = computed<KpiView>(() => {
   const m = metric.value!
-  if (error.value) {
-    return { value: '-', period: m.period, description: m.description, unavailable: true, unavailableReason: `${m.source} feed unavailable - retry to refresh` }
+  if (failure.value) {
+    return { value: '-', period: m.period, description: m.description, unavailable: true, unavailableReason: FAILURE_REASON[failure.value.kind](m.source) }
   }
   if (!data.value) {
     return { value: '-', period: m.period, description: m.description, unavailable: !loading.value, unavailableReason: 'Awaiting first sync…' }

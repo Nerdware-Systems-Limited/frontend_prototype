@@ -27,45 +27,30 @@
 </template>
 
 <script setup lang="ts">
-import { useSafety, useGis } from '~/composables/api'
 import type { PredictiveHotspot, BlackSpot, GeoJSONFeatureCollection } from '~/composables/api'
 import type { WidgetInstance } from '~/types/dashboard'
-import { filterParams } from '~/composables/useDomainData'
 import { useWidgetFilters } from '~/composables/useDashboardFilters'
+import { useWidgetData, useWidgetSources } from '~/composables/useWidgetData'
 
 type MarkerSpec = import('~/components/UaptsMap.vue').MarkerSpec
 
 const props = defineProps<{ instance: WidgetInstance; config: Record<string, unknown>; bodyHeight?: number }>()
 const { context, emit } = useWidgetFilters(() => props.instance.id)
-const tick = inject<Ref<number>>('dashboard:refreshTick', ref(0))
 
-const hotspots = ref<PredictiveHotspot[]>([])
-const blackspots = ref<BlackSpot[]>([])
-const roads = ref<GeoJSONFeatureCollection | null>(null)
-const loading = ref(true)
-const failed = ref(false)
+const spots = useWidgetSources(
+  () => ['safety.hotspots', 'safety.top-blackspots'],
+  () => context.value,
+  { options: () => ({ 'safety.hotspots': { limit: Number(props.config.hotspotLimit ?? 30) } }) },
+)
+const hotspots = computed(() => (spots.data.value['safety.hotspots'] as PredictiveHotspot[] | undefined) ?? [])
+const blackspots = computed(() => (spots.data.value['safety.top-blackspots'] as BlackSpot[] | undefined) ?? [])
+const loading = computed(() => spots.state.value === 'loading')
+const failed = computed(() => ['error', 'forbidden', 'not-integrated'].includes(spots.state.value))
+// The map is still useful without the road layer, so a roads failure is silent.
+const { data: roads } = useWidgetData<GeoJSONFeatureCollection>(() => (props.config.showRoads ? 'gis.roads' : null), () => context.value)
 
 const mapHeight = computed(() => Math.max(200, (props.bodyHeight ?? 300) - (topRoads.value.length ? 40 : 0)))
 
-async function load() {
-  loading.value = true
-  const params = filterParams(context.value)
-  const safety = useSafety()
-  const [h, b] = await Promise.allSettled([
-    safety.hotspots({ page_size: Number(props.config.hotspotLimit ?? 30), ...params }),
-    safety.topBlackspots(params),
-  ])
-  hotspots.value = h.status === 'fulfilled' ? (h.value.results ?? []) : []
-  blackspots.value = b.status === 'fulfilled' ? (b.value.results ?? []) : []
-  failed.value = h.status === 'rejected' && b.status === 'rejected'
-  loading.value = false
-}
-watch(() => JSON.stringify(context.value), load, { immediate: true })
-watch(tick, load)
-onMounted(async () => {
-  if (!props.config.showRoads) return
-  try { roads.value = await useGis().roads({ limit: 300, simplify: 0.02 }) } catch { /* map still useful without roads */ }
-})
 
 const ok = (lat: unknown, lon: unknown) => Number.isFinite(lat) && Number.isFinite(lon)
 const tierColor = (t: string | null | undefined): MarkerSpec['color'] =>
@@ -146,8 +131,10 @@ const emptyMessage = computed(() => {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 10.5px; font-weight: 600;
   border: 1px solid var(--border-subtle); border-radius: var(--r-xs); background: var(--surface-1); color: var(--fg-2); cursor: pointer;
 }
-.map-chip:hover { border-color: var(--border-interactive); }
-.map-chip.active { background: var(--primary-fill); border-color: var(--primary-fill); color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .map-chip:hover { border-color: var(--border-interactive); }
+}
+.map-chip.active { background: var(--primary-fill); border-color: var(--primary-fill); color: var(--primary-fg); }
 .map-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .map-chip-n { font-family: var(--font-mono); opacity: .75; }
 </style>

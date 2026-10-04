@@ -13,12 +13,14 @@
     </div>
 
     <template v-if="spec.domains.length">
-      <div v-if="loading && !rows.length" class="agency-muted">Loading {{ agency }} data…</div>
-      <div v-else-if="failed" class="agency-muted">{{ agency }} feed unavailable - retry to refresh</div>
-      <div v-for="r in rows" v-else :key="r.label" class="agency-row">
-        <span class="agency-row-label">{{ r.label }}</span>
-        <span class="badge" :class="r.tone">{{ r.value }}</span>
-      </div>
+      <WidgetState v-if="!hasData" :state="state" :source="agency" @retry="reload" />
+      <template v-else>
+        <div v-for="r in rows" :key="r.label" class="agency-row">
+          <span class="agency-row-label">{{ r.label }}</span>
+          <span class="badge agency-val" :class="STATUS_CLASS[r.status]">{{ r.value }}</span>
+        </div>
+        <p v-if="missing.length" class="agency-muted">Not shown: {{ missing.join(', ') }} feed unavailable.</p>
+      </template>
     </template>
     <p v-else class="agency-muted">No live feed connected for {{ agency }} yet. Figures appear here once its Integration Hub feed is onboarded.</p>
 
@@ -28,29 +30,41 @@
 
 <script setup lang="ts">
 import type { WidgetInstance } from '~/types/dashboard'
-import { loadDomain } from '~/composables/useDomainData'
 import { useWidgetFilters } from '~/composables/useDashboardFilters'
-import { fmtKsh, fmtNum, fmtPct, type Domain, type DomainPayloads } from '~/utils/metricRegistry'
+import { useWidgetSources } from '~/composables/useWidgetData'
+import { DOMAIN_SOURCE } from '~/utils/dataSources'
+import { DOMAIN_LABELS, type Domain, type DomainPayloads } from '~/utils/metricRegistry'
+import { THRESHOLDS, statusOf, type Status, type ThresholdKey } from '~/utils/thresholds'
+import { formatValue } from '~/utils/units'
+import WidgetState from '~/components/dashboard/WidgetState.vue'
 
-type Tone = 'good' | 'warn' | 'crit' | 'info'
-interface Row { label: string; value: string; tone: Tone }
+/**
+ * A row's status comes from its own value crossing a shared threshold
+ * (utils/thresholds) - the same one the KPI cards and alerts use, so the
+ * three can't disagree. Rows with no threshold (counts, throughput) are
+ * neutral, never coloured by position.
+ */
+interface Row { label: string; value: string; status: Status }
+const STATUS_CLASS: Record<Status, string> = { healthy: 'success', warning: 'warning', critical: 'danger', neutral: '' }
+const plain = (label: string, value: string): Row => ({ label, value, status: 'neutral' })
+const judged = (label: string, v: number | null | undefined, key: ThresholdKey, value = formatValue(v, THRESHOLDS[key].unit)): Row =>
+  ({ label, value, status: statusOf(v, key) })
 interface Spec { title: string; tag: string; to: string; domains: Domain[]; rows: (d: Partial<DomainPayloads>) => Row[] }
 
 const props = defineProps<{ instance: WidgetInstance; config: Record<string, unknown> }>()
 const agency = computed(() => String(props.config.agency ?? 'NTSA'))
 const { context, emit } = useWidgetFilters(() => props.instance.id)
-const tick = inject<Ref<number>>('dashboard:refreshTick', ref(0))
 
 const SPECS: Record<string, Spec> = {
   NTSA: {
     title: 'NTSA - Safety & enforcement', tag: 'Live · iTIMS · IRSMS', to: '/fleet', domains: ['safety', 'fleet'],
     rows: ({ safety, fleet }) => [
-      fleet && { label: 'Vehicle registry (iTIMS)', value: `${fmtNum(fleet.kpis.total_vehicles)} records`, tone: 'info' as Tone },
-      safety && { label: 'Active road incidents', value: fmtNum(safety.kpis.active), tone: (safety.kpis.active > 10 ? 'crit' : safety.kpis.active > 5 ? 'warn' : 'good') as Tone },
-      safety && { label: 'Fatalities (30d)', value: fmtNum(safety.kpis.fatal_30d), tone: 'crit' as Tone },
-      safety && { label: 'Critical black spots', value: fmtNum(safety.black_spots_by_tier['critical'] ?? 0), tone: 'warn' as Tone },
-      fleet && { label: 'Governor tamper rate', value: fmtPct(fleet.governor_compliance.tamper_rate_pct), tone: (fleet.governor_compliance.tamper_rate_pct < 5 ? 'good' : 'warn') as Tone },
-    ].filter(Boolean) as Row[],
+      fleet && plain('Vehicle registry (iTIMS)', `${formatValue(fleet.kpis.total_vehicles, 'count')} records`),
+      safety && judged('Active road incidents', safety.kpis.active, 'safety.active_incidents'),
+      safety && judged('Fatalities (30d)', safety.kpis.fatal_30d, 'safety.fatalities_30d'),
+      safety && judged('Critical black spots', safety.black_spots_by_tier['critical'] ?? 0, 'safety.critical_blackspots'),
+      fleet && judged('Governor tamper rate', fleet.governor_compliance.tamper_rate_pct, 'fleet.governor_tamper_pct'),
+    ].filter((r): r is Row => !!r),
   },
   KeNHA: {
     title: 'KeNHA - Road asset manager', tag: 'REST API · ArcGIS', to: '/traffic', domains: ['infra'],
@@ -60,19 +74,20 @@ const SPECS: Record<string, Spec> = {
       const total = dist.reduce((s, c) => s + (c.length || 0), 0)
       const good = total ? dist.filter(c => c.condition_class === 'good').reduce((s, c) => s + (c.length || 0), 0) / total * 100 : null
       return [
-        { label: 'Network in good condition', value: fmtPct(good), tone: good != null && good >= 60 ? 'good' : 'warn' },
-        { label: 'Avg IRI score', value: infra.network.iri_average?.toFixed(2) ?? '-', tone: 'info' },
-        { label: 'Bridges critical', value: `${fmtNum(infra.bridges.critical_count)} / ${fmtNum(infra.bridges.total)}`, tone: infra.bridges.critical_count > 0 ? 'warn' : 'good' },
-        { label: 'Maintenance backlog', value: `KES ${fmtKsh(infra.maintenance.open_value_kes)}`, tone: 'crit' },
-        { label: 'At-risk segments (12mo)', value: fmtNum(infra.predictive.at_risk_segments_12mo), tone: 'warn' },
+        judged('Network in good condition', good, 'infra.good_condition_pct'),
+        plain('Avg IRI score', formatValue(infra.network.iri_average, 'score')),
+        judged('Bridges critical', infra.bridges.critical_count, 'infra.critical_bridges',
+          `${formatValue(infra.bridges.critical_count, 'count')} / ${formatValue(infra.bridges.total, 'count')}`),
+        plain('Maintenance backlog', formatValue(infra.maintenance.open_value_kes, 'kes')),
+        plain('At-risk segments (12mo)', formatValue(infra.predictive.at_risk_segments_12mo, 'count')),
       ]
     },
   },
   SDR: {
     title: 'SDR - National roads oversight', tag: 'IFMIS · e-ProMIS', to: '/infrastructure', domains: ['infra'],
     rows: ({ infra }) => infra ? [
-      { label: 'Budget absorption (FY)', value: fmtPct(infra.budget.utilization_pct), tone: infra.budget.utilization_pct >= 60 ? 'good' : 'warn' },
-      { label: 'Maintenance backlog (all agencies)', value: `KES ${fmtKsh(infra.maintenance.open_value_kes)}`, tone: 'crit' },
+      judged('Budget absorption (FY)', infra.budget.utilization_pct, 'infra.budget_absorption_pct'),
+      plain('Maintenance backlog (all agencies)', formatValue(infra.maintenance.open_value_kes, 'kes')),
     ] : [],
   },
   KPA: {
@@ -82,34 +97,34 @@ const SPECS: Record<string, Spec> = {
       const ports = maritime.ports ?? []
       const dwell = ports.length ? ports.reduce((s, p) => s + (p.avg_yard_dwell_days || 0), 0) / ports.length : null
       return [
-        ...ports.slice(0, 2).map(p => ({ label: `${p.port_name} TEUs (30d)`, value: fmtNum(p.teu_throughput_30d), tone: 'good' as Tone })),
-        { label: 'Live vessels in port', value: fmtNum(maritime.kpis.live_vessels ?? 0), tone: 'good' },
-        { label: 'Avg yard dwell', value: dwell != null ? `${dwell.toFixed(1)} days` : '-', tone: dwell != null && dwell < 5 ? 'good' : 'warn' },
+        ...ports.slice(0, 2).map(p => plain(`${p.port_name} TEUs (30d)`, formatValue(p.teu_throughput_30d, 'count'))),
+        plain('Live vessels in port', formatValue(maritime.kpis.live_vessels, 'count')),
+        judged('Avg yard dwell', dwell, 'maritime.yard_dwell_days'),
       ]
     },
   },
   KMA: {
     title: 'KMA - Kenya Maritime Authority', tag: 'NAV 2018 · Hybrid', to: '/maritime', domains: ['maritime'],
     rows: ({ maritime }) => maritime ? [
-      { label: 'Maritime incidents (30d)', value: fmtNum(maritime.kpis.incidents_30d), tone: maritime.kpis.incidents_30d > 5 ? 'warn' : 'good' },
+      judged('Maritime incidents (30d)', maritime.kpis.incidents_30d, 'maritime.incidents_30d'),
     ] : [],
   },
   KAA: {
     title: 'KAA - Airports authority', tag: 'Live · KAA / KCAA', to: '/aviation', domains: ['aviation'],
     rows: ({ aviation }) => aviation ? [
-      { label: 'Flight movements (7d)', value: fmtNum(aviation.kpis.flights_total), tone: 'good' },
-      { label: 'Passenger throughput (7d)', value: fmtNum(aviation.kpis.pax_total), tone: 'good' },
-      { label: 'On-time performance', value: fmtPct(aviation.kpis.otp_pct), tone: aviation.kpis.otp_pct >= 85 ? 'good' : 'warn' },
-      { label: 'Avg delay', value: `${aviation.kpis.avg_delay_min?.toFixed(0) ?? '-'} min`, tone: (aviation.kpis.avg_delay_min ?? 0) < 15 ? 'good' : 'warn' },
+      plain('Flight movements (7d)', formatValue(aviation.kpis.flights_total, 'count')),
+      plain('Passenger throughput (7d)', formatValue(aviation.kpis.pax_total, 'count')),
+      judged('On-time performance', aviation.kpis.otp_pct, 'aviation.otp_pct'),
+      judged('Avg delay', aviation.kpis.avg_delay_min, 'aviation.avg_delay_min'),
     ] : [],
   },
   KRC: {
     title: 'KRC - Railways corporation', tag: 'SAP S4/HANA · CTC', to: '/railway', domains: ['rail'],
     rows: ({ rail }) => rail ? [
-      { label: 'SGR on-time performance (30d)', value: fmtPct(rail.on_time_30d.on_time_pct), tone: rail.on_time_30d.on_time_pct >= 80 ? 'good' : 'warn' },
-      { label: 'Ridership (30d)', value: fmtNum(rail.ridership_30d.passengers), tone: 'good' },
-      { label: 'Freight tonnage (30d)', value: `${fmtNum(rail.freight_30d.total_tons)} t`, tone: 'good' },
-      { label: 'Avg delay', value: `${rail.on_time_30d.avg_delay_min?.toFixed(1) ?? '-'} min`, tone: rail.on_time_30d.avg_delay_min < 10 ? 'good' : 'warn' },
+      judged('SGR on-time performance (30d)', rail.on_time_30d.on_time_pct, 'rail.otp_pct'),
+      plain('Ridership (30d)', formatValue(rail.ridership_30d.passengers, 'count')),
+      plain('Freight tonnage (30d)', formatValue(rail.freight_30d.total_tons, 'tonnes')),
+      judged('Avg delay', rail.on_time_30d.avg_delay_min, 'rail.avg_delay_min', formatValue(rail.on_time_30d.avg_delay_min, 'min', 1)),
     ] : [],
   },
 }
@@ -118,23 +133,13 @@ const fallback = (code: string): Spec => ({
 })
 const spec = computed(() => SPECS[agency.value] ?? fallback(agency.value))
 
-const data = shallowRef<Partial<DomainPayloads>>({})
-const loading = ref(true)
-const failed = ref(false)
+const sources = useWidgetSources(() => spec.value.domains.map(d => DOMAIN_SOURCE[d]), () => context.value)
+const { state, reload } = sources
+const hasData = computed(() => ['ready', 'refreshing', 'partial'].includes(state.value))
+const data = computed<Partial<DomainPayloads>>(() =>
+  Object.fromEntries(spec.value.domains.map(d => [d, sources.data.value[DOMAIN_SOURCE[d]]]).filter(([, v]) => v != null)) as Partial<DomainPayloads>)
 const rows = computed(() => spec.value.rows(data.value))
-
-async function load() {
-  if (!spec.value.domains.length) { loading.value = false; return }
-  loading.value = true
-  const res = await Promise.allSettled(spec.value.domains.map(x => loadDomain(x, context.value)))
-  const next: Partial<DomainPayloads> = {}
-  res.forEach((r, i) => { if (r.status === 'fulfilled') Object.assign(next, { [spec.value.domains[i]!]: r.value }) })
-  data.value = next
-  failed.value = res.every(r => r.status === 'rejected')
-  loading.value = false
-}
-watch([agency, () => JSON.stringify(context.value)], load, { immediate: true })
-watch(tick, load)
+const missing = computed(() => spec.value.domains.filter(d => sources.failures.value[DOMAIN_SOURCE[d]]).map(d => DOMAIN_LABELS[d]))
 
 const selected = ref(false)
 function pick() {
@@ -147,7 +152,10 @@ function pick() {
 .agency { display: flex; flex-direction: column; gap: 2px; height: 100%; }
 .agency-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
 .agency-title { font-size: 12px; font-weight: 700; color: var(--fg-1); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
-.agency-title:hover, .agency-title.active { color: var(--primary); }
+.agency-title.active { color: var(--primary); }
+@media (hover: hover) and (pointer: fine) {
+  .agency-title:hover { color: var(--primary); }
+}
 .agency-title:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .agency-tag {
   font-family: var(--font-mono); font-size: 8.5px; padding: 2px 6px; border-radius: var(--r-xs); background: var(--surface-1);
@@ -162,12 +170,6 @@ function pick() {
   color: var(--primary); text-decoration: none;
 }
 .agency-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.badge {
-  display: inline-flex; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: var(--r-xs);
-  letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; border: 1px solid transparent;
-}
-.badge.good { background: var(--success-bg); color: var(--success-fg); }
-.badge.warn { background: var(--warning-bg); color: var(--warning-fg); }
-.badge.crit { background: var(--danger-bg); color: var(--danger-fg); }
-.badge.info { background: var(--info-bg); color: var(--info-fg); }
+/* Colours come from the global .badge.success/.warning/.danger; values are figures, so mono. */
+.agency-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 </style>

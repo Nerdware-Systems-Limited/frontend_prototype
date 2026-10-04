@@ -84,7 +84,7 @@ Routes live under `app/pages/`, grouped by module:
 - `/analytics`, `/query-builder`, `/reports` - M09/M15
 - `/agencies`, `/users`, `/roles`, `/access-policies`, `/audit` - M10 access control
   (`/access-policies` is "Module Access": per-agency and per-role module, page,
-  data-category and capability access; see `Reference.md` §9.7)
+  data-category and capability access; see `docs/Reference.md` §9.7)
 - `/notifications`, `/notifications/rules` - M11
 - `/integrations` - M12
 - `/gis` - M13

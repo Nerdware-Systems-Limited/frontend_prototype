@@ -12,7 +12,7 @@
  * Swap adapters with setAccessPolicyStorage(); nothing else changes.
  */
 
-import { POLICY_VERSION, type AgencyOverride, type PolicyOverrides } from '~/utils/resolveAccess'
+import { POLICY_VERSION, type AccessSettings, type AgencyOverride, type PolicyOverrides } from '~/utils/resolveAccess'
 import { normalizeHistory, parseStoredHistory, type HistoryEntry } from '~/utils/accessHistory'
 
 export interface AccessPolicyStorage {
@@ -23,6 +23,10 @@ export interface AccessPolicyStorage {
    * store adopts it instead of its own draft.
    */
   save(overrides: PolicyOverrides): Promise<PolicyOverrides | void>
+  /** The server's baseline policy; `null`/absent when the adapter has none (tests supply it directly). */
+  loadBaseline?(): Promise<AccessSettings | null>
+  /** Dashboard permission codes the signed-in user earns, computed by the server from Module Access. */
+  loadPermissions?(): Promise<string[]>
   /** Change log, newest first. Optional: an adapter without it simply keeps no history. */
   loadHistory?(): Promise<HistoryEntry[]>
   saveHistory?(entries: HistoryEntry[]): Promise<void>
@@ -101,6 +105,8 @@ export const localAccessPolicyStorage: AccessPolicyStorage = {
 // ── Accounts API adapter ───────────────────────────────────────────────────
 
 export const ACCESS_POLICY_API_PATH = '/api/v1/access-control/'
+export const ACCESS_BASELINE_API_PATH = '/api/v1/access-control/baseline/'
+export const ACCESS_VIEWER_API_PATH = '/api/v1/access-control/viewer/'
 export const ACCESS_POLICY_HISTORY_API_PATH = '/api/v1/access-control/history/'
 
 /** The `$api` fetcher (bearer token, silent refresh) - injected so this file stays free of Nuxt. */
@@ -149,6 +155,17 @@ export function createApiAccessPolicyStorage(
 
     async load() {
       return normalizePolicy(await getApi()(ACCESS_POLICY_API_PATH))
+    },
+
+    async loadBaseline() {
+      const doc = await getApi()<AccessSettings | null>(ACCESS_BASELINE_API_PATH)
+      // Unlike the overrides, a baseline of the wrong shape is useless: refuse it so the resolver keeps failing closed.
+      return isPlainObject(doc) && isPlainObject(doc.modules) && isPlainObject(doc.agencies) && isPlainObject(doc.roles) ? doc : null
+    },
+
+    async loadPermissions() {
+      const doc = await getApi()<{ permissions?: unknown }>(ACCESS_VIEWER_API_PATH)
+      return Array.isArray(doc?.permissions) ? doc.permissions.filter((p): p is string => typeof p === 'string') : []
     },
 
     async save(overrides) {

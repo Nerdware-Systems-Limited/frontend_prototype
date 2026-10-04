@@ -87,10 +87,15 @@
               @click="previewSheet = s.name"
             >{{ s.name }}<span v-if="!s.recognised" class="hint"> (not read by this template)</span></button>
           </div>
+          <div v-if="previewError && !previewLoading" class="upload-banner upload-banner-error" role="alert">
+            {{ previewError }}
+            <button type="button" class="btn" style="margin-left:10px" @click="loadPreview">Retry</button>
+          </div>
           <SampleGrid
+            v-else
             :columns="preview?.active?.columns ?? []" :rows="preview?.active?.rows ?? []"
             :start-row-number="previewOffset + DATA_START_ROW" :row-errors="rowErrorsBySourceRow"
-            :loading="previewLoading"
+            :loading="previewLoading || (!previewLoaded && !previewError)"
           />
           <div v-if="preview?.active" class="preview-pager">
             <button class="btn" :disabled="previewOffset === 0" @click="previewOffset = Math.max(0, previewOffset - PREVIEW_LIMIT); loadPreview()">← Prev {{ PREVIEW_LIMIT }}</button>
@@ -393,6 +398,9 @@ watch(() => upload.value?.status, (statusNow) => {
   if (!openedDefaultTab && statusNow && statusNow !== 'unrouted') {
     openedDefaultTab = true
     activeTab.value = statusNow === 'needs_mapping' ? 'mapping' : 'sample'
+    // activeTab already starts as 'sample', so assigning it again is not a
+    // change and watch(activeTab) never fires - load the first tab here.
+    if (activeTab.value === 'sample') ensurePreview()
   }
   if (statusNow === 'needs_mapping') loadMappingForm()
 })
@@ -622,23 +630,45 @@ const previewSheet = ref<string | undefined>(undefined)
 const previewOffset = ref(0)
 const previewLoading = ref(false)
 
+// Distinguishes "haven't asked yet" from "asked, file is empty" - without
+// it the grid's empty state flashes before the first request even starts.
+const previewLoaded = ref(false)
+const previewError = ref<string | null>(null)
+let sheetSetByLoad = false
+
 async function loadPreview() {
   previewLoading.value = true
+  previewError.value = null
   try {
     preview.value = await api.uploads.preview(uploadId, { sheet: previewSheet.value, offset: previewOffset.value, limit: PREVIEW_LIMIT })
-    if (!previewSheet.value && preview.value.active) previewSheet.value = preview.value.active.name
+    if (!previewSheet.value && preview.value.active) {
+      // Adopting the server's default sheet must not trigger the
+      // watch(previewSheet) below into fetching the same page again.
+      sheetSetByLoad = true
+      previewSheet.value = preview.value.active.name
+    }
   } catch (e: any) {
-    error.value = e?.data?.message || e?.message || 'Could not load a preview of this file.'
+    previewError.value = e?.data?.message || e?.message || 'Could not load a preview of this file.'
   } finally {
+    previewLoaded.value = true
     previewLoading.value = false
   }
 }
 
+/** Load the first page once; safe to call from several places. */
+function ensurePreview() {
+  if (!previewLoaded.value && !previewLoading.value) loadPreview()
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'validation' && !rows.value.length) loadRows()
-  if (tab === 'sample' && !preview.value) loadPreview()
+  if (tab === 'sample') ensurePreview()
 })
-watch(previewSheet, () => { previewOffset.value = 0; loadPreview() })
+watch(previewSheet, () => {
+  if (sheetSetByLoad) { sheetSetByLoad = false; return }
+  previewOffset.value = 0
+  loadPreview()
+})
 
 function modelLabel(m: string): string { return m.split('.').pop() || m }
 function fmtDate(iso: string): string {

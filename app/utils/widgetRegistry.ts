@@ -9,11 +9,11 @@
  *
  * Adding a widget = one entry here + one component. No dashboard code changes.
  *
- * PERMISSIONS: DOMAIN_PERMISSIONS must stay identical to
- * backend apps/dashboards/catalog.py DOMAIN_PERMISSIONS - the server strips
- * widgets by these exact strings. UAPTS users don't carry permission strings,
- * so useViewerContext derives them from module access (safety.view = can reach
- * module M05, ...); see VIEWER_PERMISSION_RULES there.
+ * PERMISSIONS: DOMAIN_PERMISSIONS lives in utils/dataSources.ts and must stay
+ * identical to backend apps/dashboards/catalog.py DOMAIN_PERMISSIONS - the
+ * server strips widgets by these exact strings. UAPTS users don't carry
+ * permission strings, so useViewerContext derives them from module access
+ * (safety.view = can reach module M05, ...); see VIEWER_PERMISSION_RULES there.
  *
  * FILTERS: filterFields lists only the params the widget's endpoint really
  * honours on the UAPTS backend, so the frame says "Not filtered by ..."
@@ -22,19 +22,10 @@
 import type { Component } from 'vue'
 import type { FilterField, WidgetDefinition } from '~/types/dashboard'
 import { METRICS, METRICS_BY_KEY, type Domain } from '~/utils/metricRegistry'
-
-export const DOMAIN_PERMISSIONS: Record<Domain | 'integrations' | 'gis', string> = {
-  safety: 'safety.view',
-  fleet: 'fleet.view',
-  rail: 'railway.view',
-  aviation: 'aviation.view',
-  maritime: 'maritime.view',
-  infra: 'infrastructure.view',
-  integrations: 'integrations.view',
-  gis: 'gis.view',
-}
-
-const ALL_GEO: FilterField[] = ['date_range', 'agency', 'county', 'road', 'mode', 'severity', 'vehicle_class']
+import { DOMAIN_PERMISSIONS, SOURCES_BY_ID } from '~/utils/dataSources'
+import { PRESETS_BY_ID } from '~/utils/widgetPresets'
+import type { WidgetSize } from '~/types/dashboard'
+import type { Binding } from '~/types/frame'
 
 export const WIDGETS: WidgetDefinition[] = [
   // ── KPIs ───────────────────────────────────────────────────────────
@@ -42,15 +33,19 @@ export const WIDGETS: WidgetDefinition[] = [
     type: 'kpi', kind: 'kpi', category: 'KPIs',
     title: 'KPI card', description: 'One metric with status, period and trend - pick the metric in the inspector.',
     defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 },
-    // permission is derived from the chosen metric's domain - see widgetPermissions()
-    filterFields: ALL_GEO,
+    framed: false,
+    // permission and honoured filters both come from the chosen metric -
+    // see widgetPermissions() / widgetFilterFields().
+    filterFields: [],
     defaultConfig: { metricKey: 'safety.active_incidents', prominent: false },
   },
   {
     type: 'kpi-row', kind: 'kpi-row', category: 'KPIs',
     title: 'KPI ribbon', description: 'Several metrics in one evenly-spaced row, like the national health ribbon.',
     defaultSize: { w: 12, h: 2 }, minSize: { w: 4, h: 2 },
-    filterFields: ALL_GEO,
+    framed: false,
+    // the union of its metrics' fields - see widgetFilterFields()
+    filterFields: [],
     defaultConfig: {
       metricKeys: ['safety.active_incidents', 'fleet.live_vehicles', 'rail.otp_30d',
         'aviation.otp_7d', 'maritime.teu_30d', 'infra.good_condition'],
@@ -69,7 +64,9 @@ export const WIDGETS: WidgetDefinition[] = [
   },
   {
     type: 'incident-trend', kind: 'trend', category: 'Charts',
-    title: 'Incidents vs fatalities', description: 'Two-series daily line with shared crosshair.',
+    // Type id kept for stored dashboards. The incident series isn't returned by
+    // /safety/summary/ yet; the chart adds it automatically when it is.
+    title: 'Daily fatality trend', description: 'Daily fatalities as a line with a crosshair. Incidents are added when the feed provides them.',
     defaultSize: { w: 6, h: 3 }, minSize: { w: 4, h: 3 },
     requiredPermissions: [DOMAIN_PERMISSIONS.safety],
     // /safety/summary/ reads no query params.
@@ -78,12 +75,12 @@ export const WIDGETS: WidgetDefinition[] = [
   // ── Maps ───────────────────────────────────────────────────────────
   {
     type: 'risk-map', kind: 'map', category: 'Maps',
-    title: 'Risk hotspots map', description: 'Predicted hotspots and black spots over the road network. Click a spot to filter by county/road.',
+    title: 'Risk hotspots map', description: 'Predicted hotspots and black spots over the road network. Click a spot or a top road to filter by road.',
     defaultSize: { w: 8, h: 5 }, minSize: { w: 4, h: 4 },
     requiredPermissions: [DOMAIN_PERMISSIONS.safety, DOMAIN_PERMISSIONS.gis],
     // /predictive-hotspots/ and /black-spots/top/ read only tier / min_score / limit.
     filterFields: [],
-    emits: ['county', 'road'],
+    emits: ['road'],
     defaultConfig: { showRoads: true, hotspotLimit: 30 },
   },
   // ── Operations ─────────────────────────────────────────────────────
@@ -107,27 +104,61 @@ export const WIDGETS: WidgetDefinition[] = [
     type: 'agency-card', kind: 'agency-card', category: 'Agency',
     title: 'Agency snapshot', description: 'Live rows for one agency (KeNHA, NTSA, KPA, KAA, KRC…) plus its workspace link.',
     defaultSize: { w: 4, h: 4 }, minSize: { w: 3, h: 3 },
+    framed: false,
     filterFields: [],
     emits: ['agency'],
     defaultConfig: { agency: 'NTSA' },
+  },
+  // ── Generic primitives (placed through presets in widgetPresets.ts) ──
+  // Permission, filters and clicks all come from the instance's binding -
+  // see widgetPermissions() / widgetFilterFields() / widgetEmits().
+  {
+    type: 'stat', kind: 'kpi', category: 'KPIs', palette: false, framed: false,
+    title: 'Stat', description: 'One figure from any source, with its shared threshold.',
+    defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
+  {
+    type: 'series', kind: 'trend', category: 'Charts', palette: false,
+    title: 'Time series', description: 'One or more measures over time on one axis.',
+    defaultSize: { w: 6, h: 3 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
+  {
+    type: 'breakdown', kind: 'breakdown', category: 'Charts', palette: false,
+    title: 'Breakdown', description: 'A measure split by category, largest first.',
+    defaultSize: { w: 4, h: 3 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
+  {
+    type: 'table', kind: 'table', category: 'Operations', palette: false,
+    title: 'Table', description: 'Rows from any source, sortable.',
+    defaultSize: { w: 6, h: 4 }, minSize: { w: 2, h: 2 }, filterFields: [],
   },
   // ── Layout ─────────────────────────────────────────────────────────
   {
     type: 'text', kind: 'text', category: 'Layout',
     title: 'Heading / note', description: 'Section heading or a short explanatory note.',
     defaultSize: { w: 12, h: 1 }, minSize: { w: 2, h: 1 },
+    framed: false,
     defaultConfig: { text: 'Section heading', variant: 'section' },
   },
   {
     type: 'national-command-centre', kind: 'embed', category: 'Layout',
     title: 'Full national Command Centre', description: 'The existing hand-built page, mounted whole. For migration: assign it, then replace section by section.',
     defaultSize: { w: 12, h: 12 }, minSize: { w: 12, h: 6 },
+    framed: false,
     requiredPermissions: ['dashboard.national.view'],
   },
 ]
 
 export const WIDGETS_BY_TYPE: Record<string, WidgetDefinition> =
   Object.fromEntries(WIDGETS.map(w => [w.type, w]))
+
+/** Generic widget types whose data comes from a binding in their config. */
+export const BOUND_TYPES = new Set(['stat', 'series', 'breakdown', 'table'])
+const bindingIn = (type: string, config: Record<string, unknown> = {}): Binding | null =>
+  BOUND_TYPES.has(type) && config.binding && typeof config.binding === 'object' ? config.binding as Binding : null
+
+/** Whether the frame draws a card around this widget type. Unknown types are framed. */
+export const isFramed = (type: string): boolean => WIDGETS_BY_TYPE[type]?.framed ?? true
 
 /** Lazy components so a dashboard only downloads the widgets it uses. */
 export const WIDGET_COMPONENTS: Record<string, () => Promise<Component>> = {
@@ -140,6 +171,10 @@ export const WIDGET_COMPONENTS: Record<string, () => Promise<Component>> = {
   'feed-health': () => import('~/components/dashboard/widgets/FeedHealthWidget.vue').then(m => m.default),
   'agency-card': () => import('~/components/dashboard/widgets/AgencyCardWidget.vue').then(m => m.default),
   'text': () => import('~/components/dashboard/widgets/TextWidget.vue').then(m => m.default),
+  'stat': () => import('~/components/dashboard/widgets/StatWidget.vue').then(m => m.default),
+  'series': () => import('~/components/dashboard/widgets/SeriesWidget.vue').then(m => m.default),
+  'breakdown': () => import('~/components/dashboard/widgets/BreakdownWidget.vue').then(m => m.default),
+  'table': () => import('~/components/dashboard/widgets/TableWidget.vue').then(m => m.default),
   'national-command-centre': () => import('~/components/NationalCommandCentre.vue').then(m => m.default),
 }
 
@@ -166,6 +201,12 @@ export function widgetPermissions(type: string, config: Record<string, unknown> 
     const m = METRICS_BY_KEY[k]
     if (m) out.add(DOMAIN_PERMISSIONS[m.domain as Domain])
   }
+  const binding = bindingIn(type, config)
+  if (binding) {
+    const perm = SOURCES_BY_ID[binding.source]?.permission
+    // An unknown source can't be checked, so nobody may see it.
+    out.add(perm ?? 'dashboards.unknown-source')
+  }
   if (type === 'agency-card') {
     for (const d of AGENCY_CARD_DOMAINS[String(config.agency ?? '')] ?? []) out.add(DOMAIN_PERMISSIONS[d])
   }
@@ -182,7 +223,31 @@ export function widgetFilterFields(type: string, config: Record<string, unknown>
     }
     return [...set]
   }
+  const binding = bindingIn(type, config)
+  if (binding) return SOURCES_BY_ID[binding.source]?.honours ?? []
   return WIDGETS_BY_TYPE[type]?.filterFields ?? []
+}
+
+/** Fields a click on this placed widget can emit (generic widgets: their binding's). */
+export function widgetEmits(type: string, config: Record<string, unknown> = {}): FilterField[] {
+  const binding = bindingIn(type, config)
+  if (binding) return binding.emits ? [binding.emits] : []
+  return WIDGETS_BY_TYPE[type]?.emits ?? []
+}
+
+/**
+ * A palette entry -> what to place. Entries are a widget type ("kpi") or a
+ * preset ("preset:traffic.volume_24h"), which places a generic widget with
+ * the preset's binding.
+ */
+export function resolveCatalogItem(item: string): { type: string; size: WidgetSize; config: Record<string, unknown>; title?: string } | null {
+  if (item.startsWith('preset:')) {
+    const p = PRESETS_BY_ID[item.slice('preset:'.length)]
+    if (!p) return null
+    return { type: p.type, size: p.defaultSize, title: p.title, config: { ...(p.config ?? {}), binding: structuredClone(p.binding), presetId: p.id, presetTitle: p.title } }
+  }
+  const d = WIDGETS_BY_TYPE[item]
+  return d ? { type: d.type, size: d.defaultSize, config: { ...(d.defaultConfig ?? {}) } } : null
 }
 
 export const METRIC_OPTIONS = METRICS.map(m => ({ value: m.key, label: m.label, domain: m.domain, description: m.description }))

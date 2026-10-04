@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { agencyModuleSummary, OPERATIONAL_MODULES } from '~/config/agencyModuleSummary'
-import accessControlData from '~/config/access-control.json'
+import { BASE_SETTINGS } from '~/utils/resolveAccess'
 
 const { agency, agencyCode, roleTier, resolveRoute, canAccessRoute } = useAccessControl()
 
@@ -106,12 +106,12 @@ async function load() {
 onMounted(load)
 
 const quickLinkGroups = computed(() => {
-  const settings = accessControlData as any
-  const baseline = new Set(Object.keys(settings.defaults?.baselineRoutes ?? {}))
+  const settings = BASE_SETTINGS
+  const baseline = new Set(Object.keys(settings.defaults.baselineRoutes))
   const groups: { label: string; links: { path: string; label: string }[] }[] = []
-  for (const mod of Object.values<any>(settings.modules)) {
+  for (const mod of Object.values(settings.modules)) {
     const links: { path: string; label: string }[] = []
-    for (const route of mod.routes as string[]) {
+    for (const route of mod.routes) {
       if (route.includes('[')) continue
       if (baseline.has(route)) continue
       if (canAccessRoute(route)) links.push({ path: route, label: route })

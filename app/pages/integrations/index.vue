@@ -10,6 +10,17 @@
     </template>
   </PageHeader>
 
+  <!-- Page-wide drop target: drag a file anywhere on the page. Floats above
+       the workspace, so it is allowed to be an overlay (Flat-Body Rule). -->
+  <div v-if="pageDragging" class="page-drop" aria-hidden="true">
+    <div class="page-drop-card">
+      <Upload :size="22" />
+      <strong v-if="canDropFile">Drop to upload{{ selectedSource ? ` to ${selectedSource.source_id}` : ' to the routing queue' }}</strong>
+      <strong v-else>Choose a feed first</strong>
+      <span class="hint">{{ canDropFile ? '.xlsx or .csv' : 'Pick a feed below, then drop the file' }}</span>
+    </div>
+  </div>
+
   <!-- KPI ribbon - real numbers only; loading/unavailable/ok render
        differently, a failed fetch never shows as a fabricated zero. -->
   <div class="ih-ribbon ih-rise">
@@ -69,7 +80,7 @@
             <li v-if="selectedSource?.schema_version && !templateLateMode" class="flow-step">
               <span class="flow-step-label">Get the template</span>
               <button class="btn" :disabled="downloadingTemplate" @click="downloadTemplate">
-                {{ downloadingTemplate ? 'Preparing…' : '⬇ Download .xlsx' }}
+                <Download :size="13" class="btn-ico" />{{ downloadingTemplate ? 'Preparing…' : 'Download .xlsx' }}
               </button>
             </li>
 
@@ -84,26 +95,26 @@
             </li>
           </ol>
 
-          <div v-if="fileError" class="upload-banner upload-banner-error">⚠ {{ fileError }}</div>
+          <div v-if="fileError" class="upload-banner upload-banner-error" role="alert"><AlertTriangle :size="14" class="btn-ico" />{{ fileError }}</div>
 
           <!-- ── Inline result - never redirect-and-lose-the-file ─────── -->
           <div v-if="uploadResult" class="upload-result" aria-live="polite">
             <template v-if="uploadResult.status === 'validated'">
-              <p class="upload-result-main">✓ {{ uploadResult.valid_rows.toLocaleString('en-KE') }} row(s) ready.</p>
+              <p class="upload-result-main"><CheckCircle2 :size="16" class="btn-ico" />{{ uploadResult.valid_rows.toLocaleString('en-KE') }} row(s) ready.</p>
               <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Review and commit →</NuxtLink>
             </template>
             <template v-else-if="uploadResult.status === 'needs_mapping'">
-              <p class="upload-result-main">⚠ Column names don't match the template.</p>
+              <p class="upload-result-main"><AlertTriangle :size="16" class="btn-ico" />Column names don't match the template.</p>
               <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Map columns →</NuxtLink>
             </template>
             <template v-else-if="uploadResult.status === 'rejected' || uploadResult.status === 'failed'">
               <p class="upload-result-main upload-result-main--error">
-                ✕ {{ uploadResult.validation_error || 'Every row in this file failed validation.' }}
+                <XCircle :size="16" class="btn-ico" />{{ uploadResult.validation_error || 'Every row in this file failed validation.' }}
               </p>
               <button class="btn btn-primary" @click="resetUpload">Upload a correction</button>
             </template>
             <template v-else-if="uploadResult.status === 'unrouted'">
-              <p class="upload-result-main">📥 In the routing queue. A template will be assigned before it's validated.</p>
+              <p class="upload-result-main"><Inbox :size="16" class="btn-ico" />In the routing queue. A template will be assigned before it's validated.</p>
               <div class="upload-result-actions">
                 <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Assign a template now →</NuxtLink>
                 <button class="btn" @click="resetUpload">Submit another</button>
@@ -324,6 +335,7 @@ import { useAgencies } from '~/composables/api/useAccounts'
 // vue-tsc's template-only global resolution lagged the freshly generated
 // .nuxt types for a template-only reference; this sidesteps that outright.
 import { isInFlight, statusMeta } from '~/utils/ingestStatus'
+import { AlertTriangle, CheckCircle2, Download, Inbox, Upload, XCircle } from 'lucide-vue-next'
 
 const route = useRoute()
 const api = useIntegrations()
@@ -441,6 +453,43 @@ async function pollUpload() {
 }
 const poll = useUploadPoll(pollUpload, () => !!uploadResult.value && isInFlight(uploadResult.value.status))
 
+// ── Page-wide drag & drop ────────────────────────────────────────────
+// A counter, not a boolean: dragenter/dragleave fire for every child the
+// pointer crosses, so a flag would flicker off mid-drag.
+const pageDragging = ref(false)
+let dragDepth = 0
+const canDropFile = computed(() =>
+  tab.value === 'upload' && state.value === 'idle' && (!!selectedSource.value || templateLateMode.value),
+)
+const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')
+if (import.meta.client) {
+  useEventListener(window, 'dragenter', (e: DragEvent) => {
+    if (tab.value !== 'upload' || !hasFiles(e)) return
+    dragDepth++
+    pageDragging.value = true
+  })
+  useEventListener(window, 'dragleave', (e: DragEvent) => {
+    if (!hasFiles(e)) return
+    dragDepth = Math.max(0, dragDepth - 1)
+    if (!dragDepth) pageDragging.value = false
+  })
+  useEventListener(window, 'dragover', (e: DragEvent) => { if (hasFiles(e)) e.preventDefault() })
+  useEventListener(window, 'drop', (e: DragEvent) => {
+    if (!hasFiles(e)) return
+    e.preventDefault()
+    dragDepth = 0
+    pageDragging.value = false
+    // The dropzone handles drops that land on it (with its own validation);
+    // this only catches drops elsewhere on the page.
+    if ((e.target as HTMLElement | null)?.closest?.('.file-dropzone')) return
+    const file = e.dataTransfer?.files?.[0]
+    if (!file || !canDropFile.value) return
+    const ok = /\.(xlsx|csv)$/i.test(file.name)
+    if (!ok) { fileError.value = 'Upload a .xlsx or .csv file generated from the template.'; return }
+    onFileSelected(file)
+  })
+}
+
 function resetUpload() {
   uploadResult.value = null
   selectedFile.value = null
@@ -461,24 +510,17 @@ const needsAttentionFailed = ref(false)
 const needsAttentionState = computed(() => needsAttentionFailed.value ? 'unavailable' : needsAttention.value === null ? 'loading' : 'ok')
 
 const TERMINAL_STATUSES: DataUploadStatus[] = ['committed', 'rejected', 'failed', 'superseded']
-const ATTENTION_STATUSES: DataUploadStatus[] = ['unrouted', 'needs_mapping', 'validated', 'partial']
 
-async function loadPipelineCount() {
+// One cheap call (`?only=uploads`, already tenant-scoped server-side)
+// feeds both ribbon tiles - this used to be nine separate count queries.
+async function loadUploadCounts() {
   try {
-    const [grand, ...terminals] = await Promise.all([
-      api.uploads.inbox({ page_size: 1 }),
-      ...TERMINAL_STATUSES.map(status => api.uploads.inbox({ status, page_size: 1 })),
-    ])
-    filesInPipeline.value = Math.max(0, grand.count - terminals.reduce((sum, r) => sum + r.count, 0))
+    const { uploads } = await api.uploadStats('all')
+    const closed = TERMINAL_STATUSES.reduce((sum, st) => sum + (uploads.by_status[st] ?? 0), 0)
+    filesInPipeline.value = Math.max(0, uploads.total - closed)
+    needsAttention.value = uploads.needs_attention
   } catch {
     pipelineFailed.value = true
-  }
-}
-async function loadNeedsAttention() {
-  try {
-    const results = await Promise.all(ATTENTION_STATUSES.map(status => api.uploads.inbox({ status, page_size: 1 })))
-    needsAttention.value = results.reduce((sum, r) => sum + r.count, 0)
-  } catch {
     needsAttentionFailed.value = true
   }
 }
@@ -500,8 +542,7 @@ async function loadRecentUploads() {
 const agencies = ref<{ agency_code: string; agency_name: string }[]>([])
 
 onMounted(async () => {
-  loadPipelineCount()
-  loadNeedsAttention()
+  loadUploadCounts()
   loadRecentUploads()
   try {
     const [sourceRes, agencyRes] = await Promise.all([
@@ -813,4 +854,16 @@ const curlExample = computed(() => {
 }
 .test-result--ok { background: var(--success-bg); color: var(--success-fg); border: 1px solid var(--success-fg); }
 .test-result--bad { background: var(--danger-bg); color: var(--danger-fg); border: 1px solid var(--danger-fg); }
+
+.btn-ico { vertical-align: -2px; margin-right: 6px; flex-shrink: 0; }
+.page-drop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: var(--primary-wash-strong); pointer-events: none;
+}
+.page-drop-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 44px;
+  background: var(--surface-2); border: 2px dashed var(--primary); border-radius: var(--r-md);
+  color: var(--primary); box-shadow: var(--elev-2);
+}
+.page-drop-card strong { font-size: 15px; color: var(--fg-1); }
 </style>

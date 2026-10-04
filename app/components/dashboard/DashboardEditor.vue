@@ -51,7 +51,7 @@
 
     <div v-else class="de-body">
       <div class="de-left">
-        <WidgetPalette @add="addWidget" />
+        <WidgetPalette :scope="catalogScope" @add="addWidget" />
       </div>
 
       <!-- A <section>, not <main>: the layout's global `main` rule adds the sidebar/nav margins. -->
@@ -165,7 +165,7 @@
 <script setup lang="ts">
 import { Archive, ArrowLeft, Copy, Eye, History, PencilLine, Redo2, TriangleAlert, Undo2 } from 'lucide-vue-next'
 import type { DashboardAssignment, DashboardDefinition, DashboardRecord, DashboardStatus, DashboardSummary, ViewerContext, WidgetInstance } from '~/types/dashboard'
-import { WIDGETS_BY_TYPE, widgetFilterFields } from '~/utils/widgetRegistry'
+import { resolveCatalogItem, widgetFilterFields } from '~/utils/widgetRegistry'
 import { findSpot, newId, settle, compact } from '~/utils/layoutEngine'
 import { describeScope as describeScopeRaw } from '~/utils/resolveDashboard'
 import { useUserEmailLookup } from '~/composables/useUserEmailLookup'
@@ -179,6 +179,10 @@ import WidgetInspector from '~/components/dashboard/editor/WidgetInspector.vue'
 import FilterDesigner from '~/components/dashboard/editor/FilterDesigner.vue'
 import ActionDesigner from '~/components/dashboard/editor/ActionDesigner.vue'
 import AudiencePanel from '~/components/dashboard/editor/AudiencePanel.vue'
+import { catalogScopeFor, scopedDefaults, type CatalogScope } from '~/utils/agencyCatalog'
+import { EMPTY_OVERRIDES } from '~/utils/resolveAccess'
+import { getActivePinia } from 'pinia'
+import { useAccessPolicyStore } from '~/stores/accessPolicy'
 
 const props = defineProps<{ initial: DashboardRecord; allDashboards: DashboardSummary[] }>()
 const emit = defineEmits<{ saved: [DashboardRecord]; duplicate: []; archive: [] }>()
@@ -222,6 +226,10 @@ const previewViewer = ref<ViewerContext | null>(null)
 provide('dashboard:viewerOverride', previewViewer)
 provide('dashboard:refreshTick', ref(0))
 const { viewer } = useViewerContext()
+// An agency's dashboard only offers data from pages that agency can open.
+const policy = getActivePinia() ? useAccessPolicyStore() : null
+const catalogScope = computed<CatalogScope | null>(() => catalogScopeFor(record.value.ownerAgency, policy?.overrides ?? EMPTY_OVERRIDES))
+provide('dashboard:catalogScope', catalogScope)
 const engine = provideDashboardFilters(def as Ref<DashboardDefinition | null>, viewer as Ref<ViewerContext | null>, { syncUrl: false })
 
 // ── undo / redo (snapshots of the whole definition - it's small) ─────────
@@ -266,11 +274,13 @@ function set<K extends keyof DashboardDefinition>(key: K, value: DashboardDefini
 // ── widget operations ───────────────────────────────────────────────────
 function setWidgets(widgets: WidgetInstance[]) { set('widgets', widgets) }
 
-function addWidget(type: string, at?: { x: number; y: number }) {
-  const d = WIDGETS_BY_TYPE[type]
-  if (!d) return
-  const spot = at ?? findSpot(def.value.widgets, d.defaultSize)
-  const w: WidgetInstance = { id: newId(), type, x: spot.x, y: spot.y, w: d.defaultSize.w, h: d.defaultSize.h, config: { ...(d.defaultConfig ?? {}) } }
+/** `item` is a widget type ("kpi") or a preset ("preset:traffic.volume_24h"). */
+function addWidget(item: string, at?: { x: number; y: number }) {
+  const r = resolveCatalogItem(item)
+  if (!r) return
+  const spot = at ?? findSpot(def.value.widgets, r.size)
+  const config = scopedDefaults(r.type, r.config, catalogScope.value)
+  const w: WidgetInstance = { id: newId(), type: r.type, x: spot.x, y: spot.y, w: r.size.w, h: r.size.h, config, ...(r.title ? { title: r.title } : {}) }
   set('widgets', settle([...def.value.widgets, w], w.id))
   selectedId.value = w.id
 }

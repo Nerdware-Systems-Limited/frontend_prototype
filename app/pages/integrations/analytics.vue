@@ -2,12 +2,15 @@
   <PageHeader
     eyebrow="Data Integration Hub"
     title="Ingestion Analytics"
-    subtitle="Is data actually landing everywhere, and where is it not?"
+    :subtitle="statsRes?.scope === 'agency' ? 'Is your agency\'s data actually landing, and where is it not?' : 'Is data actually landing everywhere, and where is it not?'"
   >
     <template #breadcrumb>
       <NuxtLink to="/integrations" class="ih-crumb">← Upload &amp; Connect</NuxtLink>
     </template>
     <template #actions>
+      <BadgePill v-if="statsRes" :variant="statsRes.scope === 'agency' ? 'info' : 'neutral'">
+        {{ statsRes.scope === 'agency' ? 'Your agency only' : 'All agencies' }}
+      </BadgePill>
       <div class="ih-toggle" role="tablist" aria-label="Time window">
         <button
           v-for="w in WINDOWS" :key="w" type="button" role="tab"
@@ -53,6 +56,40 @@
           { label: 'Written', value: statsRes.funnel.written, variant: statsRes.funnel.written ? 'success' : 'danger' },
         ]"
       />
+    </div>
+  </div>
+
+  <!-- ── File uploads - same window + tenant scope as the funnel ────── -->
+  <div class="ih-card ih-rise ih-rise-2">
+    <div class="ih-card-head">
+      <h2>File uploads</h2>
+      <NuxtLink v-if="statsRes?.uploads?.needs_attention" to="/integrations/files" class="ih-crumb">
+        {{ statsRes.uploads.needs_attention.toLocaleString('en-KE') }} need attention →
+      </NuxtLink>
+    </div>
+    <div class="ih-card-body">
+      <EmptyState v-if="statsFailed" compact message="Could not load upload statistics." />
+      <EmptyState v-else-if="!statsRes" loading compact />
+      <EmptyState v-else-if="!statsRes.uploads.total" compact icon="inbox" message="No files uploaded in this window." />
+      <template v-else>
+        <div class="ih-stats">
+          <div class="ih-stat"><span class="ih-stat-value">{{ statsRes.uploads.total.toLocaleString('en-KE') }}</span><span class="ih-stat-label">files</span></div>
+          <div class="ih-stat"><span class="ih-stat-value">{{ statsRes.uploads.total_rows.toLocaleString('en-KE') }}</span><span class="ih-stat-label">rows parsed</span></div>
+          <div class="ih-stat"><span class="ih-stat-value">{{ statsRes.uploads.domain_records_created.toLocaleString('en-KE') }}</span><span class="ih-stat-label">rows written</span></div>
+          <div class="ih-stat"><span class="ih-stat-value">{{ writeRate }}</span><span class="ih-stat-label">of parsed rows written</span></div>
+          <div class="ih-stat"><span class="ih-stat-value">{{ fmtBytes(statsRes.uploads.total_size_bytes) }}</span><span class="ih-stat-label">received</span></div>
+        </div>
+        <div class="ih-hbars upload-status-bars">
+          <button
+            v-for="row in uploadStatusRows" :key="row.status" class="ih-hbar"
+            @click="router.push(`/integrations/files?status=${row.status}`)"
+          >
+            <span class="ih-hbar-label">{{ row.label }}</span>
+            <span class="ih-hbar-track"><span class="ih-hbar-fill" :style="{ transform: `scaleX(${row.pct / 100})` }" /></span>
+            <span class="ih-hbar-value">{{ row.count.toLocaleString('en-KE') }}</span>
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -178,7 +215,8 @@
 definePageMeta({ layout: 'default' })
 
 import { useIntegrations } from '~/composables/api'
-import type { AgencyContribution, DataSource, PlatformStats } from '~/composables/api'
+import type { AgencyContribution, DataSource, DataUploadStatus, PlatformStats } from '~/composables/api'
+import { statusMeta } from '~/utils/ingestStatus'
 
 const router = useRouter()
 const api = useIntegrations()
@@ -201,6 +239,28 @@ const writtenSub = computed(() =>
     ? 'nothing is landing'
     : 'rows into domain tables',
 )
+// Pipeline order, so the bars read left-to-right as a file's life, not by volume.
+const UPLOAD_STATUS_ORDER: DataUploadStatus[] = [
+  'unrouted', 'pending', 'validating', 'needs_mapping', 'validated', 'committing',
+  'committed', 'partial', 'rejected', 'failed', 'superseded',
+]
+const uploadStatusRows = computed(() => {
+  const by = statsRes.value?.uploads?.by_status ?? {}
+  const max = Math.max(1, ...Object.values(by).map(n => n ?? 0))
+  return UPLOAD_STATUS_ORDER
+    .filter(st => (by[st] ?? 0) > 0)
+    .map(st => ({ status: st, label: statusMeta(st).label, count: by[st]!, pct: Math.max(2, Math.round((by[st]! / max) * 100)) }))
+})
+const writeRate = computed(() => {
+  const u = statsRes.value?.uploads
+  return u && u.total_rows > 0 ? `${Math.round((u.domain_records_created / u.total_rows) * 100)}%` : '-'
+})
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`
+  return `${(n / 1024 ** 3).toFixed(2)} GB`
+}
 function fmt(n: number | undefined): string {
   return n === undefined ? '' : n.toLocaleString('en-KE')
 }
@@ -264,6 +324,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.upload-status-bars { margin-top: 18px; }
+.upload-status-bars .ih-hbar { grid-template-columns: 120px 1fr 76px; }
 .feed-filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .feed-filter-chip {
   background: var(--surface-quiet); border: 1px solid var(--border-subtle); border-radius: var(--r-pill);

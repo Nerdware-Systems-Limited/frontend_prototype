@@ -234,6 +234,27 @@ export interface TrainingRevenueAggregate {
   transaction_count: number
 }
 
+// GET /summary/ - the dashboard rollup. The server aggregates; nothing is summed client-side.
+export interface TrainingSummary {
+  kpis: {
+    active_courses: number
+    ongoing_cohorts: number
+    scheduled_cohorts: number
+    enrollments: number
+    completions: number
+    /** null when there are no completions (never 0). */
+    pass_rate_pct: number | null
+  }
+  enrollments_by_status: { status: string; enrollments: number }[]
+  completions_by_outcome: { outcome: string; completions: number }[]
+  revenue_monthly: { period: string; total_kes: string }[]
+  revenue_by_stream: { revenue_stream: string; total_kes: string }[]
+  cohorts: {
+    cohort_code: string; course: string; institute: string; status: string; start_date: string
+    enrolled_count: number; capacity: number; fill_rate_pct: number
+  }[]
+}
+
 // ── Composable ────────────────────────────────────────────────────────
 
 export function useTraining() {
@@ -307,6 +328,10 @@ export function useTraining() {
       received_at_to?: string
     }) =>
       $api<Paged<TrainingRevenue>>('/api/v1/training/revenue/', { query: cleanQuery(q as Record<string, unknown>) }),
+
+    /** One request for every training widget; honours agency, date_from, date_to. */
+    summary: (q?: { agency?: string; date_from?: string; date_to?: string }) =>
+      $api<TrainingSummary>('/api/v1/training/summary/', { query: cleanQuery(q as Record<string, unknown>) }),
 
     revenueSummary: (q?: {
       institute?: number

@@ -1,7 +1,9 @@
 <template>
   <div class="feed-health">
-    <EmptyState v-if="loading && !feeds.length" loading compact />
-    <EmptyState v-else-if="error" compact :message="`Integration Hub unavailable - ${error}`" />
+    <WidgetState
+      v-if="state !== 'ready' && state !== 'refreshing'" :state="state" source="Integration Hub" :detail="error"
+      empty-text="No agency feeds registered in the Integration Hub yet." @retry="reload"
+    />
     <template v-else>
       <div class="fh-counts">
         <div v-for="s in STATES" :key="s.key" class="fh-count" :class="s.tone">
@@ -21,13 +23,13 @@
 </template>
 
 <script setup lang="ts">
-import { useIntegrations } from '~/composables/api'
 import type { WidgetInstance } from '~/types/dashboard'
 import { useWidgetFilters } from '~/composables/useDashboardFilters'
+import { useWidgetData } from '~/composables/useWidgetData'
+import WidgetState from '~/components/dashboard/WidgetState.vue'
 
 const props = defineProps<{ instance: WidgetInstance; config: Record<string, unknown> }>()
 const { context, emit } = useWidgetFilters(() => props.instance.id)
-const tick = inject<Ref<number>>('dashboard:refreshTick', ref(0))
 
 const STATES = [
   { key: 'connected', label: 'Connected', tone: 'good' },
@@ -37,25 +39,15 @@ const STATES = [
 ] as const
 const RANK: Record<string, number> = { disconnected: 3, degraded: 2, pending: 1, connected: 0 }
 
-const feeds = ref<{ status: string; agency_code: string }[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
-
-async function load() {
-  loading.value = true
-  try {
-    const agency = context.value.agency
-    // The integrations list filters on `agency_code`; one agency at a time.
-    const res = await useIntegrations().list({ page_size: 200, ...(typeof agency === 'string' && agency ? { agency_code: agency } : {}) })
-    feeds.value = res.results ?? []
-    error.value = null
-  } catch (e) {
-    const err = e as { data?: { detail?: string }; message?: string } | null
-    error.value = err?.data?.detail || err?.message || 'request failed'
-  } finally { loading.value = false }
-}
-watch(() => JSON.stringify(context.value), load, { immediate: true })
-watch(tick, load)
+type Feed = { status: string; agency_code: string }
+// The source filters on one agency server-side; with several selected it
+// returns every feed, so narrow to the selection here.
+const { data, state, error, reload } = useWidgetData<Feed[]>(() => 'integrations.feeds', () => context.value, { isEmpty: d => !d.length })
+const feeds = computed(() => {
+  const all = data.value ?? []
+  const a = context.value.agency
+  return Array.isArray(a) && a.length ? all.filter(f => a.includes(f.agency_code)) : all
+})
 
 const counts = computed(() => {
   const c: Record<string, number> = {}
@@ -93,7 +85,9 @@ function pick(code: string) {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono);
   border: 1px solid var(--border-subtle); border-radius: var(--r-xs); background: var(--surface-1); color: var(--fg-2); cursor: pointer;
 }
-.fh-agency:hover { border-color: var(--border-interactive); }
+@media (hover: hover) and (pointer: fine) {
+  .fh-agency:hover { border-color: var(--border-interactive); }
+}
 .fh-agency.active { border-color: var(--primary); color: var(--primary); background: var(--primary-wash); }
 .fh-agency:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .fh-dot { width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--success); }

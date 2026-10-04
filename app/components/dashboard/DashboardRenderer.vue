@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { GRID_COLUMNS, type DashboardDefinition, type ViewerContext } from '~/types/dashboard'
 import { provideDashboardFilters } from '~/composables/useDashboardFilters'
-import { invalidateDomainCache } from '~/composables/useDomainData'
+import { invalidateWidgetData } from '~/composables/useWidgetData'
 import { widgetPermissions } from '~/utils/widgetRegistry'
 import WidgetFrame from '~/components/dashboard/WidgetFrame.vue'
 import DashboardFilterBar from '~/components/dashboard/DashboardFilterBar.vue'
@@ -78,7 +78,7 @@ const lastRefreshed = ref(new Date().toISOString().slice(11, 16))
 const refreshing = ref(false)
 function refresh() {
   refreshing.value = true
-  invalidateDomainCache()
+  invalidateWidgetData()
   refreshTick.value++
   lastRefreshed.value = new Date().toISOString().slice(11, 16)
   setTimeout(() => { refreshing.value = false }, 600)

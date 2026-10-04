@@ -53,7 +53,7 @@
     <fieldset v-else-if="def.type === 'agency-card'" class="insp-set">
       <legend>Agency</legend>
       <select class="insp-input" :value="config.agency" @change="patchConfig({ agency: val($event) })">
-        <option v-for="a in AGENCY_OPTIONS" :key="a.value" :value="a.value">{{ a.label }}</option>
+        <option v-for="a in agencyOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
       </select>
     </fieldset>
 
@@ -72,6 +72,28 @@
       <label class="insp-check"><input type="checkbox" :checked="!!config.showRoads" @change="patchConfig({ showRoads: checked($event) })"> Show road network</label>
       <label class="insp-row">Hotspots to plot
         <input class="insp-input insp-num" type="number" min="5" max="200" :value="config.hotspotLimit" @change="patchConfig({ hotspotLimit: Number(val($event)) })">
+      </label>
+    </fieldset>
+
+    <!-- Generic widgets: what the binding reads. Full binding editing is phase 4. -->
+    <fieldset v-else-if="binding" class="insp-set">
+      <legend>Data</legend>
+      <p class="insp-note">
+        <strong>{{ sourceOf(binding.source)?.label ?? binding.source }}</strong>
+        · {{ sourceOf(binding.source)?.source }}<br>
+        Field <code>{{ binding.path }}</code>
+        <template v-if="binding.measures.length"> · {{ binding.measures.map(m => m.label).join(', ') }}</template>
+      </p>
+      <label v-if="def.type === 'series'" class="insp-row">Chart
+        <select class="insp-input" :value="config.mode ?? 'line'" @change="patchConfig({ mode: val($event) })">
+          <option value="line">Line</option><option value="area">Area</option><option value="bars">Bars</option>
+        </select>
+      </label>
+      <label v-if="binding.shape === 'categorical' || binding.shape === 'rows'" class="insp-row">{{ binding.shape === 'categorical' ? 'Top categories' : 'Rows' }}
+        <input
+          class="insp-input insp-num" type="number" min="2" max="50" :value="binding.limit ?? ''" placeholder="All"
+          @change="patchBinding({ limit: Number(val($event)) || undefined })"
+        >
       </label>
     </fieldset>
 
@@ -119,7 +141,7 @@
       </p>
       <p class="insp-note">
         Honours filters on: <strong>{{ fields.length ? fields.map(f => FIELD_LABELS[f]).join(', ') : 'nothing' }}</strong>
-        <template v-if="def.emits?.length"> · clicks can drive actions on: <strong>{{ def.emits.map(f => FIELD_LABELS[f]).join(', ') }}</strong></template>
+        <template v-if="emits.length"> · clicks can drive actions on: <strong>{{ emits.map(f => FIELD_LABELS[f]).join(', ') }}</strong></template>
       </p>
     </fieldset>
   </div>
@@ -132,19 +154,22 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, MousePointerClick, X } from 'lucide-vue-next'
 import type { WidgetInstance, WidgetStyle } from '~/types/dashboard'
-import { AGENCY_OPTIONS, METRIC_OPTIONS, WIDGETS_BY_TYPE, widgetFilterFields, widgetPermissions } from '~/utils/widgetRegistry'
+import { AGENCY_OPTIONS, METRIC_OPTIONS, WIDGETS_BY_TYPE, isFramed, widgetEmits, widgetFilterFields, widgetPermissions } from '~/utils/widgetRegistry'
+import { SOURCES_BY_ID } from '~/utils/dataSources'
+import { bindingOf } from '~/composables/useBoundFrame'
+import type { Binding } from '~/types/frame'
 import { DOMAIN_LABELS, METRICS_BY_KEY, type Domain } from '~/utils/metricRegistry'
 import { FIELD_LABELS } from '~/utils/filterFields'
 import { clampBox } from '~/utils/layoutEngine'
+import { agencyCardsInScope, metricInScope, type CatalogScope } from '~/utils/agencyCatalog'
 
 const props = defineProps<{ widget: WidgetInstance | null }>()
 const emit = defineEmits<{ change: [WidgetInstance] }>()
 
 const def = computed(() => (props.widget ? WIDGETS_BY_TYPE[props.widget.type] : null))
 const config = computed(() => ({ ...(def.value?.defaultConfig ?? {}), ...(props.widget?.config ?? {}) }))
-const SELF_FRAMED = new Set(['kpi', 'kpi-row', 'text', 'embed', 'agency-card'])
 const style = computed<Required<WidgetStyle>>(() => {
-  const framed = !SELF_FRAMED.has(def.value?.kind ?? '')
+  const framed = props.widget ? isFramed(props.widget.type) : true
   const s = props.widget?.style ?? {}
   return {
     showTitle: s.showTitle ?? framed, background: s.background ?? (framed ? 'surface' : 'transparent'),
@@ -153,11 +178,23 @@ const style = computed<Required<WidgetStyle>>(() => {
 })
 const perms = computed(() => (props.widget ? widgetPermissions(props.widget.type, config.value) : []))
 const fields = computed(() => (props.widget ? widgetFilterFields(props.widget.type, config.value) : []))
+const emits = computed(() => (props.widget ? widgetEmits(props.widget.type, config.value) : []))
+const binding = computed(() => bindingOf(config.value))
+const sourceOf = (id: string) => SOURCES_BY_ID[id]
+function patchBinding(p: Partial<Binding>) { if (binding.value) patchConfig({ binding: { ...binding.value, ...p } }) }
 const metricKeys = computed(() => (config.value.metricKeys as string[] | undefined) ?? [])
 
+// On an agency's dashboard, only metrics and snapshots from pages that agency can open.
+const scope = inject<Ref<CatalogScope | null> | null>('dashboard:catalogScope', null)
 const metricGroups = computed(() => (Object.keys(DOMAIN_LABELS) as Domain[]).map(domain => ({
-  domain, label: DOMAIN_LABELS[domain], items: METRIC_OPTIONS.filter(m => m.domain === domain),
-})))
+  domain, label: DOMAIN_LABELS[domain],
+  items: METRIC_OPTIONS.filter(m => m.domain === domain && (metricInScope(m.value, scope?.value ?? null) || m.value === config.value.metricKey)),
+})).filter(g => g.items.length))
+const agencyOptions = computed(() => {
+  if (!scope?.value) return AGENCY_OPTIONS
+  const allowed = new Set(agencyCardsInScope(scope.value))
+  return AGENCY_OPTIONS.filter(a => allowed.has(a.value) || a.value === config.value.agency)
+})
 
 const val = (e: Event) => (e.target as HTMLInputElement).value
 const checked = (e: Event) => (e.target as HTMLInputElement).checked

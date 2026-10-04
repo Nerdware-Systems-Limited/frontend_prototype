@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { OPERATIONAL_MODULES, NON_OPERATIONAL_MODULES, agencyModuleSummary } from '~/config/agencyModuleSummary'
-import accessControlData from '~/config/access-control.json'
+import accessControlData from '../fixtures/access-control.json'
 
 describe('agencyModuleSummary registry', () => {
   it('every operational module id has a registry entry', () => {

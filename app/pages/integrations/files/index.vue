@@ -2,12 +2,17 @@
   <PageHeader
     eyebrow="Data Integration Hub"
     title="Files & Feeds"
-    subtitle="Every batch submitted, and every live feed connected, across every agency."
+    :subtitle="seesAllAgencies
+      ? 'Every batch submitted, and every live feed connected, across every agency.'
+      : 'Every batch your agency has submitted, and every live feed it has connected.'"
   >
     <template #breadcrumb>
       <NuxtLink to="/integrations" class="ih-crumb">← Upload &amp; Connect</NuxtLink>
     </template>
     <template #actions>
+      <BadgePill :variant="seesAllAgencies ? 'neutral' : 'info'">
+        {{ seesAllAgencies ? 'All agencies' : (viewerAgency ? `${viewerAgency} only` : 'Your agency only') }}
+      </BadgePill>
       <div ref="newUploadMenuEl" class="new-upload-menu">
         <button
           class="btn btn-primary" :aria-expanded="showNewUploadMenu" aria-haspopup="true"
@@ -76,8 +81,11 @@
     </div>
 
     <div class="filter-bar">
-      <input v-model="q" class="select-sm" placeholder="Search filename…" aria-label="Search filename" @input="debouncedSearch" />
-      <select v-model="agencyCode" class="select-sm" aria-label="Filter by submitting agency" @change="reload">
+      <input
+        ref="searchEl" v-model="q" class="select-sm" placeholder="Search filename…  ( / )"
+        aria-label="Search filename" @input="debouncedSearch" @keydown.esc="($event.target as HTMLInputElement).blur()"
+      />
+      <select v-if="seesAllAgencies" v-model="agencyCode" class="select-sm" aria-label="Filter by submitting agency" @change="reload">
         <option value="">Submitted by: any agency</option>
         <option v-for="a in agencies" :key="a.agency_code" :value="a.agency_code">{{ a.agency_code }}</option>
       </select>
@@ -122,7 +130,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="u in uploads" :key="u.id" class="is-clickable" @click="goToDetail(u.id)">
+            <tr
+              v-for="u in uploads" :key="u.id" class="is-clickable" tabindex="0"
+              @click="goToDetail(u.id)" @keydown.enter="goToDetail(u.id)"
+            >
               <td>
                 <span class="file-cell">{{ u.original_filename }}</span>
                 <BadgePill v-if="u.duplicate_of" variant="warning">dup of #{{ u.duplicate_of.slice(0, 8) }}</BadgePill>
@@ -200,7 +211,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="s in feedsPageRows" :key="s.source_id" class="is-clickable" @click="router.push(`/integrations/feeds/${s.source_id}`)">
+            <tr
+              v-for="s in feedsPageRows" :key="s.source_id" class="is-clickable" tabindex="0"
+              @click="router.push(`/integrations/feeds/${s.source_id}`)"
+              @keydown.enter="router.push(`/integrations/feeds/${s.source_id}`)"
+            >
               <td class="mono-sm">{{ s.source_id }}</td>
               <td><BadgePill variant="neutral">{{ s.agency_code }}</BadgePill></td>
               <td><BadgePill variant="info">{{ s.mode }}</BadgePill></td>
@@ -235,6 +250,30 @@ import { isInFlight, readPct, statusMeta, writePct } from '~/utils/ingestStatus'
 const router = useRouter()
 const route = useRoute()
 const api = useIntegrations()
+
+// Mirrors core.tenancy.visible_agency_ids server-side: super_admin and the
+// ministry tier see every agency's files; everyone else only their own. This
+// is presentation only - the backend is what actually enforces it - so a
+// scoped viewer isn't offered an agency filter that can only ever return nothing.
+const { user: viewer } = useAuth()
+const seesAllAgencies = computed(() => {
+  const u = viewer.value
+  return !!u && (['super_admin', 'ministry_admin', 'ministry_analyst'].includes(u.role_type))
+})
+const viewerAgency = computed(() => viewer.value?.agency_code ?? '')
+
+// "/" jumps to the filename search, like every other dense console.
+const searchEl = ref<HTMLInputElement | null>(null)
+if (import.meta.client) {
+  useEventListener(window, 'keydown', (e: KeyboardEvent) => {
+    if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+    if (segment.value !== 'files') return
+    e.preventDefault()
+    searchEl.value?.focus()
+  })
+}
 
 const STATUS_OPTIONS: DataUploadStatus[] = [
   'unrouted', 'pending', 'validating', 'needs_mapping', 'validated', 'rejected',
@@ -467,6 +506,7 @@ onMounted(async () => {
 }
 .routing-queue-clear:hover { text-decoration: underline; }
 
+.ih-table tbody tr.is-clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--surface-quiet); }
 .file-cell { font-weight: 600; color: var(--fg-1); margin-right: 6px; }
 .rows-err { color: var(--danger-fg); font-weight: 600; margin-left: 6px; }
 .actions-cell { text-align: right; }

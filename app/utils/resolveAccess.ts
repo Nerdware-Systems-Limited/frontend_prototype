@@ -3,20 +3,20 @@
  * the Module Access override layers (docs/superpowers/specs/
  * 2026-09-28-module-access-control-design.md).
  *
- * No Vue, no Pinia: every function takes the override set explicitly, so the
+ * No Pinia (only Vue's `reactive`, for the baseline holder): every function takes the override set explicitly, so the
  * route resolver, the policy store's self-lockout check, and the Module
  * Access page's "Preview as" panel all run exactly the same logic.
  * useAccessControl() is the reactive wrapper pages and middleware use.
  *
  * Layers, each only able to narrow the one above:
- *   ceiling  - set by super_admin; defaults to the JSON (domain bundle ∪ grants − denies)
+ *   ceiling  - set by super_admin; defaults to the baseline policy (domain bundle ∪ grants − denies)
  *   enabled  - set by the agency's own admin (or super_admin); defaults to the ceiling
  *   role     - per role tier inside the agency; defaults to enabled
  * A module value applies to every page in the module unless the same layer
  * also sets that page.
  */
 
-import settingsData from '~/config/access-control.json'
+import { reactive } from 'vue'
 
 export type AccessTier = 'super_admin' | 'oversight' | 'admin' | 'analyst' | 'operator' | 'public'
 export type ScopeLevel = 'full' | 'read' | 'none'
@@ -70,7 +70,7 @@ export interface AccessSettings {
   restrictedCategories: Record<string, { label: string; owningAgency: string; enforcement: string; minTier?: AccessTier }>
 }
 
-/** Absent key = inherit from the layer above (or the JSON, for the ceiling). */
+/** Absent key = inherit from the layer above (or the baseline policy, for the ceiling). */
 export interface ScopeMaps {
   modules?: Record<string, ScopeLevel>
   routes?: Record<string, ScopeLevel>
@@ -114,7 +114,27 @@ export interface IgnoreOverride {
 
 export const POLICY_VERSION = 1
 export const EMPTY_OVERRIDES: PolicyOverrides = { version: 1, agencies: {} }
-export const BASE_SETTINGS = settingsData as unknown as AccessSettings
+
+/**
+ * Nothing granted: what the resolver sees until the baseline arrives (or if it
+ * can't be fetched). Every lookup against it fails closed.
+ */
+export const emptySettings = (): AccessSettings => ({
+  version: 1,
+  defaults: { safeSpace: { route: '/dashboard', mode: 'restricted' }, denyRedirect: '/dashboard', newAccountTier: 'public', failClosed: true, baselineRoutes: {} },
+  roles: {}, domains: {}, modules: {}, routes: {}, agencies: {},
+  publicView: { route: '/dashboard', denyCategories: [] },
+  restrictedCategories: {},
+})
+
+/**
+ * The baseline policy (roles, domains, modules, routes, agencies, restricted
+ * categories). It is owned by the server - GET /api/v1/access-control/baseline/
+ * - and loaded into this object by the Module Access store after sign-in
+ * (setBaseSettings). The object is reactive and mutated in place so anything
+ * resolved from it recomputes once it loads.
+ */
+export const BASE_SETTINGS = reactive(emptySettings()) as AccessSettings
 const S = BASE_SETTINGS
 
 type Agency = AccessSettings['agencies'][string]
@@ -123,19 +143,13 @@ type Agency = AccessSettings['agencies'][string]
 
 /** route -> module, built once from the modules block. */
 const ROUTE_MODULE: Record<string, string> = {}
-for (const [moduleId, mod] of Object.entries(S.modules)) {
-  for (const route of mod.routes) ROUTE_MODULE[route] = moduleId
-}
 
 /**
  * Dynamic-segment route keys (e.g. "/integrations/files/[id]") can't be
  * matched by equality against a real path like "/integrations/files/abc123".
  * Longest-prefix-first so a more specific pattern wins over a shorter one.
  */
-const DYNAMIC_ROUTE_KEYS = Object.keys(ROUTE_MODULE)
-  .filter(key => key.includes('['))
-  .map(key => ({ key, prefix: key.slice(0, key.indexOf('[')) }))
-  .sort((a, b) => b.prefix.length - a.prefix.length)
+let DYNAMIC_ROUTE_KEYS: { key: string; prefix: string }[] = []
 
 export function matchRouteKey(path: string): string | undefined {
   if (path in ROUTE_MODULE) return path
@@ -149,9 +163,7 @@ export function moduleOfRoute(routeKey: string): string | undefined {
   return ROUTE_MODULE[routeKey] ?? S.routes[routeKey]?.module
 }
 
-const TIER_RANK: Record<string, number> = Object.fromEntries(
-  Object.entries(S.roles).map(([key, role]) => [key, role.tier]),
-)
+const TIER_RANK: Record<string, number> = {}
 
 export function tierRank(tier: string | undefined | null): number {
   return TIER_RANK[tier ?? 'public'] ?? TIER_RANK.public ?? 10
@@ -184,9 +196,33 @@ export function isCategoryLocked(category: string): boolean {
 }
 
 /** Every capability any role carries today. */
-export const CAPABILITIES: string[] = [...new Set(Object.values(S.roles).flatMap(r => r.capabilities ?? []))]
+export const CAPABILITIES: string[] = []
 
-const BASELINE_ROUTES = new Set(Object.keys(S.defaults.baselineRoutes))
+const BASELINE_ROUTES = new Set<string>()
+
+/** Rebuild the lookup tables derived from the baseline. Tables are mutated in place - other modules hold references. */
+function rebuildTables() {
+  for (const k of Object.keys(ROUTE_MODULE)) delete ROUTE_MODULE[k]
+  for (const [moduleId, mod] of Object.entries(S.modules)) {
+    for (const route of mod.routes) ROUTE_MODULE[route] = moduleId
+  }
+  DYNAMIC_ROUTE_KEYS = Object.keys(ROUTE_MODULE)
+    .filter(key => key.includes('['))
+    .map(key => ({ key, prefix: key.slice(0, key.indexOf('[')) }))
+    .sort((a, b) => b.prefix.length - a.prefix.length)
+  for (const k of Object.keys(TIER_RANK)) delete TIER_RANK[k]
+  for (const [key, role] of Object.entries(S.roles)) TIER_RANK[key] = role.tier
+  CAPABILITIES.splice(0, CAPABILITIES.length, ...new Set(Object.values(S.roles).flatMap(r => r.capabilities ?? [])))
+  BASELINE_ROUTES.clear()
+  for (const r of Object.keys(S.defaults.baselineRoutes)) BASELINE_ROUTES.add(r)
+}
+
+/** Replace the baseline policy (the server's document, or `null` to fail closed again). */
+export function setBaseSettings(next: AccessSettings | null) {
+  for (const k of Object.keys(BASE_SETTINGS)) delete (BASE_SETTINGS as unknown as Record<string, unknown>)[k]
+  Object.assign(BASE_SETTINGS, next ?? emptySettings())
+  rebuildTables()
+}
 
 /** A module's static, non-baseline routes - the pages an override can meaningfully change. */
 export function editableRoutes(moduleId: string): string[] {

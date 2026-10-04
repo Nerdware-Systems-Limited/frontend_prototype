@@ -12,7 +12,7 @@
 <script setup lang="ts">
 import type { WidgetInstance } from '~/types/dashboard'
 import { METRICS_BY_KEY, type Domain } from '~/utils/metricRegistry'
-import { DOMAIN_PERMISSIONS } from '~/utils/widgetRegistry'
+import { DOMAIN_PERMISSIONS } from '~/utils/dataSources'
 import KpiWidget from './KpiWidget.vue'
 
 const props = defineProps<{ instance: WidgetInstance; config: Record<string, unknown> }>()

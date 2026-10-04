@@ -11,38 +11,18 @@
  *   agencyCode      user.agency_code                           user.agency(_code)
  *   departmentCode  department_code of user.department (UUID)  user.department(_code)
  *   roles           role_name, role_type                       Groups + user.role
- *   permissions     VIEWER_PERMISSION_RULES below              user.get_all_permissions()
+ *   permissions     GET /access-control/viewer/ (server)       the same adapter
  *   isSuperAdmin    role_type === 'super_admin'                user.is_superuser
  *
- * UAPTS users carry no permission strings - access is module grants in
- * access-control.json plus the role tier - so the dashboard permission codes
- * (identical to catalog.py / DOMAIN_PERMISSIONS) are derived from module access.
- * The backend must derive them the same way (DASHBOARDS_VIEWER_ADAPTER);
- * see docs/dashboard-manager-integration.md.
+ * UAPTS users carry no permission strings - access is module grants in the
+ * baseline policy plus the role tier - so the server derives the dashboard
+ * permission codes (catalog.py DOMAIN_PERMISSIONS) from module access
+ * (DASHBOARDS_VIEWER_ADAPTER) and serves them from /access-control/viewer/.
+ * The access policy store holds them; this client never recomputes them.
  */
 import type { ViewerContext } from '~/types/dashboard'
 import { useDepartments } from '~/composables/api'
-import { DOMAIN_PERMISSIONS } from '~/utils/widgetRegistry'
-
-type AccessControl = ReturnType<typeof useAccessControl>
-
-/** Dashboard permission code -> how a UAPTS viewer earns it. */
-export const VIEWER_PERMISSION_RULES: Record<string, (ac: AccessControl) => boolean> = {
-  [DOMAIN_PERMISSIONS.safety]: ac => ac.canAccessModule('M05'),
-  [DOMAIN_PERMISSIONS.fleet]: ac => ac.canAccessModule('M03'),
-  [DOMAIN_PERMISSIONS.rail]: ac => ac.canAccessModule('M08'),
-  [DOMAIN_PERMISSIONS.aviation]: ac => ac.canAccessModule('M07a'),
-  [DOMAIN_PERMISSIONS.maritime]: ac => ac.canAccessModule('M07b'),
-  [DOMAIN_PERMISSIONS.infra]: ac => ac.canAccessModule('M06'),
-  [DOMAIN_PERMISSIONS.integrations]: ac => ac.canAccessModule('M12'),
-  [DOMAIN_PERMISSIONS.gis]: ac => ac.canAccessModule('M13'),
-  // The National Command Centre embed: ministry oversight agencies (SDT, SDR) and super admins.
-  'dashboard.national.view': ac => ac.isSuperAdmin.value || !!ac.agency.value?.domains.includes('oversight'),
-  // National dashboard administrators.
-  'dashboards.manage': ac => ac.isSuperAdmin.value,
-  // Agency admins manage their own agency's dashboards (same people who manage its users).
-  'dashboards.manage_agency': ac => ac.roleTier.value === 'admin' && !!ac.agencyCode.value && ac.canAccessRoute('/users'),
-}
+import { useAccessPolicyStore } from '~/stores/accessPolicy'
 
 /** department UUID -> department_code, shared across components for the session. */
 function useDepartmentCode(departmentId: () => string | null | undefined) {
@@ -66,6 +46,7 @@ function useDepartmentCode(departmentId: () => string | null | undefined) {
 export function useViewerContext() {
   const { user } = useAuth()
   const ac = useAccessControl()
+  const policy = useAccessPolicyStore()
   // The editor's "Preview as…" provides a simulated viewer; widgets inside
   // that preview gate on it instead of the signed-in admin.
   const override = getCurrentInstance()
@@ -83,7 +64,7 @@ export function useViewerContext() {
       agencyCode: ac.agencyCode.value,
       departmentCode: departmentCode.value,
       roles: [...new Set(roles)],
-      permissions: Object.entries(VIEWER_PERMISSION_RULES).filter(([, earns]) => earns(ac)).map(([code]) => code),
+      permissions: policy.permissions,
       isSuperAdmin: ac.isSuperAdmin.value,
     }
   })

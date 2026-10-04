@@ -7,7 +7,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { describeApiError, toDashboardApiError, useDashboardApi } from '~/composables/useDashboardApi'
-import { domainParams, filterParams } from '~/composables/useDomainData'
+import { domainParams } from '~/composables/useDomainData'
+import { filterParams } from '~/utils/dataSources'
 import { apiBaseUrl, wsUrl } from '~/utils/apiBase'
 
 const $api = vi.fn()

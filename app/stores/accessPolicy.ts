@@ -1,6 +1,6 @@
 /**
  * accessPolicy - Module Access override layers (ceiling / agency enabled /
- * role) on top of app/config/access-control.json. See
+ * role) on top of the server's baseline policy (GET /api/v1/access-control/baseline/). See
  * docs/superpowers/specs/2026-09-28-module-access-control-design.md.
  *
  * `overrides` is what the resolver reads (useAccessControl); `draft` is what
@@ -16,7 +16,7 @@ import { useAuthStore } from '~/stores/auth'
 import { useRoles } from '~/composables/api'
 import { AccessPolicyStorageError, localAccessPolicyStorage, type AccessPolicyStorage } from '~/utils/accessPolicyStorage'
 import {
-  BASE_SETTINGS, EMPTY_OVERRIDES, adminCanManagePolicy, isCategoryLocked, partitionStale, resolveFor, type PolicyOverrides,
+  BASE_SETTINGS, EMPTY_OVERRIDES, adminCanManagePolicy, isCategoryLocked, partitionStale, resolveFor, setBaseSettings, type PolicyOverrides,
 } from '~/utils/resolveAccess'
 import { applyEdit, cloneOverrides, editLayer, pruneOverrides, stableStringify, type AccessEdit } from '~/utils/accessEdits'
 import { HISTORY_LIMIT, describeChanges, type HistoryEntry } from '~/utils/accessHistory'
@@ -43,6 +43,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   const overrides = ref<PolicyOverrides>(cloneOverrides(EMPTY_OVERRIDES))
   const draft = ref<PolicyOverrides>(cloneOverrides(EMPTY_OVERRIDES))
   const loaded = ref(false)
+  /** Dashboard permission codes the server says the signed-in user earns (see refreshPermissions). */
+  const permissions = ref<string[]>([])
   /** The account the current overrides were loaded for - a different one must not inherit them (see ensureLoaded). */
   const loadedFor = ref<string | null>(null)
   const saving = ref(false)
@@ -112,7 +114,28 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
     draft.value = pruneOverrides(partitionStale(draft.value, customRoleTiers.value).cleaned)
   }
 
+  /**
+   * Re-read what the user may do from the server. Called on load and after a
+   * save, since Module Access edits change it. Keeps the previous set on failure.
+   */
+  async function refreshPermissions() {
+    try {
+      const next = await storage.loadPermissions?.()
+      if (next) permissions.value = next
+    } catch (err) {
+      console.warn('[access-policy] could not load dashboard permissions', err)
+    }
+  }
+
   async function load() {
+    // The baseline first: nothing can be resolved without it, and it fails closed if missing.
+    try {
+      const baseline = await storage.loadBaseline?.()
+      if (baseline) setBaseSettings(baseline)
+    } catch (err) {
+      console.warn('[access-policy] could not load the baseline access policy - access stays closed', err)
+    }
+    await refreshPermissions()
     try {
       const stored = await storage.load()
       if (stored) overrides.value = cloneOverrides(stored)
@@ -144,6 +167,7 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   function reset() {
     overrides.value = cloneOverrides(EMPTY_OVERRIDES)
     draft.value = cloneOverrides(EMPTY_OVERRIDES)
+    permissions.value = []
     history.value = []
     saveError.value = null
     loaded.value = false
@@ -196,6 +220,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
       saving.value = false
       return
     }
+    // The edit may have changed what this user can do (their own agency's access, say).
+    await refreshPermissions()
     if (storage.recordsHistory) {
       // The server wrote the log itself (and would refuse ours); read it back.
       try {
@@ -216,8 +242,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   }
 
   return {
-    overrides, draft, loaded, saving, saveError, history,
+    overrides, draft, loaded, permissions, saving, saveError, history,
     isSuperAdmin, dirtyAgencies, isDirty, staleKeys,
-    canEditAgency, edit, resetAgency, discard, clearStale, load, ensureLoaded, reset, save, historyFor,
+    canEditAgency, edit, resetAgency, discard, clearStale, load, ensureLoaded, reset, save, historyFor, refreshPermissions,
   }
 })

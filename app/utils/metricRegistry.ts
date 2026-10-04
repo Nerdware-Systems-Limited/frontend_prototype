@@ -17,6 +17,9 @@ import type {
   SafetySummary, FleetSummary, RailwaySummary, AviationSummary,
   MaritimeOps, InfrastructureSummary,
 } from '~/composables/api'
+import { DOMAIN_SOURCE, SOURCES_BY_ID } from '~/utils/dataSources'
+import { statusOf, worstStatus } from '~/utils/thresholds'
+import { formatKesAmount, formatNumber, formatParts, formatValue } from '~/utils/units'
 
 export type Domain = 'safety' | 'fleet' | 'rail' | 'aviation' | 'maritime' | 'infra'
 
@@ -66,22 +69,24 @@ export interface MetricDefinition<D extends Domain = Domain> {
   resolve: (data: DomainPayloads[D]) => KpiView
 }
 
-// ── Formatters (same behaviour as the Command Centre) ────────────────────
+// ── Formatters - thin names over utils/units (en-KE, honest "-") ─────────
+/** Whole-number count, en-KE grouped. Prefer formatValue(v, unit) in new code. */
 export function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return '-'
-  return v.toLocaleString(undefined, { maximumFractionDigits: d })
+  return formatNumber(v, d)
 }
+/** Percentage with one decimal, e.g. "72.4%". */
 export function fmtPct(v: number | null | undefined): string {
-  return v == null ? '-' : `${v.toFixed(1)}%`
+  return formatValue(v, 'pct')
 }
+/** KES amount compacted to B / M / K, without the currency prefix. */
 export function fmtKsh(v: string | number | null | undefined): string {
-  if (v == null) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) : v
-  if (Number.isNaN(n)) return '-'
-  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
-  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
-  return n.toLocaleString()
+  return formatKesAmount(v)
+}
+
+/** KpiCard value + unit for a percentage, e.g. { value: '72.4', unit: '%' }. */
+function pctParts(v: number | null | undefined): Pick<KpiView, 'value' | 'unit'> {
+  const p = formatParts(v, 'pct')
+  return { value: p.value, unit: p.unit || undefined }
 }
 
 function paceComparison(actual: number, expected: number, window: string): Partial<KpiView> {
@@ -89,7 +94,7 @@ function paceComparison(actual: number, expected: number, window: string): Parti
   const diff = actual - expected
   if (Math.abs(diff) < 0.5) return { comparisonValue: `On ${window} pace`, trendDirection: 'flat' }
   return {
-    comparisonValue: `${Math.abs(diff).toFixed(0)} ${diff > 0 ? 'above' : 'below'} ${window} pace`,
+    comparisonValue: `${fmtNum(Math.abs(diff))} ${diff > 0 ? 'above' : 'below'} ${window} pace`,
     trendDirection: diff > 0 ? 'up' : 'down',
     trendFavorable: diff < 0, // fewer incidents is the good direction
   }
@@ -113,9 +118,9 @@ function infraGoodPct(i: InfrastructureSummary): { pct: number; total: number } 
  * translates the dashboard's agency code). Anything else shows as
  * "Not filtered by ..." on the widget.
  */
-export const DOMAIN_FILTERS: Record<Domain, FilterField[]> = {
-  safety: [], fleet: [], rail: [], aviation: [], maritime: [], infra: ['agency'],
-}
+export const DOMAIN_FILTERS: Record<Domain, FilterField[]> = Object.fromEntries(
+  (Object.keys(DOMAIN_SOURCE) as Domain[]).map(d => [d, SOURCES_BY_ID[DOMAIN_SOURCE[d]]!.honours]),
+) as Record<Domain, FilterField[]>
 
 // ── The registry ────────────────────────────────────────────────────────
 export const METRICS: MetricDefinition<any>[] = [
@@ -127,7 +132,7 @@ export const METRICS: MetricDefinition<any>[] = [
       const { active, fatal_30d: fatal } = s.kpis
       return {
         value: fmtNum(active), period: 'LIVE', description: 'Active serious incidents',
-        status: (active > 10 || fatal > 20) ? 'critical' : (active > 5 || fatal > 10) ? 'warning' : 'neutral',
+        status: worstStatus(statusOf(active, 'safety.active_incidents'), statusOf(fatal, 'safety.fatalities_30d')),
       }
     },
   },
@@ -171,7 +176,7 @@ export const METRICS: MetricDefinition<any>[] = [
       }
       return {
         value: fmtNum(fatal), period: '30D', description: 'Fatal incidents',
-        status: fatal > 20 ? 'critical' : fatal > 10 ? 'warning' : 'neutral',
+        status: statusOf(fatal, 'safety.fatalities_30d'),
         series: trend.length > 1 ? trend.map(d => d.fatalities) : undefined,
         ...cmp,
       }
@@ -187,7 +192,7 @@ export const METRICS: MetricDefinition<any>[] = [
       return {
         value: fmtNum(critical), period: 'CURRENT',
         description: critical === 0 ? 'No critical clusters active' : `High ${fmtNum(t['high'] ?? 0)} · Med ${fmtNum(t['medium'] ?? 0)}`,
-        status: critical === 0 ? 'healthy' : critical > 5 ? 'critical' : 'warning',
+        status: statusOf(critical, 'safety.critical_blackspots'),
       }
     },
   },
@@ -207,9 +212,9 @@ export const METRICS: MetricDefinition<any>[] = [
       const ie = s.intervention_effectiveness
       if (!ie || ie.total_evaluated === 0) return noData('TO DATE', 'Interventions evaluated', 'No interventions evaluated yet')
       return {
-        value: ie.average_pct.toFixed(1), unit: '%', period: 'TO DATE',
+        ...pctParts(ie.average_pct), period: 'TO DATE',
         description: `${fmtNum(ie.total_evaluated)} interventions evaluated`,
-        status: ie.average_pct >= 60 ? 'healthy' : ie.average_pct >= 45 ? 'warning' : 'critical',
+        status: statusOf(ie.average_pct, 'safety.intervention_effectiveness'),
       }
     },
   },
@@ -223,7 +228,7 @@ export const METRICS: MetricDefinition<any>[] = [
       if (live === 0 && total > 0) return noData('LIVE', 'Live GPS-tracked PSV & govt fleet', 'No live telemetry received')
       const tamper = f.governor_compliance.tamper_rate_pct
       const tracked = total > 0 ? (live / total) * 100 : 0
-      const status = (tamper > 10 || tracked < 20) ? 'critical' : (tamper > 5 || tracked < 40) ? 'warning' : 'healthy'
+      const status = worstStatus(statusOf(tamper, 'fleet.governor_tamper_pct'), statusOf(tracked, 'fleet.tracked_pct'))
       return { value: fmtNum(live), period: 'LIVE', description: `Live now · ${fmtNum(total)} registered`, status }
     },
   },
@@ -234,8 +239,8 @@ export const METRICS: MetricDefinition<any>[] = [
     resolve: (f: FleetSummary) => {
       const r = f.governor_compliance.tamper_rate_pct
       return {
-        value: r.toFixed(1), unit: '%', period: 'LIVE', description: 'Speed governors reporting tamper',
-        status: r > 10 ? 'critical' : r > 5 ? 'warning' : 'healthy',
+        ...pctParts(r), period: 'LIVE', description: 'Speed governors reporting tamper',
+        status: statusOf(r, 'fleet.governor_tamper_pct'),
       }
     },
   },
@@ -247,9 +252,9 @@ export const METRICS: MetricDefinition<any>[] = [
       const ot = r.on_time_30d
       if (!ot || ot.total_operations === 0) return noData('30D', 'On-time arrivals', 'No operations recorded (30d)')
       return {
-        value: ot.on_time_pct.toFixed(1), unit: '%', period: '30D',
-        description: `On-time arrivals · ${ot.avg_delay_min?.toFixed(0) ?? '-'} min avg delay`,
-        status: ot.on_time_pct >= 80 ? 'healthy' : 'warning',
+        ...pctParts(ot.on_time_pct), period: '30D',
+        description: `On-time arrivals · ${formatValue(ot.avg_delay_min, 'min')} avg delay`,
+        status: statusOf(ot.on_time_pct, 'rail.otp_pct'),
       }
     },
   },
@@ -269,9 +274,9 @@ export const METRICS: MetricDefinition<any>[] = [
       const k = a.kpis
       if (k.flights_total === 0) return noData('7D', 'On-time arrivals', 'No flights recorded (7d)')
       return {
-        value: k.otp_pct.toFixed(1), unit: '%', period: '7D',
+        ...pctParts(k.otp_pct), period: '7D',
         description: `On-time arrivals · ${fmtNum(k.flights_total)} flights`,
-        status: k.otp_pct >= 85 ? 'healthy' : 'warning',
+        status: statusOf(k.otp_pct, 'aviation.otp_pct'),
       }
     },
   },
@@ -293,11 +298,13 @@ export const METRICS: MetricDefinition<any>[] = [
       const teus = ports.reduce((s, p) => s + (p.teu_throughput_30d || 0), 0)
       const dwell = ports.reduce((s, p) => s + (p.avg_yard_dwell_days || 0), 0) / ports.length
       if (teus === 0 && dwell === 0) return noData('30D', 'Containers processed', 'No port throughput reported (30d)')
-      const ok = dwell < 5
+      const status = statusOf(dwell, 'maritime.yard_dwell_days')
+      const ok = status === 'healthy'
+      const teu = formatParts(teus, 'teu')
       return {
-        value: fmtNum(teus), unit: 'TEU', unitTitle: 'TEU - twenty-foot equivalent container units', period: '30D',
-        description: `Processed · ${dwell.toFixed(1)} d avg yard dwell`,
-        status: ok ? 'healthy' : 'warning', statusLabel: ok ? 'On target' : 'Dwell elevated',
+        value: teu.value, unit: teu.unit, unitTitle: teu.unitTitle, period: '30D',
+        description: `Processed · ${formatValue(dwell, 'days')} avg yard dwell`,
+        status, statusLabel: ok ? 'On target' : 'Dwell elevated',
       }
     },
   },
@@ -309,10 +316,10 @@ export const METRICS: MetricDefinition<any>[] = [
       const { pct, total } = infraGoodPct(i)
       if (!total) return noData('LATEST', 'Network rated good condition', 'No condition survey data')
       return {
-        value: pct.toFixed(1), unit: '%', abbr: 'IRI',
+        ...pctParts(pct), abbr: 'IRI',
         abbrTitle: 'International Roughness Index - lower means a smoother road',
-        description: `Rated good · IRI avg ${i.network.iri_average?.toFixed(2) ?? '-'}`,
-        period: 'LATEST', status: pct >= 60 ? 'healthy' : 'warning',
+        description: `Rated good · IRI avg ${formatValue(i.network.iri_average, 'score')}`,
+        period: 'LATEST', status: statusOf(pct, 'infra.good_condition_pct'),
       }
     },
   },
@@ -324,7 +331,7 @@ export const METRICS: MetricDefinition<any>[] = [
       const c = i.bridges.critical_count
       return {
         value: fmtNum(c), period: 'LATEST', description: `of ${fmtNum(i.bridges.total)} bridges surveyed`,
-        status: c === 0 ? 'healthy' : c > 10 ? 'critical' : 'warning',
+        status: statusOf(c, 'infra.critical_bridges'),
       }
     },
   },
@@ -333,7 +340,7 @@ export const METRICS: MetricDefinition<any>[] = [
     source: 'KeNHA / KURA / KeRRA', sourceMode: 'batch', to: '/infrastructure/maintenance', filterFields: DOMAIN_FILTERS.infra,
     period: 'OPEN', description: 'Value of open work orders',
     resolve: (i: InfrastructureSummary) => ({
-      value: `KES ${fmtKsh(i.maintenance.open_value_kes)}`, period: 'OPEN',
+      value: formatValue(i.maintenance.open_value_kes, 'kes'), period: 'OPEN',
       description: 'Value of open work orders', status: 'neutral',
     }),
   },
@@ -344,8 +351,8 @@ export const METRICS: MetricDefinition<any>[] = [
     resolve: (i: InfrastructureSummary) => {
       const u = i.budget.utilization_pct
       return {
-        value: u.toFixed(1), unit: '%', period: 'FY', description: 'Development budget utilised',
-        status: u >= 60 ? 'healthy' : u >= 40 ? 'warning' : 'critical',
+        ...pctParts(u), period: 'FY', description: 'Development budget utilised',
+        status: statusOf(u, 'infra.budget_absorption_pct'),
       }
     },
   },

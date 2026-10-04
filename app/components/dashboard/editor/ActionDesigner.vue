@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { Plus } from 'lucide-vue-next'
 import type { ActionType, DashboardAction, FilterField, WidgetInstance } from '~/types/dashboard'
-import { WIDGETS_BY_TYPE, widgetFilterFields } from '~/utils/widgetRegistry'
+import { WIDGETS_BY_TYPE, widgetEmits, widgetFilterFields } from '~/utils/widgetRegistry'
 import { FIELD_LABELS } from '~/utils/filterFields'
 import { newId } from '~/utils/layoutEngine'
 
@@ -74,9 +74,9 @@ const checked = (e: Event) => (e.target as HTMLInputElement).checked
 const labelOf = (w: WidgetInstance) => w.title || WIDGETS_BY_TYPE[w.type]?.title || w.type
 const emitsOf = (id: string): FilterField[] => {
   const w = props.widgets.find(x => x.id === id)
-  return (w && WIDGETS_BY_TYPE[w.type]?.emits) || []
+  return w ? widgetEmits(w.type, w.config) : []
 }
-const sources = computed(() => props.widgets.filter(w => WIDGETS_BY_TYPE[w.type]?.emits?.length))
+const sources = computed(() => props.widgets.filter(w => widgetEmits(w.type, w.config).length))
 const compatible = (a: DashboardAction) =>
   props.widgets.filter(w => w.id !== a.sourceWidgetId && widgetFilterFields(w.type, w.config).includes(a.field))
 

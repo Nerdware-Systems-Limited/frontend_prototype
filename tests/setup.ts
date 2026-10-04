@@ -44,6 +44,14 @@ import { ref, computed, reactive, onMounted } from 'vue'
 // every other auto-import above.
 ;(globalThis as any).definePageMeta = () => {}
 
+// The baseline access policy is served by the backend; tests resolve against a
+// copy of it (tests/fixtures/access-control.json = apps/access_control/data/
+// access-control.json). Refresh the fixture when that file changes.
+import { setBaseSettings, type AccessSettings } from '~/utils/resolveAccess'
+import accessBaseline from './fixtures/access-control.json'
+
+setBaseSettings(accessBaseline as unknown as AccessSettings)
+
 import { afterEach } from 'vitest'
 
 afterEach(() => {

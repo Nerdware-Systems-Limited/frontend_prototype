@@ -74,6 +74,8 @@ export type WidgetKind =
   | 'feed-health'  // Integration Hub status strip
   | 'text'         // heading / markdown note
   | 'embed'        // an existing full-page section, mounted as-is
+  | 'breakdown'    // generic: a measure by category (binding shape 'categorical')
+  | 'table'        // generic: rows (binding shape 'rows')
 
 export type WidgetCategory = 'KPIs' | 'Charts' | 'Maps' | 'Operations' | 'Agency' | 'Layout'
 
@@ -88,6 +90,18 @@ export interface WidgetDefinition {
   category: WidgetCategory
   defaultSize: WidgetSize
   minSize?: WidgetSize
+  /**
+   * The frame draws a card (surface, border, title bar) around the widget.
+   * False for widgets that draw their own card - KPIs, agency cards, headings.
+   * Default true.
+   */
+  framed?: boolean
+  /**
+   * Shown as its own palette entry. False for the generic primitives
+   * (stat / series / breakdown / table): authors place them through presets,
+   * which carry a binding. Default true.
+   */
+  palette?: boolean
   /** Any one of these permissions is enough. Empty = visible to anyone with the dashboard. */
   requiredPermissions?: string[]
   /** Restrict to viewers of these agencies (super admins bypass). */

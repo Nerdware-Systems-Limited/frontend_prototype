@@ -8,17 +8,11 @@
  * Field masking is per-value, not per-route (section 6 intro: masking
  * "never blocks the whole route, only flags fields") - a page calls
  * isMasked()/mask() once per restricted field it renders, using the same
- * category id declared on that route in access-control.json.
+ * category id declared on that route in the baseline policy.
  */
 
-import accessControlData from '~/config/access-control.json'
+import { BASE_SETTINGS } from '~/utils/resolveAccess'
 import { useAccessControl } from './useAccessControl'
-
-const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries((accessControlData as any).restrictedCategories ?? {}).map(
-    ([id, def]) => [id, (def as { label: string }).label],
-  ),
-)
 
 export function useFieldMask(path: string) {
   const access = useAccessControl()
@@ -29,7 +23,7 @@ export function useFieldMask(path: string) {
   }
 
   function categoryLabel(category: string): string {
-    return CATEGORY_LABELS[category] ?? category
+    return BASE_SETTINGS.restrictedCategories[category]?.label ?? category
   }
 
   /** Returns `value` untouched, or `placeholder` when `category` is denied on this route. */

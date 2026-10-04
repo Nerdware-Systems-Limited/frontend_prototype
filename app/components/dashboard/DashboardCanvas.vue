@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { Copy, Eye, EyeOff, GripVertical, X } from 'lucide-vue-next'
 import { GRID_COLUMNS, type WidgetInstance } from '~/types/dashboard'
-import { WIDGETS_BY_TYPE } from '~/utils/widgetRegistry'
+import { WIDGETS_BY_TYPE, resolveCatalogItem } from '~/utils/widgetRegistry'
 import { bottom, clampBox, settle } from '~/utils/layoutEngine'
 import WidgetFrame from '~/components/dashboard/WidgetFrame.vue'
 
@@ -148,10 +148,10 @@ function onDragOver(e: DragEvent) {
   if (props.mode !== 'edit') return
   const type = [...(e.dataTransfer?.types ?? [])].find(t => t.startsWith('application/x-uapts-widget+'))
   if (!type) return
-  const def = WIDGETS_BY_TYPE[type.split('+')[1]!]
-  if (!def) return
+  const item = resolveCatalogItem(type.slice(type.indexOf('+') + 1))
+  if (!item) return
   e.dataTransfer!.dropEffect = 'copy'
-  dropCell.value = cellAt(e, def.defaultSize.w, def.defaultSize.h)
+  dropCell.value = cellAt(e, item.size.w, item.size.h)
 }
 function onDrop(e: DragEvent) {
   const type = e.dataTransfer?.getData('application/x-uapts-widget')

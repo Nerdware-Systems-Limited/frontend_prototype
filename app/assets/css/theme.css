@@ -81,6 +81,18 @@
   /* Domain accents (used by a few pages) */
   --accent-purple: #6D53C4;
   --accent-cyan:   #0E7490;
+
+  /* Categorical chart series - slot order is the colour-blind-safety
+     mechanism (validated: adjacent CVD dE >= 9.2, normal-vision >= 19.6 on
+     #FFFFFF; first three slots pass all-pairs). Never reorder or cycle;
+     a 7th series folds into "Other". Status colours stay reserved for status.
+     viz-3/5/6 sit below 3:1 on white: charts always offer a table view. */
+  --viz-1: #1F5FB4;
+  --viz-2: #EB6834;
+  --viz-3: #1BAF7A;
+  --viz-4: #4A3AA7;
+  --viz-5: #E87BA4;
+  --viz-6: #EDA100;
   --traffic-green:  #1A9C52;
   --traffic-yellow: #C79200;
   --traffic-orange: #E06B18;
@@ -189,6 +201,13 @@
 
     --accent-purple: #A78BFA;
     --accent-cyan:   #22D3EE;
+    /* Chart series, stepped for the dark surface (validated on #131C28, all >= 3:1). */
+    --viz-1: #3987E5;
+    --viz-2: #D95926;
+    --viz-3: #199E70;
+    --viz-4: #9085E9;
+    --viz-5: #D55181;
+    --viz-6: #C98500;
     --traffic-green:  #35C27C;
     --traffic-yellow: #E0A72E;
     --traffic-orange: #F0873E;
@@ -262,6 +281,13 @@
 
   --accent-purple: #A78BFA;
   --accent-cyan:   #22D3EE;
+  /* Chart series, stepped for the dark surface (validated on #131C28, all >= 3:1). */
+  --viz-1: #3987E5;
+  --viz-2: #D95926;
+  --viz-3: #199E70;
+  --viz-4: #9085E9;
+  --viz-5: #D55181;
+  --viz-6: #C98500;
   --traffic-green:  #35C27C;
   --traffic-yellow: #E0A72E;
   --traffic-orange: #F0873E;

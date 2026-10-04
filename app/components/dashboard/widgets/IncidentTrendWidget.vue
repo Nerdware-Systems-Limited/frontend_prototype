@@ -3,8 +3,7 @@
        one shared-crosshair chart. Only real series are drawn - if the
        summary has no incident trend, this is a one-line chart, honestly. -->
   <div class="trend-widget">
-    <EmptyState v-if="loading && !series.length" loading compact />
-    <EmptyState v-else-if="error" compact :message="`NTSA IRSMS feed unavailable - ${error}`" />
+    <WidgetState v-if="state !== 'ready' && state !== 'refreshing'" :state="state" source="NTSA IRSMS" :detail="error" @retry="reload" />
     <MultiLineChart v-else :series="series" :height="chartHeight" empty-text="No trend data for this period." />
   </div>
 </template>
@@ -14,10 +13,11 @@ import type { WidgetInstance } from '~/types/dashboard'
 import type { SafetySummary } from '~/composables/api/useSafety'
 import { useDomainData } from '~/composables/useDomainData'
 import { useWidgetFilters } from '~/composables/useDashboardFilters'
+import WidgetState from '~/components/dashboard/WidgetState.vue'
 
 const props = defineProps<{ instance: WidgetInstance; config: Record<string, unknown>; bodyHeight?: number }>()
 const { context } = useWidgetFilters(() => props.instance.id)
-const { data, error, loading } = useDomainData(() => 'safety' as const, () => context.value)
+const { data, error, state, reload } = useDomainData(() => 'safety' as const, () => context.value)
 
 const chartHeight = computed(() => Math.max(120, (props.bodyHeight ?? 200) - 28))
 
