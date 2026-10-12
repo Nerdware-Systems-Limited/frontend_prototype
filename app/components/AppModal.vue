@@ -74,7 +74,11 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+  // A modal torn down while open (route change) must not leave the page unscrollable.
+  if (props.modelValue) document.body.style.overflow = ''
+})
 
 // Prevent body scroll while modal is open
 watch(() => props.modelValue, (open) => {

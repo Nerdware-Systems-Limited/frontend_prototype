@@ -1,10 +1,16 @@
 # UAPTS Frontend - Nuxt 4 + Vue 3
 
-The Unified Analytics and Predictive Transport System dashboard SPA.
+The Unified Analytics and Predictive Transport System dashboard SPA for Kenyan transport agencies. It owns no
+data: every figure, role and permission comes from the Django backend over REST and two WebSockets.
+
+**Documentation:** this file is the quick start. Detailed docs live in [`docs/`](docs/README.md): architecture,
+development guide, auth and sessions, API layer, access control, Dashboard Manager, security and the full
+code-level reference.
 
 ## Stack
 
-- **Nuxt 4** with file-based routing under `app/pages/`
+- **Nuxt 4** (`srcDir: app/`) as a single-page app (`ssr: false` for every route), file-based routing under
+  `app/pages/`
 - **Vue 3** Composition API throughout
 - **Pinia** for the auth store (`app/stores/auth.ts`), notifications, and
   Module Access overrides (`app/stores/accessPolicy.ts`)
@@ -12,9 +18,10 @@ The Unified Analytics and Predictive Transport System dashboard SPA.
   design system in `app/assets/css/theme.css` (tokens, top nav, sidebar, KPI
   cards, agency cards, alerts, modals) with light and dark themes - see
   [Theming](#theming) below
-- **lucide-vue-next** icons
+- **lucide-vue-next** icons, **Leaflet** + protomaps for maps, **d3-scale/shape/array** for chart maths (marks are
+  Vue templates, no chart library)
 - **TypeScript** strict mode
-- **Vitest** for unit + integration tests
+- **Vitest** for unit + integration tests (51 files, 747 tests)
 
 ## API wiring
 
@@ -54,6 +61,7 @@ app/composables/api/
 ├── useNotifications.ts           # M11 - event-driven notifications
 ├── useIntegrations.ts            # M12 - Data Integration Hub
 ├── useGis.ts                     # M13 - GeoJSON / map endpoints
+├── useGisLayers.ts               # M13 - uploaded layers, coverage, layer requests
 └── useTraining.ts                # M14 - Training Institutes
 ```
 
@@ -64,15 +72,24 @@ are written ahead of the backend API, mirroring the established
 the design doc, and the corresponding pages render an honest empty state
 until the backend mounts the endpoint. No mock data is fabricated.
 
-The composables resolve the base URL from `NUXT_PUBLIC_API_BASE` and reuse
-the `$api` Nuxt plugin from `app/plugins/api.ts`, which handles Bearer-token
-injection and silent refresh.
+The composables reuse the `$api` Nuxt plugin from `app/plugins/api.ts`, which
+handles Bearer-token injection and a single silent refresh-and-retry on 401.
+In `nuxi dev` the browser stays same-origin: the Nuxt dev server proxies `/api`
+and `/media` to `NUXT_PUBLIC_API_BASE` (`nitro.devProxy`), so no backend CORS
+change is needed; production builds call the absolute URL. WebSockets always
+connect straight to the backend. See [`docs/API_LAYER.md`](docs/API_LAYER.md).
+
+Two clients live outside `api/` because they carry their own error handling:
+`app/composables/useDashboardApi.ts` (Dashboard Manager, `/api/v1/dashboards/`)
+and the access-policy adapter in `app/utils/accessPolicyStorage.ts`
+(`/api/v1/access-control/`).
 
 ## Pages
 
 Routes live under `app/pages/`, grouped by module:
 
-- `/dashboard` - M01 executive dashboard
+- `/dashboard` - M01 dashboard. Shows the dashboard the server assigns to the viewer, or falls back to the
+  National (super admin, SDT) or Agency Command Centre when none is assigned
 - `/traffic`, `/traffic/analytics`, `/traffic/alerts` - M02 Road Traffic
 - `/fleet`, `/fleet/live`, `/fleet/behaviour`, `/fleet/geofences`, `/fleet/trip-playbacks` - M03 Fleet
 - `/public-transport` and subpages (`brt`, `compliance`, `driver-licensing`, `operators`, `vehicle-inspections`, `vehicle-registration`) - M04
@@ -84,10 +101,14 @@ Routes live under `app/pages/`, grouped by module:
 - `/analytics`, `/query-builder`, `/reports` - M09/M15
 - `/agencies`, `/users`, `/roles`, `/access-policies`, `/audit` - M10 access control
   (`/access-policies` is "Module Access": per-agency and per-role module, page,
-  data-category and capability access; see `docs/Reference.md` §9.7)
+  data-category and capability access; see `docs/ACCESS_CONTROL.md`)
+- `/admin/dashboards`, `/admin/dashboards/[id]` - Dashboard Manager: list and
+  editor (needs `dashboards.manage` or `dashboards.manage_agency`; see
+  `docs/DASHBOARD_MANAGER.md`)
 - `/notifications`, `/notifications/rules` - M11
 - `/integrations` - M12
-- `/gis` - M13
+- `/gis` and subpages (`overview`, `coverage`, `layers`, `layers/[id]`, `requests`) - M13 GIS & Spatial Analysis
+  (the five subpages cover agency-uploaded layers; see `docs/Reference.md` M13)
 - `/training` and subpages (`cohorts`, `enrollments`, `completions`) - M14
 - `/profile` - user profile
 - `/login`, `/forgot-password`, `/reset-password/[uid]/[token]` - auth layout
@@ -97,6 +118,20 @@ Routes live under `app/pages/`, grouped by module:
 whose composable is ahead of the API (see above) render an honest "not yet
 integrated" empty state instead of mock data, and light up automatically
 once the endpoint ships.
+
+## Sessions and access
+
+- **Tokens.** The access token lives in memory only. The refresh token goes to `localStorage` ("Remember me") or
+  `sessionStorage`. A refresh rotates the token, and tabs share the session over a `BroadcastChannel` with a Web
+  Lock serialising refreshes, so "open in new tab" stays signed in and two tabs cannot log each other out. See
+  [`docs/AUTH_AND_SESSIONS.md`](docs/AUTH_AND_SESSIONS.md).
+- **Route guard.** `app/middleware/auth.global.ts` requires a session, loads the access policy, then resolves the
+  route against it; denied routes go to `/dashboard`. `dashboard-manager.global.ts` additionally protects
+  `/admin/dashboards/**`.
+- **Access model.** Two independent axes: role tier (`usePermissions`) and agency scope (`useAccessControl`). The
+  baseline policy is **served by the backend** (`GET /api/v1/access-control/baseline/`), Module Access overrides are
+  saved through `/api/v1/access-control/`, and the resolver fails closed until the baseline arrives. All of this is a
+  UI convenience layer; the backend is the security boundary (`docs/SECURITY.md`).
 
 ## Theming
 
@@ -154,6 +189,10 @@ npm run test:watch   # dev mode
 npm run test:ui      # vitest --ui
 ```
 
+51 files, 747 tests. Beyond the contract tests below there is one file per subsystem (access control, session
+sync, dashboard bindings, widgets, thresholds, query sources, and so on); the list and conventions are in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
 - **`tests/unit/types.test.ts`** - fixture-driven shape checks for every
   API response type. Catches drift between the backend serializers and
   the TypeScript types in `app/types/uapts.ts`.
@@ -186,12 +225,14 @@ NUXT_PUBLIC_TILES_BASE=https://uapts.eu.cc/media/
 `NUXT_PUBLIC_WS_URL` is left unset by default so `useAuditSocket` can derive
 a same-host `ws(s)://` URL from `NUXT_PUBLIC_API_BASE` instead.
 
+`NUXT_PUBLIC_API_PROXY` defaults to on in `nuxi dev` and off in production builds.
+
 Overrides for the integration test suite (`tests/integration/live.test.ts`):
 
 ```
 UAPTS_API_BASE=http://127.0.0.1:8000
-UAPTS_TEST_EMAIL=admin@uapts.go.ke
-UAPTS_TEST_PASSWORD=devpass123
+UAPTS_TEST_EMAIL=<a backend test account>
+UAPTS_TEST_PASSWORD=<its password>
 UAPTS_SKIP_LIVE=1
 ```
 
@@ -199,5 +240,22 @@ UAPTS_SKIP_LIVE=1
 
 ```bash
 npm run build       # nitro server build
+npm run generate    # static output (the app is an SPA)
 npm run preview     # local preview
 ```
+
+## Documentation map
+
+| Document | Contents |
+|---|---|
+| [`docs/README.md`](docs/README.md) | Index of everything below |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, layout, boot sequence, data flow |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Setup, env vars, tests, conventions, recipes, deploy notes |
+| [`docs/AUTH_AND_SESSIONS.md`](docs/AUTH_AND_SESSIONS.md) | Login, MFA, tokens, cross-tab sessions |
+| [`docs/API_LAYER.md`](docs/API_LAYER.md) | `$api`, composables, proxy, WebSockets |
+| [`docs/ACCESS_CONTROL.md`](docs/ACCESS_CONTROL.md) | Resolver, Module Access, policy store |
+| [`docs/DASHBOARD_MANAGER.md`](docs/DASHBOARD_MANAGER.md) | Widgets, bindings, editor, runtime |
+| [`docs/MODULE_UX.md`](docs/MODULE_UX.md) | Collapsible maps and incidents, time range, certificate alerts, HQ summary |
+| [`docs/Reference.md`](docs/Reference.md) | Code-level index of routes, stores, composables, components |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Security overview and known gaps |
+| [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md) | Product intent and visual design system |

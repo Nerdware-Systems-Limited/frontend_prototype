@@ -10,8 +10,9 @@
 // regulatory references, ML risk scores). Level crossing registries
 // live in useRailInfrastructure() since they're an asset, not an event.
 //
-// Backend surface not yet implemented - written against the expected
-// shape; pages degrade gracefully (Promise.allSettled + error banner).
+// Backend: /api/v1/railway/safety/{corrective-actions,risk-indicators}/.
+// Both tables start empty - the endpoints return an empty page until
+// corrective actions are entered / the risk pipeline writes scores.
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi, cleanQuery } from './_client'

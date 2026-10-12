@@ -5,9 +5,9 @@
     subtitle="KPA · KMA · KMFRI - Port &amp; berth registry, capacity utilisation, channel depth, navigational aids, dry docks, ICDs, and capital works"
   >
     <template #actions>
-      <NuxtLink to="/maritime" class="btn">Vessel Movements →</NuxtLink>
-      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations →</NuxtLink>
-      <NuxtLink to="/maritime/waterways" class="btn">Waterways →</NuxtLink>
+      <NuxtLink to="/maritime" class="btn">Vessel Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/waterways" class="btn">Waterways<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -110,8 +110,7 @@
 
   <!-- Port map -->
   <SectionTitle pill="Live Registry">Port Map</SectionTitle>
-  <div class="card map-card">
-    <div class="card-header">Registered Ports</div>
+  <CollapsibleSection class="card map-card" title="Registered Ports" storage-key="map:maritime/infrastructure">
     <ClientOnly>
       <UaptsMap
         :markers="portMarkers"
@@ -120,7 +119,7 @@
         height="380px"
       />
     </ClientOnly>
-  </div>
+  </CollapsibleSection>
 
   <!-- Port registry -->
   <SectionTitle pill="Live Registry">Port Registry</SectionTitle>
@@ -363,6 +362,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime, useMaritimeInfrastructure } from '~/composables/api'
 import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary, CapitalWorkStatus } from '~/composables/api'
 

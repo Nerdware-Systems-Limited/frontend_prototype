@@ -47,8 +47,7 @@
 
   <!-- Map + breach log -->
   <div class="two-col">
-    <div class="card map-card">
-      <div class="card-header">Zone Map</div>
+    <CollapsibleSection class="card map-card" title="Zone Map" storage-key="map:fleet/geofences">
       <ClientOnly>
         <UaptsMap
           :markers="zoneMarkers"
@@ -65,7 +64,7 @@
         <span class="mk"><span class="dot" style="background:var(--info)" /> Medium / Low</span>
         <span class="mk"><span class="dot" style="background:var(--border-strong)" /> Inactive</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div id="breach-events" class="card drill-target">
       <div class="card-header">

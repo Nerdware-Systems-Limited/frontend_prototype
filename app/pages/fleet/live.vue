@@ -36,7 +36,7 @@
 
   <!-- Map + sidebar -->
   <div class="map-layout">
-    <div class="map-pane card map-card">
+    <CollapsibleSection class="map-pane card map-card" title="Live Fleet Map" storage-key="map:fleet/live">
       <ClientOnly>
         <UaptsMap
           :markers="mapMarkers"
@@ -53,7 +53,7 @@
         <span class="mk"><span class="dot" style="background:var(--destructive)" /> Impounded</span>
         <span class="mk"><span class="dot" style="background:var(--border-strong)" /> Unknown</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="sidebar-pane card">
       <div class="card-header">

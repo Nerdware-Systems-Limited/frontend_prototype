@@ -5,9 +5,9 @@
     subtitle="KCAA · KAA - Airport registry, capacity utilisation, runway/navaid condition, terminal & ATC facilities, and capital works"
   >
     <template #actions>
-      <NuxtLink to="/aviation" class="btn">Flight Movements →</NuxtLink>
-      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing →</NuxtLink>
-      <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats →</NuxtLink>
+      <NuxtLink to="/aviation" class="btn">Flight Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -69,8 +69,7 @@
 
   <!-- Airport map -->
   <SectionTitle pill="Live Registry">Airport Map</SectionTitle>
-  <div class="card map-card">
-    <div class="card-header">Registered Airports</div>
+  <CollapsibleSection class="card map-card" title="Registered Airports" storage-key="map:aviation/infrastructure">
     <ClientOnly>
       <UaptsMap
         :markers="airportMarkers"
@@ -79,7 +78,7 @@
         height="380px"
       />
     </ClientOnly>
-  </div>
+  </CollapsibleSection>
 
   <!-- Airport registry -->
   <SectionTitle pill="Live Registry">Airport Registry</SectionTitle>
@@ -236,6 +235,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime, useAviationInfrastructure } from '~/composables/api'
 import type { Airport, PassengerByAirport, Runway, Navaid, AviationFacility, AviationCapitalWork, AviationInfraSummary } from '~/composables/api'
 

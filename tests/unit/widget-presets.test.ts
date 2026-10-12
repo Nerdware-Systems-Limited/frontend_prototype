@@ -15,7 +15,16 @@ import { resolveCatalogItem, widgetEmits, widgetFilterFields, widgetPermissions,
 const H = (h: number) => `2026-09-30T${String(h).padStart(2, '0')}:00:00Z`
 
 /** Minimal payloads with the field names of the typed summaries in composables/api. */
+const QUERY = (rows: Record<string, unknown>[], total = rows.length) => ({ dataset: 'x', label: 'x', executed_at: H(0), total, count: rows.length, rows, limit: 500, offset: 0, sort: { field: 'id', direction: 'desc' } })
+
 const FIXTURES: Record<string, unknown> = {
+  'query.incidents': QUERY([
+    { id: '1', title: 'Collision at Kikuyu', incident_type: 'collision', severity: 'fatal', status: 'resolved', reported_at: H(4) },
+    { id: '2', title: 'Rollover on A104', incident_type: 'rollover', severity: 'serious', status: 'reported', reported_at: H(9) },
+  ], 812),
+  'query.congestion': QUERY([{ id: '1', severity: 'high', status: 'active', started_at: H(7), avg_speed_kmh: 12, segment_road_code: 'A8' }]),
+  'query.traffic_counts': QUERY([{ id: '1', recorded_at: H(7), vehicle_vol: 410, avg_speed: 52, occupancy_pct: 30, congestion_level: 'moderate', segment_road_code: 'A8' }]),
+  'query.vehicles': QUERY([{ id: '1', plate_number: 'KDA 001A', vehicle_type: 'bus', status: 'operational', make: 'Isuzu', year_of_manufacture: 2019 }]),
   'traffic.summary': {
     kpis: { active_stations: 4, total_stations: 6, active_congestion_events: 2, total_segments_observed: 30, avg_speed_24h_kmh: 48, total_volume_24h: 12000 },
     volume_24h: [{ hour: H(1), volume: 300, avg_speed: 60 }, { hour: H(2), volume: 250, avg_speed: null }],
@@ -74,10 +83,17 @@ const FIXTURES: Record<string, unknown> = {
     bridges: { by_condition_class: { good: 300, critical: 5 } },
     streetlights: { operational_pct: 77.5 },
     construction: { portfolio_by_corridor: [{ corridor: 'Northern', count: 4, contract_sum: 9e9, disbursed: 4e9, avg_physical: 45 }] },
+    budget: { fiscal_year: 2026, allocated_kes: 8e9, disbursed_kes: 5.2e9, committed_kes: 6e9, utilization_pct: 65 },
   },
+  'safety.hotspots': [{ id: 'h1', segment_road_code: 'A8', latitude: -1.1, longitude: 36.6, risk_tier: 'very_high', predicted_risk_score: 91, horizon_days: 30 }],
+  'safety.top-blackspots': [{ id: 'b1', segment_road_code: 'A104', segment_road_name: 'Waiyaki Way', centroid_latitude: -1.26, centroid_longitude: 36.78, ranking_tier: 'critical', accident_count_rolling: 14, fatality_count_rolling: 3 }],
+  'integrations.feeds': [{ id: 'f1', name: 'iTIMS Vehicle Registry', source_system: 'iTIMS', agency_code: 'NTSA', status: 'disconnected', last_sync_at: H(3) }],
 }
 
-const SHAPE_FOR: Record<string, string> = { stat: 'scalar', series: 'series', breakdown: 'categorical', table: 'rows' }
+const SHAPE_FOR: Record<string, string> = {
+  'stat': 'scalar', 'series': 'series', 'breakdown': 'categorical', 'table': 'rows',
+  'points': 'points', 'status-list': 'status', 'progress': 'scalar', 'heatmap': 'matrix',
+}
 
 describe('widget presets', () => {
   it('have unique ids', () => {

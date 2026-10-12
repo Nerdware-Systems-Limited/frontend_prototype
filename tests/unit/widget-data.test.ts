@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { effectScope, nextTick, ref } from 'vue'
+import { createApp, effectScope, nextTick, ref } from 'vue'
 import { SOURCES, SOURCES_BY_ID, type WidgetSource } from '~/utils/dataSources'
 import {
   classifyError, invalidateWidgetData, loadSource, useWidgetData, useWidgetSources,
@@ -25,6 +25,20 @@ function fakeSource(id: string, fetch: WidgetSource['fetch'], extra: Partial<Wid
   }
   SOURCES_BY_ID[id] = s
   return s
+}
+
+/**
+ * An effect scope that runs inside a Vue app, so the composable's inject() calls
+ * (the dashboard refresh tick, the widget registry) resolve to their defaults the
+ * way they do under a real component, instead of warning and returning undefined.
+ */
+function makeScope() {
+  const app = createApp({})
+  app.provide('dashboard:refreshTick', ref(0))
+  const scope = effectScope()
+  const run = scope.run.bind(scope)
+  scope.run = (<T>(fn: () => T) => app.runWithContext(() => run(fn))) as typeof scope.run
+  return scope
 }
 
 const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); await nextTick() }
@@ -105,7 +119,7 @@ describe('useWidgetData', () => {
     let n = 0
     const gates: ReturnType<typeof deferred<number>>[] = []
     fakeSource('t.r', () => { const d = deferred<number>(); gates.push(d); n++; return d.promise })
-    const scope = effectScope()
+    const scope = makeScope()
     const w = scope.run(() => useWidgetData<number>(() => 't.r', () => ({})))!
 
     expect(w.state.value).toBe('loading')
@@ -132,7 +146,7 @@ describe('useWidgetData', () => {
     const gates = new Map<string, ReturnType<typeof deferred<string>>>()
     fakeSource('t.race', (p) => { const d = deferred<string>(); gates.set(p.agency ?? '', d); return d.promise }, { honours: ['agency'] })
     const ctx = ref<{ agency: string }>({ agency: 'OLD' })
-    const scope = effectScope()
+    const scope = makeScope()
     const w = scope.run(() => useWidgetData<string>(() => 't.race', () => ctx.value))!
     await flush()
     ctx.value = { agency: 'NEW' }
@@ -148,7 +162,7 @@ describe('useWidgetData', () => {
   it('reports forbidden and not-integrated, and drops stale data on failure', async () => {
     fakeSource('t.403', async () => { throw { status: 403 } })
     fakeSource('t.ahead', async () => { throw { status: 404 } }, { backend: 'ahead-of-backend' })
-    const scope = effectScope()
+    const scope = makeScope()
     const a = scope.run(() => useWidgetData(() => 't.403', () => ({})))!
     const b = scope.run(() => useWidgetData(() => 't.ahead', () => ({})))!
     await flush()
@@ -160,7 +174,7 @@ describe('useWidgetData', () => {
 
   it('treats a successful but empty payload as empty', async () => {
     fakeSource('t.empty', async () => [])
-    const scope = effectScope()
+    const scope = makeScope()
     const w = scope.run(() => useWidgetData<unknown[]>(() => 't.empty', () => ({}), { isEmpty: d => !d.length }))!
     await flush()
     expect(w.state.value).toBe('empty')
@@ -168,7 +182,7 @@ describe('useWidgetData', () => {
   })
 
   it('is idle when no source is selected', async () => {
-    const scope = effectScope()
+    const scope = makeScope()
     const w = scope.run(() => useWidgetData(() => null, () => ({})))!
     await flush()
     expect(w.state.value).toBe('idle')
@@ -180,7 +194,7 @@ describe('useWidgetSources', () => {
   it('shows what loaded when one source fails (partial)', async () => {
     fakeSource('t.ok', async () => 'fine')
     fakeSource('t.bad', async () => { throw { status: 500 } })
-    const scope = effectScope()
+    const scope = makeScope()
     const w = scope.run(() => useWidgetSources(() => ['t.ok', 't.bad'], () => ({})))!
     await flush()
     expect(w.state.value).toBe('partial')
@@ -192,7 +206,7 @@ describe('useWidgetSources', () => {
   it('two widgets on the same source make one request', async () => {
     const fetch = vi.fn(async () => 'x')
     fakeSource('t.shared', fetch)
-    const scope = effectScope()
+    const scope = makeScope()
     scope.run(() => {
       useWidgetSources(() => ['t.shared'], () => ({}))
       useWidgetSources(() => ['t.shared'], () => ({}))

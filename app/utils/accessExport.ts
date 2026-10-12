@@ -8,7 +8,7 @@
  */
 
 import {
-  BASE_SETTINGS, CAPABILITIES, agencyRoleTiers, capabilitySet, categoryState, editableModules, editableRoutes,
+  BASE_SETTINGS, CAPABILITIES, agencyRoleColumns, capabilitySet, categoryState, editableModules, editableRoutes,
   isCategoryLocked, pageScope, type PolicyOverrides, type ScopeLevel,
 } from '~/utils/resolveAccess'
 import { capabilityLabel, enforcementLabel } from '~/utils/accessLabels'
@@ -26,8 +26,10 @@ export interface PermissionExport {
   capabilities: Record<string, string | boolean>[]
 }
 
-export function buildPermissionExport(ov: PolicyOverrides, code: string, includesUnsavedChanges: boolean): PermissionExport {
-  const roles = agencyRoleTiers(code)
+export function buildPermissionExport(
+  ov: PolicyOverrides, code: string, includesUnsavedChanges: boolean, builtInRoles: string[] = [],
+): PermissionExport {
+  const roles = agencyRoleColumns(code, builtInRoles)
   const pages = editableModules().flatMap(moduleId => editableRoutes(moduleId).map(route => ({
     module: BASE_SETTINGS.modules[moduleId]?.label ?? moduleId,
     moduleId,

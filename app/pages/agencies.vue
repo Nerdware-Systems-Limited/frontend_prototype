@@ -1,13 +1,12 @@
 <template>
   <PageHeader
-    class="header-actions-fill"
     eyebrow="Access Control"
     title="Agencies"
     :subtitle="canWrite ? 'Platform-wide agency directory (tbl_agencies) - create and adjust the agencies UAPTS tracks' : 'Platform-wide agency directory - read-only for your role, contact a Super Admin to make changes'"
   >
     <template #actions>
       <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-agencies" label="Export" />
-      <button v-if="canWrite" class="btn-primary" @click="openCreate">+ Add Agency</button>
+      <button v-if="canWrite" class="btn btn-primary" @click="openCreate">+ Add Agency</button>
     </template>
   </PageHeader>
 
@@ -136,7 +135,7 @@
       <div class="modal-footer">
         <button class="btn" @click="closeModal">Cancel</button>
         <button
-          class="btn-primary"
+          class="btn btn-primary"
           :disabled="!form.agency_code || !form.agency_name || saving"
           @click="doSave"
         >{{ saving ? 'Saving…' : (editId ? 'Save Changes' : 'Add Agency') }}</button>

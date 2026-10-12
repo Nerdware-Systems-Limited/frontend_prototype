@@ -5,8 +5,8 @@
     subtitle="KRC · NCTTCA - SGR &amp; MGR timetables, OTP, NCTTCA corridor punctuality benchmarks, and recent operation adherence"
   >
     <template #actions>
-      <DayRangeToggle v-model="otpDays" :options="[7, 30, 90]" suffix="d OTP" @update:model-value="loadOtp" />
-      <NuxtLink to="/railway/network-inventory" class="btn">Station / Route Performance →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="loadOtp" />
+      <NuxtLink to="/railway/network-inventory" class="btn">Station / Route Performance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -18,7 +18,7 @@
       <span class="otp-pct-num" :style="{ color: otp.on_time_pct >= 85 ? 'var(--success-fg)' : otp.on_time_pct >= 70 ? 'var(--warning-fg)' : 'var(--danger-fg)' }">
         {{ otp.on_time_pct.toFixed(1) }}%
       </span>
-      <span class="otp-pct-label">On-Time ({{ otpDays }}d)</span>
+      <span class="otp-pct-label">On-Time ({{ timeRange.period.value.toLowerCase() }})</span>
     </div>
     <div class="otp-panel-bar-col">
       <div class="otp-panel-bar-wrap">
@@ -43,7 +43,7 @@
       :value="otp ? `${otp.on_time_pct.toFixed(1)}%` : '-'"
       :unavailable="!otp"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${otpDays}D`"
+      :period="`${timeRange.period.value}`"
       description="Rolling period"
       :status="!otp ? undefined : otp.on_time_pct >= 85 ? 'healthy' : 'warning'"
       to="#otp-panel"
@@ -53,7 +53,7 @@
       :value="otp ? fmtNum(otp.total_operations) : '-'"
       :unavailable="!otp"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${otpDays}D`"
+      :period="`${timeRange.period.value}`"
       to="#schedule-adherence"
     />
     <KpiCard
@@ -61,7 +61,7 @@
       :value="otp ? `${otp.avg_delay_min.toFixed(0)} min` : '-'"
       :unavailable="!otp"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${otpDays}D`"
+      :period="`${timeRange.period.value}`"
       description="Arrival delay average"
       :status="!otp ? undefined : otp.avg_delay_min < 10 ? 'healthy' : 'warning'"
     />
@@ -70,7 +70,7 @@
       :value="otp ? fmtNum(otp.delayed) : '-'"
       :unavailable="!otp"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${otpDays}D`"
+      :period="`${timeRange.period.value}`"
       :description="otp ? `${otp.cancellation_pct.toFixed(1)}% cancellation rate` : ''"
       to="#schedule-adherence"
     />
@@ -79,7 +79,7 @@
       :value="otp ? fmtNum(otp.cancelled) : '-'"
       :unavailable="!otp"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${otpDays}D`"
+      :period="`${timeRange.period.value}`"
       description="Service cancelled"
       :status="!otp ? undefined : otp.cancelled === 0 ? 'healthy' : 'warning'"
       to="#schedule-adherence"
@@ -189,7 +189,7 @@
   </div>
 
   <!-- Revenue, bookings and no-shows by route -->
-  <SectionTitle :pill="`KRC Ticketing · ${otpDays}d`">Revenue &amp; Bookings by Route</SectionTitle>
+  <SectionTitle :pill="`KRC Ticketing · ${timeRange.period.value.toLowerCase()}`">Revenue &amp; Bookings by Route</SectionTitle>
 
   <div class="card" style="margin-bottom:16px">
     <div class="card-body">
@@ -273,6 +273,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway } from '~/composables/api'
 import type { TrainSchedule, TrainOperation, OnTimeStats, RailTicket } from '~/composables/api'
 
@@ -284,7 +286,8 @@ const loading    = ref(true)
 const error      = ref<string | null>(null)
 const schedulesError = ref(false)
 const lastRefreshed  = ref('-')
-const otpDays        = ref(30)
+const timeRange = useTimeRange('railway', { default: '30d' })
+const otpDays = timeRange.days
 const networkFilter  = ref('')
 const classFilter    = ref('')
 const dayTypeFilter  = ref('')

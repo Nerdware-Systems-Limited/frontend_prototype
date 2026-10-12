@@ -5,7 +5,7 @@
     subtitle="Build dashboards from widgets, then choose which agencies, departments, roles and people land on them"
   >
     <template v-if="allowed" #actions>
-      <button type="button" class="btn-primary" @click="openCreate">
+      <button type="button" class="btn btn-primary" @click="openCreate">
         <Plus :size="14" aria-hidden="true" /> New dashboard
       </button>
     </template>
@@ -212,7 +212,7 @@
     <template #footer>
       <div class="dm-drawer-actions">
         <button type="button" class="btn" @click="createOpen = false">Cancel</button>
-        <button type="submit" form="dm-create" class="btn-primary" :disabled="!newName.trim() || creating">{{ creating ? 'Creating…' : 'Create and open editor' }}</button>
+        <button type="submit" form="dm-create" class="btn btn-primary" :disabled="!newName.trim() || creating">{{ creating ? 'Creating…' : 'Create and open editor' }}</button>
       </div>
     </template>
   </SideDrawer>

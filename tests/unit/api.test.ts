@@ -140,15 +140,19 @@ describe('domain composables - endpoint mapping', () => {
       expect($api).toHaveBeenLastCalledWith('/api/v1/public-transport/feeds/feed-1/publish/', { method: 'POST' })
     })
 
-  it('useSafety.createIncident POSTs to /incidents/ and kpis/blackspots list', async () => {
+  it('useSafety.createIncident POSTs to /incidents/; kpi aggregates and blackspots list', async () => {
     $api.mockResolvedValue({ id: 'i' })
     const safety = useSafety()
     await safety.createIncident({ incident_type: 'road', severity: 'serious', title: 'Crash' } as any)
     expect($api).toHaveBeenLastCalledWith('/api/v1/safety/incidents/',
       { method: 'POST', body: { incident_type: 'road', severity: 'serious', title: 'Crash' } })
 
-    await safety.kpis({ agency: 'NTSA' } as any)
-    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/kpis/', { query: { agency: 'NTSA' } })
+    // The KPI page reads the aggregate endpoints (accidents), not the SafetyKPI rollup list.
+    await safety.kpiTrend(365)
+    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/kpis/trend/', { query: { days: 365 } })
+
+    await safety.kpiByCounty()
+    expect($api).toHaveBeenLastCalledWith('/api/v1/safety/kpis/by-county/', { query: {} })
 
     await safety.blackspots()
     expect($api).toHaveBeenLastCalledWith('/api/v1/safety/black-spots/', { query: {} })

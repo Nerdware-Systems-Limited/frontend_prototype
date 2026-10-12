@@ -5,8 +5,8 @@
     subtitle="All student registrations across NTSA · KMA · KCAA · NITA-K cohorts - track confirmation, payment status, and attendance"
   >
     <template #actions>
-      <NuxtLink to="/training/cohorts" class="btn">← Cohorts</NuxtLink>
-      <NuxtLink to="/training/completions" class="btn-primary">Certificates →</NuxtLink>
+      <NuxtLink to="/training/cohorts" class="btn"><ArrowLeft :size="14" aria-hidden="true" />Cohorts</NuxtLink>
+      <NuxtLink to="/training/completions" class="btn">Certificates<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -143,6 +143,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 import { useTraining } from '~/composables/api'
 import type { TrainingEnrollment } from '~/composables/api'
 

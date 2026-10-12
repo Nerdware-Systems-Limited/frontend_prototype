@@ -5,8 +5,8 @@
     subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET - Per-agency network inventory, pavement quality (IRI/PCI), and AI deterioration forecasts"
   >
     <template #actions>
-      <NuxtLink :to="agencyLink('/infrastructure/bridges')" class="btn">Bridges & Assets →</NuxtLink>
-      <NuxtLink :to="agencyLink('/infrastructure/funding')" class="btn-primary">Funding →</NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/bridges')" class="btn">Bridges & Assets<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/funding')" class="btn">Funding<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -54,7 +54,7 @@
     <KpiCard
       label="Avg IRI"
       :value="stats.avgIri != null ? stats.avgIri.toFixed(2) : '-'"
-      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      :unavailable="!loading && (stats.segmentCount === 0 || stats.avgIri == null)" :unavailable-note="loading ? 'Loading…' : stats.segmentCount === 0 ? 'Agency Survey feed unavailable' : 'No IRI measurements recorded'"
       period="LIVE"
       :description="stats.usingAggregate ? 'IRI (m/km) · network-wide average' : 'IRI (m/km) · estimated'"
       :status="stats.avgIri == null ? undefined : stats.avgIri <= 4 ? 'healthy' : 'warning'"
@@ -63,7 +63,7 @@
     <KpiCard
       label="Avg PCI"
       :value="stats.avgPci != null ? stats.avgPci.toFixed(1) : '-'"
-      :unavailable="!loading && stats.segmentCount === 0" :unavailable-note="loading ? 'Loading…' : 'Agency Survey feed unavailable'"
+      :unavailable="!loading && (stats.segmentCount === 0 || stats.avgPci == null)" :unavailable-note="loading ? 'Loading…' : stats.segmentCount === 0 ? 'Agency Survey feed unavailable' : 'No PCI measurements recorded'"
       period="LIVE"
       :description="stats.usingAggregate ? 'PCI (0–100) · network-wide average' : 'PCI (0–100) · estimated'"
       :status="stats.avgPci == null ? undefined : stats.avgPci >= 70 ? 'healthy' : 'warning'"
@@ -93,12 +93,12 @@
   <div class="three-col">
     <div class="card">
       <div class="card-header">Road Class Distribution</div>
-      <div v-if="stats.isSample" class="dist-caveat">Estimated - no network-wide breakdown exists for this metric.</div>
+      <div v-if="!stats.usingAggregate && !loading" class="dist-caveat">Estimated - the network-wide breakdown is unavailable right now.</div>
       <div class="card-body">
         <div v-if="stats.byClass.length" class="dist-list">
           <div v-for="d in stats.byClass" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key.replace(/_/g,' ') }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: 'var(--primary-fill)', transform: `scaleX(${stats.segmentCount > 0 ? d.count / stats.segmentCount : 0})` }" /></div>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: 'var(--primary-fill)', transform: `scaleX(${stats.conditionBase > 0 ? d.count / stats.conditionBase : 0})` }" /></div>
             <span class="dist-val">{{ d.count }}</span>
           </div>
         </div>
@@ -108,12 +108,12 @@
 
     <div class="card">
       <div class="card-header">Surface Type Distribution</div>
-      <div v-if="stats.isSample" class="dist-caveat">Estimated - no network-wide breakdown exists for this metric.</div>
+      <div v-if="!stats.usingAggregate && !loading" class="dist-caveat">Estimated - the network-wide breakdown is unavailable right now.</div>
       <div class="card-body">
         <div v-if="stats.bySurface.length" class="dist-list">
           <div v-for="d in stats.bySurface" :key="d.key" class="dist-row">
             <span class="dist-label">{{ d.key }}</span>
-            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: '#8b5cf6', transform: `scaleX(${stats.segmentCount > 0 ? d.count / stats.segmentCount : 0})` }" /></div>
+            <div class="dist-bar-wrap"><div class="dist-bar" :style="{ background: '#8b5cf6', transform: `scaleX(${stats.conditionBase > 0 ? d.count / stats.conditionBase : 0})` }" /></div>
             <span class="dist-val">{{ d.count }}</span>
           </div>
         </div>
@@ -139,8 +139,7 @@
 
   <!-- Condition map -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Road Network Map ({{ agencyLabel }})</div>
+    <CollapsibleSection class="card map-card" :title="`Road Network Map (${agencyLabel})`" storage-key="map:infrastructure/index">
       <ClientOnly>
         <UaptsMap
           :roads-tiles-url="roadsTilesUrl"
@@ -161,7 +160,7 @@
       <div class="map-note">
         Roads are coloured by their worst recorded surface condition (KRB / RICS road-condition data) and drawn thicker for higher road classes. This is a separate dataset from the segment registry below, which has no stored geometry, so individual segments are not pinned.
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <div v-if="agencyBudget" class="card">
@@ -274,9 +273,9 @@
       </div>
 
       <div class="pagination">
-        <button class="btn" :disabled="tablePage <= 1 || tableLoading" @click="goToPage(tablePage - 1)">← Prev</button>
+        <button class="btn" :disabled="tablePage <= 1 || tableLoading" @click="goToPage(tablePage - 1)"><ArrowLeft :size="14" aria-hidden="true" />Prev</button>
         <span class="page-info">Page {{ fmtNum(tablePage) }} of {{ fmtNum(tableTotalPages) }} · {{ fmtNum(tableTotal) }} segments</span>
-        <button class="btn" :disabled="tablePage >= tableTotalPages || tableLoading" @click="goToPage(tablePage + 1)">Next →</button>
+        <button class="btn" :disabled="tablePage >= tableTotalPages || tableLoading" @click="goToPage(tablePage + 1)">Next<ArrowRight :size="14" aria-hidden="true" /></button>
       </div>
     </div>
   </div>
@@ -386,6 +385,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 import { useInfrastructure, useGis, useAgencies } from '~/composables/api'
 import type { InfrastructureSummary, DeteriorationForecast, TrafficSignal, RoadSegment, Bridge, MaintenanceBudget } from '~/composables/api'
 
@@ -632,8 +633,7 @@ const agencyBudget = computed(() => {
 // if the relevant summary request hasn't resolved yet (e.g. still loading,
 // or the request failed) - labelled as sample-based in the template via
 // `isSample`/`totalSegmentsReal`.
-// Class/Surface distribution and Data Completeness have no aggregate at all
-// and are always sample-based, regardless of agency selection.
+// Data Completeness has no aggregate and is always sample-based.
 const stats = computed(() => {
   const list = segments.value
   const segmentCount = list.length
@@ -649,11 +649,14 @@ const stats = computed(() => {
   const surveyDates = list.filter(r => r.last_evaluated_at).map(r => new Date(r.last_evaluated_at as string).getTime())
   const latestSurvey = surveyDates.length ? new Date(Math.max(...surveyDates)).toISOString() : null
 
-  const byClass = countBy(list, r => r.road_class)
-  const bySurface = countBy(list, r => r.surface_type)
-
   const activeSummary = selectedAgency.value ? agencySummary.value : summary.value
   const net = activeSummary?.network ?? null
+  const byClass = net
+    ? net.class_distribution.map(c => ({ key: c.road_class || 'unrecorded', count: c.total }))
+    : countBy(list, r => r.road_class)
+  const bySurface = net
+    ? net.surface_distribution.map(c => ({ key: c.surface_type || 'unrecorded', count: c.total }))
+    : countBy(list, r => r.surface_type)
   const usingAggregate = !!net
   const totalLength = net ? net.total_length_km : list.reduce((s, r) => s + (r.length_km ?? 0), 0)
   const avgIri = net ? net.iri_average : sampleAvgIri

@@ -5,8 +5,8 @@
     subtitle="NTSA · NaMATA - PSV licence status, expiry alerts, NaMATA route compliance, GPS tracking rates, and operator registration"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Vehicle Inspections →</NuxtLink>
-      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Vehicle Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -69,23 +69,8 @@
     />
   </div>
 
-  <!-- Expiry alerts -->
-  <SectionTitle pill="NTSA PSV Registry · Batch">Upcoming Expiry Alerts</SectionTitle>
-
-  <div id="expiry-alerts" class="card drill-target">
-    <div class="card-body">
-      <div v-if="expiringLicenses.length">
-        <AlertItem
-          v-for="l in expiringLicenses.slice(0, 20)"
-          :key="l.id"
-          :severity="daysUntil(l.expiry_date) <= 30 ? 'critical' : daysUntil(l.expiry_date) <= 60 ? 'warning' : 'info'"
-          :title="`${l.license_number} - ${l.sacco_name ?? 'Unknown operator'}`"
-          :meta="`Route: ${l.route_name ?? '-'} · Expires: ${fmtDate(l.expiry_date)} · ${daysUntil(l.expiry_date)}d remaining · GPS: ${l.gps_compliance_pct.toFixed(0)}%`"
-        />
-      </div>
-      <EmptyState v-else :loading="loading" message="No licences expiring in the next 90 days." icon="search" compact />
-    </div>
-  </div>
+  <!-- Expiry alerts: PSV licences that are expired or expiring, most urgent first -->
+  <CertificateExpiryPanel id="expiry-alerts" class="drill-target" title="Licence expiry alerts" :sources="['psv']" storage-key="psv-compliance" style="margin-bottom:16px" />
 
   <!-- Licence table with filters -->
   <SectionTitle>PSV Licence Registry</SectionTitle>
@@ -232,6 +217,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport } from '~/composables/api'
 import type { PSVLicense, Sacco } from '~/composables/api'
 

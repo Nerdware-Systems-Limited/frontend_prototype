@@ -30,11 +30,14 @@
   </div>
 
   <!-- Trip path map (shown when a trip is selected) -->
-  <div v-if="selectedTrip" class="card map-card" style="margin-bottom:16px">
-    <div class="card-header">
-      Replay: {{ selectedTrip.plate_number }} - {{ selectedTrip.origin_label }} → {{ selectedTrip.destination_label }}
-      <button class="btn" style="margin-left:auto" @click="selectedTrip = null; tripPath = []">✕ Close</button>
-    </div>
+  <CollapsibleSection
+    v-if="selectedTrip" class="card map-card" style="margin-bottom:16px" default-open
+    :title="`Replay: ${selectedTrip.plate_number} - ${selectedTrip.origin_label} → ${selectedTrip.destination_label}`"
+    storage-key="map:fleet/trip-playbacks"
+  >
+    <template #actions>
+      <button class="btn" @click="selectedTrip = null; tripPath = []">✕ Close</button>
+    </template>
     <ClientOnly>
       <UaptsMap
         :lines="tripLines"
@@ -59,7 +62,7 @@
         <BadgePill :variant="tripStatusBadge(selectedTrip.status)">{{ selectedTrip.status.replace(/_/g,' ') }}</BadgePill>
       </div>
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Trips table -->
   <SectionTitle>Trip Records</SectionTitle>

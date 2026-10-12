@@ -29,6 +29,8 @@ import type {
   User,
 } from '~/types/uapts'
 
+import { CHANNEL_NAME, createTabSync, tokenExpiry, type ChannelLike, type LocksLike, type SessionSnapshot, type TabSync } from '~/utils/tabSync'
+
 // ── Safe browser-storage helpers (no-ops on SSR) ────────────────────────────
 function getItem(key: string): string | null {
   if (typeof window === 'undefined') return null
@@ -109,6 +111,57 @@ export const useAuthStore = defineStore('auth', () => {
   // same persistence choice once the code is confirmed and tokens actually
   // arrive.
   let pendingRemember = false
+
+  // ── Cross-tab session sharing (utils/tabSync.ts) ───────────────────────────
+  // Off until initTabSync() runs (the auth-sync client plugin), so the store
+  // stays usable on its own - SSR, scripts and unit tests.
+  let sync: TabSync | null = null
+
+  function _currentSession(): SessionSnapshot | null {
+    if (!refreshToken.value) return null
+    return { access: accessToken.value, refresh: refreshToken.value, user: user.value, remember: preferLocal() === 'local' }
+  }
+
+  /** Take a session another tab announced (or answered with), and persist it the way that login did. */
+  function _applySession(s: SessionSnapshot) {
+    // Messages can arrive late: never replace a newer access token with an older one.
+    if (accessToken.value && s.access && tokenExpiry(s.access) < tokenExpiry(accessToken.value)) return
+    accessToken.value  = s.access
+    refreshToken.value = s.refresh
+    if (s.user) user.value = s.user as AuthUser
+    _persistRefresh(s.refresh, s.remember)
+    if (user.value) setItem('uapts_user', JSON.stringify(user.value), s.remember ? 'local' : 'session')
+  }
+
+  function initTabSync(opts: {
+    onRemoteLogout?: () => unknown
+    channel?: ChannelLike | null
+    locks?: LocksLike | null
+  } = {}) {
+    if (typeof window === 'undefined' || sync) return
+    const channel = opts.channel !== undefined ? opts.channel
+      : typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CHANNEL_NAME) as unknown as ChannelLike : null
+    const locks = opts.locks !== undefined ? opts.locks
+      : typeof navigator !== 'undefined' ? ((navigator as unknown as { locks?: LocksLike }).locks ?? null) : null
+    sync = createTabSync({
+      channel, locks,
+      getSession: _currentSession,
+      onSession: _applySession,
+      onLogout: () => { _clearTokens(false); void opts.onRemoteLogout?.() },
+    })
+  }
+
+  /**
+   * A tab with no session (a new tab of a session-only login) asks the open
+   * tabs for theirs. True if one answered and this tab is now signed in.
+   */
+  async function adoptFromOtherTab(): Promise<boolean> {
+    if (!sync || refreshToken.value) return !!accessToken.value
+    const s = await sync.requestSession()
+    if (!s) return false
+    _applySession(s)
+    return true
+  }
 
   // ── Getters ────────────────────────────────────────────────────────────────
   const isAuthenticated = computed(() => !!accessToken.value)
@@ -308,6 +361,26 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Silent token refresh ───────────────────────────────────────────────────
   async function refreshAccessToken(): Promise<string | null> {
     if (!refreshToken.value) return null
+    const seen = accessToken.value
+    // One tab refreshes at a time: the backend rotates refresh tokens and
+    // blacklists the old one, so two tabs refreshing together would log both out.
+    return sync ? sync.withRefreshLock(waited => _refresh(seen, waited)) : _refresh(seen, false)
+  }
+
+  async function _refresh(seen: string | null, waited: boolean): Promise<string | null> {
+    // A different, still-valid access token than the one this call started with
+    // means another tab refreshed meanwhile: use its result instead of spending
+    // the (now rotated) refresh token a second time.
+    const rotatedElsewhere = () => !!accessToken.value && accessToken.value !== seen && isAccessTokenFresh()
+    // The tab we queued behind has just rotated; give its announcement a moment to arrive.
+    if (waited) await sync?.drain()
+    if (rotatedElsewhere()) return accessToken.value
+    // "Remember me" tabs share localStorage: take the newest stored token.
+    if (preferLocal() === 'local') {
+      const stored = getItem('uapts_refresh')
+      if (stored) refreshToken.value = stored
+    }
+    if (!refreshToken.value) return null
     try {
       const res = await $fetch<TokenRefreshResponse>('/api/v1/auth/token/refresh/', {
         baseURL: BASE_URL,
@@ -326,8 +399,17 @@ export const useAuthStore = defineStore('auth', () => {
         refreshToken.value = res.refresh
         _persistRefresh(res.refresh, remember)
       }
+      const session = _currentSession()
+      if (session) sync?.announceSession(session) // every tab now holds the rotated token
       return res.access
     } catch {
+      // Rejected - maybe because another tab rotated this token and its
+      // announcement is still in flight. Look for it before declaring the session dead.
+      if (sync) {
+        if (rotatedElsewhere()) return accessToken.value
+        await sync.nextSession(500)
+        if (rotatedElsewhere()) return accessToken.value
+      }
       _clearTokens()
       return null
     }
@@ -364,6 +446,8 @@ export const useAuthStore = defineStore('auth', () => {
     user.value         = userData
     _persistRefresh(refresh, remember)
     setItem('uapts_user', JSON.stringify(userData), remember ? 'local' : 'session')
+    const session = _currentSession()
+    if (session) sync?.announceSession(session) // other open tabs share this sign-in
   }
 
   function _persistRefresh(token: string, remember: boolean) {
@@ -371,7 +455,9 @@ export const useAuthStore = defineStore('auth', () => {
     setItem('uapts_refresh', token, remember ? 'local' : 'session')
   }
 
-  function _clearTokens() {
+  /** `announce` is false when clearing because another tab already signed out. */
+  function _clearTokens(announce = true) {
+    if (announce) sync?.announceLogout()
     accessToken.value  = null
     refreshToken.value = null
     user.value         = null
@@ -383,7 +469,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     accessToken, refreshToken, user, isLoading, showMfaNudge,
     isAuthenticated, userInitials,
-    hydrate, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
+    hydrate, initTabSync, adoptFromOtherTab, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
     dismissMfaNudge,
     mfaVerify, mfaResend, mfaEnroll, mfaEnrollVerify, mfaDisable,
     requestPasswordReset, confirmPasswordReset, changePassword,

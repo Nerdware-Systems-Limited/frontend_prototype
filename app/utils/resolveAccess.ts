@@ -18,7 +18,7 @@
 
 import { reactive } from 'vue'
 
-export type AccessTier = 'super_admin' | 'oversight' | 'admin' | 'analyst' | 'operator' | 'public'
+export type AccessTier = 'super_admin' | 'oversight' | 'admin' | 'analyst' | 'operator' | 'auditor' | 'public'
 export type ScopeLevel = 'full' | 'read' | 'none'
 export type CategoryState = 'allow' | 'deny'
 export type PolicyLayer = 'ceiling' | 'enabled' | 'role'
@@ -53,6 +53,8 @@ export interface AccessSettings {
   routes: Record<string, {
     module: string
     minTier: AccessTier
+    /** Roles admitted whatever their tier (the auditor ranks below operator but may open /audit). */
+    allowRoles?: string[]
     agencyScoped: boolean
     categories?: string[]
     /** Lowers minTier to `minTier` for viewers whose own agency sits in `domain` - see resolveFor step 7. */
@@ -245,6 +247,33 @@ export function agencyRoleTiers(code: string): AccessTier[] {
   return [...tiers].sort((a, b) => tierRank(b) - tierRank(a)) as AccessTier[]
 }
 
+/**
+ * Role columns for the Module Access screens: the built-in roles that actually exist - the backend's
+ * role catalog (`catalogBuiltIns`: role names with no owning agency) - and that the resolver governs
+ * (it has a tier for them), minus super_admin and public. A policy tier with no matching role, such as
+ * `oversight`, is not shown, and a role real accounts hold (say `operator` at an agency whose
+ * `roleTiers` omits it) is.
+ *
+ * With no catalog (it could not be loaded) the only list left is the policy's own, `agencyRoleTiers`.
+ * That list itself is unchanged: it is the policy's view and feeds the capability ceilings.
+ */
+export function agencyRoleColumns(code: string, catalogBuiltIns: Iterable<string> = []): AccessTier[] {
+  const catalog = [...new Set(catalogBuiltIns)]
+  if (!catalog.length) return agencyRoleTiers(code)
+  return catalog
+    .filter(name => name !== 'super_admin' && name !== 'public' && name in S.roles)
+    .sort((a, b) => tierRank(b) - tierRank(a)) as AccessTier[]
+}
+
+/**
+ * Built-in catalog roles Module Access does not govern. The resolver ranks a role missing from the
+ * policy's `roles` as `public`, so no page grant can reach them; platform rules in the backend
+ * (core/permissions.py, the auditor middleware, tenancy) cover them instead.
+ */
+export function ungovernedBuiltInRoles(catalogBuiltIns: Iterable<string>): string[] {
+  return [...new Set(catalogBuiltIns)].filter(name => !(name in S.roles)).sort()
+}
+
 /** Label of the first domain bundle the agency sits in that includes this module, if any. */
 export function inheritedDomainLabel(code: string, moduleId: string): string | null {
   for (const domainKey of S.agencies[code]?.domains ?? []) {
@@ -422,7 +451,10 @@ export function resolveFor(ov: PolicyOverrides, subject: AccessSubject | null, p
   let minTier = routeMeta?.minTier ?? 'operator'
   const override = routeMeta?.minTierDomainOverride
   if (override && agency.domains.includes(override.domain)) minTier = override.minTier
-  if (tierRank(roleTier) < tierRank(minTier)) return denyResult(`role tier below ${minTier} for ${routeKey}`)
+  // allowRoles admits the named roles whatever their tier; every other role has to clear minTier.
+  if (!(routeMeta?.allowRoles ?? []).includes(roleTier) && tierRank(roleTier) < tierRank(minTier)) {
+    return denyResult(`role tier below ${minTier} for ${routeKey}`)
+  }
 
   // Step 8 (the permit path).
   return {

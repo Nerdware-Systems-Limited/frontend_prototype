@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { ref, computed, reactive, onMounted } from 'vue'
+import { config } from '@vue/test-utils'
 
 // Provide the runtime flag the auth store guards on. In Nuxt, `process.client`
 // is set to true in the browser bundle; we replicate that here for happy-dom.
@@ -34,6 +35,12 @@ import { ref, computed, reactive, onMounted } from 'vue'
     wsUrl: process.env.NUXT_PUBLIC_WS_URL ?? 'ws://test.local:8000/ws/audit/',
   },
 })
+// A default `$api` that answers every call with an empty page. Without one,
+// `useApi()` returns undefined and any composable that fetches (the access-policy
+// store loads custom roles on every sign-in) throws "is not a function" - swallowed
+// by the store, but it floods the output and hides that path from the tests. A test
+// that cares sets `globalThis.$api` (or stubs useNuxtApp) itself.
+;(globalThis as any).$api ??= async () => ({ count: 0, results: [] })
 ;(globalThis as any).useNuxtApp = () => ({ $api: (globalThis as any).$api })
 ;(globalThis as any).useState = <T>(_k: string, init: () => T): { value: T } => {
   return { value: init() } as any
@@ -51,6 +58,17 @@ import { setBaseSettings, type AccessSettings } from '~/utils/resolveAccess'
 import accessBaseline from './fixtures/access-control.json'
 
 setBaseSettings(accessBaseline as unknown as AccessSettings)
+
+// Nuxt's built-in components don't exist outside a Nuxt build. Mounting a component
+// that uses one logged "Failed to resolve component" and rendered it as an unknown
+// element. These defaults apply to every mount(); a test passing its own stub for the
+// same name still wins.
+config.global.stubs = {
+  NuxtLink: { props: ['to'], template: '<a :href="typeof to === \'string\' ? to : undefined"><slot /></a>' },
+  ClientOnly: { template: '<div><slot /></div>' },
+  UaptsMap: { template: '<div class="map-stub" />' },
+  ...(config.global.stubs ?? {}),
+}
 
 import { afterEach } from 'vitest'
 

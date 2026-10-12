@@ -9,10 +9,14 @@
     <div class="fd-add">
       <select v-model="newField" class="fd-input" aria-label="Filter field">
         <option value="" disabled>Add a filter on…</option>
-        <option v-for="f in ALL_FIELDS" :key="f" :value="f" :disabled="filters.some(x => x.field === f)">{{ FIELD_LABELS[f] }}</option>
+        <option v-for="f in ALL_FIELDS" :key="f" :value="f" :disabled="filters.some(x => x.field === f)">{{ FIELD_LABELS[f] }} · {{ honourCount(f) }} of {{ widgets.length }} widgets</option>
       </select>
       <button type="button" class="btn btn-sm btn-primary" :disabled="!newField" @click="add">Add</button>
     </div>
+
+    <p v-if="newField && !honourCount(newField)" class="fd-hint" role="note">
+      No widget on this dashboard can be filtered by {{ FIELD_LABELS[newField].toLowerCase() }} yet - viewers would see it change nothing.
+    </p>
 
     <p v-if="!filters.length" class="fd-empty">No filters yet. Filters appear in a bar above the dashboard and narrow every widget they apply to.</p>
 
@@ -99,9 +103,12 @@ const supports = (w: WidgetInstance, f: DashboardFilter) => widgetFilterFields(w
 const supporting = (f: DashboardFilter) => props.widgets.filter(w => supports(w, f))
 const optionsFor = (f: DashboardFilter): FilterOption[] => f.options?.length ? f.options : FIELD_OPTIONS[f.field] ?? []
 
+/** How many widgets on the dashboard can honour a field at all. */
+const honourCount = (field: FilterField) => props.widgets.filter(w => widgetFilterFields(w.type, w.config).includes(field)).length
+
 function appliesSummary(f: DashboardFilter) {
   const n = f.appliesTo === 'all' ? supporting(f).length : f.appliesTo.length
-  return `${f.appliesTo === 'all' ? 'all · ' : ''}${n} widget${n === 1 ? '' : 's'}`
+  return `${n} of ${props.widgets.length} widget${props.widgets.length === 1 ? '' : 's'}`
 }
 
 function add() {
@@ -134,6 +141,7 @@ function onToggle(e: Event, id: string) {
 .fd-add { display: flex; gap: 6px; }
 .fd-input { height: 30px; padding: 0 8px; font-size: 12px; }
 .fd-empty { font-size: 11.5px; color: var(--fg-3); line-height: 1.5; margin: 4px 0; }
+.fd-hint { font-size: 11.5px; color: var(--warning-fg); line-height: 1.5; margin: 0; }
 .fd-item { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--surface-2); }
 .fd-item summary { display: flex; align-items: center; gap: 6px; padding: 9px 10px; cursor: pointer; list-style: none; border-radius: var(--r-sm); }
 .fd-item summary::-webkit-details-marker { display: none; }

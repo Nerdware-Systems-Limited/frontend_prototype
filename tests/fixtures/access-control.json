@@ -21,6 +21,7 @@
     "admin":       { "tier": 40,  "capabilities": ["manage_users", "approve_uploads", "register_feeds", "configure_rules", "export", "query_builder", "run_reports"] },
     "analyst":     { "tier": 30,  "capabilities": ["export", "query_builder", "run_reports"] },
     "operator":    { "tier": 20,  "capabilities": ["acknowledge_alerts", "update_incidents", "submit_uploads"] },
+    "auditor":     { "tier": 25,  "capabilities": [] },
     "public":      { "tier": 10,  "capabilities": [] }
   },
 
@@ -50,7 +51,7 @@
     "M10": { "label": "Access Control", "routes": ["/agencies", "/users", "/roles", "/audit", "/access-policies", "/admin/dashboards", "/admin/dashboards/[id]"], "note": "Every agency's grants.full now includes M10 (added 2026-09-19) - every agency admin manages its own tenant's users/roles/audit, same as KMA already did (its own note here predates the rollout and assumed every other agency already had this; they didn't - only KMA and, via the 'oversight' domain, SDR/SDT had any M10 access at all, so every other agency's admins could not open Access Control). /agencies stays separately gated (minTier 'oversight' + page-level isUnscopedAdmin write check) since it's the platform-wide agency directory, not a tenant's own data - see its own route note." },
     "M11": { "label": "Notifications", "routes": ["/notifications", "/notifications/rules"] },
     "M12": { "label": "Data Integration Hub", "routes": ["/integrations", "/integrations/analytics", "/integrations/files", "/integrations/files/[id]", "/integrations/feeds/[source_id]"] },
-    "M13": { "label": "GIS", "routes": ["/gis"] },
+    "M13": { "label": "GIS", "routes": ["/gis", "/gis/overview", "/gis/coverage", "/gis/layers", "/gis/layers/[id]", "/gis/requests"] },
     "M14": { "label": "Training Institutes", "routes": ["/training", "/training/cohorts", "/training/enrollments", "/training/completions"] }
   },
 
@@ -61,7 +62,7 @@
     "/agencies": { "module": "M10", "minTier": "oversight", "agencyScoped": false, "minTierDomainOverride": { "domain": "oversight", "minTier": "admin" }, "note": "The agency directory itself (tbl_agencies), not any one tenant's data - restricted to Ministry Oversight and Super Admin, same pattern as /query-builder. minTierDomainOverride additionally admits admin-tier accounts at SDT/SDR (the 'oversight' domain) since no seeded account anywhere carries the literal role_type 'oversight' - see useAccessControl.ts step 7. Write (create/edit/delete) is further narrowed to super_admin only in the page itself, since 'oversight' is documented read-only (roles.oversight.write:false) and this resolver doesn't enforce that flag." },
     "/users": { "module": "M10", "minTier": "admin", "agencyScoped": true },
     "/roles": { "module": "M10", "minTier": "admin", "agencyScoped": true },
-    "/audit": { "module": "M10", "minTier": "admin", "agencyScoped": true },
+    "/audit": { "module": "M10", "minTier": "admin", "agencyScoped": true, "allowRoles": ["auditor"], "note": "allowRoles admits the listed roles whatever their tier, so the auditor can open the audit page (what the role exists for) without the admin tier. Like every other role, the auditor is otherwise governed by its tier and Module Access." },
     "/access-policies": { "module": "M10", "minTier": "admin", "agencyScoped": true, "note": "Module Access - what each agency and role may reach. super_admin edits every agency's ceiling; an agency admin edits only its own agency within that ceiling (enforced server-side by apps.access_control)." },
     "/admin/dashboards": { "module": "M10", "minTier": "admin", "agencyScoped": true, "note": "Dashboard Manager. Route-level gate only; the page and middleware/dashboard-manager.global.ts additionally require dashboards.manage or dashboards.manage_agency, and the API enforces the same." },
     "/admin/dashboards/[id]": { "module": "M10", "minTier": "admin", "agencyScoped": true, "note": "Dashboard Manager editor - same gate as /admin/dashboards." },
@@ -70,6 +71,11 @@
     "/infrastructure/funding": { "module": "M06", "minTier": "analyst", "agencyScoped": true, "categories": ["procurement"] },
     "/infrastructure/maintenance": { "module": "M06", "minTier": "operator", "agencyScoped": true, "categories": ["procurement"] },
     "/gis": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"], "note": "Category filtering here is layer-level, not route-level - see section 6." },
+    "/gis/overview": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"] },
+    "/gis/coverage": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"] },
+    "/gis/layers": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"] },
+    "/gis/layers/[id]": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"] },
+    "/gis/requests": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"] },
     "/safety/incidents": { "module": "M05", "minTier": "operator", "agencyScoped": true, "categories": ["crash_victim"] },
     "/safety/blackspots": { "module": "M05", "minTier": "operator", "agencyScoped": true, "categories": ["high_res_geometry"] },
     "/fleet": { "module": "M03", "minTier": "operator", "agencyScoped": true, "categories": ["anpr_plate", "vehicle_owner_pii"] },
@@ -188,7 +194,7 @@
       },
       "denies": {
         "modules": ["M02", "M04", "M05", "M07a", "M07b", "M08", "M14"],
-        "routes": ["/gis", "/query-builder"],
+        "routes": ["/gis", "/gis/overview", "/gis/coverage", "/gis/layers", "/gis/layers/[id]", "/gis/requests", "/query-builder"],
         "categories": [],
         "note": "lease_commercial is SDR_MTD's own category - Agency Admin tier within SDR_MTD (restrictedCategories.minTier), not denied to its own tenant outright. Key renamed from 'SDR-MTD' to 'SDR_MTD' 2026-09-18 to match tbl_agencies.agency_code from the RBAC test seed."
       }
@@ -329,7 +335,7 @@
       "name": "State Department for Transport",
       "domains": ["oversight"],
       "landing": "/dashboard",
-      "roleTiers": ["oversight", "admin", "analyst", "operator"],
+      "roleTiers": ["oversight", "admin", "analyst", "operator", "auditor"],
       "grants": {
         "full": ["M09", "M10", "M13"],
         "read": [],
@@ -354,7 +360,7 @@
         "read": [],
         "routes": {
           "/traffic": "read", "/traffic/analytics": "read",
-          "/gis": "read",
+          "/gis": "read", "/gis/overview": "read", "/gis/coverage": "read", "/gis/layers": "read", "/gis/layers/[id]": "read", "/gis/requests": "read",
           "/infrastructure": "read",
           "/notifications": "read"
         }
@@ -427,7 +433,7 @@
           "/maritime": "full", "/maritime/port-ops": "full", "/maritime/cargo": "full", "/maritime/imports-exports": "full", "/maritime/infrastructure": "full", "/maritime/performance": "full", "/maritime/services": "full", "/maritime/green-transport": "full",
           "/dashboard": "read",
           "/railway/freight": "read",
-          "/gis": "read",
+          "/gis": "read", "/gis/overview": "read", "/gis/coverage": "read", "/gis/layers": "read", "/gis/layers/[id]": "read", "/gis/requests": "read",
           "/maritime/vessels": "read", "/maritime/accidents": "read", "/maritime/waterways": "read",
           "/notifications": "read", "/notifications/rules": "full"
         }
@@ -475,7 +481,7 @@
           "/maritime/port-ops": "read", "/maritime/performance": "read", "/maritime/imports-exports": "read",
           "/traffic/analytics": "read",
           "/railway/freight": "read",
-          "/gis": "read",
+          "/gis": "read", "/gis/overview": "read", "/gis/coverage": "read", "/gis/layers": "read", "/gis/layers/[id]": "read", "/gis/requests": "read",
           "/notifications": "read"
         }
       },

@@ -5,9 +5,10 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - SGR & MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >
     <template #actions>
-      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory →</NuxtLink>
-      <NuxtLink to="/railway/safety" class="btn">Rail Safety →</NuxtLink>
-      <NuxtLink to="/railway/live" class="btn-primary">Live Operations →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="load" />
+      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/safety" class="btn">Rail Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/live" class="btn">Live Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -106,8 +107,7 @@
 
   <!-- Rail map + live operations -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">SGR & MGR Network Map</div>
+    <CollapsibleSection class="card map-card" title="SGR &amp; MGR Network Map" storage-key="map:railway/index">
       <ClientOnly>
         <UaptsMap
           :markers="mapData.markers"
@@ -126,25 +126,25 @@
         <span class="mk"><span class="dot" style="background:#3b82f6" /> SGR Station</span>
         <span class="mk"><span class="dot" style="background:#10b981" /> MGR Station</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <!-- OTP summary card -->
       <div id="otp-summary" class="card drill-target">
-        <div class="card-header">On-Time Performance - 30d</div>
-        <div class="card-body" v-if="summary">
-          <div class="otp-big">{{ summary.on_time_30d.on_time_pct.toFixed(1) }}%</div>
+        <div class="card-header">On-Time Performance - {{ otp?.window }}</div>
+        <div class="card-body" v-if="otp">
+          <div class="otp-big">{{ otp.on_time_pct.toFixed(1) }}%</div>
           <div class="otp-bar-wrap">
             <div class="otp-bar" :style="{
-              transform: `scaleX(${summary.on_time_30d.on_time_pct / 100})`,
-              background: summary.on_time_30d.on_time_pct >= 85 ? 'var(--success)' : summary.on_time_30d.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
+              transform: `scaleX(${otp.on_time_pct / 100})`,
+              background: otp.on_time_pct >= 85 ? 'var(--success)' : otp.on_time_pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
             }" />
           </div>
           <div class="otp-stats">
-            <div><span class="stat-label">Total Ops</span><span>{{ fmtNum(summary.on_time_30d.total_operations) }}</span></div>
-            <div><span class="stat-label">Delayed</span><span>{{ otpStats ? fmtNum(otpStats.delayed) : '-' }}</span></div>
-            <div><span class="stat-label">Cancelled</span><span>{{ fmtNum(summary.on_time_30d.cancelled) }}</span></div>
-            <div><span class="stat-label">Avg Delay</span><span>{{ summary.on_time_30d.avg_delay_min.toFixed(0) }} min</span></div>
+            <div><span class="stat-label">Total Ops</span><span>{{ fmtNum(otp.total_operations) }}</span></div>
+            <div><span class="stat-label">Delayed</span><span>{{ otp.delayed != null ? fmtNum(otp.delayed) : '-' }}</span></div>
+            <div><span class="stat-label">Cancelled</span><span>{{ fmtNum(otp.cancelled) }}</span></div>
+            <div><span class="stat-label">Avg Delay</span><span>{{ otp.avg_delay_min.toFixed(0) }} min</span></div>
           </div>
         </div>
         <EmptyState v-else :loading="loading" message="No OTP data" compact />
@@ -301,6 +301,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway, useGis } from '~/composables/api'
 import type { RailwaySummary, LiveOperation, OnTimeStats } from '~/composables/api'
 
@@ -308,6 +310,15 @@ const summary  = ref<RailwaySummary | null>(null)
 // RailwaySummary.on_time_30d is a trimmed-down OnTimeStats (no `delayed` /
 // `cancellation_pct` on this backend) - fetch the full stats separately so
 // the "Delayed" stat below doesn't show a misleading dash.
+const timeRange = useTimeRange('railway', { default: '30d' })
+// The range-driven on-time figures when they have loaded; otherwise the summary's own fixed 30 days,
+// labelled as such, so the card never shows one window under another window's name.
+const otp = computed(() => {
+  const o = otpStats.value
+  if (o) return { on_time_pct: o.on_time_pct, total_operations: o.total_operations, cancelled: o.cancelled, avg_delay_min: o.avg_delay_min, delayed: o.delayed as number | null, window: timeRange.period.value.toLowerCase() }
+  const s = summary.value?.on_time_30d
+  return s ? { on_time_pct: s.on_time_pct, total_operations: s.total_operations, cancelled: s.cancelled, avg_delay_min: s.avg_delay_min, delayed: null as number | null, window: '30d' } : null
+})
 const otpStats = ref<OnTimeStats | null>(null)
 const liveOps  = ref<LiveOperation[]>([])
 const mapData  = ref<{ lines: any[]; markers: any[] }>({ lines: [], markers: [] })
@@ -324,7 +335,7 @@ async function load() {
     rail.summary(),
     rail.liveOperations(),
     rail.mapData(),
-    rail.onTimeStats(30),
+    rail.onTimeStats(timeRange.days.value),
   ])
 
   if (sumRes.status  === 'fulfilled') {

@@ -280,13 +280,16 @@ export interface InfrastructureSummary {
   network: {
     total_segments: number
     total_length_km: number
-    iri_average: number
-    pci_average: number
+    // null when no segment has a measurement (not 0).
+    iri_average: number | null
+    pci_average: number | null
     condition_distribution: Array<{
       condition_class: string
       total: number
       length: number
     }>
+    class_distribution: Array<{ road_class: string | null; total: number; length: number | null }>
+    surface_distribution: Array<{ surface_type: string | null; total: number; length: number | null }>
     // Exact per-agency segment counts/lengths (independent of any `agency`
     // scoping on this response) - powers the agency tab list.
     by_agency: Array<{

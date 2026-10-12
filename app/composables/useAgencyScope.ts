@@ -50,17 +50,6 @@ export function canManageUser(viewer: AgencyScopeUser | null, target: { agency_c
 }
 
 /**
- * Every built-in role_type, most-privileged first - derived from
- * access-control.json's roles catalog (the platform's actual RBAC config),
- * not a separately maintained list, so adding/renaming a tier there doesn't
- * need a matching code change here. 'oversight' is a capability bucket that
- * JSON also tracks, not a real User.role_type value - excluded.
- */
-export const ROLE_TYPES: string[] = Object.keys(BASE_SETTINGS.roles)
-  .filter(r => r !== 'oversight')
-  .sort((a, b) => (BASE_SETTINGS.roles[b]?.tier ?? 0) - (BASE_SETTINGS.roles[a]?.tier ?? 0))
-
-/**
  * Whether the viewer may move an account from role `from` to role `to` (`from`
  * is null when creating one). super_admin is the platform-wide bypass, so any
  * change with super_admin on either side - granting it to someone else, to
@@ -80,10 +69,51 @@ export function canViewRole(viewer: AgencyScopeUser | null, role: string): boole
 }
 
 /**
- * Role types to offer in a role dropdown for an account currently on
- * `current` (null when creating). The account's current role stays in the
- * list so a locked row still renders its own value instead of a blank select.
+ * Built-in roles whose reach is platform-wide (mirrors core.permissions.is_ministry_tier on the
+ * backend). Only a super_admin may hand these out: the API only blocks agency admins from granting
+ * super_admin, so the UI must not offer them to anyone else.
  */
-export function assignableRoleTypes(viewer: AgencyScopeUser | null, current: string | null = null): string[] {
-  return ROLE_TYPES.filter(role => role === current || canChangeRole(viewer, current, role))
+const GLOBAL_TIER_ROLES = new Set(['super_admin', 'ministry_admin', 'ministry_analyst'])
+
+/** Display order for built-in roles, most privileged first (matches User.ROLE_CHOICES). Unlisted names follow, A-Z. */
+const BUILTIN_ORDER = ['super_admin', 'ministry_admin', 'ministry_analyst', 'admin', 'analyst', 'operator', 'auditor', 'public']
+
+export interface CatalogRole {
+  role_name: string
+  agency: string | null
+  base_tier: string | null
 }
+
+/**
+ * Which built-in roles a custom role may be based on. The backend only accepts a tier the resolver
+ * governs and rules out super_admin (it already bypasses every check) and public (the resolver
+ * denies it outright), so this is the catalog's built-ins that the policy has a tier for, minus
+ * those two - most privileged first. Nothing here names a role: it follows the catalog.
+ */
+export function customRoleBaseTiers(catalog: CatalogRole[]): string[] {
+  const rank = (n: string) => BASE_SETTINGS.roles[n]?.tier ?? 0
+  return catalog
+    .filter(r => !r.agency && !r.base_tier)
+    .map(r => r.role_name)
+    .filter(name => name !== 'super_admin' && name !== 'public' && name in BASE_SETTINGS.roles)
+    .sort((x, y) => rank(y) - rank(x))
+}
+
+/**
+ * The built-in roles a viewer may assign, taken from the backend's role catalog (the rows with no
+ * owning agency and no base tier) rather than a list kept in code - so a role added on the server
+ * shows up here without a frontend change. `current` stays in the list so a locked row still shows
+ * its own value.
+ */
+export function assignableBuiltInRoles(
+  viewer: AgencyScopeUser | null, catalog: CatalogRole[], current: string | null = null,
+): string[] {
+  const rank = (n: string) => { const i = BUILTIN_ORDER.indexOf(n); return i === -1 ? BUILTIN_ORDER.length : i }
+  return catalog
+    .filter(r => !r.agency && !r.base_tier)
+    .map(r => r.role_name)
+    .filter(name => name === current
+      || (canChangeRole(viewer, current, name) && (!GLOBAL_TIER_ROLES.has(name) || isUnscopedAdmin(viewer))))
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+}
+

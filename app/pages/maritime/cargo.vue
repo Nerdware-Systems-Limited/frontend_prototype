@@ -5,8 +5,8 @@
     subtitle="KPA · KRA/KenTrade - Cargo type breakdown, import &amp; export pipeline stage tracking, cargo handling KPIs, and onward transport modes from port"
   >
     <template #actions>
-      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations →</NuxtLink>
-      <NuxtLink to="/maritime/services" class="btn">Port Services →</NuxtLink>
+      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/services" class="btn">Port Services<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -165,6 +165,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useMaritimeCargo } from '~/composables/api'
 import type { MaritimeCargoSummary, CargoTypeStat, PipelineShipment, HandlingStageKpis, OnwardTransportStat, MaritimeCargoType, PipelineDirection, CargoGreenFlag, OnwardTransportMode } from '~/composables/api'
 

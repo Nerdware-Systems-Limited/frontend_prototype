@@ -96,9 +96,7 @@
   </div>
 
   <!-- Active alert cards -->
-  <SectionTitle pill="KeNHA RTMS · Live">Active Alerts</SectionTitle>
-
-  <div id="active-alerts-list" class="card drill-target">
+  <CollapsibleSection id="active-alerts-list" class="card drill-target" default-open title="Active Alerts" source="KeNHA RTMS · Live" :count="activeAlerts.length" :tone="activeAlerts.some(a => a.severity === 'critical') ? 'danger' : activeAlerts.length ? 'warning' : 'success'" storage-key="inc:traffic/alerts:active-alerts">
     <div class="card-body">
       <div v-if="filteredAlerts.filter(a => a.is_active).length">
         <AlertItem
@@ -114,7 +112,7 @@
       </div>
       <EmptyState v-else :loading="loading" message="No active alerts match the current filters." icon="search" compact />
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Full alert log table -->
   <SectionTitle>Alert Log</SectionTitle>
@@ -180,9 +178,7 @@
   </div>
 
   <!-- Active congestion events -->
-  <SectionTitle pill="KeNHA RTMS · Live">Active Congestion Events</SectionTitle>
-
-  <div id="congestion-events-table" class="card drill-target">
+  <CollapsibleSection id="congestion-events-table" class="card drill-target" default-open title="Active Congestion Events" source="KeNHA RTMS · Live" :count="congestion.length" :tone="congestion.length ? 'warning' : 'success'" storage-key="inc:traffic/alerts:active-congestion-events">
     <div class="card-body">
       <table>
         <thead>
@@ -225,7 +221,7 @@
         @prev="congestionPrev" @next="congestionNext"
       />
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Forecast risk events -->
   <SectionTitle pill="AI Model · Next 12h">Upcoming Congestion Risk</SectionTitle>

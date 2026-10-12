@@ -1,8 +1,8 @@
 # Roles and Permissions
 
-_As of 2026-09-20._
+_Last verified 2026-10-12 against the backend baseline policy (module grants, denials, tiers and routes for all 22 agencies). The one substantive change since 2026-09-20 is the new `auditor` tier; access storage and the baseline now live on the backend._
 
-This explains, in plain terms, how UAPTS decides what a signed-in user can see and do, and gives a concrete breakdown of what each agency and role actually gets. The underlying mechanism is documented in detail in `Reference.md` section 9 and lives in `app/config/access-control.json`; this file is the readable walkthrough plus the answer to "what does user X actually see."
+This explains, in plain terms, how UAPTS decides what a signed-in user can see and do, and gives a concrete breakdown of what each agency and role actually gets. The underlying mechanism is documented in `ACCESS_CONTROL.md` (and `Reference.md` section 9). The baseline policy it reads is served by the backend at `/api/v1/access-control/baseline/`; there is no longer a policy file in this repo (a test copy is kept at `tests/fixtures/access-control.json`); this file is the readable walkthrough plus the answer to "what does user X actually see."
 
 **The frontend's access control is a convenience layer, not the security boundary.** Everything below decides what the UI shows and which pages it lets you navigate to. The real gate is the backend API (see `SECURITY_AUDIT.md` and the backend's `docs/security-recommendations-status.md`): a route being hidden here does not stop a direct API call from succeeding or failing, that is decided server-side.
 
@@ -17,12 +17,13 @@ A KeNHA admin and an NTSA admin have the same tier (`admin`) but see completely 
 
 ## Role tiers: what a person may do
 
-Six tiers exist, ranked low to high. A user's tier comes from their account's `role_type` field.
+Seven tiers exist, ranked low to high. A user's tier comes from their account's `role_type` field.
 
 | Tier | Rank | What it means | Capabilities |
 | --- | --- | --- | --- |
 | `public` | 10 | Read-only access to published dashboards and public data. No login required in principle; seeded test accounts also use this tier to simulate an anonymous viewer. | none |
 | `operator` | 20 | Update incident status, dispatch resources, trigger feed sync, submit uploads, acknowledge alerts. | acknowledge_alerts, update_incidents, submit_uploads |
+| `auditor` | 25 | Read access to the audit trail only. Ranks between operator and analyst, but the baseline lets it open `/audit` through the route's `allowRoles`, which the tier rank alone would not. Seeded only for SDT so far. | none |
 | `analyst` | 30 | Everything an operator can read, plus run ad-hoc queries, generate and download reports, export data. | export, query_builder, run_reports |
 | `admin` | 40 | Manage users within their own agency, approve uploads, register data feeds, configure notification rules, plus everything analyst can do. | manage_users, approve_uploads, register_feeds, configure_rules, export, query_builder, run_reports |
 | `oversight` | 50 | Cross-agency read access with no write right anywhere. Intended for Ministry-level reviewers who need to see across every agency's data without being able to change any of it. | export, query_builder, run_reports |
@@ -32,7 +33,7 @@ Six tiers exist, ranked low to high. A user's tier comes from their account's `r
 
 ## Agency scope: whose data a person sees
 
-Every account (except `public` and `super_admin`) belongs to one agency, identified by `agency_code`. That agency's entry in `access-control.json` decides which modules open and at what level. Three mechanisms combine, in this order:
+Every account (except `public` and `super_admin`) belongs to one agency, identified by `agency_code`. That agency's entry in the baseline policy decides which modules open and at what level. Three mechanisms combine, in this order:
 
 1. **Domain membership** (`agency.domains`). A domain is a named bundle of modules for a whole sector, for example `roads` bundles the Command Centre, Road Traffic, Safety, Infrastructure, Reporting, and GIS modules. An agency's domains grant every module in the bundle. The one exception is the `oversight` domain (SDT, SDR): it grants **read-only**, never write, across a much larger bundle spanning nearly every module in the platform. This is a deliberate different shape, not an oversight (no pun intended) in the data.
 2. **The agency's own grants** (`agency.grants`), layered on top of domain membership:
@@ -82,7 +83,7 @@ Module codes are the same M01 to M14 codes used throughout the codebase; see `RE
 | KENTRADE | Kenya Trade Network Agency | (none, provisional) | admin, analyst | M09, M10, M12 | Maritime port-ops (single route) | none module-level |
 | NPS | National Police Service | (none, provisional) | admin, analyst | M05, M09, M10 | M02, Traffic alerts | crash_victim category |
 | KWS | Kenya Wildlife Service | (none, provisional) | admin, analyst | M09, M10, M13 | M05 (Safety) | crash_victim category |
-| SDT | State Department for Transport | oversight | oversight, admin, analyst, operator (seeded accounts are all `admin`) | M09, M10, M13 | Read-only across nearly everything via the oversight domain | land_parcel, resettlement, critical_infrastructure, procurement categories |
+| SDT | State Department for Transport | oversight | oversight, admin, analyst, operator, auditor (seeded accounts are all `admin`) | M09, M10, M13 | Read-only across nearly everything via the oversight domain | land_parcel, resettlement, critical_infrastructure, procurement categories |
 | NTSA | National Transport and Safety Authority | regulation | admin, analyst, operator | M03, M04, M05, M09, M10, M12 | Traffic, Traffic analytics, GIS, Infrastructure overview | M07a, M07b, M08, M14, Infrastructure bridges/maintenance/projects/funding |
 | NAMATA | Nairobi Metropolitan Area Transport Authority | urban_transit | admin, analyst, operator | Public transport (full), M09, M10, M12, M13 | Fleet, Traffic, Railway schedules | M06, M07a, M07b, M14, PT compliance/licensing/registration/inspections, Safety incidents |
 | KRC | Kenya Railways Corporation | rail | admin, analyst, operator | M08, M14, M09, M10, M12, M13 | Maritime port-ops/imports-exports/cargo, Fleet | M02, M04, M05, M06, M07a, all other Maritime routes; cargo_commercial category |
@@ -91,7 +92,7 @@ Module codes are the same M01 to M14 codes used throughout the codebase; see `RE
 | NCTTCA | Northern Corridor Transit and Transport Coordination Authority | corridor | admin, analyst | M09, M10, M12 | Maritime port-ops/performance/imports-exports, Traffic analytics, Railway freight, GIS | M03, M04, M05, M06, M07a, M14, Query Builder; member_state_data category |
 | LAPSSET | LAPSSET Corridor Development Authority | corridor | admin, analyst | M13, M09, M10, M12 | Infrastructure projects, Maritime port-ops, Railway freight | M02, M03, M04, M05, M07a, M14, Query Builder |
 
-**Provisional agencies.** Every agency marked "(none, provisional)" above (COUNTY_GOV, KAA, KCAA, KMD, KRA, KRB, KENTRADE, NPS, KWS) was added on 2026-09-18 solely so the RBAC test-account seed had a real `agency_code` to resolve against. None has a completed UAPTS Needs Assessment return on file; the grants shown are a best guess at the agency's real mandate, not confirmed policy. `access-control.json` says so explicitly on each of these entries.
+**Provisional agencies.** Every agency marked "(none, provisional)" above (COUNTY_GOV, KAA, KCAA, KMD, KRA, KRB, KENTRADE, NPS, KWS) was added on 2026-09-18 solely so the RBAC test-account seed had a real `agency_code` to resolve against. None has a completed UAPTS Needs Assessment return on file; the grants shown are a best guess at the agency's real mandate, not confirmed policy. The baseline policy says so explicitly on each of these entries.
 
 ## Category-based field masking
 
@@ -133,6 +134,6 @@ The 62 `*@uapts.test` accounts (password `ChangeMe!` for all of them, see the ba
 - `/roles` and `/users` (both admin-tier, agency-scoped) are where an agency's own admin manages their tenant's accounts and role assignments.
 - `/agencies` is the platform-wide agency directory, restricted to oversight tier and super_admin (with the SDT/SDR admin override noted above); creating or editing an agency is further narrowed to super_admin only.
 - `/access-policies` ("Module Access") is where access is adjusted without editing files. super_admin sets what each agency is **allowed** (modules, individual pages, restricted data categories, capabilities). Within that limit, the agency's own admin decides what the agency has **enabled** and what each of its roles (admin, analyst, operator, ...) can reach. Each level can only narrow the one above it, and an agency admin can never remove their own ability to manage access. Changes are a draft until saved, every save is recorded in the page's change history, and "Preview as role" shows exactly which pages a role would reach.
-- **For now those changes are saved in the browser where they are made**, and the page says so: they don't reach other users or the server until the accounts API takes over storage. `app/config/access-control.json` remains the baseline everything above narrows from, and with nothing saved, access is exactly as described in this document.
-- Capabilities (export, query builder, manage users, ...) set on that page are recorded and shown in its preview but not yet enforced by the pages themselves; those still use the role tiers described above.
-- Changing the baseline policy itself (an agency's domains, default grants and denials, a new category) still means editing `app/config/access-control.json`; `Reference.md` section 9 covers the file and section 9.7 the Module Access layers on top of it.
+- **Those changes are saved on the server** (`GET`/`PUT /api/v1/access-control/`) and reach every user of the agency. The server validates each save against the caller's rights, stamps who changed what and when, keeps the change history, and audit-logs it. The baseline policy everything above narrows from is also served by the backend, and with nothing saved, access is exactly as described in this document.
+- Capabilities (export, query builder, manage users, ...) set on that page are enforced by the UI: a gated control needs both the role tier and the capability. This is client-side only. The backend's export, query and user endpoints still gate on role tier alone, so switching a capability off hides the control without closing the endpoint.
+- Changing the baseline policy itself (an agency's domains, default grants and denials, a new category) is a backend change (`apps/access_control/data/access-control.json`), mirrored into `tests/fixtures/access-control.json` for the frontend tests. `ACCESS_CONTROL.md` covers the resolver and the Module Access layers on top of it.

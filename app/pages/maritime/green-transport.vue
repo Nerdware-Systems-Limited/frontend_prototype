@@ -5,8 +5,8 @@
     subtitle="KPA / KMA - Vessel fuel type &amp; emissions per TEU-km, shore power (cold ironing), EV trucks &amp; trains in the port hinterland, and cold-chain reefer energy"
   >
     <template #actions>
-      <NuxtLink to="/maritime/cargo" class="btn">Cargo →</NuxtLink>
-      <NuxtLink to="/maritime/accidents" class="btn">Pollution Incidents →</NuxtLink>
+      <NuxtLink to="/maritime/cargo" class="btn">Cargo<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/accidents" class="btn">Pollution Incidents<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -156,6 +156,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useMaritimeGreenTransport } from '~/composables/api'
 import type { MaritimeGreenSummary, VesselEmissionRecord, GreenTransportModeStat, GreenModeWaterStat, GreenModeEvStat, EVFleetRecord, ReeferEnergyRecord, VesselFuelType } from '~/composables/api'
 

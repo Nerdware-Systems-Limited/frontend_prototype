@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor,
-  visibleAgencyOptions, canManageUser, canChangeRole, assignableRoleTypes, canViewRole,
+  visibleAgencyOptions, canManageUser, canChangeRole, assignableBuiltInRoles, canViewRole,
 } from '~/composables/useAgencyScope'
 
 const kenhaAdmin  = { role_type: 'admin', agency: 'agency-uuid-kenha', agency_code: 'KENHA' }
@@ -103,15 +103,17 @@ describe('useAgencyScope', () => {
     expect(canChangeRole(null, null, 'super_admin')).toBe(false)
   })
 
-  it('assignableRoleTypes: super_admin is offered only to a super_admin', () => {
-    expect(assignableRoleTypes(kenhaAdmin)).not.toContain('super_admin')
-    expect(assignableRoleTypes(kenhaAdmin, 'analyst')).toEqual(['admin', 'analyst', 'operator', 'public'])
-    expect(assignableRoleTypes(superAdmin, 'analyst')).toContain('super_admin')
-    expect(assignableRoleTypes(superAdmin)).toHaveLength(5)
+  const catalog = ['super_admin', 'admin', 'analyst', 'operator', 'public'].map(role_name => ({ role_name, agency: null, base_tier: null }))
+
+  it('assignableBuiltInRoles: super_admin is offered only to a super_admin', () => {
+    expect(assignableBuiltInRoles(kenhaAdmin, catalog)).not.toContain('super_admin')
+    expect(assignableBuiltInRoles(kenhaAdmin, catalog, 'analyst')).toEqual(['admin', 'analyst', 'operator', 'public'])
+    expect(assignableBuiltInRoles(superAdmin, catalog, 'analyst')).toContain('super_admin')
+    expect(assignableBuiltInRoles(superAdmin, catalog)).toHaveLength(5)
   })
 
-  it('assignableRoleTypes: a super_admin row is locked to its own role for a non-super_admin viewer', () => {
-    expect(assignableRoleTypes(kenhaAdmin, 'super_admin')).toEqual(['super_admin'])
+  it('assignableBuiltInRoles: a super_admin row is locked to its own role for a non-super_admin viewer', () => {
+    expect(assignableBuiltInRoles(kenhaAdmin, catalog, 'super_admin')).toEqual(['super_admin'])
   })
 
   it('canViewRole: super_admin is listed only for a super_admin, every other role for everyone', () => {

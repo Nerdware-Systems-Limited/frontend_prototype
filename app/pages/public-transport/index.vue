@@ -5,9 +5,10 @@
     subtitle="NaMATA · NTSA · NCTTCA - BRT operations, PSV oversight, schedule adherence, fare analytics, NCTTCA corridor ridership, and operator ranking"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
-      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
-      <NuxtLink to="/public-transport/compliance" class="btn-primary">Compliance →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="load" />
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/compliance" class="btn">Compliance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -76,8 +77,7 @@
 
   <!-- Route map + channel revenue side by side -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Nairobi Public Transport Map</div>
+    <CollapsibleSection class="card map-card" title="Nairobi Public Transport Map" storage-key="map:public-transport/index">
       <ClientOnly>
         <UaptsMap
           :lines="mapLines"
@@ -94,12 +94,12 @@
         <span class="mk"><span class="dot" style="background:#3b82f6" /> Matatu routes</span>
         <span class="mk"><span class="dot" style="background:#eab308" /> BRT stops</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="side-col">
       <!-- Payment channels -->
       <div class="card">
-        <div class="card-header">Revenue by Channel (7d)</div>
+        <div class="card-header">Revenue by Channel ({{ rangeTag }})</div>
         <div class="card-body">
           <div v-for="c in fareChannels" :key="c.payment_channel" class="chan-row">
             <span class="chan-label">{{ c.payment_channel }}</span>
@@ -136,7 +136,7 @@
   </div>
 
   <!-- Revenue trend bar chart -->
-  <SectionTitle pill="BebaPay / NTSA · 7d">Revenue Trend (Last 7 Days)</SectionTitle>
+  <SectionTitle :pill="`BebaPay / NTSA · ${rangeTag}`">Revenue Trend ({{ timeRange.label.value }})</SectionTitle>
 
   <div id="revenue-trend" class="card drill-target">
     <div class="card-body">
@@ -150,8 +150,8 @@
     </div>
   </div>
 
-  <!-- Operator leaderboard + Expiring licenses -->
-  <div class="two-col">
+  <!-- Operator leaderboard -->
+  <div class="two-col" style="grid-template-columns:1fr">
     <div id="operator-leaderboard" class="card drill-target">
       <div class="card-header">
         Operator Leaderboard
@@ -193,28 +193,10 @@
         />
       </div>
     </div>
-
-    <div class="card">
-      <div class="card-header">
-        Expiring PSV Licences (90d)
-        <NuxtLink to="/public-transport/compliance" class="link-sm">Manage →</NuxtLink>
-      </div>
-      <div class="card-body">
-        <div v-if="expiringLicenses.length">
-          <AlertItem
-            v-for="l in expiringLicenses.slice(0, 6)"
-            :key="l.license_number"
-            :severity="daysUntil(l.expiry_date) <= 30 ? 'critical' : daysUntil(l.expiry_date) <= 60 ? 'warning' : 'info'"
-            :title="l.sacco__sacco_name ?? l.license_number"
-            :meta="`Expires ${fmtDate(l.expiry_date)} · ${daysUntil(l.expiry_date)}d remaining`"
-          />
-        </div>
-        <div v-else style="font-size:13px;color:var(--fg-3)">
-          {{ loading ? 'Loading…' : 'No licences expiring in the next 90 days.' }}
-        </div>
-      </div>
-    </div>
   </div>
+
+  <!-- Certificate renewals: PSV and driving licences, urgent first -->
+  <CertificateExpiryPanel title="Licence &amp; certificate renewals" :sources="['psv', 'driver']" storage-key="public-transport" style="margin-bottom:16px" />
 
   <!-- Feedback by category -->
   <SectionTitle pill="Passenger Feedback">Feedback Categories</SectionTitle>
@@ -252,6 +234,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport, useGis } from '~/composables/api'
 import type { PTSummary, OperatorMetric } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -272,6 +256,9 @@ const roadsGeo         = ref<GeoJSONFeatureCollection | null>(null)
 const loading          = ref(true)
 const error            = ref<string | null>(null)
 const lastRefreshed    = ref('-')
+const timeRange        = useTimeRange('public-transport', { default: '7d' })
+const days             = timeRange.days
+const rangeTag         = computed(() => timeRange.period.value.toLowerCase())
 
 async function load() {
   loading.value = true
@@ -282,9 +269,9 @@ async function load() {
   const [sumRes, lbRes, revRes, chanRes, otRes, fbcRes, licRes, mapRes, roadsRes] = await Promise.allSettled([
     pt.summary(),
     pt.leaderboard(),
-    pt.revenueTrend(7),
-    pt.revenueByChannel(7),
-    pt.onTimeStats(7),
+    pt.revenueTrend(days.value),
+    pt.revenueByChannel(days.value),
+    pt.onTimeStats(days.value),
     pt.feedbackByCategory(),
     pt.expiringLicenses(90),
     pt.mapData(),
@@ -297,7 +284,7 @@ async function load() {
     feedbackByCategory.value = sumRes.value.feedback_by_category ?? []
   }
   if (lbRes.status   === 'fulfilled') leaderboard.value       = (lbRes.value as any).results ?? []
-  if (revRes.status  === 'fulfilled') fareTrend.value         = ((revRes.value as any).results ?? []).slice(-24)
+  if (revRes.status  === 'fulfilled') fareTrend.value         = (revRes.value as any).results ?? []
   if (chanRes.status === 'fulfilled') fareChannels.value      = (chanRes.value as any).results ?? []
   if (otRes.status   === 'fulfilled') onTime.value            = ((otRes.value as any).results ?? []).slice(0, 8)
   if (fbcRes.status  === 'fulfilled' && !(feedbackByCategory.value.length)) feedbackByCategory.value = (fbcRes.value as any).results ?? []
@@ -320,14 +307,26 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // ── Computed ─────────────────────────────────────────────────────────────
 const maxFeedback = computed(() => Math.max(1, ...feedbackByCategory.value.map(f => f.total ?? 0)))
 const demandForecast = computed(() => summary.value?.demand_forecast_24h ?? [])
+// The 24-hour KPI sparkline is always the last 24 hourly points, whatever range is selected.
 const revenueSeries = computed(() => {
-  const t = fareTrend.value
+  const t = fareTrend.value.slice(-24)
   return t.length > 1 ? t.map(f => f.total_kes ?? 0) : undefined
 })
 
-const fareTrendPoints = computed(() =>
-  fareTrend.value.map(f => ({ label: fmtHour(f.collected_hour), value: f.total_kes ?? 0 })),
-)
+// 24 Hours plots the hourly points; longer ranges are summed per day (East Africa Time) so a
+// 30-day window is 30 bars, not 720 hourly ones.
+const fareTrendPoints = computed(() => {
+  if (days.value <= 1) {
+    return fareTrend.value.slice(-24).map(f => ({ label: fmtHour(f.collected_hour), value: f.total_kes ?? 0 }))
+  }
+  const byDay = new Map<string, number>()
+  for (const f of fareTrend.value) {
+    const d = eatDate(new Date(f.collected_hour))
+    byDay.set(d, (byDay.get(d) ?? 0) + (f.total_kes ?? 0))
+  }
+  return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([d, value]) => ({ label: new Date(`${d}T00:00:00Z`).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', timeZone: 'UTC' }), value }))
+})
 const demandForecastPoints = computed(() =>
   demandForecast.value.map(d => ({ label: fmtHour(d.target_at), value: d.total_predicted ?? 0 })),
 )

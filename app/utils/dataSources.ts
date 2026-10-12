@@ -22,8 +22,9 @@
 import {
   useSafety, useFleet, useRailway, useAviationMaritime, useInfrastructure,
   useAgencies, useIntegrations, useGis, useTraffic, usePublicTransport,
-  useTraining, useAviationInfrastructure, useMaritimeCargo,
+  useTraining, useAviationInfrastructure, useMaritimeCargo, useQuery,
 } from '~/composables/api'
+import type { QueryDatasetKey, QueryFilter, QueryJoinSide, QuerySort } from '~/composables/api/useQuery'
 import type { SummaryFilterParams } from '~/composables/api/_client'
 import type { FilterField, FilterValue, WidgetFilterContext } from '~/types/dashboard'
 import type { Domain } from '~/utils/metricRegistry'
@@ -153,6 +154,145 @@ async function agencyIdFor(code: string): Promise<string> {
 // below just picks its slice, in the shape the presets already bind to.
 const trainingSummary = (p: SummaryFilterParams) => useTraining().summary(p)
 
+// ── Query sources (M15 /query/execute/) ──────────────────────────────────
+// "Any dataset on a dashboard" (docs/Widgets.md phase 5). One source per
+// allow-listed dataset; the binding's `params` carry the dataset fields,
+// filters, sort and limit. The server validates all of them and applies
+// the viewer's row-level access, so these are as safe as the summaries.
+
+/** The server returns at most this many records per request. */
+export const QUERY_MAX_ROWS = 500
+
+/** What a query source's binding.params hold. */
+export interface QueryParams {
+  fields?: string[]
+  filters?: QueryFilter[]
+  sort?: QuerySort
+  limit?: number
+}
+export interface JoinParams {
+  left?: Omit<QueryJoinSide, 'dataset'>
+  right?: Omit<QueryJoinSide, 'dataset'>
+  join_type?: 'inner' | 'left'
+  limit?: number
+}
+
+export interface QueryDatasetSpec {
+  dataset: QueryDatasetKey
+  module: string
+  route: string
+  label: string
+  source: string
+  permission: string
+  /** Dashboard filter -> the dataset field it narrows (checked against /query/datasets/). */
+  filterMap: Partial<Record<FilterField, string>>
+}
+
+export const QUERY_DATASETS: QueryDatasetSpec[] = [
+  { dataset: 'incidents', module: 'M05', route: '/safety', label: 'Safety incidents (records)', source: 'NTSA IRSMS', permission: DOMAIN_PERMISSIONS.safety,
+    filterMap: { date_range: 'reported_at', severity: 'severity', road: 'segment_road_code' } },
+  { dataset: 'blackspots', module: 'M05', route: '/safety/blackspots', label: 'Accident black spots (records)', source: 'NTSA KDE analysis', permission: DOMAIN_PERMISSIONS.safety,
+    filterMap: { road: 'segment_road_code' } },
+  { dataset: 'congestion', module: 'M02', route: '/traffic', label: 'Congestion events (records)', source: 'KeNHA ATC / RTMS', permission: DOMAIN_PERMISSIONS.traffic,
+    filterMap: { date_range: 'started_at', road: 'segment_road_code' } },
+  { dataset: 'traffic_counts', module: 'M02', route: '/traffic', label: 'Traffic counts (records)', source: 'KeNHA ATC / RTMS', permission: DOMAIN_PERMISSIONS.traffic,
+    filterMap: { date_range: 'recorded_at', road: 'segment_road_code' } },
+  { dataset: 'vehicles', module: 'M03', route: '/fleet', label: 'Tracked vehicles (records)', source: 'NTSA iTIMS', permission: DOMAIN_PERMISSIONS.fleet,
+    filterMap: {} },
+  { dataset: 'gps_tracks', module: 'M03', route: '/fleet', label: 'GPS tracks (sample records)', source: 'NTSA iTIMS', permission: DOMAIN_PERMISSIONS.fleet,
+    filterMap: { date_range: 'timestamp' } },
+]
+export const QUERY_DATASETS_BY_KEY = Object.fromEntries(QUERY_DATASETS.map(d => [d.dataset, d])) as Record<QueryDatasetKey, QueryDatasetSpec>
+
+/**
+ * Joins whose two sides need the same permission. A join across domains
+ * (incidents x congestion) would need "both permissions" on the server,
+ * which the dashboard catalog can't express yet - see docs/Widgets.md B20.
+ */
+export const QUERY_JOINS: { id: string; left: QueryDatasetKey; right: QueryDatasetKey; label: string }[] = [
+  { id: 'query.join.vehicles-gps', left: 'vehicles', right: 'gps_tracks', label: 'Vehicles x GPS tracks (join)' },
+  { id: 'query.join.incidents-blackspots', left: 'incidents', right: 'blackspots', label: 'Incidents x black spots, by road segment (join)' },
+  { id: 'query.join.congestion-counts', left: 'congestion', right: 'traffic_counts', label: 'Congestion x traffic counts, by road segment (join)' },
+]
+export const QUERY_JOINS_BY_ID = Object.fromEntries(QUERY_JOINS.map(j => [j.id, j]))
+
+export const isQuerySource = (id: string | undefined): boolean => !!id && id.startsWith('query.')
+export const isJoinSource = (id: string | undefined): boolean => !!id && id.startsWith('query.join.')
+
+/** A binding's params as request options (part of the cache key). */
+export const paramsOption = (params: Record<string, unknown> | undefined): SourceOptions =>
+  params && Object.keys(params).length ? { params: JSON.stringify(params) } : {}
+
+/** Read the binding params a query source was given. */
+function paramsOf<T>(o: SourceOptions): T {
+  try { return (typeof o.params === 'string' ? JSON.parse(o.params) : {}) as T } catch { return {} as T }
+}
+
+const nextDay = (d: string) => {
+  const t = new Date(`${d.slice(0, 10)}T00:00:00Z`)
+  if (Number.isNaN(t.getTime())) return d
+  t.setUTCDate(t.getUTCDate() + 1)
+  return t.toISOString().slice(0, 10)
+}
+
+/**
+ * Dashboard filters as dataset filters. Only fields in `filterMap` are
+ * honoured (and listed in the source's `honours`), so nothing claims a
+ * filter the dataset can't apply. The date range's end day is inclusive.
+ */
+export function dashboardQueryFilters(p: SummaryFilterParams, map: QueryDatasetSpec['filterMap']): QueryFilter[] {
+  const out: QueryFilter[] = []
+  const list = (v: string) => v.split(',').map(x => x.trim()).filter(Boolean)
+  if (map.date_range && p.date_from) out.push({ field: map.date_range, op: 'gte', value: p.date_from })
+  if (map.date_range && p.date_to) out.push({ field: map.date_range, op: 'lt', value: nextDay(p.date_to) })
+  for (const f of ['severity', 'road', 'county', 'agency', 'vehicle_class'] as const) {
+    const field = map[f]
+    const raw = (p as Record<string, string | undefined>)[f]
+    if (!field || !raw) continue
+    const vals = list(raw)
+    out.push(vals.length > 1 ? { field, op: 'in', value: vals } : { field, op: 'eq', value: vals[0]! })
+  }
+  return out
+}
+
+const honoursOf = (map: QueryDatasetSpec['filterMap']) => Object.keys(map) as FilterField[]
+const clampLimit = (n: unknown) => Math.min(QUERY_MAX_ROWS, Math.max(1, Number(n) || QUERY_MAX_ROWS))
+
+const QUERY_SOURCES: WidgetSource[] = [
+  ...QUERY_DATASETS.map((d): WidgetSource => ({
+    id: `query.${d.dataset}`, module: d.module, route: d.route, label: d.label, source: d.source,
+    tier: 'live', cadence: 'On request', permission: d.permission, honours: honoursOf(d.filterMap), backend: 'live',
+    fetch: (p, o) => {
+      const q = paramsOf<QueryParams>(o)
+      return useQuery().execute({
+        dataset: d.dataset,
+        filters: [...(q.filters ?? []), ...dashboardQueryFilters(p, d.filterMap)],
+        ...(q.fields?.length ? { fields: q.fields } : {}),
+        ...(q.sort ? { sort: q.sort } : {}),
+        limit: clampLimit(q.limit),
+      })
+    },
+  })),
+  ...QUERY_JOINS.map((j): WidgetSource => {
+    const l = QUERY_DATASETS_BY_KEY[j.left]
+    const r = QUERY_DATASETS_BY_KEY[j.right]
+    // A dashboard filter is honoured only when both sides can apply it.
+    const honours = honoursOf(l.filterMap).filter(f => f in r.filterMap)
+    return {
+      id: j.id, module: l.module, route: l.route, label: j.label, source: l.source === r.source ? l.source : `${l.source} + ${r.source}`,
+      tier: 'live', cadence: 'On request', permission: l.permission, honours, backend: 'live',
+      fetch: (p, o) => {
+        const q = paramsOf<JoinParams>(o)
+        const side = (spec: QueryDatasetSpec, s: JoinParams['left']): QueryJoinSide => ({
+          ...(s ?? {}), dataset: spec.dataset,
+          filters: [...(s?.filters ?? []), ...dashboardQueryFilters(p, Object.fromEntries(honours.map(f => [f, spec.filterMap[f]])))],
+        })
+        return useQuery().executeJoin({ left: side(l, q.left), right: side(r, q.right), join_type: q.join_type ?? 'inner', limit: clampLimit(q.limit) })
+      },
+    }
+  }),
+]
+
 // ── The registry ─────────────────────────────────────────────────────────
 export const SOURCES: WidgetSource[] = [
   {
@@ -266,6 +406,8 @@ export const SOURCES: WidgetSource[] = [
     },
   },
 ]
+
+SOURCES.push(...QUERY_SOURCES)
 
 export const SOURCES_BY_ID: Record<string, WidgetSource> = Object.fromEntries(SOURCES.map(s => [s.id, s]))
 

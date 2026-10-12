@@ -130,11 +130,14 @@ export interface QueryJoinResult {
 // distribution happens when `run` is called (by a user here, or by the
 // Report Centre) rather than on an actual timer.
 
-export type SavedQueryType = 'single' | 'join'
+export type SavedQueryType = 'single' | 'join' | 'sql'
 export type ScheduleFrequency = 'manual' | 'daily' | 'weekly' | 'monthly'
 export type SavedQueryFormat = 'csv' | 'json'
 
 export interface SavedQueryDefinition {
+  // query_type = 'sql' - read-only statements only (enforced server-side)
+  sql?: string
+  max_rows?: number
   // query_type = 'single'
   dataset?: QueryDatasetKey
   filters?: QueryFilter[]

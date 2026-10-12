@@ -157,7 +157,7 @@ export const METRICS: MetricDefinition<any>[] = [
   {
     key: 'safety.fatalities_30d', label: 'Fatalities', domain: 'safety',
     source: 'NTSA IRSMS + NPS', sourceMode: 'live', to: '/safety/kpis', filterFields: DOMAIN_FILTERS.safety,
-    period: '30D', description: 'Fatal incidents',
+    period: '30D', description: 'People killed',
     resolve: (s: SafetySummary) => {
       const fatal = s.kpis.fatal_30d
       const trend = s.fatality_trend_30d ?? []
@@ -175,7 +175,7 @@ export const METRICS: MetricDefinition<any>[] = [
         }
       }
       return {
-        value: fmtNum(fatal), period: '30D', description: 'Fatal incidents',
+        value: fmtNum(fatal), period: '30D', description: 'People killed',
         status: statusOf(fatal, 'safety.fatalities_30d'),
         series: trend.length > 1 ? trend.map(d => d.fatalities) : undefined,
         ...cmp,
@@ -316,9 +316,13 @@ export const METRICS: MetricDefinition<any>[] = [
       const { pct, total } = infraGoodPct(i)
       if (!total) return noData('LATEST', 'Network rated good condition', 'No condition survey data')
       return {
-        ...pctParts(pct), abbr: 'IRI',
-        abbrTitle: 'International Roughness Index - lower means a smoother road',
-        description: `Rated good · IRI avg ${formatValue(i.network.iri_average, 'score')}`,
+        ...pctParts(pct),
+        ...(i.network.iri_average != null
+          ? { abbr: 'IRI', abbrTitle: 'International Roughness Index - lower means a smoother road' }
+          : {}),
+        description: i.network.iri_average != null
+          ? `Rated good · IRI avg ${formatValue(i.network.iri_average, 'score')}`
+          : 'Rated good · no IRI measurements recorded',
         period: 'LATEST', status: statusOf(pct, 'infra.good_condition_pct'),
       }
     },

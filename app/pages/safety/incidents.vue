@@ -41,7 +41,7 @@
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
       period="30D"
-      sub="Fatal incidents this month"
+      sub="People killed this month"
       :status="!summary ? undefined : summary.kpis.fatal_30d > 20 ? 'critical' : summary.kpis.fatal_30d > 10 ? 'below' : 'monitoring'"
       to="#all-incidents"
       :filter="{ severity: 'fatal' }"
@@ -59,9 +59,11 @@
   </div>
 
   <!-- Incidents table with filtering -->
-  <SectionTitle>All Incidents</SectionTitle>
-
-  <div id="all-incidents" class="filter-row drill-target">
+  <CollapsibleSection
+    id="all-incidents" class="drill-target" plain default-open style="margin-bottom:16px"
+    title="All Incidents" :count="filteredIncidents.length" storage-key="incidents:safety/all"
+  >
+  <div class="filter-row">
     <input v-model="incidentSearch" class="select-sm" placeholder="Search reference / title…" style="min-width:180px" />
     <select v-model="severityFilter" class="select-sm">
       <option value="">All severities</option>
@@ -174,11 +176,11 @@
       />
     </div>
   </div>
+  </CollapsibleSection>
 
   <!-- Map + active list -->
   <div class="two-col">
-    <div class="card map-card">
-      <div class="card-header">Active Incident Map</div>
+    <CollapsibleSection class="card map-card" title="Active Incident Map" storage-key="map:safety/incidents">
       <ClientOnly>
         <UaptsMap
           :markers="incidentMarkers"
@@ -189,13 +191,12 @@
           show-legend
         />
       </ClientOnly>
-    </div>
+    </CollapsibleSection>
 
-    <div id="active-queue" class="card drill-target">
-      <div class="card-header">
-        Active Incidents
-        <span class="count-badge">{{ activeIncidents.length }}</span>
-      </div>
+    <CollapsibleSection
+      id="active-queue" class="card drill-target" default-open storage-key="incidents:safety/active"
+      title="Active Incidents" :count="activeIncidents.length" :tone="activeTone"
+    >
       <div class="card-body scroll-body">
         <div
           v-for="inc in activeIncidents"
@@ -252,13 +253,14 @@
         </div>
         <EmptyState v-if="activeIncidents.length === 0" :loading="loading" message="No active incidents matching current filters." icon="search" compact />
       </div>
-    </div>
+    </CollapsibleSection>
   </div>
 
   <!-- Dispatch log -->
-  <SectionTitle pill="NPS / NTSA · Live">Emergency Dispatch Log</SectionTitle>
-
-  <div id="dispatch-log" class="card drill-target">
+  <CollapsibleSection
+    id="dispatch-log" class="card drill-target" default-open storage-key="incidents:safety/dispatch"
+    title="Emergency Dispatch Log" source="NPS / NTSA · Live" :count="dispatches.length"
+  >
     <div class="card-body">
       <table>
         <thead>
@@ -296,7 +298,7 @@
         @prev="dispatchesPrev" @next="dispatchesNext"
       />
     </div>
-  </div>
+  </CollapsibleSection>
 
   <AppModal
     v-model="reportersModalOpen"
@@ -473,6 +475,10 @@ const activeIncidents = computed(() =>
   incidents.value.filter(i => !['resolved','closed','cancelled'].includes(i.status)),
 )
 
+/** The header colour while the list is folded: the worst thing still open. */
+const activeTone = computed(() =>
+  activeIncidents.value.some(i => i.severity === 'fatal') ? 'danger'
+    : activeIncidents.value.length ? 'warning' : 'success')
 const filteredIncidents = computed(() => incidents.value.filter(i => {
   if (incidentSearch.value) {
     const q = incidentSearch.value.toLowerCase()

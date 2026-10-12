@@ -1,5 +1,5 @@
 // The baseline policy and the viewer's dashboard permissions come from the server.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import baseline from '../fixtures/access-control.json'
 import { createApiAccessPolicyStorage, type PolicyApiFetch } from '~/utils/accessPolicyStorage'
@@ -70,9 +70,14 @@ describe('policy store', () => {
   })
 
   it('stays closed when the baseline cannot be fetched', async () => {
+    // The store logs this failure on purpose; assert it instead of letting it spill into the test output.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     setBaseSettings(null)
     setAccessPolicyStorage({ ...localAccessPolicyStorage, loadBaseline: async () => { throw new Error('down') } })
     await useAccessPolicyStore().load()
     expect(Object.keys(BASE_SETTINGS.agencies)).toEqual([])
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toContain('could not load the baseline access policy')
+    warn.mockRestore()
   })
 })

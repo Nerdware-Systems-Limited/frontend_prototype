@@ -5,8 +5,8 @@
     subtitle="KPA · KMA - Cargo handling operations (offload / load / stevedoring), pilotage boarding-to-berthing records, and vessel / pilot / crane-equipment licensing"
   >
     <template #actions>
-      <NuxtLink to="/maritime" class="btn">Vessel Movements →</NuxtLink>
-      <NuxtLink to="/maritime/cargo" class="btn">Cargo →</NuxtLink>
+      <NuxtLink to="/maritime" class="btn">Vessel Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/cargo" class="btn">Cargo<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -122,6 +122,9 @@
     </div>
   </div>
 
+  <!-- Renewals: maritime licences that are expired or expiring, most urgent first -->
+  <CertificateExpiryPanel title="Licence renewals" :sources="['maritime']" storage-key="maritime-services" style="margin-bottom:16px" />
+
   <!-- Licensing -->
   <SectionTitle pill="KMA · Live">Licensing Register</SectionTitle>
   <div id="licensing-table" class="card drill-target">
@@ -169,6 +172,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useMaritimeServices } from '~/composables/api'
 import type { MaritimeServicesSummary, CargoHandlingRecord, PilotageRecord, MaritimeLicence, LicenceCategory, LicenceStatus } from '~/composables/api'
 

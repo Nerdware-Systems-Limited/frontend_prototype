@@ -1,6 +1,8 @@
 # Frontend Security Audit
 
-_As of 2026-09-20._
+_As of 2026-09-20; updated 2026-10-12 for the changes noted below._
+
+**Update 2026-10-12.** [SECURITY.md](SECURITY.md) is now the full, current security overview and the ranked gap list; this file stays as the narrower frontend-role audit. Since the original date: the access policy moved to the backend (baseline served at `/api/v1/access-control/baseline/`, overrides saved server-side), tabs now share a session over a `BroadcastChannel` with a Web Lock around refresh (`app/utils/tabSync.ts`; see [AUTH_AND_SESSIONS.md](AUTH_AND_SESSIONS.md)), and the `auditor` tier was added. Line references below were not re-pinned; search by function name.
 
 Companion to the backend's `docs/security-recommendations-status.md`, covering the frontend's role in the same three controls requested in Mugambi Githinji's 15 September 2026 email. Verified against the current code, not against `Reference.md` or `PRODUCT.md`, both of which predate some of this and are noted as stale below where that matters.
 
@@ -17,7 +19,7 @@ The short version: the frontend correctly treats all three controls as the backe
 ## 2. Role-based access control
 
 - Two composables split the gate in two, matching the backend's own split between role and tenant: `usePermissions()` (role tier: what this person may do) and `useAccessControl()` (agency scope: whose data they may see), both driven by the versioned policy file `app/config/access-control.json`.
-- **Now wired into the global route guard.** `app/middleware/auth.global.ts` resolves every navigation through `useAccessControl().resolveRoute()` and redirects to a safe space on denial. `Reference.md`'s note on `useAccessControl()` ("Not yet wired to anything") is stale; this was wired in during the agency command centre work earlier in this session's git history. The same middleware's own comment marks this as closing a previously-known gap: no client-side route gating on `/roles`, `/users`, `/audit`, `/integrations` (also referenced as an open item in `PRODUCT.md`, likewise now stale).
+- **Now wired into the global route guard.** `app/middleware/auth.global.ts` resolves every navigation through `useAccessControl().resolveRoute()` and redirects to a safe space on denial. `Reference.md` has since been corrected; the guard was wired in during the agency command centre work. The same middleware's own comment marks this as closing a previously-known gap: no client-side route gating on `/roles`, `/users`, `/audit`, `/integrations` (also referenced as an open item in `PRODUCT.md`, likewise now stale).
 - Like authentication, this is UX gating only. It hides navigation and blocks client-side rendering, but a direct API call bypasses it entirely - the backend's `core/permissions.py` RBAC classes (see the backend audit, section 2) are what actually enforce this.
 
 ## 3. Object-level authorization

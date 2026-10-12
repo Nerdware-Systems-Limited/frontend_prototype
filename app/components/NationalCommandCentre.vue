@@ -86,6 +86,10 @@
     />
   </div>
 
+  <!-- Cross-module HQ summary: other modules' live status, performance over the
+       selected range, what needs attention, and certificate renewals. -->
+  <HqSummary />
+
   <!-- ═══════════════════════════════════════════════════════════════
        2. ROAD SAFETY & INCIDENT MANAGEMENT
        (Kept by request - the other four detail sections that used to sit
@@ -200,16 +204,16 @@
   <div class="section-label">National Incident Heatmap</div>
 
   <div class="map-alerts-row">
-    <div class="map-wrap">
-      <div class="map-wrap-head">
-        Predictive risk hotspots &amp; black spot clusters
+    <CollapsibleSection class="map-wrap" title="Predictive risk hotspots & black spot clusters" storage-key="map:national-command-centre">
+      <template #meta>
         <span class="map-head-meta">
           <template v-if="loading">Loading…</template>
           <template v-else>{{ hotspotsSummary }} · {{ blackspotsSummary }}</template>
-          <template v-if="roads"> · road network</template>
         </span>
+      </template>
+      <template #actions>
         <NuxtLink to="/safety/blackspots" class="section-link">Full blackspot analysis &amp; map →</NuxtLink>
-      </div>
+      </template>
       <div class="map-stage">
         <ClientOnly>
           <UaptsMap
@@ -244,7 +248,7 @@
           <span class="map-legend-item map-legend-dim"><span class="map-dash" style="background:var(--fg-2)"></span>Roads</span>
         </template>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="alerts-section">
       <div class="alerts-head">
@@ -1126,9 +1130,10 @@ const infraView = computed((): KpiView => {
   return {
     value: infraGoodPct.value.toFixed(1),
     unit: '%',
-    abbr: 'IRI',
-    abbrTitle: 'International Roughness Index - lower means a smoother road',
-    description: `Rated good · IRI avg ${iri?.toFixed(2) ?? '-'}`,
+    ...(iri != null
+      ? { abbr: 'IRI', abbrTitle: 'International Roughness Index - lower means a smoother road' }
+      : {}),
+    description: iri != null ? `Rated good · IRI avg ${iri.toFixed(2)}` : 'Rated good · no IRI measurements recorded',
     period: 'LATEST',
     status: infraGoodPct.value >= 60 ? 'healthy' : 'warning',
   }
@@ -1163,7 +1168,7 @@ const incidents7dView = computed((): KpiView => {
 
 const fatalities30dView = computed((): KpiView => {
   if (!safety.value) {
-    return { value: '-', period: '30D', description: 'Fatal incidents', unavailable: true, unavailableReason: safetyFailed.value ? feedDownReason('NTSA IRSMS + NPS') : awaitingReason }
+    return { value: '-', period: '30D', description: 'People killed', unavailable: true, unavailableReason: safetyFailed.value ? feedDownReason('NTSA IRSMS + NPS') : awaitingReason }
   }
   const fatal = safety.value.kpis.fatal_30d
   const trend = safety.value.fatality_trend_30d ?? []
@@ -1184,7 +1189,7 @@ const fatalities30dView = computed((): KpiView => {
   }
   return {
     value: fmtNum(fatal),
-    description: 'Fatal incidents',
+    description: 'People killed',
     period: '30D',
     status: fatal > 20 ? 'critical' : fatal > 10 ? 'warning' : 'neutral',
     series,

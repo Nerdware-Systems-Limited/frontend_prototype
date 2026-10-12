@@ -6,7 +6,7 @@
   >
     <template #actions>
       <span class="freshness-badge">{{ runs.length ? `${runs.length} recent runs` : 'No recent runs' }}</span>
-      <button class="btn-primary" @click="showGenerateModal = true">+ Generate Report</button>
+      <button class="btn btn-primary" @click="showGenerateModal = true">+ Generate Report</button>
     </template>
   </PageHeader>
 
@@ -54,7 +54,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" @click="showGenerateModal = false">Cancel</button>
-        <button class="btn-primary" :disabled="!genForm.template_id || generating" @click="generateReport">
+        <button class="btn btn-primary" :disabled="!genForm.template_id || generating" @click="generateReport">
           {{ generating ? 'Generating…' : 'Generate' }}
         </button>
       </div>
@@ -79,7 +79,7 @@
         <div class="tc-formats">
           <span v-for="f in tmpl.formats" :key="f" class="tc-fmt">{{ f.toUpperCase() }}</span>
         </div>
-        <button class="btn-primary tc-btn" @click="quickGenerate(tmpl)">Generate →</button>
+        <button class="btn btn-primary tc-btn" @click="quickGenerate(tmpl)">Generate<ArrowRight :size="14" aria-hidden="true" /></button>
       </div>
     </div>
   </div>
@@ -97,7 +97,7 @@
           <div class="saved-main">
             <div class="saved-name">
               {{ sq.name }}
-              <BadgePill :variant="sq.query_type === 'join' ? 'info' : 'neutral'">{{ sq.query_type === 'join' ? 'Cross-module' : 'Single dataset' }}</BadgePill>
+              <BadgePill :variant="sq.query_type === 'join' ? 'info' : 'neutral'">{{ sq.query_type === 'join' ? 'Cross-module' : sq.query_type === 'sql' ? 'SQL' : 'Single dataset' }}</BadgePill>
             </div>
             <div class="saved-desc">{{ sq.description || 'No description' }}</div>
             <div class="saved-meta">
@@ -108,7 +108,7 @@
             </div>
           </div>
           <div class="saved-actions">
-            <button class="btn-primary" :disabled="runningSavedId === sq.id" @click="runSavedNow(sq)">
+            <button class="btn btn-primary" :disabled="runningSavedId === sq.id" @click="runSavedNow(sq)">
               {{ runningSavedId === sq.id ? 'Running…' : '▶ Run Now' }}
             </button>
             <button class="remove-btn" title="Delete" @click="deleteSaved(sq.id)">×</button>
@@ -150,7 +150,7 @@
             <td class="run-by">{{ (r as any).requested_by_email ?? '-' }}</td>
             <td class="run-size">{{ (r as any).file_size_bytes ? fmtBytes((r as any).file_size_bytes) : '-' }}</td>
             <td>
-              <button v-if="r.status === 'completed'" class="btn run-dl" @click="useReports().download(r.id)">⬇ Download</button>
+              <button v-if="r.status === 'completed'" class="btn run-dl" @click="useReports().download(r.id)"><Download :size="14" aria-hidden="true" />Download</button>
               <span v-else-if="r.status === 'running'" class="run-progress">● Generating…</span>
               <span v-else-if="r.status === 'queued'" class="run-queued">⏳ Queued…</span>
               <span v-else-if="r.status === 'failed'" class="run-failed" :title="(r as any).error">✕ Failed</span>
@@ -172,6 +172,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight, Download } from 'lucide-vue-next'
 import { useReports, useQuery } from '~/composables/api'
 import type { ReportTemplate, ReportRun, SavedQuery, ScheduleFrequency, SavedQueryFormat } from '~/composables/api'
 

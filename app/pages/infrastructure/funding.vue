@@ -5,8 +5,8 @@
     subtitle="KeNHA · KURA · KeRRA · KRB · LAPSSET · National Treasury - Budget allocations, disbursements, absorption, and variance analytics per agency and fiscal year"
   >
     <template #actions>
-      <NuxtLink :to="agencyLink('/infrastructure')" class="btn">Road Network →</NuxtLink>
-      <NuxtLink :to="agencyLink('/infrastructure/projects')" class="btn-primary">Project Status →</NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure')" class="btn">Road Network<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/projects')" class="btn">Project Status<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -192,6 +192,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { MaintenanceBudget, RoadSegment, ConstructionProject, DeteriorationForecast, InfrastructureSummary } from '~/composables/api'
 

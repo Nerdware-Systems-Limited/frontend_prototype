@@ -520,8 +520,8 @@ button { font-family: inherit; }
   transition: background-color .15s var(--ease-standard);
 }
 .sidebar-toggle { display: inline-flex; margin-right: 8px; }
-/* Hamburger is a mobile-only affordance - the sidebar is persistent on desktop. */
-.hamburger-btn { display: none; }
+/* Hamburger toggles the off-canvas drawer on mobile and collapses the sidebar on desktop. */
+.hamburger-btn { display: inline-flex; margin-right: 8px; }
 .sidebar-toggle:hover, .hamburger-btn:hover { background: rgba(255, 255, 255, .1); }
 
 .sidebar {
@@ -576,7 +576,19 @@ button { font-family: inherit; }
 .sidebar-group-title:hover { background: var(--surface-quiet); color: var(--fg-2); }
 .sidebar-caret { font-size: 9px; color: var(--fg-3); transition: transform .15s; }
 .sidebar-group-items { display: flex; flex-direction: column; padding: 3px 0 5px; }
-body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+/* Desktop collapse only - below 900px the off-canvas drawer (.mobile-open) owns
+   the sidebar, and this higher-specificity rule would otherwise pin it shut.
+   visibility drops the hidden links out of the tab order once the slide ends. */
+@media (min-width: 901px) {
+  body.sidebar-collapsed .sidebar {
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform .2s var(--ease-out), visibility 0s .2s;
+  }
+  body.sidebar-collapsed main, body.sidebar-collapsed .main-content { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, main, .main-content { transition: none !important; }
+}
 
 /* ═════════════════════════════════════════════════════════════════════════
    MAIN CONTENT + PAGE HEADER
@@ -588,8 +600,8 @@ main, .main-content {
   display: flex; flex-direction: column; gap: 16px;
   animation: fadeIn .22s var(--ease-out);
   background: var(--bg);
+  transition: margin-left .2s var(--ease-out);
 }
-body.sidebar-collapsed main, body.sidebar-collapsed .main-content { margin-left: 0; }
 .app-container { display: block; }
 .container { max-width: 100%; display: flex; flex-direction: column; gap: 16px; }
 
@@ -685,6 +697,31 @@ body.sidebar-collapsed main, body.sidebar-collapsed .main-content { margin-left:
 .btn-sm { padding: 3px 10px; font-size: 12px; min-height: 26px; }
 .btn svg, .btn-primary svg, .btn-secondary svg, .btn-accent svg, .btn-ghost svg, .btn-danger svg, .header-btns button svg { width: 14px; height: 14px; }
 .header-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* A select in a header row sits at button height, not 4px short of it. */
+.header-btns .select-sm { min-height: 32px; }
+
+/* Segmented control - one bordered shell, hairline-divided segments, the
+   chosen one filled (DayRangeToggle, the hub's time window). Selectors are
+   doubled with .header-btns so they outrank `.header-btns button`, which
+   would otherwise draw each segment as its own rounded button. */
+.segmented {
+  display: inline-flex; flex-shrink: 0; overflow: hidden;
+  border: 1px solid var(--border-interactive); border-radius: var(--r-sm); background: var(--surface-2);
+}
+.segmented > button, .header-btns .segmented > button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0;
+  min-height: 30px; padding: 6px 12px; margin: 0;
+  border: 0; border-right: 1px solid var(--border-subtle); border-radius: 0;
+  background: transparent; color: var(--fg-2);
+  font: 600 12px/1 var(--font-ui); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.segmented > button:last-child, .header-btns .segmented > button:last-child { border-right: 0; }
+.segmented > button:hover:not(.active):not(:disabled),
+.header-btns .segmented > button:hover:not(.active):not(:disabled) { background: var(--surface-quiet); color: var(--fg-1); border-color: var(--border-subtle); }
+.segmented > button.active, .header-btns .segmented > button.active { background: var(--primary-fill); color: #fff; }
+.segmented > button:active, .header-btns .segmented > button:active { transform: none; }
+.segmented > button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
 /* ═════════════════════════════════════════════════════════════════════════
    ROLE / SEGMENT TABS
@@ -1325,8 +1362,6 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
   .top-nav-actions { gap: 6px; }
   .kpi-grid, .stats-grid, .dashboard-grid { grid-template-columns: 1fr; }
   main, .main-content { padding: 10px 8px; }
-  .header-btns .btn, .header-btns .btn-primary, .header-btns .btn-secondary,
-  .header-btns .btn-accent, .header-btns .btn-ghost, .header-btns .btn-danger { width: 100%; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1390,13 +1425,22 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
   .filter-bar--grid input, .filter-bar--grid select { min-height: 40px; padding: 8px 12px; font-size: 16px; }
 }
 
-/* Page-header actions - on phones the header is a column, and its button row
-   would otherwise shrink to its own content width (two buttons then sit narrower
-   than the three on the next page). Opt in with class="header-actions-fill" on
-   <PageHeader>: the row spans the header and the buttons share it evenly. */
+/* Page-header actions on phones - the header is a column, and its action row
+   would otherwise shrink to its own content (two buttons narrower than the
+   three on the next page, a stack of full-width ones on another). Every page
+   gets one layout: the row spans the header, buttons share it evenly at a
+   40px tap height, badges keep their size, and a segmented control or a
+   select takes a full line of its own. A wrapper holding a button (a menu)
+   counts as a button. */
 @media (max-width: 600px) {
-  .header-actions-fill .header-btns { align-self: stretch; }
-  .header-actions-fill .header-btns > * { flex: 1 1 130px; justify-content: center; min-height: 40px; }
+  .header-btns { align-self: stretch; }
+  .header-btns > * { flex: 1 1 130px; min-width: 0; }
+  .header-btns > .btn, .header-btns > button, .header-btns > a { justify-content: center; min-height: 40px; font-size: 13px; }
+  .header-btns > div > .btn { width: 100%; justify-content: center; min-height: 40px; font-size: 13px; }
+  .header-btns > span { flex: 0 0 auto; }
+  .header-btns > .segmented, .header-btns > select { flex: 1 1 100%; }
+  .header-btns > .segmented > button { flex: 1 1 0; min-height: 40px; font-size: 13px; }
+  .header-btns > select { min-height: 40px; font-size: 16px; }
 }
 
 /* Stacked-card tables - at 768px and below (the same point the rest of the
@@ -1408,40 +1452,41 @@ main svg:not([width]):not([height]) { max-width: 24px; max-height: 24px; }
      .stack-block    caption above the value instead of beside it (long text)
      .stack-actions  the action-button row, ruled off at the bottom
    The td[colspan] rule covers empty-state and expanded-detail rows.
-   Every selector is prefixed with .card-body on purpose: the pages' own scoped
+   Every selector is prefixed with the card body (.card-body, or the Integration
+   Hub's .ih-card-body) on purpose: the pages' own scoped
    cell rules (`.users-table td` and friends, specificity 0,2,1) would otherwise
    outrank these and put desktop cell padding back inside the cards. */
 @media (max-width: 768px) {
   /* Beat the 480px scroll floor the 768px block gives every .card-body table. */
-  .card-body .stack-table { min-width: 0; }
-  .card-body .stack-table > thead { display: none; }
-  .card-body .stack-table, .card-body .stack-table > tbody { display: block; width: 100%; }
-  .card-body .stack-table > tbody > tr {
+  :is(.card-body, .ih-card-body) .stack-table { min-width: 0; }
+  :is(.card-body, .ih-card-body) .stack-table > thead { display: none; }
+  :is(.card-body, .ih-card-body) .stack-table, :is(.card-body, .ih-card-body) .stack-table > tbody { display: block; width: 100%; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr {
     position: relative; display: block; width: 100%; margin-bottom: 8px; padding: 10px 12px;
     background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
   }
   /* A tap leaves :hover stuck on touch screens - no hover wash on cards. */
-  .card-body .stack-table > tbody > tr:hover > td { background: transparent; }
-  .card-body .stack-table > tbody > tr > td {
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr:hover > td { background: transparent; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     min-width: 0; padding: 4px 0; border: 0; font-size: 12.5px; white-space: normal;
   }
-  .card-body .stack-table > tbody > tr > td::before {
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td::before {
     content: attr(data-label); flex-shrink: 0;
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3);
+    font-family: var(--font-ui); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3);
   }
-  .card-body .stack-table > tbody > tr > td:not([data-label])::before { content: none; }
-  .card-body .stack-table > tbody > tr > td[colspan] { display: block; }
-  .card-body .stack-table > tbody > tr > td.stack-block { flex-direction: column; align-items: flex-start; gap: 2px; }
-  .card-body .stack-table > tbody > tr > td.stack-title {
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td:not([data-label])::before { content: none; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td[colspan] { display: block; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td.stack-block { flex-direction: column; align-items: flex-start; gap: 2px; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td.stack-title {
     display: block; padding: 0 0 8px; margin-bottom: 6px;
     border-bottom: 1px solid var(--border-subtle); font-size: 14px; font-weight: 700;
   }
-  .card-body .stack-table > tbody > tr > td.stack-actions {
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td.stack-actions {
     justify-content: flex-start; padding: 8px 0 0; margin-top: 4px; border-top: 1px solid var(--border-subtle);
   }
-  .card-body .stack-table > tbody > tr > td.stack-actions::before { content: none; }
-  .card-body .stack-table > tbody > tr.detail-row { padding: 0; background: none; border: 0; }
-  .card-body .stack-table > tbody > tr.detail-row > td { padding: 0; }
-  .card-body .stack-table .btn-sm { min-height: 36px; padding: 6px 14px; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr > td.stack-actions::before { content: none; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr.detail-row { padding: 0; background: none; border: 0; }
+  :is(.card-body, .ih-card-body) .stack-table > tbody > tr.detail-row > td { padding: 0; }
+  :is(.card-body, .ih-card-body) .stack-table .btn-sm { min-height: 36px; padding: 6px 14px; }
 }

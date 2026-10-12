@@ -5,8 +5,8 @@
     subtitle="KRC · RSSB · NTSA - Incident tracking, level crossing safety, regulatory compliance, and predictive risk indicators"
   >
     <template #actions>
-      <NuxtLink to="/railway/infrastructure" class="btn">Rail Infrastructure →</NuxtLink>
-      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory →</NuxtLink>
+      <NuxtLink to="/railway/infrastructure" class="btn">Rail Infrastructure<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -27,8 +27,7 @@
   </div>
 
   <!-- Incident table -->
-  <SectionTitle pill="KRC Safety Dept · Live">Incident Registry</SectionTitle>
-  <div id="incident-registry" class="card drill-target">
+  <CollapsibleSection id="incident-registry" class="card drill-target" default-open title="Incident Registry" source="KRC Safety Dept · Live" :count="filteredIncidents.length" :tone="openIncidents.length ? 'warning' : 'success'" storage-key="inc:railway/safety:incident-registry">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="typeFilter" class="select-sm">
@@ -89,7 +88,7 @@
       />
       <div class="source-note">Incident core fields (type, severity, casualties, status) are live from KRC Safety reporting. Response owner and corrective-action status await the RSSB compliance-tracking integration; train/rolling-stock involvement and root cause are not yet captured upstream.</div>
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Level crossing safety -->
   <SectionTitle pill="KRC Level Crossings · Live">Level Crossing Safety</SectionTitle>
@@ -231,6 +230,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway, useRailInfrastructure, useRailSafety } from '~/composables/api'
 import type { RailIncident, RailLine, LevelCrossing, CorrectiveAction, RailRiskIndicator, RailNetwork } from '~/composables/api'
 

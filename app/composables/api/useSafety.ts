@@ -4,7 +4,7 @@
 //
 // Backend surface: /api/v1/safety/
 //   /incidents/, /accidents/, /black-spots/, /emergency-dispatches/,
-//   /predictive-hotspots/, /kpis/, /interventions/, /traffic-violations/,
+//   /predictive-hotspots/, /kpis/{trend,by-county}/, /interventions/, /traffic-violations/,
 //   /summary/.
 // ─────────────────────────────────────────────────────────────────────
 
@@ -182,25 +182,6 @@ export interface PredictiveHotspot {
   updated_at: string
 }
 
-export interface SafetyKPI {
-  id: string
-  agency: string | null
-  agency_code: string | null
-  date: string
-  county: string
-  total_incidents: number
-  fatal_count: number
-  serious_count: number
-  minor_count: number
-  fatalities: number
-  injuries: number
-  avg_response_minutes: number | null
-  interventions_evaluated: number
-  intervention_effectiveness_pct: number | null
-  created_at: string
-  updated_at: string
-}
-
 export interface SafetyIntervention {
   id: string
   segment: string | null
@@ -306,7 +287,8 @@ export function useSafety() {
 
   return {
     // ── Dashboard / summary ────────────────────────────────────────
-    summary: (params?: SummaryFilterParams) => api<SafetySummary>(`${S}/summary/`, { query: cleanQuery(params) }),
+    summary: (params?: SummaryFilterParams) =>
+      api<SafetySummary>(`${S}/summary/`, { query: cleanQuery(params) }),
 
     // ── Incidents ──────────────────────────────────────────────────
     incidents: (q?: SafetyQuery) =>
@@ -365,10 +347,8 @@ export function useSafety() {
     hotspotHeatmap: () => api<PredictiveHotspotHeatmap>(`${S}/predictive-hotspots/heatmap/`),
 
     // ── KPIs ───────────────────────────────────────────────────────
-    kpis: (q?: SafetyQuery) =>
-      api<Paged<SafetyKPI>>(`${S}/kpis/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    kpiTrend: () => api<unknown>(`${S}/kpis/trend/`),
-    kpiByCounty: () => api<unknown>(`${S}/kpis/by-county/`),
+    kpiTrend: (days?: number) => api<unknown>(`${S}/kpis/trend/`, { query: cleanQuery({ days }) }),
+    kpiByCounty: (days?: number) => api<unknown>(`${S}/kpis/by-county/`, { query: cleanQuery({ days }) }),
 
     // ── Interventions ──────────────────────────────────────────────
     interventions: (q?: SafetyQuery) =>

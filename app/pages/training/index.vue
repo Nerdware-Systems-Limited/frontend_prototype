@@ -5,8 +5,8 @@
     subtitle="NTSA · KMA · KCAA · NITA-K - Accredited transport & safety training: course catalogue, cohort scheduling, enrollments, and certificate issuance"
   >
     <template #actions>
-      <NuxtLink to="/training/cohorts" class="btn">Cohorts →</NuxtLink>
-      <NuxtLink to="/training/completions" class="btn-primary">Certificates →</NuxtLink>
+      <NuxtLink to="/training/cohorts" class="btn">Cohorts<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/training/completions" class="btn">Certificates<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -238,6 +238,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useTraining } from '~/composables/api'
 import type { TrainingCourse, TrainingCohort, TrainingEnrollment, TrainingCompletion } from '~/composables/api'
 

@@ -24,10 +24,10 @@
 
     <div
       v-for="w in rendered" :key="w.id"
-      class="dc-cell" :class="{ selected: w.id === selectedId, hidden: w.hidden, moving: drag?.id === w.id }"
+      class="dc-cell" :class="{ selected: w.id === selectedId, hidden: w.hidden, moving: drag?.id === w.id, flagged: flagged.includes(w.id) }"
       :style="cellStyle(w)"
       tabindex="0" role="group"
-      :aria-label="`${labelFor(w)}, column ${w.x + 1}, row ${w.y + 1}, ${w.w} by ${w.h}${w.hidden ? ', hidden' : ''}`"
+      :aria-label="`${labelFor(w)}, column ${w.x + 1}, row ${w.y + 1}, ${w.w} by ${w.h}${w.hidden ? ', hidden' : ''}${flagged.includes(w.id) ? ', needs attention' : ''}`"
       @focus="emit('select', w.id)" @keydown="onKey($event, w)"
     >
       <WidgetFrame :instance="w" class="dc-content" />
@@ -71,7 +71,9 @@ const props = withDefaults(defineProps<{
   gap: number
   selectedId?: string | null
   mode?: 'edit' | 'personal'
-}>(), { selectedId: null, mode: 'edit' })
+  /** Widgets with a problem that blocks publishing - outlined in the danger colour. */
+  flagged?: string[]
+}>(), { selectedId: null, mode: 'edit', flagged: () => [] })
 
 const emit = defineEmits<{
   'update:widgets': [WidgetInstance[]]
@@ -206,6 +208,7 @@ function toggleHidden(w: WidgetInstance) {
   transition: outline-color var(--dur-fast) var(--ease-standard);
 }
 .dc--dragging .dc-cell:not(.moving) { transition: none; }
+.dc-cell.flagged { outline: 1px dashed var(--danger-fg); outline-offset: 2px; }
 .dc-cell.selected { outline: 2px solid var(--primary); outline-offset: 2px; z-index: 5; }
 .dc-cell:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .dc-cell.hidden .dc-content { opacity: .25; filter: grayscale(1); }

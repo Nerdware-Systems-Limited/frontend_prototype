@@ -5,7 +5,7 @@
     subtitle="Real-time alerts from all UAPTS modules - traffic, fleet, safety, infrastructure and more"
   >
     <template #actions>
-      <NuxtLink to="/notifications/rules" class="btn">Alert Rules →</NuxtLink>
+      <NuxtLink to="/notifications/rules" class="btn">Alert Rules<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -100,6 +100,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useNotifications } from '~/composables/api'
 import type { Notification } from '~/composables/api'

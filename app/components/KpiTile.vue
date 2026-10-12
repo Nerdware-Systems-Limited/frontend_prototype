@@ -44,6 +44,10 @@ withDefaults(defineProps<{
   height: 24px; width: 60%; margin-top: 6px; border-radius: var(--r-xs);
   background: var(--border-subtle); animation: pulse 1.4s ease-in-out infinite;
 }
+@media (max-width: 600px) {
+  .kpi-tile { padding: 11px 12px; min-width: 0; }
+  .kpi-tile-value { font-size: 20px; overflow-wrap: anywhere; }
+}
 @media (prefers-reduced-motion: reduce) {
   .kpi-tile-skeleton { animation-duration: 2.8s; }
 }

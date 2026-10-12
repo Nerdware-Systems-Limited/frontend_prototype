@@ -5,8 +5,8 @@
     subtitle="UNCTAD · IAPH · World Bank LPI - International-standard port KPIs and a composite ranking of Kenyan ports against each other and regional East African peers"
   >
     <template #actions>
-      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations →</NuxtLink>
-      <NuxtLink to="/maritime/green-transport" class="btn">Green Transport →</NuxtLink>
+      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/green-transport" class="btn">Green Transport<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -181,6 +181,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useMaritimePerformance, RANK_WEIGHTS } from '~/composables/api'
 import type { MaritimePerformanceSummary, PortPerformanceKpi, PortRankingScore, TrackedKpiField, RankingCategory } from '~/composables/api'
 

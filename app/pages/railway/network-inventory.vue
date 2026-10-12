@@ -5,8 +5,8 @@
     subtitle="KRC · NCTTCA - Line, station and rolling-stock registry with an SGR/MGR comparison panel and cross-network data quality checks"
   >
     <template #actions>
-      <NuxtLink to="/railway/infrastructure" class="btn">Rail Infrastructure →</NuxtLink>
-      <NuxtLink to="/railway/live" class="btn">Train Operations →</NuxtLink>
+      <NuxtLink to="/railway/infrastructure" class="btn">Rail Infrastructure<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/live" class="btn">Train Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -36,8 +36,7 @@
 
   <!-- Network map -->
   <SectionTitle pill="Live · OSM-Sourced Geometry">Network Map</SectionTitle>
-  <div class="card map-card">
-    <div class="card-header">Lines &amp; Stations</div>
+  <CollapsibleSection class="card map-card" title="Lines &amp; Stations" storage-key="map:railway/network-inventory">
     <ClientOnly>
       <UaptsMap
         :markers="stationMarkers"
@@ -52,7 +51,7 @@
       <span class="mk"><span class="line-seg" style="background:#3b82f6" /> SGR</span>
       <span class="mk"><span class="line-seg" style="background:#10b981" /> MGR</span>
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Line inventory -->
   <SectionTitle pill="Live · OSM-Sourced Geometry">Line Inventory</SectionTitle>
@@ -273,6 +272,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway } from '~/composables/api'
 import type { RailLine, RailStation, Train, TrainSchedule, TrainOperation, RailTicket, FreightManifest, RailIncident, RailNetwork } from '~/composables/api'
 

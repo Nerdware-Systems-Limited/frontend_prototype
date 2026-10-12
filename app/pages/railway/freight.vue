@@ -5,8 +5,8 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - Freight manifests, corridor analysis, KenTrade single-window clearances, NCTTCA transit tracking, and KPA port-rail reconciliation"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
-      <NuxtLink to="/railway/infrastructure" class="btn">Freight Terminals →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="load" />
+      <NuxtLink to="/railway/infrastructure" class="btn">Freight Terminals<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -19,7 +19,7 @@
       :value="fmtNum(manifests.length)"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Manifests in view"
       to="#manifest-log"
     />
@@ -28,7 +28,7 @@
       :value="totalTons ? `${fmtNum(totalTons)} t` : '-'"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Freight tonne-km"
       to="#cargo-type-mix"
     />
@@ -37,7 +37,7 @@
       :value="totalRevenue ? `KES ${fmtKES(totalRevenue)}` : '-'"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Freight revenue"
       to="#manifest-log"
     />
@@ -46,7 +46,7 @@
       :value="avgWagons ? avgWagons.toFixed(1) : '-'"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Average wagon count"
     />
     <KpiCard
@@ -54,16 +54,16 @@
       :value="fmtNum(portRailManifests.length)"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC / KPA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Rail-nominated containers (KPA)"
       to="#port-rail-reconciliation"
     />
     <KpiCard
       label="Transit Manifests"
-      :value="fmtNum(manifests.filter(m => m.port_origin).length)"
+      :value="fmtNum(portManifests.filter(m => m.port_origin).length)"
       :unavailable="loading || mfError"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="From port of origin"
       to="#intermodal-transfer"
     />
@@ -91,7 +91,7 @@
     </div>
 
     <div class="card">
-      <div class="card-header">Top Freight Corridors ({{ days }}d)</div>
+      <div class="card-header">Top Freight Corridors ({{ timeRange.period.value.toLowerCase() }})</div>
       <div class="card-body">
         <div v-if="corridors.length" class="corridor-list">
           <div v-for="c in corridors.slice(0, 8)" :key="`${c.origin_station__code}-${c.destination_station__code}`" class="corridor-item">
@@ -268,16 +268,20 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway } from '~/composables/api'
 import type { FreightManifest } from '~/composables/api'
 
 const manifests = ref<FreightManifest[]>([])
+const portManifests = ref<FreightManifest[]>([])
 const corridors = ref<any[]>([])
 const loading   = ref(true)
 const error     = ref<string | null>(null)
 const mfError   = ref(false)
 const lastRefreshed = ref('-')
-const days          = ref(30)
+const timeRange = useTimeRange('railway', { default: '30d' })
+const days = timeRange.days
 const cargoFilter   = ref('')
 const manifestSearch = ref('')
 const expanded = ref<string | null>(null)
@@ -287,12 +291,16 @@ async function load() {
   error.value = null
   const rail = useRailway()
 
-  const [mfRes, corrRes] = await Promise.allSettled([
+  const [mfRes, portRes, corrRes] = await Promise.allSettled([
     rail.freight({ page_size: 100, days: days.value }),
+    // Port-origin manifests are fetched on their own: the list is newest-first
+    // and capped at 100, so they would otherwise fall off the first page.
+    rail.freight({ page_size: 100, days: days.value, port_linked: true }),
     rail.freightByCorridor(days.value),
   ])
 
   if (mfRes.status   === 'fulfilled') manifests.value = (mfRes.value as any).results ?? []
+  if (portRes.status === 'fulfilled') portManifests.value = (portRes.value as any).results ?? []
   if (corrRes.status === 'fulfilled') corridors.value = (corrRes.value as any).results ?? []
 
   mfError.value = mfRes.status === 'rejected'
@@ -310,9 +318,7 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const portRailManifests = computed(() =>
-  manifests.value.filter(m => m.customs_clearance_ref || m.port_origin),
-)
+const portRailManifests = computed(() => portManifests.value)
 
 // ── Table pagination (max 15 rows visible per table) ───────────────────
 const {
@@ -350,7 +356,7 @@ const byCargoType = computed(() => {
 
 const intermodalByPort = computed(() => {
   const m = new Map<string, { port: string; count: number; tons: number; transitHours: number[]; pending: number }>()
-  for (const mf of manifests.value) {
+  for (const mf of portManifests.value) {
     if (!mf.port_origin) continue
     const ex = m.get(mf.port_origin) ?? { port: mf.port_origin, count: 0, tons: 0, transitHours: [], pending: 0 }
     ex.count++

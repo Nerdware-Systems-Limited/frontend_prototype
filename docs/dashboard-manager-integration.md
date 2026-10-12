@@ -1,5 +1,9 @@
 # Dashboard Manager: frontend ↔ backend integration notes
 
+> How the Dashboard Manager works in the frontend is documented in [DASHBOARD_MANAGER.md](DASHBOARD_MANAGER.md).
+> This page records where the deployed backend differs from its reference package. Backend work still outstanding
+> is logged in [Widgets.md](Widgets.md) sections 9 to 13.
+
 Status as of 2026-09-29, checked against the deployed backend at
 `http://192.168.0.110:8000` (live requests) and the reference package's
 `backend/apps/dashboards` (read-only).

@@ -5,7 +5,7 @@
     subtitle="KAA · KCAA · KenTrade - Airport throughput, domestic vs international volumes, KenTrade air cargo clearances, and revenue trends"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
+      <TimeRangeSelector :range="timeRange" @change="load" />
       <select v-model="airportFilter" class="select-sm" @change="load">
         <option value="">All airports</option>
         <option v-for="a in airports" :key="a.iata_code" :value="a.iata_code">{{ a.iata_code }} - {{ a.name }}</option>
@@ -22,7 +22,7 @@
       :value="fmtNum(totalPax)"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="All airports"
       to="#by-airport"
     />
@@ -31,7 +31,7 @@
       :value="fmtNum(totalDomestic)"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       :description="totalPax > 0 ? `${((totalDomestic / totalPax) * 100).toFixed(1)}% share` : ''"
       to="#volume-comparison"
     />
@@ -40,7 +40,7 @@
       :value="fmtNum(totalIntl)"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       :description="totalPax > 0 ? `${((totalIntl / totalPax) * 100).toFixed(1)}% share` : ''"
       to="#volume-comparison"
     />
@@ -49,7 +49,7 @@
       :value="totalRevenue ? `KES ${fmtKES(totalRevenue)}` : '-'"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Across network"
       to="#by-airport"
     />
@@ -58,7 +58,7 @@
       :value="fmtNum(byAirport.length)"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="With passenger data"
       to="#by-airport"
     />
@@ -67,13 +67,13 @@
       :value="totalPax > 0 && totalRevenue ? `KES ${fmtKES(totalRevenue / totalPax)}` : '-'"
       :unavailable="loading || byApError"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="Yield per passenger"
     />
   </div>
 
   <!-- Airport breakdown table + intl share bars -->
-  <SectionTitle :pill="`KAA · ${days}d`">By Airport</SectionTitle>
+  <SectionTitle :pill="`KAA · ${timeRange.period.value.toLowerCase()}`">By Airport</SectionTitle>
 
   <div id="by-airport" class="card drill-target">
     <div class="card-body">
@@ -198,7 +198,8 @@ const loading    = ref(true)
 const error      = ref<string | null>(null)
 const byApError  = ref(false)
 const lastRefreshed = ref('-')
-const days          = ref(30)
+const timeRange = useTimeRange('aviation', { default: '7d' })
+const days = timeRange.days
 const airportFilter = ref('')
 
 async function load() {

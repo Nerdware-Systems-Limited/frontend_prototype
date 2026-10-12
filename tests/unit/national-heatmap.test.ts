@@ -55,6 +55,7 @@ vi.mock('~/composables/api', async () => {
 import KpiCard from '~/components/KpiCard.vue'
 import EmptyState from '~/components/EmptyState.vue'
 import SectionTitle from '~/components/SectionTitle.vue'
+import CollapsibleSection from '~/components/CollapsibleSection.vue'
 import NationalCommandCentre from '~/components/NationalCommandCentre.vue'
 
 const hotspot = (id: string, over: Record<string, unknown> = {}) => ({
@@ -83,11 +84,14 @@ const UaptsMap = {
 async function mountCentre() {
   const w = mount(NationalCommandCentre, {
     global: {
-      components: { KpiCard, EmptyState, SectionTitle },
-      stubs: { NuxtLink: true, Sparkline: true, ClientOnly: { template: '<div><slot /></div>' }, UaptsMap },
+      components: { KpiCard, EmptyState, SectionTitle, CollapsibleSection },
+      stubs: { NuxtLink: true, Sparkline: true, HqSummary: true, ClientOnly: { template: '<div><slot /></div>' }, UaptsMap },
       renderStubDefaultSlot: true,
     },
   })
+  await flushPromises()
+  // The map starts collapsed (and is not mounted until opened), like every map in the app.
+  await w.find('.map-wrap .cs-toggle').trigger('click')
   await flushPromises()
   return w
 }

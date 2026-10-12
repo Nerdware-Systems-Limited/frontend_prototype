@@ -5,8 +5,8 @@
     subtitle="NaMATA · NTSA - BRT stop facilities, boarding counts, NTSA vehicle compliance, headway compliance, and schedule adherence"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
-      <NuxtLink to="/public-transport/compliance" class="btn">PSV Compliance →</NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/compliance" class="btn">PSV Compliance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -69,8 +69,7 @@
 
   <!-- Map + headway side by side -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">BRT Stop Network</div>
+    <CollapsibleSection class="card map-card" title="BRT Stop Network" storage-key="map:public-transport/brt">
       <ClientOnly>
         <UaptsMap
           :markers="stopMarkers"
@@ -87,7 +86,7 @@
         <span class="mk"><span class="dot" style="background:#ef4444" /> Accessibility &lt; 50%</span>
         <span class="mk"><span class="dot" style="background:#94a3b8" /> Inactive</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div id="headway-compliance" class="card drill-target">
       <div class="card-header">Headway Compliance by Route</div>
@@ -258,6 +257,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport, useGis } from '~/composables/api'
 import type { BRTStop, ScheduleAdherence } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'

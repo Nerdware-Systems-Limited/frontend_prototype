@@ -354,6 +354,7 @@ export interface RailQuery {
   train_number?: string
   origin?: string
   destination?: string
+  port_linked?: boolean
   date_from?: string
   date_to?: string
   days?: number

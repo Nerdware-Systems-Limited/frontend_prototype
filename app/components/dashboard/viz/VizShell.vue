@@ -33,6 +33,9 @@
         <VizTable :frame="frame" size="m" :caption="summary" :max-rows="1000" :interactive="false" />
       </div>
     </template>
+    <p v-if="frame.meta.partial" class="vs-note">
+      From the first {{ formatValue(frame.meta.partial.count, 'count') }} of {{ formatValue(frame.meta.partial.total, 'count') }} records
+    </p>
   </div>
 </template>
 
@@ -41,6 +44,7 @@ import { ref } from 'vue'
 import { ChartNoAxesColumn, Table2 } from 'lucide-vue-next'
 import type { Frame } from '~/types/frame'
 import type { SizeClass } from '~/utils/viz'
+import { formatValue } from '~/utils/units'
 import VizTable from './VizTable.vue'
 
 withDefaults(defineProps<{
@@ -75,6 +79,8 @@ const asTable = ref(false)
   .vs-toggle:hover { color: var(--fg-1); border-color: var(--border-interactive); }
 }
 .vs-body { flex: 1; min-height: 0; position: relative; }
+/* Honest sampling: aggregates over part of the records say so (PRODUCT.md principle 2). */
+.vs-note { margin: 0; font-size: 10.5px; color: var(--warning-fg); font-variant-numeric: tabular-nums; }
 .vs-sr {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;

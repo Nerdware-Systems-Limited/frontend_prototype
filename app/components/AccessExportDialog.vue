@@ -24,7 +24,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" @click="emit('close')">Cancel</button>
-        <button type="button" class="btn-primary" @click="emit('export', format)">Export</button>
+        <button type="button" class="btn btn-primary" @click="emit('export', format)">Export</button>
       </div>
     </div>
   </div>

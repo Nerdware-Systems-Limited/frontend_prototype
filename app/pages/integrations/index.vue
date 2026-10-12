@@ -5,8 +5,8 @@
     subtitle="Get a file in, or register how a live feed connects."
   >
     <template #actions>
-      <NuxtLink to="/integrations/files" class="btn">Files &amp; Feeds →</NuxtLink>
-      <NuxtLink to="/integrations/analytics" class="btn">Ingestion Analytics →</NuxtLink>
+      <NuxtLink to="/integrations/files" class="btn">Files &amp; Feeds<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/integrations/analytics" class="btn">Ingestion Analytics<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -44,7 +44,7 @@
   </div>
 
   <TabStrip
-    :tabs="[{ key: 'upload', label: 'Upload a file' }, { key: 'api', label: 'Register an API' }]"
+    :tabs="[{ key: 'upload', label: 'Upload a file' }, { key: 'api', label: 'Register an API' }, { key: 'gis', label: 'GIS layers' }]"
     v-model="tab"
   />
 
@@ -101,11 +101,11 @@
           <div v-if="uploadResult" class="upload-result" aria-live="polite">
             <template v-if="uploadResult.status === 'validated'">
               <p class="upload-result-main"><CheckCircle2 :size="16" class="btn-ico" />{{ uploadResult.valid_rows.toLocaleString('en-KE') }} row(s) ready.</p>
-              <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Review and commit →</NuxtLink>
+              <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Review and commit<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
             </template>
             <template v-else-if="uploadResult.status === 'needs_mapping'">
               <p class="upload-result-main"><AlertTriangle :size="16" class="btn-ico" />Column names don't match the template.</p>
-              <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Map columns →</NuxtLink>
+              <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Map columns<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
             </template>
             <template v-else-if="uploadResult.status === 'rejected' || uploadResult.status === 'failed'">
               <p class="upload-result-main upload-result-main--error">
@@ -116,7 +116,7 @@
             <template v-else-if="uploadResult.status === 'unrouted'">
               <p class="upload-result-main"><Inbox :size="16" class="btn-ico" />In the routing queue. A template will be assigned before it's validated.</p>
               <div class="upload-result-actions">
-                <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Assign a template now →</NuxtLink>
+                <NuxtLink class="btn btn-primary" :to="`/integrations/files/${uploadResult.id}`">Assign a template now<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
                 <button class="btn" @click="resetUpload">Submit another</button>
               </div>
             </template>
@@ -137,7 +137,7 @@
            shown once; pull feeds get a real SSRF-guarded reachability
            test. See the script header comment for the full picture.
       ══════════════════════════════════════════════════════════════ -->
-      <template v-else>
+      <template v-else-if="tab === 'api'">
         <EmptyState
           v-if="!isAdmin" icon="inbox"
           message="Registering a live feed is an admin action. Ask an admin to add it, or sign in with an admin account."
@@ -163,7 +163,7 @@
               </p>
             </div>
             <div class="upload-result-actions" style="margin-top:14px">
-              <NuxtLink class="btn btn-primary" :to="`/integrations/feeds/${registeredResult.source_id}`">View connection details →</NuxtLink>
+              <NuxtLink class="btn btn-primary" :to="`/integrations/feeds/${registeredResult.source_id}`">View connection details<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
               <button type="button" class="btn" @click="resetRegisterForm">Register another feed</button>
             </div>
           </div>
@@ -284,6 +284,9 @@
           </div>
         </template>
       </template>
+
+      <!-- GIS LAYERS TAB - tracker + shapefile/GeoJSON/GeoPackage upload (/api/v1/gis/layer-*) -->
+      <GisLayersPanel v-else />
     </div>
 
     <!-- ── Right: context ───────────────────────────────────────────── -->
@@ -335,7 +338,7 @@ import { useAgencies } from '~/composables/api/useAccounts'
 // vue-tsc's template-only global resolution lagged the freshly generated
 // .nuxt types for a template-only reference; this sidesteps that outright.
 import { isInFlight, statusMeta } from '~/utils/ingestStatus'
-import { AlertTriangle, CheckCircle2, Download, Inbox, Upload, XCircle } from 'lucide-vue-next'
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Inbox, Upload, XCircle } from 'lucide-vue-next'
 
 const route = useRoute()
 const api = useIntegrations()
@@ -350,7 +353,7 @@ const isAdmin = computed(() => {
   return rt === 'admin' || rt === 'super_admin' || !!auth.user.value?.is_staff
 })
 
-const tab = ref<'upload' | 'api'>('upload')
+const tab = ref<'upload' | 'api' | 'gis'>(route.query.tab === 'gis' ? 'gis' : 'upload')
 
 // ── Feed picker ──────────────────────────────────────────────────────
 const sourceId = ref(typeof route.query.source_id === 'string' ? route.query.source_id : '')
@@ -725,8 +728,12 @@ const curlExample = computed(() => {
 </script>
 
 <style scoped>
-.hub-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
-@media (max-width: 900px) { .hub-layout { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr) so a long curl line or feed name can't widen the flow
+   column past the viewport (a bare 1fr won't shrink below its content). */
+.hub-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.hub-main, .hub-rail { min-width: 0; }
+@media (max-width: 1100px) { .hub-layout { grid-template-columns: minmax(0, 1fr) 260px; } }
+@media (max-width: 900px) { .hub-layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* Numbered stepper - CSS counter so a hidden step 2 (no template feed /
    routing-queue mode) renumbers the rest automatically. */
@@ -776,7 +783,7 @@ const curlExample = computed(() => {
 .upload-banner-success { background: var(--success-bg); border: 1px solid var(--success-fg); color: var(--fg-1); }
 .upload-banner code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: var(--surface-quiet); padding: 1px 5px; border-radius: var(--r-xs); }
 
-.secret-row { display: flex; align-items: center; gap: 8px; }
+.secret-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .secret-value {
   flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
@@ -791,7 +798,9 @@ const curlExample = computed(() => {
 @keyframes hub-spin { to { transform: rotate(360deg); } }
 
 .feed-mini-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.feed-mini-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.feed-mini-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+.feed-mini-list li > .mono-sm { min-width: 0; overflow-wrap: anywhere; }
+.feed-mini-list li > .hint { margin-left: auto; white-space: nowrap; }
 .feed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-3); flex-shrink: 0; }
 .feed-dot.success { background: var(--success-fg); }
 .feed-dot.warning { background: var(--warning-fg); }
@@ -866,4 +875,13 @@ const curlExample = computed(() => {
   color: var(--primary); box-shadow: var(--elev-2);
 }
 .page-drop-card strong { font-size: 15px; color: var(--fg-1); }
+
+@media (max-width: 560px) {
+  .flow-step { padding-left: 34px; }
+  .flow-step::before { width: 24px; height: 24px; }
+  .flow-step:not(:last-child)::after { left: 12px; }
+  .protocol { padding: 9px 10px; min-width: 0; }
+  .test-row > .btn { flex: 1 1 auto; justify-content: center; }
+  .page-drop-card { padding: 22px 24px; margin: 0 16px; text-align: center; }
+}
 </style>

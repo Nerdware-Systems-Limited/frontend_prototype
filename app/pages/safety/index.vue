@@ -7,7 +7,7 @@
     <template #actions>
       
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
-      <NuxtLink to="/safety/incidents" class="btn-primary">Incident Command →</NuxtLink>
+      <NuxtLink to="/safety/incidents" class="btn">Incident Command<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -45,7 +45,7 @@
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS + NPS feed unavailable'"
       period="30D"
-      sub="Fatal incidents this month"
+      sub="People killed this month"
       :status="!summary ? undefined : summary.kpis.fatal_30d > 20 ? 'critical' : summary.kpis.fatal_30d > 10 ? 'below' : 'monitoring'"
       :series="fatalitySeries"
       to="#fatality-trend"
@@ -161,8 +161,7 @@
   <SectionTitle pill="NTSA KDE + IRSMS">Incident Hotspot Map</SectionTitle>
 
   <div class="two-col">
-    <div class="card map-card">
-      <div class="card-header">Predictive Hotspots &amp; Black Spots</div>
+    <CollapsibleSection class="card map-card" title="Predictive Hotspots &amp; Black Spots" storage-key="map:safety/index">
       <ClientOnly>
         <UaptsMap
           :markers="mapMarkers"
@@ -178,7 +177,7 @@
         <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;width:8px;height:8px" /> Medium risk</span>
         <span class="legend-item"><span class="legend-dot" style="background:#ef4444;width:7px;height:7px;opacity:.6" /> Black spot</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="card">
       <div class="card-header">
@@ -298,6 +297,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useSafety, useGis } from '~/composables/api'
 import type { SafetySummary, PredictiveHotspot, BlackSpot, SafetyIntervention } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'

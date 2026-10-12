@@ -5,8 +5,8 @@
     subtitle="Certificate register for all accredited training completions - issued by NTSA · KCAA · KMA · NITA-K with validity tracking and pass/fail outcomes"
   >
     <template #actions>
-      <NuxtLink to="/training/enrollments" class="btn">← Enrollments</NuxtLink>
-      <NuxtLink to="/training" class="btn-primary">Overview →</NuxtLink>
+      <NuxtLink to="/training/enrollments" class="btn"><ArrowLeft :size="14" aria-hidden="true" />Enrollments</NuxtLink>
+      <NuxtLink to="/training" class="btn">Overview<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -174,6 +174,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 import { useTraining } from '~/composables/api'
 import type { TrainingCompletion } from '~/composables/api'
 

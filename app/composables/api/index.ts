@@ -40,7 +40,6 @@ export {
   type BlackSpot, type BlackSpotTier,
   type EmergencyDispatch, type DispatchServiceType, type DispatchStatus,
   type PredictiveHotspot, type RiskTier,
-  type SafetyKPI,
   type SafetyIntervention, type InterventionType,
   type TrafficViolation, type ViolationType,
   type SafetyQuery,

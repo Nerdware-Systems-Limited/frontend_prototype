@@ -5,8 +5,8 @@
     subtitle="Threshold-based alert rules, escalation workflows, and delivery activity across every UAPTS module"
   >
     <template #actions>
-      <NuxtLink to="/notifications" class="btn">← Feed</NuxtLink>
-      <button class="btn-primary" @click="openCreate">+ Create Rule</button>
+      <NuxtLink to="/notifications" class="btn"><ArrowLeft :size="14" aria-hidden="true" />Notifications</NuxtLink>
+      <button class="btn btn-primary" @click="openCreate">+ Create Rule</button>
     </template>
   </PageHeader>
 
@@ -256,7 +256,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" @click="closeModal">Cancel</button>
-        <button class="btn-primary" :disabled="!form.name || !form.event_type || saving" @click="saveRule">
+        <button class="btn btn-primary" :disabled="!form.name || !form.event_type || saving" @click="saveRule">
           {{ saving ? 'Saving…' : editId ? 'Update' : 'Create' }}
         </button>
       </div>
@@ -314,7 +314,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn" @click="closePolicyModal">Cancel</button>
-        <button class="btn-primary" :disabled="!policyForm.name || policySaving" @click="savePolicy">
+        <button class="btn btn-primary" :disabled="!policyForm.name || policySaving" @click="savePolicy">
           {{ policySaving ? 'Saving…' : editPolicyId ? 'Update' : 'Create' }}
         </button>
       </div>
@@ -324,6 +324,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft } from 'lucide-vue-next'
 import { useNotifications } from '~/composables/api'
 import type {
   AlertRule, AlertStats, AlertActivityItem, EscalationPolicy, EscalationPolicyRequest,

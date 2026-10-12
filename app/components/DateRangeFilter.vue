@@ -52,4 +52,10 @@ const emit = defineEmits<{
 .drf-segment.active { background: var(--primary); color: #fff; }
 .drf-arrow { font-size: 11px; color: var(--fg-3); flex-shrink: 0; }
 .drf-date { width: 128px; flex-shrink: 0; }
+/* Phones: the two dates share the row instead of a fixed 128px each, which
+   clipped the date text once the filter bar bumped inputs to 16px. */
+@media (max-width: 768px) {
+  .date-range-filter { width: 100%; }
+  .drf-date { flex: 1 1 120px; width: auto; min-width: 0; padding-left: 8px; padding-right: 6px; }
+}
 </style>

@@ -5,9 +5,9 @@
     subtitle="KAA · KCAA · KMD - Real-time ADS-B flight tracking, OTP, passenger volumes, cargo, KMD weather advisories, and KCAA safety oversight"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 14, 30]" @update:model-value="load" />
-      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing →</NuxtLink>
-      <NuxtLink to="/aviation/passenger-stats" class="btn-primary">Passenger Stats →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="load" />
+      <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -44,7 +44,7 @@
       :value="summary ? fmtNum(summary.kpis.flights_total) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       :description="summary ? `${fmtNum(summary.kpis.flights_delayed)} delayed · ${fmtNum(summary.kpis.flights_cancelled)} cancelled` : ''"
       to="#recent-flights"
     />
@@ -53,7 +53,7 @@
       :value="summary ? `${summary.kpis.otp_pct.toFixed(1)}%` : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       :description="summary ? `Avg delay ${summary.kpis.avg_delay_min.toFixed(0)} min` : ''"
       :status="!summary ? undefined : summary.kpis.otp_pct >= 80 ? 'healthy' : 'warning'"
       to="#otp-card"
@@ -63,7 +63,7 @@
       :value="summary ? fmtNum(summary.kpis.pax_total) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="All airports"
       to="#passenger-traffic"
     />
@@ -72,7 +72,7 @@
       :value="summary?.kpis.cargo_kg_total ? `${(summary.kpis.cargo_kg_total / 1000).toFixed(0)} t` : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KAA feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       description="All airports"
       to="#cargo-by-commodity"
     />
@@ -89,8 +89,7 @@
 
   <!-- Airport map + Flight status distribution -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Airport Network (KAA)</div>
+    <CollapsibleSection class="card map-card" title="Airport Network (KAA)" storage-key="map:aviation/index">
       <ClientOnly>
         <UaptsMap
           :markers="airportMarkers"
@@ -105,12 +104,12 @@
         <span class="mk"><span class="dot" style="background:#3b82f6" /> Regional</span>
         <span class="mk"><span class="dot" style="background:#22c55e" /> Domestic</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <!-- OTP card -->
       <div id="otp-card" class="card drill-target" v-if="otp">
-        <div class="card-header">On-Time Performance ({{ days }}d)</div>
+        <div class="card-header">On-Time Performance ({{ timeRange.period.value.toLowerCase() }})</div>
         <div class="card-body">
           <div class="otp-big">{{ otp.on_time_pct.toFixed(1) }}%</div>
           <div class="otp-bar-wrap">
@@ -143,7 +142,7 @@
 
       <!-- Cargo by commodity -->
       <div id="cargo-by-commodity" class="card drill-target" style="margin-top:12px">
-        <div class="card-header">Cargo by Commodity ({{ days }}d)</div>
+        <div class="card-header">Cargo by Commodity ({{ timeRange.period.value.toLowerCase() }})</div>
         <div class="card-body">
           <div v-if="cargo.length" class="cong-list">
             <div v-for="c in cargo.slice(0,6)" :key="c.commodity" class="cong-row">
@@ -162,7 +161,7 @@
   </div>
 
   <!-- Passenger volumes by airport -->
-  <SectionTitle :pill="`KAA · ${days}d`">Passenger Traffic by Airport</SectionTitle>
+  <SectionTitle :pill="`KAA · ${timeRange.period.value.toLowerCase()}`">Passenger Traffic by Airport</SectionTitle>
 
   <div id="passenger-traffic" class="card drill-target">
     <div class="card-body">
@@ -270,6 +269,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type {
   AviationSummary, Airport, Airline, Flight, FlightOTP, CargoByCommodity, PassengerByAirport,
@@ -294,8 +295,9 @@ const lastRefreshed  = ref('-')
 
 const route = useRoute()
 const queryWindow = Number.parseInt(String(route.query.window ?? ''), 10)
-const days = ref([7, 14, 30].includes(queryWindow) ? queryWindow : 7)
-
+const timeRange = useTimeRange('aviation', { default: '7d' })
+{ const w = presetFromDays(queryWindow); if (w) timeRange.setMode(w) }
+const days = timeRange.days
 async function load() {
   loading.value = true
   error.value = null

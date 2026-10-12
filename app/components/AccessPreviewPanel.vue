@@ -28,13 +28,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  BASE_SETTINGS, agencyRoleTiers, capabilitiesFor, editableModules, editableRoutes, resolveFor, type PolicyOverrides,
+  BASE_SETTINGS, agencyRoleColumns, capabilitiesFor, editableModules, editableRoutes, resolveFor, type PolicyOverrides,
 } from '~/utils/resolveAccess'
 import { capabilityLabel } from '~/utils/accessLabels'
 
-const props = defineProps<{ code: string; overrides: PolicyOverrides }>()
+const props = defineProps<{ code: string; overrides: PolicyOverrides; builtInRoles?: string[] }>()
 
-const tiers = computed(() => agencyRoleTiers(props.code))
+const tiers = computed(() => agencyRoleColumns(props.code, props.builtInRoles ?? []))
 const pickedTier = ref<string | null>(null)
 // Falls back to the most-privileged tier when the pick doesn't exist at a newly selected agency.
 const chosenTier = computed({

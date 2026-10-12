@@ -5,8 +5,8 @@
     subtitle="KeNHA · KRB · LAPSSET - Bridge inventory, condition scores, inspection schedules, streetlights, signals, WIM stations and closures"
   >
     <template #actions>
-      <NuxtLink :to="agencyLink('/infrastructure')" class="btn">Road Network →</NuxtLink>
-      <NuxtLink :to="agencyLink('/infrastructure/projects')" class="btn">Infrastructure Status →</NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure')" class="btn">Road Network<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/projects')" class="btn">Infrastructure Status<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -124,8 +124,7 @@
 
   <!-- Map + condition distribution -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Bridge Locations</div>
+    <CollapsibleSection class="card map-card" title="Bridge Locations" storage-key="map:infrastructure/bridges">
       <ClientOnly>
         <UaptsMap
           :markers="bridgeMarkers"
@@ -142,7 +141,7 @@
         <span class="mk"><span class="dot" style="background:#f59e0b" /> Poor</span>
         <span class="mk"><span class="dot" style="background:#ef4444" /> Critical</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="card">
       <div class="card-header">Condition by Bridge Type</div>
@@ -295,6 +294,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useInfrastructure, useGis } from '~/composables/api'
 import type { Bridge, TrafficSignal, RuralRoadStatus, InfrastructureSummary } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'

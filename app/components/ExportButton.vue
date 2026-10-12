@@ -1,11 +1,11 @@
 <template>
   <button
     v-if="canExport"
-    class="export-btn"
+    class="btn export-btn"
     :disabled="disabled || busy || (!href && !rows.length)"
     :title="tooltip"
     @click="href ? onExportHref() : onExportRows()"
-  >⬇ {{ busy ? 'Exporting…' : label }}</button>
+  ><Download :size="14" aria-hidden="true" />{{ busy ? 'Exporting…' : label }}</button>
 </template>
 
 <script setup lang="ts">
@@ -18,6 +18,7 @@
 // Renders nothing at all below `minRole`, or when the viewer's role has the
 // `export` capability switched off (Module Access) - export is opt-in per
 // role, not hidden-but-reachable.
+import { Download } from 'lucide-vue-next'
 import { useApi } from '~/composables/api/_client'
 
 const props = withDefaults(defineProps<{
@@ -75,13 +76,9 @@ async function onExportHref() {
 </script>
 
 <style scoped>
-.export-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);
-  border: 1px solid var(--border-interactive); background: var(--surface-2); color: var(--fg-1); cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-  white-space: nowrap; text-decoration: none;
-}
-.export-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-quiet); color: var(--primary); }
-.export-btn:disabled { opacity: .45; cursor: default; }
+/* Base look comes from .btn, so Export matches every other button. A disabled
+   export still takes hover, so its "No data to export" tooltip can show. */
+.export-btn { white-space: nowrap; }
+.export-btn:disabled { pointer-events: auto; cursor: not-allowed; }
+.export-btn:disabled:hover { background: var(--surface-2); border-color: var(--border-interactive); color: var(--fg-1); transform: none; }
 </style>

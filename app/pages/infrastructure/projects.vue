@@ -5,8 +5,8 @@
     subtitle="KeNHA · KURA · KeRRA · LAPSSET · KRB (funding) - Construction portfolio, maintenance work orders, asset status, and exceptions per agency"
   >
     <template #actions>
-      <NuxtLink :to="agencyLink('/infrastructure/bridges')" class="btn">Bridges & Assets →</NuxtLink>
-      <NuxtLink :to="agencyLink('/infrastructure/funding')" class="btn-primary">Funding →</NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/bridges')" class="btn">Bridges & Assets<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink :to="agencyLink('/infrastructure/funding')" class="btn">Funding<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -381,6 +381,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useInfrastructure, useAgencies } from '~/composables/api'
 import type { ConstructionProject, MaintenanceOrder, RoadSegment, Bridge, TrafficSignal, MaintenanceBudget, InfrastructureSummary, RuralRoadStatus } from '~/composables/api'
 

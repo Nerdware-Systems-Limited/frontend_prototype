@@ -18,6 +18,10 @@
       <span class="badge" :class="STATUS_CLASS[record.status]">{{ STATUS_LABEL[record.status] }}<template v-if="record.publishedVersion"> v{{ record.publishedVersion }}</template></span>
       <span v-if="dirty" class="badge warning" role="status">Unsaved changes</span>
       <span v-else-if="hasUnpublished" class="de-meta">Draft has unpublished edits</span>
+      <button
+        v-if="errorIssues.length" type="button" class="de-issues" :title="errorIssues[0]!.message"
+        @click="showIssue(errorIssues[0]!.widgetId)"
+      ><CircleAlert :size="13" aria-hidden="true" />{{ flaggedIds.length }} widget{{ flaggedIds.length === 1 ? ' needs' : 's need' }} attention</button>
 
       <div class="de-bar-actions">
         <div class="de-history-btns" role="group" aria-label="Undo and redo">
@@ -62,7 +66,7 @@
         </div>
         <DashboardFilterBar :filters="def.filters" :engine="engine" />
         <DashboardCanvas
-          :widgets="def.widgets" :row-height="def.theme.rowHeight" :gap="def.theme.gap" :selected-id="selectedId"
+          :widgets="def.widgets" :row-height="def.theme.rowHeight" :gap="def.theme.gap" :selected-id="selectedId" :flagged="flaggedIds"
           @update:widgets="setWidgets" @select="selectedId = $event"
           @add="addWidget" @remove="removeWidget" @duplicate="duplicateWidget"
         />
@@ -76,7 +80,10 @@
           >{{ t.label }}<span v-if="t.count?.()" class="de-tab-n">{{ t.count() }}</span></button>
         </div>
         <div class="de-tab-body" role="tabpanel">
-          <WidgetInspector v-if="tab === 'widget'" :widget="selected" @change="replaceWidget" />
+          <WidgetInspector
+            v-if="tab === 'widget'" :widget="selected" :filters="def.filters" :actions="def.actions"
+            @change="replaceWidget" @add-action="addActionFor" @open-tab="tab = $event"
+          />
           <FilterDesigner v-else-if="tab === 'filters'" :filters="def.filters" :widgets="def.widgets" @update:filters="set('filters', $event)" />
           <ActionDesigner v-else-if="tab === 'actions'" :actions="def.actions" :widgets="def.widgets" @update:actions="set('actions', $event)" />
           <AudiencePanel
@@ -124,6 +131,17 @@
           </ul>
           <p v-else class="de-muted">Nobody yet. Only editors will be able to open it.</p>
         </div>
+        <div v-if="errorIssues.length" class="de-blockers" role="alert">
+          <CircleAlert :size="15" aria-hidden="true" class="de-warn-icon" />
+          <div>
+            <strong>Fix {{ errorIssues.length === 1 ? 'this' : `these ${errorIssues.length}` }} before publishing</strong>
+            <ul>
+              <li v-for="i in errorIssues" :key="i.widgetId + i.message">
+                <button type="button" class="de-issue-link" @click="showIssue(i.widgetId)">{{ i.label }}</button>: {{ i.message }}
+              </li>
+            </ul>
+          </div>
+        </div>
         <div v-if="warnings.length" class="de-warnings" role="note">
           <TriangleAlert :size="15" aria-hidden="true" class="de-warn-icon" />
           <ul><li v-for="w in warnings" :key="w">{{ w }}</li></ul>
@@ -133,7 +151,7 @@
       <template #footer>
         <div class="de-drawer-actions">
           <button type="button" class="btn" @click="publishOpen = false">Cancel</button>
-          <button type="button" class="btn-primary" :disabled="publishing" @click="publish">{{ publishing ? 'Publishing…' : 'Publish now' }}</button>
+          <button type="button" class="btn btn-primary" :disabled="publishing || errorIssues.length > 0" @click="publish">{{ publishing ? 'Publishing…' : 'Publish now' }}</button>
         </div>
       </template>
     </SideDrawer>
@@ -163,9 +181,11 @@
 </template>
 
 <script setup lang="ts">
-import { Archive, ArrowLeft, Copy, Eye, History, PencilLine, Redo2, TriangleAlert, Undo2 } from 'lucide-vue-next'
+import { Archive, ArrowLeft, CircleAlert, Copy, Eye, History, PencilLine, Redo2, TriangleAlert, Undo2 } from 'lucide-vue-next'
 import type { DashboardAssignment, DashboardDefinition, DashboardRecord, DashboardStatus, DashboardSummary, ViewerContext, WidgetInstance } from '~/types/dashboard'
-import { resolveCatalogItem, widgetFilterFields } from '~/utils/widgetRegistry'
+import { WIDGETS_BY_TYPE, resolveCatalogItem, widgetEmits, widgetFilterFields } from '~/utils/widgetRegistry'
+import { dashboardIssues } from '~/utils/widgetValidation'
+import { FIELD_LABELS } from '~/utils/filterFields'
 import { findSpot, newId, settle, compact } from '~/utils/layoutEngine'
 import { describeScope as describeScopeRaw } from '~/utils/resolveDashboard'
 import { useUserEmailLookup } from '~/composables/useUserEmailLookup'
@@ -310,6 +330,29 @@ function removeWidget(id: string) {
   if (selectedId.value === id) selectedId.value = null
 }
 
+/** Adds a filter action driven by this widget (from the inspector's Actions tab). */
+function addActionFor(id: string) {
+  const src = def.value.widgets.find(w => w.id === id)
+  const field = src ? widgetEmits(src.type, src.config)[0] : undefined
+  if (!src || !field) return
+  const label = src.title || WIDGETS_BY_TYPE[src.type]?.title || src.type
+  set('actions', [...def.value.actions, {
+    id: newId('a'), name: `Filter by ${FIELD_LABELS[field].toLowerCase()} from ${label}`,
+    type: 'filter', sourceWidgetId: id, field, targetWidgetIds: 'all', onClear: 'show-all',
+  }])
+}
+
+// ── validation: errors block Publish, drafts always save ────────────────
+const issues = computed(() => dashboardIssues(def.value, catalogScope.value))
+const errorIssues = computed(() => issues.value.filter(i => i.level === 'error'))
+const flaggedIds = computed(() => [...new Set(errorIssues.value.map(i => i.widgetId))])
+function showIssue(id: string) {
+  publishOpen.value = false
+  previewMode.value = false
+  selectedId.value = id
+  tab.value = 'widget'
+}
+
 // ── save / publish ──────────────────────────────────────────────────────
 const saving = ref(false)
 async function saveDraft() {
@@ -336,10 +379,12 @@ const warnings = computed(() => {
   for (const a of def.value.actions) {
     if (a.type === 'navigate' && !a.urlTemplate) out.push(`Action “${a.name}” has no route.`)
   }
+  for (const i of issues.value) if (i.level === 'warning') out.push(`${i.label}: ${i.message}`)
   if (!record.value.assignments.length) out.push('No audience assigned - nobody will be routed to this dashboard.')
   return out
 })
 async function publish() {
+  if (errorIssues.value.length) return
   publishing.value = true
   error.value = null
   try {
@@ -483,6 +528,18 @@ onBeforeRouteLeave(() => (dirty.value ? window.confirm('You have unsaved changes
 }
 .de-warnings ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .de-warn-icon { flex-shrink: 0; margin-top: 2px; }
+.de-blockers {
+  display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); font-size: 12px; line-height: 1.5;
+  background: var(--danger-bg); color: var(--danger-fg); border: 1px solid color-mix(in srgb, var(--danger-fg) 22%, transparent);
+}
+.de-blockers ul { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.de-issue-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
+.de-issues {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--danger-fg) 30%, transparent); background: var(--danger-bg); color: var(--danger-fg);
+  font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.de-issues:focus-visible, .de-issue-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .de-drawer-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .de-versions { list-style: none; margin: 0; padding: 0; }

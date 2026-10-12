@@ -1,14 +1,13 @@
 <template>
   <PageHeader
-    class="header-actions-fill"
     eyebrow="User Management"
     title="Users"
     :subtitle="unscoped ? 'Platform account directory - create accounts, manage status, and view profiles across all UAPTS agencies' : `Account directory for ${ownAgencyCode} - create accounts, manage status, and view profiles within your own agency`"
   >
     <template #actions>
       <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-accounts" label="Export" />
-      <NuxtLink to="/roles" class="btn">Roles & Permissions →</NuxtLink>
-      <button v-if="canManageUsers" class="btn-primary" @click="openCreate">+ Create User</button>
+      <NuxtLink to="/roles" class="btn">Roles & Permissions<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <button v-if="canManageUsers" class="btn btn-primary" @click="openCreate">+ Create User</button>
     </template>
   </PageHeader>
 
@@ -187,7 +186,7 @@
                     </div>
                   </div>
                   <div class="detail-footer">
-                    <NuxtLink to="/roles" class="btn btn-sm">Manage Role & Permissions →</NuxtLink>
+                    <NuxtLink to="/roles" class="btn btn-sm">Manage Role & Permissions<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
                   </div>
                 </div>
               </td>
@@ -275,14 +274,16 @@
         <div class="form-row">
           <div class="form-group">
             <label>Role <span class="required">*</span></label>
-            <select v-model="form.roleSelection" class="input-full">
-              <optgroup label="Built-in">
+            <select v-model="form.roleSelection" class="input-full" :class="{ 'input-error': formErrors.role }" @change="formErrors.role = ''">
+              <option value="" disabled>{{ roles.length ? 'Select a role…' : 'Roles could not be loaded - reload the page' }}</option>
+              <optgroup v-if="createRoleOptions.length" label="Built-in">
                 <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
               </optgroup>
               <optgroup v-if="createCustomRoleOptions.length" label="Custom">
                 <option v-for="r in createCustomRoleOptions" :key="r.id" :value="r.id">{{ r.role_name }}</option>
               </optgroup>
             </select>
+            <span v-if="formErrors.role" class="field-error">{{ formErrors.role }}</span>
           </div>
           <div class="form-group">
             <label>Agency</label>
@@ -318,7 +319,7 @@
       <div class="modal-footer">
         <button class="btn" @click="closeModal">Cancel</button>
         <button
-          class="btn-primary"
+          class="btn btn-primary"
           :disabled="!form.email || creating"
           @click="doCreate"
         >{{ creating ? 'Creating…' : 'Create User' }}</button>
@@ -329,11 +330,13 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit, useRoles as _useRoles, useDepartments as _useDepartments } from '~/composables/api'
 import type { User, Agency, Role, Department } from '~/types/uapts'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, visibleAgencyOptions, canManageUser,
-  canChangeRole, assignableRoleTypes, canViewRole,
+  canChangeRole, assignableBuiltInRoles, canViewRole,
 } from '~/composables/useAgencyScope'
 import { roleBadgeVariant } from '~/utils/accessLabels'
 
@@ -381,19 +384,19 @@ const creating     = ref(false)
 const createApiError = ref<string | null>(null)
 // roleSelection is either a built-in role_type ('admin', ...) or a custom
 // Role's id - doCreate() below resolves it back to role_type + role.
-const form         = ref({ email: '', roleSelection: 'analyst' as string, agency: '', department: '', is_active: true, is_staff: false })
-const formErrors   = ref({ email: '' })
+const form         = ref({ email: '', roleSelection: '' as string, agency: '', department: '', is_active: true, is_staff: false })
+const formErrors   = ref({ email: '', role: '' })
 
 function tierLabel(t: string) { return t.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') }
-/** Only a super_admin is offered super_admin here - nobody else can hand out the platform bypass. */
-const createRoleOptions = computed(() => assignableRoleTypes(viewerScope.value).map(value => ({ value, label: tierLabel(value) })))
+/** Built-in roles from the backend's role catalog. Platform-wide roles (super_admin, ministry_*) are offered to super_admin only. */
+const createRoleOptions = computed(() => assignableBuiltInRoles(viewerScope.value, roles.value).map(value => ({ value, label: tierLabel(value) })))
 /** Custom roles belonging to whichever agency the form currently targets. */
 const createCustomRoleOptions = computed(() => roles.value.filter(r => r.base_tier && r.agency === form.value.agency))
 /** Departments belonging to whichever agency the form currently targets - empty (and hidden) until one's picked. */
 const createDeptOptions = computed(() => departments.value.filter(d => d.agency === form.value.agency))
 // A custom role or department picked for one agency doesn't carry over to another.
 watch(() => form.value.agency, () => {
-  if (!createCustomRoleOptions.value.some(r => r.id === form.value.roleSelection)) form.value.roleSelection = 'analyst'
+  if (!createCustomRoleOptions.value.some(r => r.id === form.value.roleSelection) && !createRoleOptions.value.some(r => r.value === form.value.roleSelection)) form.value.roleSelection = ''
   if (!createDeptOptions.value.some(d => d.id === form.value.department)) form.value.department = ''
 })
 
@@ -703,8 +706,8 @@ async function runConfirmAction() {
 
 function openCreate() {
   if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
-  form.value = { email: '', roleSelection: 'analyst', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
-  formErrors.value = { email: '' }
+  form.value = { email: '', roleSelection: '', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
+  formErrors.value = { email: '', role: '' }
   createApiError.value = null
   showModal.value = true
 }
@@ -713,10 +716,12 @@ function closeModal() { showModal.value = false }
 
 async function doCreate() {
   formErrors.value.email = ''
+  formErrors.value.role  = ''
   createApiError.value   = null
   if (!canManageUsers.value) { createApiError.value = MANAGE_USERS_OFF; return }
   if (!form.value.email) { formErrors.value.email = 'Email is required.'; return }
   if (!form.value.email.includes('@')) { formErrors.value.email = 'Enter a valid email address.'; return }
+  if (!form.value.roleSelection) { formErrors.value.role = 'Choose a role.'; return }
   if (!unscoped.value && form.value.agency !== (viewerScope.value?.agency ?? '')) {
     createApiError.value = 'You can only create accounts in your own agency.'
     return

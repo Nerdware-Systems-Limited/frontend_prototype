@@ -5,8 +5,8 @@
     subtitle="Schedule and track training cohorts across all NTSA · KMA · KCAA accredited institutes - capacity, fill rates, sessions, and enrollment counts"
   >
     <template #actions>
-      <NuxtLink to="/training" class="btn">← Overview</NuxtLink>
-      <NuxtLink to="/training/enrollments" class="btn-primary">Enrollments →</NuxtLink>
+      <NuxtLink to="/training" class="btn"><ArrowLeft :size="14" aria-hidden="true" />Overview</NuxtLink>
+      <NuxtLink to="/training/enrollments" class="btn">Enrollments<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -172,6 +172,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 import { useTraining } from '~/composables/api'
 import type { TrainingCohort, TrainingSession } from '~/composables/api'
 

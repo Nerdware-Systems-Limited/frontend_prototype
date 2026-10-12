@@ -48,7 +48,7 @@
           <div class="field-group">
             <div class="field-label-row">
               <label class="field-label" for="uapts-pwd">Password</label>
-              <NuxtLink to="/forgot-password" class="forgot-link">Forgot Password</NuxtLink>
+              <NuxtLink to="/forgot-password" class="forgot-link">Forgot Password?</NuxtLink>
             </div>
             <div class="field-input-wrap">
               <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

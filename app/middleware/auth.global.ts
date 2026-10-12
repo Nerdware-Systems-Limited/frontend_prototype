@@ -7,6 +7,8 @@
  * Logic (mirrors what GitHub / Notion / Linear do):
  *   1. Public routes (login) - always let through
  *   2. Has access token in memory → let through
+ *      (a tab with no stored token first asks its sibling tabs for the
+ *      session - utils/tabSync.ts - so "open in new tab" stays signed in)
  *   3. No access token but has a stored refresh token → attempt a silent
  *      refresh (this covers the "come back the next day" case).
  *      - Refresh succeeds → let through
@@ -23,17 +25,22 @@
 
 import { useAuthStore } from '~/stores/auth'
 import { useAccessPolicyStore } from '~/stores/accessPolicy'
-
-const PUBLIC_ROUTES = ['/login', '/forgot-password']
+import { isPublicRoute } from '~/utils/publicRoutes'
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (PUBLIC_ROUTES.includes(to.path) || to.path.startsWith('/reset-password/')) return
+  if (isPublicRoute(to.path)) return
 
   const auth = useAuthStore()
 
   // Hydrate from storage on the first navigation (SSR-off / SPA boot)
   if (!auth.refreshToken) {
     auth.hydrate()
+  }
+
+  // A new tab of a session-only login has no stored token (sessionStorage is
+  // per tab): ask the tabs that are already open for the session before giving up.
+  if (!auth.refreshToken) {
+    await auth.adoptFromOtherTab()
   }
 
   // Already have a live access token

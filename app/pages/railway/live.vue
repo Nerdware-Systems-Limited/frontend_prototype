@@ -12,8 +12,8 @@
         <option value="sgr">SGR</option>
         <option value="mgr">MGR</option>
       </select>
-      <NuxtLink to="/railway/network-inventory" class="btn">Rolling Stock Registry →</NuxtLink>
-      <NuxtLink to="/railway/safety" class="btn">Incidents & Safety →</NuxtLink>
+      <NuxtLink to="/railway/network-inventory" class="btn">Rolling Stock Registry<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/safety" class="btn">Incidents & Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -81,8 +81,7 @@
 
   <!-- Live map + delayed alerts -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Live Train Positions (OCC)</div>
+    <CollapsibleSection class="card map-card" title="Live Train Positions (OCC)" storage-key="map:railway/live">
       <ClientOnly>
         <UaptsMap
           :markers="trainMarkers"
@@ -101,7 +100,7 @@
         <span class="mk"><span class="line-seg" style="background:#3b82f6" /> SGR</span>
         <span class="mk"><span class="line-seg" style="background:#10b981" /> MGR</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <!-- Delayed alerts -->
@@ -220,6 +219,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway } from '~/composables/api'
 import type { TrainOperation, Train } from '~/composables/api'
 

@@ -14,7 +14,7 @@
 import type { Binding } from '~/types/frame'
 import type { WidgetCategory, WidgetSize } from '~/types/dashboard'
 
-export type GenericWidgetType = 'stat' | 'series' | 'breakdown' | 'table'
+export type GenericWidgetType = 'stat' | 'series' | 'breakdown' | 'table' | 'points' | 'status-list' | 'progress' | 'heatmap'
 
 export interface WidgetPreset {
   id: string
@@ -244,5 +244,85 @@ export const PRESETS: WidgetPreset[] = [
     { source: 'infra.summary', shape: 'scalar', path: 'streetlights.operational_pct', measures: [{ key: 'value', label: 'Street lighting', unit: 'pct' }] },
     { period: 'LATEST', description: 'Lights operational', to: '/infrastructure' }),
 ]
+
+// ── Query datasets (M15 /query/execute/): records grouped on the client ──
+// Each reads up to 500 records server-side filtered by the dashboard
+// filters the dataset honours; charts say so when more records matched.
+PRESETS.push(
+  k('query.incidents_total', 'Incidents matching filters', 'Safety incidents matching the dashboard filters (date range, severity, road).',
+    { source: 'query.incidents', shape: 'scalar', path: 'total', params: { fields: ['id'], limit: 1 }, measures: [{ key: 'value', label: 'Incidents', unit: 'count' }] },
+    { period: 'FILTERED', description: 'Recorded incidents', to: '/safety/incidents' }),
+  b('query.incidents_by_severity', 'Incidents by severity (records)', 'Recorded incidents counted by severity. Click a severity to filter linked widgets.',
+    { source: 'query.incidents', shape: 'categorical', path: 'rows', params: { fields: ['severity'] },
+      aggregate: { by: 'severity', fn: 'count' }, dimension: { key: 'severity', label: 'Severity' }, measures: [{ key: 'value', label: 'Incidents', unit: 'count' }], emits: 'severity' }),
+  b('query.incidents_by_type', 'Incidents by type (records)', 'Recorded incidents counted by type, top six.',
+    { source: 'query.incidents', shape: 'categorical', path: 'rows', params: { fields: ['incident_type'] },
+      aggregate: { by: 'incident_type', fn: 'count' }, dimension: { key: 'incident_type', label: 'Incident type' }, measures: [{ key: 'value', label: 'Incidents', unit: 'count' }], limit: 6 }),
+  s('query.incidents_per_day', 'Incidents per day', 'Recorded incidents per day.',
+    { source: 'query.incidents', shape: 'series', path: 'rows', params: { fields: ['reported_at'] },
+      aggregate: { by: 'reported_at', fn: 'count', bucket: 'day' }, dimension: { key: 'reported_at', label: 'Day', kind: 'time' }, measures: [{ key: 'value', label: 'Incidents', unit: 'count' }] },
+    { mode: 'bars' }),
+  t('query.latest_incidents', 'Latest incidents', 'The most recently reported incidents.',
+    { source: 'query.incidents', shape: 'rows', path: 'rows',
+      params: { fields: ['title', 'incident_type', 'severity', 'status', 'reported_at'], sort: { field: 'reported_at', direction: 'desc' }, limit: 50 },
+      columns: [{ key: 'title', label: 'Incident' }, { key: 'severity', label: 'Severity' }, { key: 'status', label: 'Status' }, { key: 'reported_at', label: 'Reported' }], measures: [] }),
+  b('query.congestion_by_severity', 'Congestion events by severity', 'Congestion events counted by severity.',
+    { source: 'query.congestion', shape: 'categorical', path: 'rows', params: { fields: ['severity'] },
+      aggregate: { by: 'severity', fn: 'count' }, dimension: { key: 'severity', label: 'Severity' }, measures: [{ key: 'value', label: 'Events', unit: 'count' }] }),
+  s('query.traffic_volume_daily', 'Counted vehicles per day', 'Vehicles counted per day across counting stations.',
+    { source: 'query.traffic_counts', shape: 'series', path: 'rows', params: { fields: ['recorded_at', 'vehicle_vol'] },
+      aggregate: { by: 'recorded_at', fn: 'sum', measure: 'vehicle_vol', bucket: 'day' }, dimension: { key: 'recorded_at', label: 'Day', kind: 'time' }, measures: [{ key: 'value', label: 'Vehicles', unit: 'count' }] },
+    { mode: 'bars' }),
+  b('query.vehicles_by_status', 'Tracked vehicles by status', 'Tracked vehicles counted by operating status.',
+    { source: 'query.vehicles', shape: 'categorical', path: 'rows', params: { fields: ['status'] },
+      aggregate: { by: 'status', fn: 'count' }, dimension: { key: 'status', label: 'Status' }, measures: [{ key: 'value', label: 'Vehicles', unit: 'count' }] }),
+)
+
+// ── Primitives v2 (phase 6): maps, status lists, progress, heatmaps ──
+const map = (id: string, title: string, description: string, binding: Binding): WidgetPreset =>
+  ({ id, type: 'points', title, description, category: 'Maps', defaultSize: { w: 6, h: 5 }, binding })
+const status = (id: string, title: string, description: string, binding: Binding): WidgetPreset =>
+  ({ id, type: 'status-list', title, description, category: 'Operations', defaultSize: { w: 4, h: 4 }, binding })
+const progress = (id: string, title: string, description: string, binding: Binding): WidgetPreset =>
+  ({ id, type: 'progress', title, description, category: 'KPIs', defaultSize: { w: 3, h: 2 }, binding })
+const heat = (id: string, title: string, description: string, binding: Binding): WidgetPreset =>
+  ({ id, type: 'heatmap', title, description, category: 'Charts', defaultSize: { w: 8, h: 4 }, binding })
+
+PRESETS.push(
+  map('safety.hotspots_map', 'Predicted risk hotspots (map)', 'Model-predicted crash hotspots, coloured by risk tier. Click one to filter linked widgets by its road.',
+    { source: 'safety.hotspots', shape: 'points', path: '', geo: { lat: 'latitude', lon: 'longitude', key: 'segment_road_code', tier: 'risk_tier' },
+      dimension: { key: 'segment_road_code', label: 'Road' }, measures: [{ key: 'predicted_risk_score', label: 'Risk score', unit: 'pct' }, { key: 'horizon_days', label: 'Horizon', unit: 'days' }], emits: 'road' }),
+  map('safety.blackspots_map', 'Accident black spots (map)', 'Crash clusters, coloured by tier. Click one to filter linked widgets by its road.',
+    { source: 'safety.top-blackspots', shape: 'points', path: '', geo: { lat: 'centroid_latitude', lon: 'centroid_longitude', key: 'segment_road_code', tier: 'ranking_tier' },
+      dimension: { key: 'segment_road_name', label: 'Road' }, measures: [{ key: 'accident_count_rolling', label: 'Accidents', unit: 'count' }, { key: 'fatality_count_rolling', label: 'Fatalities', unit: 'count' }], emits: 'road' }),
+
+  status('integrations.feed_status', 'Feeds needing attention', 'Agency data feeds, offline and degraded first. Click an agency to filter linked widgets.',
+    { source: 'integrations.feeds', shape: 'status', path: '', dimension: { key: 'agency_code', label: 'Agency' }, status: { field: 'status' },
+      columns: [{ key: 'name', label: 'Feed' }, { key: 'source_system', label: 'System' }], measures: [], limit: 20, emits: 'agency' }),
+  status('rail.delays', 'Trains running late', 'Trains in service, most delayed first, against the rail delay threshold.',
+    { source: 'rail.summary', shape: 'status', path: 'live_operations', dimension: { key: 'train_number', label: 'Train' }, threshold: 'rail.avg_delay_min',
+      columns: [{ key: 'origin_code', label: 'From' }, { key: 'destination_code', label: 'To' }], measures: [{ key: 'delay_arrival_min', label: 'Delay', unit: 'min' }], limit: 12 }),
+  status('query.congestion_live', 'Active congestion events', 'Congestion events still active, worst severity first.',
+    { source: 'query.congestion', shape: 'status', path: 'rows',
+      params: { fields: ['severity', 'status', 'started_at', 'avg_speed_kmh', 'segment_road_code'], filters: [{ field: 'status', op: 'eq', value: 'active' }] },
+      dimension: { key: 'segment_road_code', label: 'Road' }, status: { field: 'severity' }, columns: [{ key: 'started_at', label: 'Since' }],
+      measures: [{ key: 'avg_speed_kmh', label: 'Speed', unit: 'kmh' }], limit: 20, emits: 'road' }),
+
+  progress('infra.budget_absorption', 'Development budget absorption', 'Share of the development budget spent, against the absorption thresholds.',
+    { source: 'infra.summary', shape: 'scalar', path: 'budget.utilization_pct', threshold: 'infra.budget_absorption_pct', measures: [{ key: 'value', label: 'Budget absorbed', unit: 'pct' }] }),
+  progress('infra.disbursed_vs_allocated', 'Disbursed vs allocated', 'Development funds disbursed this fiscal year against the allocation.',
+    { source: 'infra.summary', shape: 'scalar', path: 'budget.disbursed_kes', target: { path: 'budget.allocated_kes', label: 'Allocated' }, measures: [{ key: 'value', label: 'Disbursed', unit: 'kes' }] }),
+  progress('rail.otp_progress', 'Rail on-time vs benchmark', 'On-time performance over 30 days against the 80% benchmark.',
+    { source: 'rail.summary', shape: 'scalar', path: 'on_time_30d.on_time_pct', threshold: 'rail.otp_pct', target: { value: 80, label: 'Benchmark' }, measures: [{ key: 'value', label: 'On time', unit: 'pct' }] }),
+
+  heat('query.incidents_hour_weekday', 'Incidents by hour and weekday', 'When incidents are reported: hour of day (EAT) by day of week.',
+    { source: 'query.incidents', shape: 'matrix', path: 'rows', params: { fields: ['reported_at'] },
+      aggregate: { by: 'reported_at', bucket: 'hourOfDay', by2: 'reported_at', bucket2: 'dayOfWeek', fn: 'count' },
+      dimension: { key: 'reported_at', label: 'Hour of day' }, dimension2: { key: 'reported_at', label: 'Day of week' }, measures: [{ key: 'value', label: 'Incidents', unit: 'count' }] }),
+  heat('query.traffic_hour_weekday', 'Counted vehicles by hour and weekday', 'Vehicles counted per hour of day (EAT) and day of week.',
+    { source: 'query.traffic_counts', shape: 'matrix', path: 'rows', params: { fields: ['recorded_at', 'vehicle_vol'] },
+      aggregate: { by: 'recorded_at', bucket: 'hourOfDay', by2: 'recorded_at', bucket2: 'dayOfWeek', fn: 'sum', measure: 'vehicle_vol' },
+      dimension: { key: 'recorded_at', label: 'Hour of day' }, dimension2: { key: 'recorded_at', label: 'Day of week' }, measures: [{ key: 'value', label: 'Vehicles', unit: 'count' }] }),
+)
 
 export const PRESETS_BY_ID: Record<string, WidgetPreset> = Object.fromEntries(PRESETS.map(p => [p.id, p]))

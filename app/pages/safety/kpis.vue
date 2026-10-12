@@ -17,25 +17,25 @@
     <KpiCard
       label="Total Incidents (period)"
       :value="fmtNum(totalIncidents)"
-      :unavailable="loading || kpisError"
+      :unavailable="loading || countyError"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="ALL"
-      description="Across all KPI records"
+      :period="`${windowDays}D`"
+      description="Recorded accidents in window"
       to="#county-breakdown"
     />
     <KpiCard
       label="Total Fatalities"
       :value="fmtNum(totalFatalities)"
-      :unavailable="loading || kpisError"
+      :unavailable="loading || countyError"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="ALL"
-      description="Period aggregate"
+      :period="`${windowDays}D`"
+      description="People killed in window"
       to="#county-breakdown"
     />
     <KpiCard
       label="Avg Intervention Effectiveness"
       :value="avgEffectiveness ? fmtPct(avgEffectiveness) : '-'"
-      :unavailable="loading || kpisError"
+      :unavailable="loading || summaryError"
       :unavailable-note="loading ? 'Loading…' : 'KeNHA / NTSA feed unavailable'"
       period="ALL"
       description="Across evaluated interventions"
@@ -43,10 +43,10 @@
     <KpiCard
       label="Counties with Data"
       :value="fmtNum(countyData.length)"
-      :unavailable="loading || (countyError && kpisError)"
+      :unavailable="loading || countyError"
       :unavailable-note="loading ? 'Loading…' : 'NTSA feed unavailable'"
       period="ALL"
-      description="Reporting county KPI records"
+      description="Counties with recorded accidents"
       to="#county-breakdown"
     />
   </div>
@@ -120,11 +120,7 @@
             <th>County</th>
             <th>Total Incidents</th>
             <th>Fatalities</th>
-            <th>Serious</th>
-            <th>Minor</th>
-            <th>Avg Response (min)</th>
-            <th>Interventions</th>
-            <th>Effectiveness</th>
+            <th>Serious Injuries</th>
           </tr>
         </thead>
         <tbody v-if="countyData.length">
@@ -133,19 +129,11 @@
             <td>{{ fmtNum(row.total_incidents) }}</td>
             <td style="color:var(--danger-fg);font-weight:600">{{ fmtNum(row.fatal_count) }}</td>
             <td>{{ fmtNum(row.serious_count) }}</td>
-            <td>{{ fmtNum(row.minor_count) }}</td>
-            <td>{{ row.avg_response_minutes != null ? row.avg_response_minutes.toFixed(1) : '-' }}</td>
-            <td>{{ fmtNum(row.interventions_evaluated) }}</td>
-            <td>
-              <span :style="{ color: effectColor(row.intervention_effectiveness_pct) }">
-                {{ row.intervention_effectiveness_pct != null ? fmtPct(row.intervention_effectiveness_pct) : '-' }}
-              </span>
-            </td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">
+            <td colspan="4" style="text-align:center;color:var(--fg-3);padding:16px">
               {{ loading ? 'Loading…' : 'No county KPI data available' }}
             </td>
           </tr>
@@ -187,15 +175,17 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 import { useSafety } from '~/composables/api'
-import type { SafetyKPI } from '~/composables/api'
 
-const kpis         = ref<SafetyKPI[]>([])
 const trendData    = ref<any[]>([])
 const countyRaw    = ref<any[]>([])
 const violationData = ref<any[]>([])
 const loading      = ref(true)
 const error        = ref<string | null>(null)
-const kpisError    = ref(false)
+const summaryError = ref(false)
+const avgEffectiveness = ref<number | null>(null)
+// Trend and county aggregates are requested over the same window so the
+// headline totals and the chart describe the same period.
+const windowDays   = 365
 const countyError  = ref(false)
 const lastRefreshed = ref('-')
 const trendMetric  = ref<'incidents' | 'fatalities' | 'injuries'>('incidents')
@@ -205,14 +195,17 @@ async function load() {
   error.value = null
   const safety = useSafety()
 
-  const [kpiRes, trendRes, countyRes, violRes] = await Promise.allSettled([
-    safety.kpis({ page_size: 100 }),
-    safety.kpiTrend(),
-    safety.kpiByCounty(),
+  const [summaryRes, trendRes, countyRes, violRes] = await Promise.allSettled([
+    safety.summary(),
+    safety.kpiTrend(windowDays),
+    safety.kpiByCounty(windowDays),
     safety.violationsByType(),
   ])
 
-  if (kpiRes.status    === 'fulfilled') kpis.value         = (kpiRes.value as any).results ?? []
+  if (summaryRes.status === 'fulfilled') {
+    const eff = summaryRes.value.intervention_effectiveness
+    avgEffectiveness.value = eff?.total_evaluated ? eff.average_pct : null
+  }
   if (trendRes.status  === 'fulfilled') {
     const raw = trendRes.value as any
     trendData.value = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
@@ -220,18 +213,12 @@ async function load() {
   if (countyRes.status === 'fulfilled') {
     const raw = countyRes.value as any
     const rows: any[] = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
-    // /kpis/by-county/ returns {county, incidents, fatalities, serious} - remap onto the
-    // SafetyKPI-shaped field names the table below reads. minor_count / avg_response_minutes /
-    // interventions_evaluated / intervention_effectiveness_pct aren't produced by this rollup.
+    // /kpis/by-county/ returns {county, incidents, fatalities, serious}.
     countyRaw.value = rows.map(r => ({
       county: r.county,
       total_incidents: r.incidents ?? 0,
       fatal_count: r.fatalities ?? 0,
       serious_count: r.serious ?? 0,
-      minor_count: null,
-      avg_response_minutes: null,
-      interventions_evaluated: null,
-      intervention_effectiveness_pct: null,
     }))
   }
   if (violRes.status   === 'fulfilled') {
@@ -239,10 +226,10 @@ async function load() {
     violationData.value = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
   }
 
-  kpisError.value   = kpiRes.status    === 'rejected'
-  countyError.value = countyRes.status === 'rejected'
+  summaryError.value = summaryRes.status === 'rejected'
+  countyError.value  = countyRes.status  === 'rejected'
 
-  if ([kpiRes, trendRes, countyRes].every(r => r.status === 'rejected'))
+  if ([summaryRes, trendRes, countyRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Safety API.'
 
   lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
@@ -255,24 +242,7 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ─────────────────────────────────────────────────────────────
-const countyData = computed(() => {
-  // Aggregate kpis by county if direct county data isn't returned
-  if (countyRaw.value.length) return countyRaw.value
-  const map = new Map<string, SafetyKPI>()
-  kpis.value.forEach(k => {
-    const existing = map.get(k.county)
-    if (existing) {
-      existing.total_incidents += k.total_incidents
-      existing.fatal_count     += k.fatal_count
-      existing.serious_count   += k.serious_count
-      existing.minor_count     += k.minor_count
-      existing.interventions_evaluated += k.interventions_evaluated
-    } else {
-      map.set(k.county, { ...k })
-    }
-  })
-  return Array.from(map.values()).sort((a, b) => b.fatal_count - a.fatal_count)
-})
+const countyData = computed(() => countyRaw.value)
 
 // ── Table pagination (max 15 rows visible per table) ───────────────────
 const {
@@ -280,13 +250,8 @@ const {
   total: countyDataTotal, next: countyDataNext, prev: countyDataPrev,
 } = usePagination(countyData, 15)
 
-const totalIncidents = computed(() => kpis.value.reduce((s, k) => s + k.total_incidents, 0))
-const totalFatalities = computed(() => kpis.value.reduce((s, k) => s + k.fatal_count, 0))
-const avgEffectiveness = computed(() => {
-  const vals = kpis.value.filter(k => k.intervention_effectiveness_pct != null)
-  if (!vals.length) return null
-  return vals.reduce((s, k) => s + k.intervention_effectiveness_pct!, 0) / vals.length
-})
+const totalIncidents = computed(() => countyData.value.reduce((s, r) => s + r.total_incidents, 0))
+const totalFatalities = computed(() => countyData.value.reduce((s, r) => s + r.fatal_count, 0))
 
 function getMetric(d: any): number {
   return d[trendMetric.value] ?? 0
@@ -331,10 +296,6 @@ function fmtPct(v: number | null | undefined) {
 function shortDate(s: string) {
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short' }) }
   catch { return s.slice(5) }
-}
-function effectColor(v: number | null | undefined) {
-  if (v == null) return 'var(--border-strong)'
-  return v >= 50 ? 'var(--success)' : v >= 20 ? 'var(--warning)' : 'var(--destructive)'
 }
 </script>
 

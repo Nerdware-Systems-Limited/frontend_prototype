@@ -4,10 +4,10 @@
     page-header actions. Was hand-built with near-identical markup+CSS on
     9 separate pages; this is the one shared version.
   -->
-  <div class="day-filter">
+  <div class="segmented" role="group" aria-label="Time range">
     <button
       v-for="opt in options" :key="opt" type="button"
-      class="btn" :class="{ 'btn-active': modelValue === opt }"
+      :class="{ active: modelValue === opt }" :aria-pressed="modelValue === opt"
       @click="select(opt)"
     >{{ opt }}{{ suffix }}</button>
   </div>
@@ -39,6 +39,3 @@ function select(opt: number) {
 }
 </script>
 
-<style scoped>
-.day-filter { display: flex; gap: 4px; }
-</style>

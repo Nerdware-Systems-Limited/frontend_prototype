@@ -7,7 +7,7 @@
     <template #actions>
       
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
-      <NuxtLink to="/fleet/live" class="btn-primary">Live Map →</NuxtLink>
+      <NuxtLink to="/fleet/live" class="btn">Live Map<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -211,6 +211,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useFleet } from '~/composables/api'
 import type { FleetSummary, DriverBehaviorEvent, FleetUtilization, SpeedGovernorCompliance } from '~/composables/api'
 

@@ -6,13 +6,11 @@
       ? 'Every batch submitted, and every live feed connected, across every agency.'
       : 'Every batch your agency has submitted, and every live feed it has connected.'"
   >
-    <template #breadcrumb>
-      <NuxtLink to="/integrations" class="ih-crumb">← Upload &amp; Connect</NuxtLink>
-    </template>
     <template #actions>
       <BadgePill :variant="seesAllAgencies ? 'neutral' : 'info'">
         {{ seesAllAgencies ? 'All agencies' : (viewerAgency ? `${viewerAgency} only` : 'Your agency only') }}
       </BadgePill>
+      <NuxtLink to="/integrations" class="btn"><ArrowLeft :size="13" aria-hidden="true" />Upload &amp; Connect</NuxtLink>
       <div ref="newUploadMenuEl" class="new-upload-menu">
         <button
           class="btn btn-primary" :aria-expanded="showNewUploadMenu" aria-haspopup="true"
@@ -80,9 +78,9 @@
       <button type="button" class="routing-queue-clear" @click="statusFilter = ''; reload()">Clear filter</button>
     </div>
 
-    <div class="filter-bar">
+    <div class="filter-bar filter-bar--grid">
       <input
-        ref="searchEl" v-model="q" class="select-sm" placeholder="Search filename…  ( / )"
+        ref="searchEl" v-model="q" class="select-sm filter-span" placeholder="Search filename…  ( / )"
         aria-label="Search filename" @input="debouncedSearch" @keydown.esc="($event.target as HTMLInputElement).blur()"
       />
       <select v-if="seesAllAgencies" v-model="agencyCode" class="select-sm" aria-label="Filter by submitting agency" @change="reload">
@@ -102,6 +100,7 @@
         <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ statusMeta(s).label }}</option>
       </select>
       <DateRangeFilter
+        class="filter-span"
         :fields="DATE_FIELDS" :field="dateField" :from="dateFrom" :to="dateTo"
         @update:field="v => { dateField = v; reload() }"
         @update:from="v => { dateFrom = v; reload() }"
@@ -114,7 +113,7 @@
       <div class="ih-card-body">
         <EmptyState v-if="!loading && !uploads.length" icon="inbox" message="No uploads match the current filters." />
         <div v-else class="ih-table-wrap">
-        <table class="ih-table">
+        <table class="ih-table stack-table">
           <thead>
             <tr>
               <th>File</th>
@@ -134,31 +133,31 @@
               v-for="u in uploads" :key="u.id" class="is-clickable" tabindex="0"
               @click="goToDetail(u.id)" @keydown.enter="goToDetail(u.id)"
             >
-              <td>
+              <td class="stack-title">
                 <span class="file-cell">{{ u.original_filename }}</span>
                 <BadgePill v-if="u.duplicate_of" variant="warning">dup of #{{ u.duplicate_of.slice(0, 8) }}</BadgePill>
               </td>
-              <td><BadgePill variant="neutral">{{ u.agency_code }}</BadgePill></td>
-              <td class="mono-sm">{{ u.source_id || '-' }}</td>
-              <td>{{ u.period_label || '-' }}</td>
+              <td data-label="Submitted by"><BadgePill variant="neutral">{{ u.agency_code }}</BadgePill></td>
+              <td class="mono-sm" data-label="Feed">{{ u.source_id || '-' }}</td>
+              <td data-label="Period">{{ u.period_label || '-' }}</td>
               <template v-if="u.status === 'unrouted'">
-                <td class="hint">-</td>
-                <td class="progress-cell hint">not read yet</td>
-                <td class="progress-cell hint">-</td>
+                <td class="hint" data-label="Rows">-</td>
+                <td class="progress-cell hint" data-label="Read">not read yet</td>
+                <td class="progress-cell hint" data-label="Write">-</td>
               </template>
               <template v-else>
-                <td class="num">
+                <td class="num" data-label="Rows">
                   {{ u.total_rows.toLocaleString('en-KE') }}
                   <span v-if="u.error_rows" class="rows-err">{{ u.error_rows }} err</span>
                 </td>
-                <td class="progress-cell"><IngestProgress :pct="readPct(u)" /></td>
-                <td class="progress-cell">
+                <td class="progress-cell" data-label="Read"><IngestProgress :pct="readPct(u)" /></td>
+                <td class="progress-cell" data-label="Write">
                   <IngestProgress :pct="writePct(u)" :variant="u.status === 'partial' ? 'warning' : 'success'" />
                 </td>
               </template>
-              <td><IngestStatusPill :status="u.status" /></td>
-              <td class="hint" :title="u.uploaded_by_email || ''">{{ fmtRelative(u.created_at) }}</td>
-              <td class="actions-cell" @click.stop>
+              <td data-label="Status"><IngestStatusPill :status="u.status" /></td>
+              <td class="hint" data-label="Uploaded" :title="u.uploaded_by_email || ''">{{ fmtRelative(u.created_at) }}</td>
+              <td class="actions-cell stack-actions" @click.stop>
                 <NuxtLink
                   class="btn" :class="{ 'btn-primary': u.status === 'unrouted' }" style="font-size:11px"
                   :to="`/integrations/files/${u.id}`"
@@ -180,8 +179,8 @@
 
   <!-- ── Feeds segment ────────────────────────────────────────────── -->
   <template v-else>
-    <div v-if="nonManualSources.length" class="filter-bar">
-      <input v-model="feedSearch" class="select-sm" placeholder="Search feed or agency…" aria-label="Search feed or agency" />
+    <div v-if="nonManualSources.length" class="filter-bar filter-bar--grid">
+      <input v-model="feedSearch" class="select-sm filter-span" placeholder="Search feed or agency…" aria-label="Search feed or agency" />
       <select v-model="feedStatusSeg" class="select-sm" aria-label="Filter by status">
         <option value="all">Any status</option>
         <option value="connected">Connected</option>
@@ -198,7 +197,7 @@
         <EmptyState v-if="!sourcesLoading && !nonManualSources.length" icon="inbox" message="No live feeds registered." />
         <EmptyState v-else-if="!sourcesLoading && !filteredFeedsSeg.length" compact message="No feeds match this filter." />
         <div v-else-if="filteredFeedsSeg.length" class="ih-table-wrap">
-        <table class="ih-table">
+        <table class="ih-table stack-table">
           <thead>
             <tr>
               <th>Feed</th>
@@ -216,13 +215,13 @@
               @click="router.push(`/integrations/feeds/${s.source_id}`)"
               @keydown.enter="router.push(`/integrations/feeds/${s.source_id}`)"
             >
-              <td class="mono-sm">{{ s.source_id }}</td>
-              <td><BadgePill variant="neutral">{{ s.agency_code }}</BadgePill></td>
-              <td><BadgePill variant="info">{{ s.mode }}</BadgePill></td>
-              <td><BadgePill :variant="feedStatusVariant(s.status)">{{ s.status }}</BadgePill></td>
-              <td class="mono-sm num">{{ (s.records_today ?? 0).toLocaleString('en-KE') }}</td>
-              <td class="hint">{{ s.last_sync_at ? fmtRelative(s.last_sync_at) : 'never' }}</td>
-              <td class="hint">{{ s.last_error || '-' }}</td>
+              <td class="mono-sm stack-title">{{ s.source_id }}</td>
+              <td data-label="Agency"><BadgePill variant="neutral">{{ s.agency_code }}</BadgePill></td>
+              <td data-label="Mode"><BadgePill variant="info">{{ s.mode }}</BadgePill></td>
+              <td data-label="Status"><BadgePill :variant="feedStatusVariant(s.status)">{{ s.status }}</BadgePill></td>
+              <td class="mono-sm num" data-label="Records today">{{ (s.records_today ?? 0).toLocaleString('en-KE') }}</td>
+              <td class="hint" data-label="Last sync">{{ s.last_sync_at ? fmtRelative(s.last_sync_at) : 'never' }}</td>
+              <td class="hint stack-block" data-label="Last error">{{ s.last_error || '-' }}</td>
             </tr>
           </tbody>
         </table>
@@ -239,6 +238,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft } from 'lucide-vue-next'
 
 import { useIntegrations } from '~/composables/api'
 import type { DataSource, DataUpload, DataUploadStatus, UploadInboxAggregates } from '~/composables/api'
@@ -477,8 +478,12 @@ onMounted(async () => {
    safety net at narrow/mobile widths, exactly as it is everywhere else. */
 .filter-bar { gap: 8px; }
 .filter-bar > * { min-width: 0; }
-.filter-bar input[type="text"], .filter-bar input:not([type]) { flex: 0 1 150px; width: 150px; }
-.filter-bar select { flex: 0 1 110px; max-width: 110px; }
+/* Desktop widths only - on phones .filter-bar--grid (theme.css) takes over;
+   a 110px cap left active there clips every option label. */
+@media (min-width: 769px) {
+  .filter-bar input[type="text"], .filter-bar input:not([type]) { flex: 0 1 150px; width: 150px; }
+  .filter-bar select { flex: 0 1 110px; max-width: 110px; }
+}
 
 /* ── Routing-queue jump-chip ──────────────────────────────────────────── */
 .routing-queue-chip {
@@ -512,6 +517,25 @@ onMounted(async () => {
 .actions-cell { text-align: right; }
 .progress-cell { min-width: 120px; }
 
+/* Ten columns: below a wide desktop, slimmer bars and cell padding keep the
+   table inside its card at laptop widths instead of scrolling sideways. */
+@media (min-width: 769px) and (max-width: 1440px) {
+  .progress-cell { min-width: 72px; }
+  .ih-table th, .ih-table td { padding-left: 8px; padding-right: 8px; }
+  .file-cell { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 768px) {
+  /* Stacked cards: the progress bar takes the space beside its caption, the
+     filename wraps instead of running off the card, and the Review link
+     sits at the bottom of the record. */
+  .progress-cell > * { flex: 1 1 auto; max-width: 60%; }
+  .file-cell { overflow-wrap: anywhere; }
+  .actions-cell { text-align: left; }
+  .routing-queue-chip { flex-wrap: wrap; }
+  .routing-queue-go { margin-left: 0; }
+}
+
 .new-upload-menu { position: relative; display: inline-block; }
 .new-upload-dropdown {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
@@ -524,4 +548,12 @@ onMounted(async () => {
   text-decoration: none; border-radius: var(--r-xs);
 }
 .new-upload-option:hover { background: var(--surface-quiet); }
+
+@media (max-width: 600px) {
+  /* The button fills the header row beside the scope badge; the menu opens
+     full-width under it rather than hanging off its right edge. */
+  .header-btns > .new-upload-menu { flex: 1 1 100%; }
+  .new-upload-dropdown { left: 0; right: 0; min-width: 0; }
+  .new-upload-option { padding: 11px 10px; font-size: 13px; }
+}
 </style>

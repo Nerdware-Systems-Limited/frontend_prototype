@@ -5,9 +5,9 @@
     subtitle="KeNHA · KURA · KMD - Real-time flow, congestion events, speed compliance, KMD weather impact, and NCTTCA corridor alerts"
   >
     <template #actions>
-      
+      <TimeRangeSelector :range="timeRange" @change="load" />
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
-      <NuxtLink to="/traffic/alerts" class="btn-primary">Alerts →</NuxtLink>
+      <NuxtLink to="/traffic/alerts" class="btn">Alerts<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -77,8 +77,7 @@
 
   <!-- Map + congestion distribution -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Live Traffic Map</div>
+    <CollapsibleSection class="card map-card" title="Live Traffic Map" storage-key="map:traffic/index">
       <ClientOnly>
         <UaptsMap
           :markers="mapMarkers"
@@ -102,7 +101,7 @@
         <span class="mk"><span class="dot" style="background:#ef4444" /> Severe</span>
       </div>
       <p class="map-key-note">Congestion events (large dots) are colored by live speed vs. free-flow speed; the shaded circle around one is its reported impact radius.</p>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <!-- Congestion distribution -->
@@ -124,7 +123,7 @@
 
       <!-- Vehicle class breakdown -->
       <div class="card" style="margin-top:12px">
-        <div class="card-header">Vehicle Class Mix (7d)</div>
+        <div class="card-header">Vehicle Class Mix ({{ classWindow }})</div>
         <div class="card-body">
           <div v-if="classShare.length" class="cong-list">
             <div v-for="c in classShare" :key="c.vehicle_class" class="cong-row">
@@ -275,6 +274,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useTraffic, useGis } from '~/composables/api'
 import type { TrafficSummary, CongestionEvent, TrafficAlert, WeatherObservation } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
@@ -285,6 +286,8 @@ const summary          = ref<TrafficSummary | null>(null)
 const congestionEvents = ref<CongestionEvent[]>([])
 const alerts           = ref<TrafficAlert[]>([])
 const weather          = ref<WeatherObservation[]>([])
+const timeRange        = useTimeRange('traffic', { default: '7d' })
+const classWindow      = ref('7d')
 const classShare       = ref<{ vehicle_class: string; total: number; share_pct: number }[]>([])
 const mapMarkers       = ref<MarkerSpec[]>([])
 const roadsGeo         = ref<GeoJSONFeatureCollection | null>(null)
@@ -303,7 +306,7 @@ async function load() {
     traffic.activeCongestion(),
     traffic.alerts({ page_size: 20, active: true } as any),
     traffic.weather({ page_size: 6 }),
-    traffic.classShare(7),
+    traffic.classShare(timeRange.days.value),
     traffic.mapData(),
     gis.roads({ limit: 400, simplify: 0.01 }),
   ])
@@ -311,12 +314,17 @@ async function load() {
   if (sumRes.status   === 'fulfilled') {
     summary.value    = sumRes.value
     classShare.value = sumRes.value.class_breakdown ?? []
+    classWindow.value = '7d'   // the summary's own fixed window
   }
   if (congRes.status  === 'fulfilled') congestionEvents.value = (congRes.value as any).results ?? []
   if (alertRes.status === 'fulfilled') alerts.value           = (alertRes.value as any).results ?? []
   if (wxRes.status    === 'fulfilled') weather.value          = (wxRes.value as any).results ?? []
-  if (classRes.status === 'fulfilled' && !classShare.value.length)
-    classShare.value = (classRes.value as any).results ?? []
+  // The range-driven endpoint wins, so the mix always matches the selected range; the summary's
+  // fixed 7-day breakdown is only the fallback if that request fails.
+  if (classRes.status === 'fulfilled' && ((classRes.value as any).results ?? []).length) {
+    classShare.value = (classRes.value as any).results
+    classWindow.value = timeRange.period.value.toLowerCase()
+  }
   if (mapRes.status   === 'fulfilled') mapMarkers.value       = mapRes.value.markers as MarkerSpec[]
   if (roadsRes.status === 'fulfilled') roadsGeo.value         = roadsRes.value
 

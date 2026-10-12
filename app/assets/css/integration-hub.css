@@ -18,6 +18,7 @@
 }
 .ih-crumb:hover { color: var(--primary); }
 
+
 /* ── Card ─────────────────────────────────────────────────────────────── */
 .ih-card {
   background: var(--surface-2); border: 1px solid var(--border-subtle);
@@ -70,19 +71,8 @@
   max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ── Window / segment toggle ─────────────────────────────────────────── */
-.ih-toggle { display: inline-flex; border: 1px solid var(--border-interactive); border-radius: var(--r-sm); overflow: hidden; }
-.ih-toggle button {
-  background: var(--surface-2); border: none; border-right: 1px solid var(--border-subtle);
-  padding: 6px 12px; font: 600 12px/1 inherit; color: var(--fg-2); cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-}
-.ih-toggle button:last-child { border-right: none; }
-.ih-toggle button:hover { background: var(--surface-quiet); }
-.ih-toggle button.active { background: var(--primary); color: #fff; }
-
 /* ── Two-column card grid ────────────────────────────────────────────── */
-.ih-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ih-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 @media (max-width: 900px) { .ih-two-col { grid-template-columns: 1fr; } }
 
 /* ── Stat cluster (label + big mono number) ──────────────────────────── */
@@ -121,6 +111,22 @@
 }
 .ih-hbar-value { text-align: right; font: 600 12px/1 var(--font-mono); color: var(--fg-1); font-variant-numeric: tabular-nums; }
 .ih-hbar:hover .ih-hbar-label { color: var(--primary); }
+
+/* ── Small screens ───────────────────────────────────────────────────
+   Tighter card padding, a 2-up ribbon instead of tiles dropping to one
+   per row at 320px, and a narrower label column on the ranked bars so
+   the track keeps a readable length. Tables opt into the shared
+   .stack-table card layout (theme.css) per page. */
+@media (max-width: 600px) {
+  .ih-card-body { padding: 12px; }
+  .ih-card-head { padding: 11px 12px; }
+  .ih-ribbon { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ih-ribbon > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .ih-stats { gap: 14px 20px; }
+  .ih-hbar { grid-template-columns: minmax(64px, 30%) minmax(0, 1fr) auto; gap: 8px; }
+  .ih-hbar-label { overflow-wrap: anywhere; }
+  .ih-chip { max-width: 100%; }
+}
 
 /* ── Entrance ────────────────────────────────────────────────────────── */
 @keyframes ih-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }

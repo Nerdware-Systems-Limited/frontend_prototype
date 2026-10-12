@@ -5,8 +5,18 @@
     subtitle="Browse the gisdb schema, compose a query visually or in raw SQL, preview it, and run it"
   >
     <template #actions>
+      <button class="btn" :disabled="!canUseQueryBuilder" :title="canUseQueryBuilder ? undefined : QUERY_BUILDER_OFF" @click="openSavedList">
+        <Bookmark :size="14" /> Saved<span v-if="savedQueries.length" class="saved-count">{{ savedQueries.length }}</span>
+      </button>
       <button
-        class="btn-primary" :disabled="!canRun || busy"
+        class="btn" :disabled="!canSave || busy"
+        :title="canUseQueryBuilder ? saveBlockedReason || undefined : QUERY_BUILDER_OFF"
+        @click="openSave"
+      >
+        <Save :size="14" /> Save
+      </button>
+      <button
+        class="btn btn-primary" :disabled="!canRun || busy"
         :title="canUseQueryBuilder ? undefined : QUERY_BUILDER_OFF"
         @click="runQuery"
       >
@@ -620,6 +630,42 @@
       </footer>
     </section>
   </div>
+
+  <AppModal v-model="saveOpen" title="Save query" subtitle="Saved queries are private to you and can be reopened here or run from the Reports page." max-width="520px">
+    <div class="save-form">
+      <label class="save-field">
+        <span>Name</span>
+        <input v-model="saveName" class="ctl" maxlength="150" placeholder="e.g. Fatal incidents by county" @keydown.enter.prevent="submitSave" />
+      </label>
+      <label class="save-field">
+        <span>Description <em>(optional)</em></span>
+        <input v-model="saveDescription" class="ctl" maxlength="300" />
+      </label>
+      <pre class="save-sql">{{ currentSql }}</pre>
+      <p class="save-note"><Lock :size="12" /> Only read-only queries can be saved. A saved query always runs rolled back.</p>
+      <div v-if="saveError" class="qb-error"><TriangleAlert :size="13" /><span>{{ saveError }}</span></div>
+    </div>
+    <template #footer>
+      <button class="btn" @click="saveOpen = false">Cancel</button>
+      <button class="btn btn-primary" :disabled="saving || !saveName.trim()" @click="submitSave">{{ saving ? 'Saving…' : 'Save query' }}</button>
+    </template>
+  </AppModal>
+
+  <AppModal v-model="savedOpen" title="Saved queries" subtitle="Load one into the SQL editor, or delete it." max-width="640px">
+    <div v-if="savedError" class="qb-error"><TriangleAlert :size="13" /><span>{{ savedError }}</span></div>
+    <div v-if="savedQueries.length" class="saved-list">
+      <div v-for="sq in savedQueries" :key="sq.id" class="saved-row">
+        <div class="saved-main">
+          <div class="saved-name">{{ sq.name }}</div>
+          <div v-if="sq.description" class="saved-desc">{{ sq.description }}</div>
+          <div class="saved-meta">{{ sq.query_type === 'sql' ? 'SQL' : sq.query_type === 'join' ? 'Cross-module' : 'Single dataset' }} · saved {{ sq.created_at.slice(0, 10) }}</div>
+        </div>
+        <button v-if="sq.query_type === 'sql'" class="btn btn-sm" @click="loadSaved(sq)">Load</button>
+        <button class="icon-btn" title="Delete" :disabled="deletingId === sq.id" @click="removeSaved(sq)"><Trash2 :size="14" /></button>
+      </div>
+    </div>
+    <p v-else class="saved-empty">{{ savedLoading ? 'Loading…' : 'No saved queries yet. Compose a query and click Save.' }}</p>
+  </AppModal>
 </template>
 
 <script setup lang="ts">
@@ -627,10 +673,10 @@ import {
   Play, Search, RefreshCw, Plus, X, Pencil, Lock, RotateCcw,
   Database, Layers, Table2, KeyRound, Hash, CalendarClock, Type, List, Columns3,
   ChevronRight, ChevronDown, ChevronUp, ChevronLeft, ChevronFirst, ChevronLast,
-  Copy, Check, Download, Braces, Maximize2, Minimize2, ArrowDownUp, TriangleAlert,
+  Copy, Check, Download, Braces, Maximize2, Minimize2, ArrowDownUp, TriangleAlert, Bookmark, Save, Trash2,
 } from 'lucide-vue-next'
 import { useQuery } from '~/composables/api'
-import type { DbTable, DbColumn, RawSqlResult } from '~/composables/api'
+import type { DbTable, DbColumn, RawSqlResult, SavedQuery } from '~/composables/api'
 
 definePageMeta({ layout: 'default' })
 
@@ -1355,7 +1401,110 @@ function exportCSV() {
   flash('exported')
 }
 
-onMounted(loadSchema)
+// ── Saved queries ────────────────────────────────────────────────────
+// Stored as query_type 'sql'. The backend only accepts read-only statements and
+// always replays them rolled back; running a saved SQL query stays admin-only.
+const savedQueries = ref<SavedQuery[]>([])
+const savedLoading = ref(false)
+const savedError = ref<string | null>(null)
+const savedOpen = ref(false)
+const saveOpen = ref(false)
+const saveName = ref('')
+const saveDescription = ref('')
+const saveError = ref<string | null>(null)
+const saving = ref(false)
+const deletingId = ref<string | null>(null)
+
+const currentSql = computed(() =>
+  (builderMode.value === 'sql' ? sqlDraft.value : generatedSql.value).trim(),
+)
+// Visual mode only generates a saveable (read-only) statement for SELECT. In SQL
+// mode the server validates every statement and reports what it rejects.
+const saveBlockedReason = computed(() => {
+  if (!currentSql.value) return 'Compose a query first.'
+  if (builderMode.value === 'visual' && command.value !== 'SELECT') return 'Only SELECT queries can be saved.'
+  if (builderMode.value === 'visual' && !visualValid.value) return 'Complete the query first.'
+  return ''
+})
+const canSave = computed(() => canUseQueryBuilder.value && !saveBlockedReason.value)
+
+async function loadSavedQueries() {
+  savedLoading.value = true
+  savedError.value = null
+  try {
+    savedQueries.value = (await useQuery().savedList()).results ?? []
+  } catch (e: any) {
+    savedError.value = e?.data?.detail ?? e?.message ?? 'Unable to load saved queries.'
+  } finally {
+    savedLoading.value = false
+  }
+}
+function openSavedList() {
+  savedOpen.value = true
+  loadSavedQueries()
+}
+function openSave() {
+  if (!canSave.value) return
+  saveName.value = ''
+  saveDescription.value = ''
+  saveError.value = null
+  saveOpen.value = true
+}
+async function submitSave() {
+  const name = saveName.value.trim()
+  if (!name || saving.value) return
+  saving.value = true
+  saveError.value = null
+  try {
+    const maxRows = builderMode.value === 'sql'
+      ? Number(sqlMaxRows.value)
+      : (limitEnabled.value ? Number(limitValue.value) : 0)
+    const created = await useQuery().savedCreate({
+      name,
+      description: saveDescription.value.trim(),
+      query_type: 'sql',
+      definition: { sql: currentSql.value, ...(maxRows > 0 ? { max_rows: maxRows } : {}) },
+      schedule_frequency: 'manual',
+      export_format: 'csv',
+      recipients: [],
+    })
+    savedQueries.value = [created, ...savedQueries.value]
+    saveOpen.value = false
+    flash('Query saved')
+  } catch (e: any) {
+    const d = e?.data?.definition ?? e?.data?.name ?? e?.data?.detail
+    saveError.value = Array.isArray(d) ? d.join(' ') : (d ?? e?.message ?? 'Failed to save query.')
+  } finally {
+    saving.value = false
+  }
+}
+function loadSaved(sq: SavedQuery) {
+  const def = sq.definition
+  if (!def?.sql) return
+  builderMode.value = 'sql'
+  sqlDraft.value = def.sql
+  sqlReadOnly.value = true
+  if (def.max_rows) sqlMaxRows.value = def.max_rows
+  savedOpen.value = false
+  flash(`Loaded "${sq.name}"`)
+}
+async function removeSaved(sq: SavedQuery) {
+  deletingId.value = sq.id
+  savedError.value = null
+  try {
+    await useQuery().savedDelete(sq.id)
+    savedQueries.value = savedQueries.value.filter(x => x.id !== sq.id)
+  } catch (e: any) {
+    savedError.value = e?.data?.detail ?? e?.message ?? 'Failed to delete saved query.'
+  } finally {
+    deletingId.value = null
+  }
+}
+
+onMounted(() => {
+  loadSchema()
+  if (canUseQueryBuilder.value) loadSavedQueries()
+})
 </script>
 
 <style scoped>
@@ -1722,16 +1871,16 @@ onMounted(loadSchema)
 .sqlc-copy:hover { border-color: var(--primary, #0d4c8b); color: var(--primary, #0d4c8b); }
 .sqlc-body {
   margin: 0; padding: 10px 0; max-height: 190px; overflow: auto;
-  background: #0f2033; color: #cbd5e1;
+  background: var(--surface-1, #f6f8fa); color: var(--fg-1, #111823);
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; line-height: 1.65;
 }
 .sql-ln { display: flex; align-items: flex-start; }
 .sql-gutter {
   flex-shrink: 0; width: 34px; text-align: right; padding-right: 10px;
-  color: #4a6076; user-select: none;
+  color: var(--fg-3, #5b6773); user-select: none;
 }
 .sql-code { white-space: pre; padding-right: 12px; }
-.sql-code :deep(.kw) { color: #7dd3fc; font-weight: 700; }
+.sql-code :deep(.kw) { color: var(--primary, #0d4c8b); font-weight: 700; }
 
 /* ══════════════ SQL editor (sql mode) ══════════════ */
 .sqled { display: flex; flex-direction: column; gap: 8px; }
@@ -1750,24 +1899,24 @@ onMounted(loadSchema)
   border: 1px solid var(--border-interactive, #7b8ea8);
   border-radius: var(--r-sm, 8px);
   overflow: hidden;
-  background: #0f2033;
+  background: var(--surface-1, #f6f8fa);
 }
 .sqled-wrap:focus-within { border-color: var(--primary, #0d4c8b); box-shadow: 0 0 0 3px var(--primary-wash-strong, rgba(13, 76, 139, .12)); }
 .sqled-gutter {
   flex-shrink: 0; width: 40px; overflow: hidden;
-  background: #0b1826; padding: 10px 0;
+  background: var(--surface-sunken, #e4e9f0); padding: 10px 0;
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.6;
 }
 .sqled-gutter > div { display: flex; flex-direction: column; }
-.sqled-gutter span { text-align: right; padding-right: 10px; color: #47607a; }
+.sqled-gutter span { text-align: right; padding-right: 10px; color: var(--fg-3, #5b6773); }
 .sqled-area {
   flex: 1; min-width: 0; min-height: 220px; resize: vertical;
   border: none; outline: none; background: transparent;
-  padding: 10px 12px; color: #e2e8f0;
+  padding: 10px 12px; color: var(--fg-1, #111823); caret-color: var(--primary, #0d4c8b);
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.6;
   white-space: pre; tab-size: 2;
 }
-.sqled-area::placeholder { color: #47607a; }
+.sqled-area::placeholder { color: var(--fg-3, #5b6773); opacity: .8; }
 .sqled-note { font-size: 10.5px; color: var(--fg-3, #586778); line-height: 1.6; }
 .sqled-note kbd {
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px;
@@ -1879,4 +2028,18 @@ onMounted(loadSchema)
 .pg.active { background: var(--primary, #0d4c8b); border-color: var(--primary, #0d4c8b); color: #fff; font-weight: 700; }
 .pg.gap { border: none; background: transparent; cursor: default; }
 .pg:disabled { opacity: .4; cursor: not-allowed; }
+
+.saved-count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--surface-sunken); font-size: 11px; line-height: 16px; }
+.save-form { display: flex; flex-direction: column; gap: 12px; }
+.save-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-3); }
+.save-field em { font-style: normal; opacity: .7; }
+.save-sql { max-height: 160px; overflow: auto; margin: 0; padding: 10px; border-radius: 6px; background: var(--surface-sunken); font: 12px/1.5 var(--font-mono, monospace); white-space: pre-wrap; word-break: break-word; }
+.save-note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--fg-3); }
+.saved-list { display: flex; flex-direction: column; gap: 8px; }
+.saved-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.saved-main { flex: 1; min-width: 0; }
+.saved-name { font-weight: 600; font-size: 13px; }
+.saved-desc { font-size: 12px; color: var(--fg-2); }
+.saved-meta { font-size: 11px; color: var(--fg-3); margin-top: 2px; }
+.saved-empty { margin: 0; text-align: center; color: var(--fg-3); font-size: 13px; padding: 16px 0; }
 </style>

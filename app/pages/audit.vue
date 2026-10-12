@@ -1,6 +1,5 @@
 <template>
   <PageHeader
-    class="header-actions-fill"
     eyebrow="Compliance & Governance"
     title="Audit Trail"
     subtitle="Full platform audit log - every user action, data change, and system event across all modules"
@@ -127,9 +126,9 @@
       <!-- Pagination - driven by next/previous URLs returned by the API.
            No client-side page_size math: the server controls page size. -->
       <div v-if="prevUrl || nextUrl" class="pagination">
-        <button class="btn" :disabled="!prevUrl || loading" @click="loadUrl(prevUrl!)">← Prev</button>
+        <button class="btn" :disabled="!prevUrl || loading" @click="loadUrl(prevUrl!)"><ArrowLeft :size="14" aria-hidden="true" />Prev</button>
         <span style="font-size:13px;color:var(--fg-2)">Page {{ page }} · {{ fmtNum(total) }} total</span>
-        <button class="btn" :disabled="!nextUrl || loading" @click="loadUrl(nextUrl!)">Next →</button>
+        <button class="btn" :disabled="!nextUrl || loading" @click="loadUrl(nextUrl!)">Next<ArrowRight :size="14" aria-hidden="true" /></button>
       </div>
     </div>
   </div>
@@ -137,6 +136,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 // Known gap, not fixed here: unlike /users.vue and /roles.vue, this page is
 // NOT scoped to the viewer's own agency - every admin sees the full
 // platform-wide audit log. Scoping it properly needs backend support that

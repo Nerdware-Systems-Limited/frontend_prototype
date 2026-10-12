@@ -20,9 +20,10 @@
 <script setup lang="ts">
 // The wireframe's body class triggers the sidebar collapse animation.
 // We mirror that here so the existing theme.css rules still apply.
+const { collapsed } = useSidebar()
 useHead({
   bodyAttrs: {
-    class: '',
+    class: computed(() => collapsed.value ? 'sidebar-collapsed' : ''),
   },
 })
 </script>

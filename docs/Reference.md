@@ -6,6 +6,12 @@ supporting utils that tie them together. For product intent and audience,
 see `PRODUCT.md`; for the visual design system and its named rules, see
 `DESIGN.md`. This document is the code-level map.
 
+_Last reviewed 2026-10-12._ Subsystem write-ups, which go deeper than this
+index: [ARCHITECTURE.md](ARCHITECTURE.md), [DEVELOPMENT.md](DEVELOPMENT.md),
+[AUTH_AND_SESSIONS.md](AUTH_AND_SESSIONS.md), [API_LAYER.md](API_LAYER.md),
+[ACCESS_CONTROL.md](ACCESS_CONTROL.md) and
+[DASHBOARD_MANAGER.md](DASHBOARD_MANAGER.md). Full index: [README.md](README.md).
+
 Nuxt 4 / Vue 3 (Composition API, `<script setup>`), `srcDir: app/`,
 file-based routing, SPA (`ssr: false` for every route — `routeRules`), Pinia
 for global state, Tailwind + a large hand-written token system
@@ -19,8 +25,10 @@ for global state, Tailwind + a large hand-written token system
 |---|---|
 | `app/layouts/default.vue` | The authenticated shell: `AppTopNav` + `AppSidebar` + scrolling `<main>`. Owns the notification-store `connect()`/`disconnect()` lifecycle (see §6). |
 | `app/layouts/auth.vue` | Bare layout for login/forgot-password/reset-password. |
-| `app/middleware/auth.global.ts` | Global route guard. Public routes: `/login`, `/forgot-password`, `/reset-password/*`. Otherwise: live access token → through; else attempt silent refresh from a stored refresh token; else redirect to `/login?redirect=<intended path>`. |
-| `app/plugins/api.ts` | The `$api` fetcher every composable is built on — Bearer token injection, silent refresh-on-401, force-logout on a second 401. |
+| `app/middleware/auth.global.ts` | Global route guard. Public routes (`app/utils/publicRoutes.ts`): `/login`, `/forgot-password`, `/reset-password/*`. Otherwise: hydrate the stored refresh token; with none, ask sibling tabs for a session (`adoptFromOtherTab`); live access token → through; else silent refresh; else redirect to `/login?redirect=<intended path>`. Once authenticated it awaits `useAccessPolicyStore().ensureLoaded()` and then resolves the route through `useAccessControl().resolveRoute()`, redirecting denials to the safe space. See [AUTH_AND_SESSIONS.md](AUTH_AND_SESSIONS.md). |
+| `app/middleware/dashboard-manager.global.ts` | Runs after `auth.global.ts`. `/admin/dashboards/**` needs `dashboards.manage` or `dashboards.manage_agency` (from `useViewerContext`), otherwise redirects to `/dashboard`. |
+| `app/plugins/api.ts` | The `$api` fetcher every composable is built on — Bearer token injection, silent refresh-on-401 (one shared refresh for concurrent 401s, one retry), force-logout on a second 401. |
+| `app/plugins/auth-sync.client.ts` | Starts cross-tab session sharing (`auth.initTabSync`, `app/utils/tabSync.ts`) before any middleware runs, and sends this tab to `/login?redirect=...` when another tab signs out. |
 | `app/plugins/theme.client.ts` | Applies the stored light/dark choice to `<html data-theme>` before mount (no flash). |
 | `app/plugins/leaflet.client.ts` | Client-only Leaflet bootstrap for `UaptsMap`. |
 | `app/plugins/access-policy.client.ts` | Registers the accounts-API adapter for the `accessPolicy` store (`setAccessPolicyStorage`) and clears the store on sign-out. Loads nothing itself: the access token is memory-only and only `auth.global.ts` refreshes it, so the policy is fetched there once authenticated. See §9.7. |
@@ -33,8 +41,10 @@ and `/integrations/uploads/:id` are kept as static redirects to the current
 `:param`-level rule, which Nitro would match before the real file-based
 pages and silently swallow `/integrations/files`/`/integrations/analytics`.
 
-**Config** (`runtimeConfig.public`): `apiBase` (REST), `wsUrl` (derived from
-`apiBase` if unset), `notificationsWsUrl`, `tilesBase` (protomaps PMTiles).
+**Config** (`runtimeConfig.public`): `apiBase` (REST), `apiProxy` (true in
+`nuxi dev`: HTTP goes through `nitro.devProxy` for `/api` and `/media`, see
+`app/utils/apiBase.ts`), `wsUrl` (derived from `apiBase` if unset),
+`notificationsWsUrl`, `tilesBase` (protomaps PMTiles).
 
 ---
 
@@ -151,6 +161,8 @@ real, current copy, not a paraphrase.
 | `/roles` | "Roles & Permissions" — RBAC role assignments, status management, departments |
 | `/access-policies` | "Module Access" — which modules, pages, restricted data categories and capabilities each agency (and each role inside it) can reach. super_admin sets every agency's limit; an agency admin manages its own agency within that limit. Admin tier. See §9.7 |
 | `/audit` | "Audit Trail" — full platform audit log, every user action/data change/system event |
+| `/admin/dashboards` | "Dashboards" — Dashboard Manager list: templates, status, audiences, archive/duplicate. Admin tier, plus `dashboards.manage` or `dashboards.manage_agency` (`dashboard-manager.global.ts`). See [DASHBOARD_MANAGER.md](DASHBOARD_MANAGER.md) |
+| `/admin/dashboards/[id]` | Dashboard editor: palette, live canvas, inspector (Data / Actions / Style / JSON), filters, audience, versions, publish. Same gate |
 
 ### M11 — Notifications
 | Route | Purpose |
@@ -174,7 +186,14 @@ module in this reference — routes, functions, components, conventions).
 ### M13 — GIS
 | Route | Purpose |
 |---|---|
-| `/gis` | "GIS Explorer" — national road network, PT routes, rail lines, port infrastructure, spatial layers |
+| `/gis` | "GIS Explorer" — national road network, PT routes, rail lines, port infrastructure, spatial layers (`app/pages/gis/index.vue`) |
+| `/gis/overview` | "Layer Overview" — one card per expected spatial layer: size, completeness and breakdown, for every layer an agency has uploaded |
+| `/gis/coverage` | "Layer Coverage" — which layers each agency is expected to provide and where they stand: missing, requested, processing or uploaded |
+| `/gis/layers` | "Layer Catalogue" — every spatial layer on the platform (agency uploads and reference layers) with status, size and provenance |
+| `/gis/layers/[id]` | Layer analysis — summary totals, completeness, numeric ranges and a PostGIS-aggregated "group by" breakdown for one layer |
+| `/gis/requests` | "Layer Requests" — uploads admins have asked specific people to provide: who, which layer, by when |
+
+All six `/gis*` routes are M13, `minTier: operator`, agency-scoped, with the categories `critical_infrastructure`, `road_reserve_boundary` and `high_res_geometry` (backend baseline). The sidebar shows them as a collapsible "GIS & Spatial Analysis" group (gated by `canSeeModule('M13')`), and the command palette lists the four subpages.
 
 ### M14 — Training Institutes
 | Route | Purpose |
@@ -202,7 +221,10 @@ Surfaced through `/analytics` above (`useMlPredictive.ts` — model registry
 - **`auth.ts`** (`useAuthStore`) — the only owner of tokens/user state.
   `accessToken` is memory-only (never localStorage — limits XSS blast
   radius); `refreshToken` persists to `localStorage` ("remember me") or
-  `sessionStorage`. Actions: `login`, `mfaVerify`, `mfaResend`, `mfaEnroll`,
+  `sessionStorage`. Tabs share the session over a `BroadcastChannel`
+  (`initTabSync`, `adoptFromOtherTab`) and serialise refreshes with a Web Lock,
+  because the backend rotates and blacklists refresh tokens
+  ([AUTH_AND_SESSIONS.md](AUTH_AND_SESSIONS.md)). Actions: `login`, `mfaVerify`, `mfaResend`, `mfaEnroll`,
   `mfaEnrollVerify`, `mfaDisable`, `logout`, `forceLogout`,
   `refreshAccessToken`, `fetchMe`, `isAccessTokenFresh(bufferMs)` (decodes
   the JWT `exp` claim client-side, no signature check needed since it's our
@@ -212,7 +234,10 @@ Surfaced through `/analytics` above (`useMlPredictive.ts` — model registry
   on app boot. Backend doesn't emit `full_name`; `normaliseUser()`
   synthesizes one from the email local-part.
 - **`accessPolicy.ts`** (`useAccessPolicyStore`) — Module Access overrides
-  (§9.7). `overrides` is the saved state the resolver reads; `draft` is what
+  (§9.7). It also loads the **baseline policy** from
+  `GET /api/v1/access-control/baseline/` into `BASE_SETTINGS`, the dashboard
+  permission codes from `/access-control/viewer/` (`permissions`), and the
+  custom/built-in role names. `overrides` is the saved state the resolver reads; `draft` is what
   `/access-policies` edits until Save. Every change goes through
   `edit(code, AccessEdit)`, which checks the viewer's rights first (super_admin:
   any agency, any layer; agency admin: own agency, enabled + role layers, and
@@ -256,7 +281,23 @@ with the post-auth redirect (`?redirect=` query param, default
 | `useNotificationSocket(wsBaseUrl?)` | WebSocket client for `/ws/notifications/` (JWT via `?token=` query string — browsers can't set a custom header on a WS handshake). Message types: `hello`/`notification`/`count`/`ping`/`pong`. 30s client keepalive ping, 3s auto-reconnect, caps the in-memory list at 200. Wrapped by the `notifications` store — don't call directly outside it. |
 | `useAuditSocket(urlOverride?)` | WebSocket client for `/ws/audit/` (same JWT-in-query-string pattern). `initial` (last 50 logs) / `new_log` (prepend, cap 200) / `metrics` message types. Used directly by `audit.vue` only (not wrapped in a store — see the file's own comment on why that's only safe as long as exactly one component uses it). |
 | `useUploadPoll(fetcher, isInFlight)` | See §10.4 — Integration Hub's shared backoff poller. |
-| `useAccessControl()` | The agency-scope resolver from the RBAC spec (section 7). Second axis alongside `usePermissions()`'s role-tier gate — that answers "what may this person do", this answers "whose data and which modules may they see"; a route needs both to pass. A thin reactive wrapper over the pure resolver in `app/utils/resolveAccess.ts`, bound to the signed-in user and the **saved** Module Access overrides (never the unsaved draft; outside a Pinia app it falls back to `access-control.json` alone). `resolveRoute(path)` runs the spec's 8-step algorithm (deny by default → domain bundle → agency grants → agency denials always win → Module Access ceiling / enabled / role layers → route's minimum tier → category masks → safe space if nothing resolved) and returns `{allowed, scopeLevel, module, deniedCategories, isSafeSpace}`; `canAccessRoute()`/`canAccessModule()`/`moduleScope()` are convenience wrappers and `hasCapability(cap)` answers the capability layers. Called by `auth.global.ts` (route guard), `AppSidebar.vue`, `AppTopNav.vue`'s command palette, `useFieldMask()` and the agency Command Centre. |
+| `useAccessControl()` | The agency-scope resolver from the RBAC spec (section 7). Second axis alongside `usePermissions()`'s role-tier gate — that answers "what may this person do", this answers "whose data and which modules may they see"; a route needs both to pass. A thin reactive wrapper over the pure resolver in `app/utils/resolveAccess.ts`, bound to the signed-in user and the **saved** Module Access overrides (never the unsaved draft; outside a Pinia app it uses the baseline alone). `resolveRoute(path)` runs the spec's 8-step algorithm (deny by default → domain bundle → agency grants → agency denials always win → Module Access ceiling / enabled / role layers → route's minimum tier → category masks → safe space if nothing resolved) and returns `{allowed, scopeLevel, module, deniedCategories, isSafeSpace}`; `canAccessRoute()`/`canAccessModule()`/`moduleScope()` are convenience wrappers and `hasCapability(cap)` answers the capability layers. Called by `auth.global.ts` (route guard), `AppSidebar.vue`, `AppTopNav.vue`'s command palette, `useFieldMask()` and the agency Command Centre. |
+| `useTimeRange(key, opts)` | The selected reporting window for one module (24h / 7d / 30d or a year), shared by that module's pages for the session: `days`, `from`, `to`, `period`, `label`, `setMode`, `setYear`, `stepYear`. Calendar days in East Africa Time (`utils/timeRange.ts`). |
+| `useCertificateExpiry(opts)` | Certificates the viewer may see, classified by days left (`utils/certificateExpiry.ts`); only permitted sources are fetched and one failing source never blanks the rest. Sources: `config/certificateSources.ts`. |
+| `useModuleSummaries(opts)` | One headline tile per operational module the viewer can open (`config/agencyModuleSummary.ts`); shared by the agency workspace and the HQ summary. |
+| `useViewerContext()` | The viewer the dashboard resolver and widget gates reason about: user id, agency code, department code, roles, permissions (from the `accessPolicy` store, never recomputed), `isSuperAdmin`. Honours a "Preview as..." override. Exposes `can(required)`, `canManageDashboards`, `canManageAgencyDashboards` (always from the real user). |
+| `useDashboardApi()` | Dashboard Manager client over `/api/v1/dashboards/` (resolve, CRUD, publish, versions, assignments, personal layout, directory). Errors become `DashboardApiError`. |
+| `useDashboardDirectory()` | Agencies, departments and roles for the audience picker; falls back to the accounts API when the backend directory is empty. |
+| `useDashboardFilters()` | Filter and action engine for one rendered dashboard (`provideDashboardFilters`, `useWidgetFilters`); state is URL-synced as `?f.<field>=` and `?a.<actionId>=`. |
+| `useWidgetData()` | The one data primitive for every widget: cache and de-duplication per source and params, stale-response guard, honest states (`loading`/`refreshing`/`ready`/`empty`/`partial`/`not-integrated`/`forbidden`/`error`). Also `loadSource`, `invalidateWidgetData`. |
+| `useBoundFrame()`, `useDomainData()` | Source + binding to `Frame` for generic widgets; domain summary payloads for KPI widgets. |
+| `useWidgetSize()` | Size class (`xs`/`s`/`m`/`l`) of a widget's body, provided by `WidgetFrame`. |
+| `useQueryCatalog()` | The Query Builder dataset catalog and saved queries, loaded once for the editor's query picker (saved queries are copied, never run). |
+| `useSelectable()` | Click-to-filter selection helper for chart marks. |
+| `useAgencyScope` (plain functions) | Account-management scoping: an agency admin manages only their own agency's users; only `super_admin` sees every tenant. |
+| `useFieldMask(path)` | `isMasked(category)` / `mask()` for restricted-category fields, from `resolveRoute(path).deniedCategories`. |
+| `useSidebar()` | Sidebar state: `collapsed` (desktop, persisted to `localStorage['uapts_sidebar_collapsed']`) and `mobileOpen` (never persisted); one viewport-aware `toggle()`. |
+| `useUserEmailLookup()` | Resolves user ids to emails for display (audit and history views). |
 
 ### Module Access utilities (`app/utils/`)
 
@@ -409,6 +450,22 @@ cross-page `useState`-backed convenience wrapper (`banner`, `health`,
 `loading`, `lastChecked`) with `refresh(force=false)` throttled to 30s;
 powers the top-nav health dots and dashboard status strip.
 
+### `useGisLayers.ts` — M13
+Uploaded GIS layers (shapefile / GeoJSON / GeoPackage) and the "missing GIS
+data" tracker. Backend `/api/v1/gis/` (`apps/gis/layer_views.py`), all answers
+in the `{success, data, message}` envelope; the backend returns 503 when it has
+no PostGIS, surfaced as a normal error. Surface: `layers/` (list), `layers/upload/`
+(multipart, 202, poll `layers.detail()`), `layers/{id}/` (status and per-feature
+load errors), `layers/{id}/reload/` (202, optional new settings),
+`layers/{id}/summary/` (totals, completeness, breakdowns, numeric ranges),
+`layers/{id}/features/` (GeoJSON; bbox/limit/offset/simplify/`prop.<field>=`),
+`layer-requirements/` and `layer-requirements/coverage/` (expected layers, live
+status, counts by agency), `layer-requirements/{id}/request-upload/` and
+`layer-requests/?mine=1`. Types: `GeoLayer`, `GeoLayerRequest`,
+`GeoLayerRequirement`, `GisCoverage`, `LayerSummary`, `RowFilter`; statuses
+`LayerStatus` (processing/ready/failed) and `RequirementStatus`
+(uploaded/processing/requested/failed/missing).
+
 ### `useVehicleInspections.ts` — M03/M04
 Base `/api/v1/vehicle-inspections/`. `list(q?)`, `get(id)`, `summary()`,
 `reinspections(id)`, `forVehicle(vehicleId)`.
@@ -495,7 +552,7 @@ Pure re-export barrel — no logic of its own.
 
 ## 6. Shared components
 
-`app/components/`, 52 files. Grouped by role.
+`app/components/`, 53 flat files plus the `dashboard/` tree (below). Grouped by role.
 
 ### Layout / chrome
 | Component | Purpose |
@@ -553,12 +610,46 @@ blue wash, a level set on that layer drawn solid with a reset icon, "Capped" /
 `AccessExportDialog.vue` (CSV / JSON / PDF). All tables adopt the shared
 `.stack-table` mobile pattern.
 
+### Shared module UX components
+| Component | Purpose |
+|---|---|
+| `CollapsibleSection.vue` | One header that shows or hides a block; lazy-mounted then kept alive. Wraps every map card (collapsed by default) and the incident lists (open by default). |
+| `TimeRangeSelector.vue` | The unified 24 Hours / 7 Days / 30 Days (and Year) control; edits a `useTimeRange()` object. |
+| `CertificateExpiryPanel.vue` | Expired and expiring certificates and licences, urgent first, with counters and short/medium-term filters. |
+| `HqSummary.vue` | Cross-module HQ section inside the national Command Centre. |
+
+Details: [MODULE_UX.md](MODULE_UX.md).
+
+### Dashboard Manager (`app/components/dashboard/`)
+| Folder | Contents |
+|---|---|
+| (root) | `DashboardRenderer` (filter engine, refresh clock, 12-column grid), `DashboardCanvas` (drag and resize), `DashboardEditor` (the full editor), `DashboardFilterBar`, `PersonalCanvas` (viewer's own layout), `WidgetFrame` (chrome, "Not filtered by" note, error boundary), `WidgetState` (honest placeholders) |
+| `widgets/` | One component per widget type: hand-built (`Kpi`, `KpiRow`, `FatalityBars`, `IncidentTrend`, `RiskMap`, `Alerts`, `FeedHealth`, `AgencyCard`, `Text`, `Image`) and generic (`Stat`, `Series`, `Breakdown`, `Table`, `Points`, `StatusList`, `Progress`, `Heatmap`) |
+| `viz/` | Visual primitives the generic widgets draw: `VizShell`, `VizSeries`, `VizBreakdown`, `VizTable`, `VizPoints`, `VizStatusList`, `VizProgress`, `VizHeatmap` |
+| `editor/` | `WidgetPalette`, `WidgetInspector`, `BindingEditor`, `QueryEditor`, `MeasureRow`, `OptionField`, `WidgetJson`, `FilterDesigner`, `ActionDesigner`, `AudiencePanel` |
+
+Details: [DASHBOARD_MANAGER.md](DASHBOARD_MANAGER.md).
+
 ### Empty / not implemented
 `AuditTable.vue`, `DashboardCard.vue`, `StatCard.vue`, `UserTable.vue` are
 all **0-byte files** — plausible-sounding names with nothing behind them.
 `audit.vue`, `dashboard.vue`, and `users.vue` all build their own inline
 table/card markup directly rather than using any of these. Don't assume
 they're wired to anything.
+
+### GIS layer components
+`GisLayersPanel.vue` is the Integration Hub "GIS layers" panel: coverage ribbon
+(required / uploaded / missing), per-agency requirement status, an admin's
+"ask a user to upload" action and the upload dialog (zipped shapefile, GeoJSON
+or GeoPackage). `GisRowFilterEditor.vue` builds the upload's `row_filter`
+(`include` / `exclude` rows whose attribute matches listed values). It is mounted as the third tab of the
+Integration Hub (`/integrations`, "GIS layers"; deep link `/integrations?tab=gis`).
+
+Helpers: `app/utils/gisFile.ts` (client-side sniffing of a file's head, at most
+`SNIFF_BYTES` = 2 MB, so a ~1 GB file is never read whole; suggests which file
+column feeds each required attribute for the backend's `field_map`) and
+`app/utils/gisFormat.ts` (en-KE number, km/km², percent and date formatters,
+status badge maps, geometry labels). Tests: `tests/unit/gis-file.test.ts`.
 
 ### Data Integration Hub-specific (11 components)
 `FileDropzone.vue`, `IngestStatusPill.vue`, `SampleGrid.vue`,
@@ -810,28 +901,34 @@ after another backoff wait) on `visibilitychange`, stops for good once
 
 ---
 
-## 9.6 RBAC settings file (`app/config/access-control.json`)
+## 9.6 Baseline access policy (served by the backend)
 
-The interim, file-based settings source `useAccessControl()` (§4) reads.
-Encodes the whole RBAC spec's model: `roles` (the tier ladder incl. the new
-`super_admin`/`oversight` tiers), `domains` (9 transport-domain bundles,
-`oversight` marked `readOnly`), `modules` (route membership per M01–M14),
-`routes` (per-route `minTier`/`agencyScoped`/`categories` overrides — only
-populated for routes that deviate from the default), the 12 agency
-profiles (`grants.full`/`grants.read`/`grants.routes`, `denies.modules`/
-`denies.routes`/`denies.categories`), `publicView`, and
-`restrictedCategories` (the section 6 data-sensitivity table, with a
-`minTier` field for categories that stay admin-gated even within the
-*owning* agency's own tenant — separate from `denies.categories`, which is
-the cross-tenant "never shown to another agency at all" block). Version 1,
-`updatedBy: "system@transport.go.ke"` as a placeholder pending the section
-9 "who holds Super Admin" decision.
+**This used to be `app/config/access-control.json`. It no longer exists in the
+frontend.** The baseline policy is owned by the server and fetched after
+sign-in from `GET /api/v1/access-control/baseline/`
+(`createApiAccessPolicyStorage().loadBaseline`), then loaded into the reactive
+`BASE_SETTINGS` object with `setBaseSettings()` (`app/utils/resolveAccess.ts`).
+Until it arrives, or if it fails to load or has the wrong shape, the resolver
+fails closed: only the baseline routes are open.
 
-Verified against `tests/unit/access-control.test.ts` (13 cases covering
-fail-closed-when-unauthenticated, the super_admin bypass, the public
-single-view rule, cross-agency denial, the query-builder restriction,
-oversight's read-only domain scope, tier gates on top of module grants,
-and both category-masking directions).
+It encodes: `roles` (the tier ladder: `super_admin`, `oversight`, `admin`,
+`analyst`, `auditor`, `operator`, `public`), `domains` (9 transport-domain
+bundles, `oversight` marked `readOnly`), `modules` (route membership per
+M01-M14), `routes` (per-route `minTier`, `allowRoles`, `agencyScoped`,
+`categories`, `minTierDomainOverride`), the 22 agency profiles
+(`grants.full`/`grants.read`/`grants.routes`, `denies.modules`/`routes`/
+`categories`), `publicView`, `defaults` (safe space, deny redirect, baseline
+routes `/dashboard` and `/profile`) and `restrictedCategories` (the data
+sensitivity table, with `minTier` for categories that stay admin-gated even
+inside the owning tenant, separate from `denies.categories`, the cross-tenant
+"never shown to another agency" block).
+
+The baseline lives in the backend at `apps/access_control/data/access-control.json`.
+Tests resolve against a copy, `tests/fixtures/access-control.json`, loaded by
+`tests/setup.ts`; refresh it when the backend file changes. A new page must be
+registered in the backend baseline, or non-super-admins are denied it with
+"route not recognised"; `tests/unit/page-access-coverage.test.ts` enforces that
+against the fixture. Full write-up: [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
 
 ## 9.7 Module Access (`/access-policies`, 2026-09-28)
 
@@ -848,8 +945,8 @@ Each layer holds module and page scopes (None/Read/Full), restricted data
 category allow/deny (ceiling and enabled only) and capability sets. A module
 value applies to all its pages unless the same layer sets a page. Platform-wide
 category blocks (`ingestion_validation`, `not_ingested`, `feature_flag_off`)
-can't be changed. With nothing saved, resolution is identical to before, pinned
-by `tests/unit/access-parity.test.ts`'s snapshot of every agency × tier × route.
+can't be changed. With nothing saved, resolution is identical to before, covered
+by the resolver tests in `tests/unit/resolve-access.test.ts`.
 
 **Code.** Logic: `app/utils/resolveAccess.ts` and the other `access*.ts` utils
 (§4). State: the `accessPolicy` store (§3), given the API adapter by
@@ -889,15 +986,16 @@ and logs a warning. `localStorage['uapts:access-policy:v1']` /
 `['uapts:access-policy-history:v1']` remain the store's default adapter for
 tests and dev.
 
-**Tests.** `resolve-access`, `access-parity`, `access-policy-store`,
+**Tests.** `resolve-access`, `access-baseline-load`, `access-policy-store`,
 `access-policy-wiring`, `access-scope-toggle`, `access-filter`,
-`access-history`, `access-policies-page`, `access-policy-api-storage`,
-`access-policy-middleware`, `capability-gates` (all under `tests/unit/`).
+`access-history`, `access-role-columns`, `access-policies-page`,
+`access-policy-api-storage`, `access-policy-middleware`, `capability-gates`
+(all under `tests/unit/`).
 
-Spec: `docs/superpowers/specs/2026-09-28-module-access-control-design.md`
-(see its "Changes after approval" section).
+The original design spec and plans (`docs/superpowers/`) were removed from the
+working tree; they remain in git history (`git log -- docs/superpowers`).
 
-## 10. Known gaps (accurate as of this document, not fixed here)
+## 10. Known gaps (re-verified 2026-10-12, not fixed here)
 
 - **Four empty component files**: `AuditTable.vue`, `DashboardCard.vue`,
   `StatCard.vue`, `UserTable.vue` (0 bytes each). The correspondingly-named
@@ -909,11 +1007,6 @@ Spec: `docs/superpowers/specs/2026-09-28-module-access-control-design.md`
 - **`ProgressBar.vue`** still animates `width` directly (shared
   `.progress-bar` class) — the layout-thrash pattern fixed in
   `IngestProgress.vue` and the Integration Hub's own bar-fills.
-- **`UploadTimeline.vue`** has one leftover raw em-dash placeholder.
-- **`AppSidebar.vue`** has an unused `canManageUsers`/`ADMIN_ROLES`
-  computed/constant — dead code, no client-side route gating currently
-  wired to it (a previously-flagged, still-open product/eng decision — see
-  `DESIGN_AUDIT.md`).
 - Client-side route gating is in place (`auth.global.ts`, `AppSidebar.vue`
   and the command palette all go through `useAccessControl()`), but it is the
   clean experience only; `/query-builder` still needs restricting
@@ -925,8 +1018,11 @@ Spec: `docs/superpowers/specs/2026-09-28-module-access-control-design.md`
   user endpoints still gate on role tier alone, so switching a capability off
   hides the control without closing the endpoint. Role/department catalog
   editing on `/roles` is not capability-gated.
-- **The baseline JSON is duplicated.** `app/config/access-control.json` is also
-  vendored into the backend (`apps/access_control/data/`) for server-side
-  resolution; change both together until one is served from the other.
+- **The baseline is served, but tests carry a copy.** The backend owns the
+  baseline (`apps/access_control/data/access-control.json`, served at
+  `/api/v1/access-control/baseline/`); `tests/fixtures/access-control.json` is a
+  copy that must be refreshed when the backend file changes. If the baseline
+  request fails at runtime, the resolver fails closed (baseline routes only)
+  until reload.
 - **PDF export** uses the browser's print dialog ("Save as PDF"); there is no
   PDF library in the project.

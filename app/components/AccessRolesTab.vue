@@ -12,6 +12,9 @@
           <div class="card-subtitle">
             <template v-if="filtering">{{ visible.length }} of {{ modules.length }} modules match.</template>
             A role can never exceed what the agency has enabled.
+            <template v-if="ungoverned.length">
+              {{ ungoverned.map(r => r.replace(/_/g, ' ')).join(', ') }} {{ ungoverned.length === 1 ? 'is' : 'are' }} not governed here - platform rules apply to them.
+            </template>
           </div>
         </div>
         <AccessScopeLegend />
@@ -120,8 +123,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
-  BASE_SETTINGS, CAPABILITIES, agencyRoleTiers, capabilitySet, editableModules, editableRoutes, moduleSummary, pageScope,
-  type PolicyOverrides, type ScopeLevel,
+  BASE_SETTINGS, CAPABILITIES, agencyRoleColumns, capabilitySet, editableModules, editableRoutes, moduleSummary, pageScope,
+  ungovernedBuiltInRoles, type PolicyOverrides, type ScopeLevel,
 } from '~/utils/resolveAccess'
 import { capabilityLabel } from '~/utils/accessLabels'
 import type { AccessEdit, EditableLayer } from '~/utils/accessEdits'
@@ -135,6 +138,8 @@ const props = defineProps<{
   canEditCeiling: boolean
   canEditEnabled: boolean
   filter?: ModuleFilter
+  /** Built-in role names from the backend's role catalog (the policy store loads them). */
+  builtInRoles?: string[]
 }>()
 const emit = defineEmits<{ edit: [AccessEdit] }>()
 
@@ -152,7 +157,9 @@ onMounted(async () => {
 const customTierNames = computed(() =>
   allRoles.value.filter(r => r.base_tier && r.agency_code?.toUpperCase() === props.code.toUpperCase()).map(r => r.role_name),
 )
-const tiers = computed<string[]>(() => [...agencyRoleTiers(props.code), ...customTierNames.value])
+// Built-in columns follow the role catalog (plus the agency's policy tiers), not the policy list alone.
+const tiers = computed<string[]>(() => [...agencyRoleColumns(props.code, props.builtInRoles ?? []), ...customTierNames.value])
+const ungoverned = computed(() => ungovernedBuiltInRoles(props.builtInRoles ?? []))
 
 const activeFilter = computed(() => props.filter ?? EMPTY_FILTER)
 const filtering = computed(() => isFilterActive(activeFilter.value))

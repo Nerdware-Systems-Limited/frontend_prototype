@@ -5,11 +5,14 @@
     subtitle="KeNHA · KURA · KeRRA · KRB · KRC · KPA · KMA · KAA · NCTTCA - National road network, PT routes, rail lines, port infrastructure, and UAPTS spatial layers"
   >
     <template #actions>
-      <button class="btn btn-ghost" type="button" @click="copyShareLink">
-        {{ copyLinkStatus === 'copied' ? '✓ Link copied' : copyLinkStatus === 'error' ? 'Copy failed' : '⚲ Copy link' }}
+      <button class="btn" type="button" @click="copyShareLink">
+        <Check v-if="copyLinkStatus === 'copied'" :size="14" aria-hidden="true" />
+        <AlertCircle v-else-if="copyLinkStatus === 'error'" :size="14" aria-hidden="true" />
+        <Link2 v-else :size="14" aria-hidden="true" />
+        {{ copyLinkStatus === 'copied' ? 'Link copied' : copyLinkStatus === 'error' ? 'Copy failed' : 'Copy link' }}
       </button>
       <button class="btn" :disabled="loading" @click="load({ force: true })">
-        <span class="reload-icon" :class="{ spinning: loading }">↻</span> Reload Layers
+        <RefreshCw class="reload-icon" :class="{ spinning: loading }" :size="14" aria-hidden="true" /> Reload Layers
       </button>
     </template>
   </PageHeader>
@@ -384,6 +387,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+import { AlertCircle, Check, Link2, RefreshCw } from 'lucide-vue-next'
 import { useGis } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
 import type { LineSpec, MarkerSpec, MarkerColor } from '~/components/UaptsMap.vue'

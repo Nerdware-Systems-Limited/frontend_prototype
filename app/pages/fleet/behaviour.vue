@@ -5,8 +5,8 @@
     subtitle="NTSA iTIMS - Full driver behaviour event log and the fleet utilization leaderboard"
   >
     <template #actions>
-      <NuxtLink to="/fleet" class="btn">Fleet Overview →</NuxtLink>
-      <NuxtLink to="/fleet/live" class="btn">Live Map →</NuxtLink>
+      <NuxtLink to="/fleet" class="btn">Fleet Overview<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/fleet/live" class="btn">Live Map<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -164,6 +164,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useFleet } from '~/composables/api'
 import type { DriverBehaviorEvent, FleetUtilization } from '~/composables/api'
 

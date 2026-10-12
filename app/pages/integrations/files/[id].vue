@@ -4,10 +4,8 @@
     :title="upload?.original_filename || 'Loading…'"
     :subtitle="headerSubtitle"
   >
-    <template #breadcrumb>
-      <NuxtLink to="/integrations/files" class="ih-crumb">← Files &amp; Feeds</NuxtLink>
-    </template>
     <template #actions>
+      <NuxtLink to="/integrations/files" class="btn"><ArrowLeft :size="13" aria-hidden="true" />Files &amp; Feeds</NuxtLink>
       <button class="btn" :disabled="downloading || !upload" @click="download">
         {{ downloading ? 'Preparing…' : 'Download original' }}
       </button>
@@ -98,9 +96,9 @@
             :loading="previewLoading || (!previewLoaded && !previewError)"
           />
           <div v-if="preview?.active" class="preview-pager">
-            <button class="btn" :disabled="previewOffset === 0" @click="previewOffset = Math.max(0, previewOffset - PREVIEW_LIMIT); loadPreview()">← Prev {{ PREVIEW_LIMIT }}</button>
+            <button class="btn" :disabled="previewOffset === 0" @click="previewOffset = Math.max(0, previewOffset - PREVIEW_LIMIT); loadPreview()"><ArrowLeft :size="14" aria-hidden="true" />Prev {{ PREVIEW_LIMIT }}</button>
             <span class="hint">Rows {{ previewOffset + 1 }}–{{ previewOffset + preview.active.rows.length }}</span>
-            <button class="btn" :disabled="preview.active.rows.length < PREVIEW_LIMIT" @click="previewOffset += PREVIEW_LIMIT; loadPreview()">Next {{ PREVIEW_LIMIT }} →</button>
+            <button class="btn" :disabled="preview.active.rows.length < PREVIEW_LIMIT" @click="previewOffset += PREVIEW_LIMIT; loadPreview()">Next {{ PREVIEW_LIMIT }}<ArrowRight :size="14" aria-hidden="true" /></button>
           </div>
         </div>
       </div>
@@ -129,12 +127,12 @@
           </div>
 
           <EmptyState v-if="!rowsLoading && !rows.length" message="No rows match this filter." />
-          <table v-else class="ih-table">
+          <table v-else class="ih-table stack-table">
             <thead><tr><th>#</th><th>Status</th><th>Data</th></tr></thead>
             <tbody>
               <tr v-for="r in rows" :key="r.id">
-                <td class="mono-sm">{{ r.source_row ?? '-' }}</td>
-                <td>
+                <td class="mono-sm" data-label="Row">{{ r.source_row ?? '-' }}</td>
+                <td class="stack-block" data-label="Status">
                   <span v-if="r.row_status === 'error'" class="row-status danger">✕ {{ r.row_errors.map(e => e.message).join('; ') }}</span>
                   <span v-else-if="r.row_status === 'duplicate_in_file'" class="row-status warning">⚠ same key as an earlier row in this file</span>
                   <span v-else-if="r.row_status === 'duplicate_in_db'" class="row-status warning">⚠ already recorded from an earlier upload</span>
@@ -142,7 +140,7 @@
                   <span v-else-if="r.handler_error" class="row-status danger">✕ {{ r.handler_error }}</span>
                   <span v-else class="hint">○ not yet committed</span>
                 </td>
-                <td class="mono-sm row-data-cell">{{ rowSummary(r) }}</td>
+                <td class="mono-sm row-data-cell stack-block" data-label="Data">{{ rowSummary(r) }}</td>
               </tr>
             </tbody>
           </table>
@@ -228,13 +226,13 @@
 
           <template v-if="dbMatchModel">
             <EmptyState v-if="!dbMatchLoading && !dbMatchRows.length" compact message="No rows for this table." />
-            <table v-else class="ih-table">
+            <table v-else class="ih-table stack-table">
               <thead><tr><th>#</th><th>Record</th><th>Data</th></tr></thead>
               <tbody>
                 <tr v-for="r in dbMatchRows" :key="r.id">
-                  <td class="mono-sm">{{ r.source_row ?? '-' }}</td>
-                  <td class="mono-sm">#{{ r.target_pk.slice(0, 8) }}</td>
-                  <td class="mono-sm row-data-cell">{{ rowSummary(r) }}</td>
+                  <td class="mono-sm" data-label="Row">{{ r.source_row ?? '-' }}</td>
+                  <td class="mono-sm" data-label="Record">#{{ r.target_pk.slice(0, 8) }}</td>
+                  <td class="mono-sm row-data-cell stack-block" data-label="Data">{{ rowSummary(r) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -301,7 +299,7 @@
     </div>
     <div v-else class="action-bar-row">
       <template v-if="upload.status === 'needs_mapping'">
-        <button class="btn btn-primary" @click="activeTab = 'mapping'">Review mapping →</button>
+        <button class="btn btn-primary" @click="activeTab = 'mapping'">Review mapping<ArrowRight :size="14" aria-hidden="true" /></button>
       </template>
       <template v-else-if="upload.status === 'validated'">
         <button v-if="upload.duplicate_rows" class="btn" :disabled="includingDuplicates" @click="includeDuplicates">
@@ -321,6 +319,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
 
 import { useIntegrations } from '~/composables/api'
 import type { DataUploadDetail, ExpectedColumn, FieldError, IngestedRecord, IngestedRowStatus, PreviewResult } from '~/composables/api'
@@ -707,7 +707,10 @@ onMounted(async () => {
 .kpi-tile-label { font-size: 11px; color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 .kpi-tile-sub { font-size: 11px; color: var(--fg-3); }
 
-.detail-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; margin-bottom: 70px; }
+/* minmax(0, 1fr), not 1fr: a plain 1fr track can't shrink below its widest
+   child, so a wide sample sheet pushed the rail off-screen and got clipped. */
+.detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; margin-bottom: 70px; }
+.detail-main { min-width: 0; }
 .detail-rail { display: flex; flex-direction: column; gap: 12px; }
 @media (max-width: 900px) { .detail-layout { grid-template-columns: 1fr; } }
 
@@ -761,7 +764,24 @@ onMounted(async () => {
   background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--r-md);
   box-shadow: var(--elev-2); padding: 12px 16px;
 }
-.action-bar-row { display: flex; gap: 10px; align-items: center; }
+.action-bar-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .commit-confirm { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 12.5px; color: var(--fg-1); flex-wrap: wrap; }
 .commit-confirm-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  /* Stacked rows: show the whole payload summary instead of one clipped line. */
+  .row-data-cell { max-width: none; white-space: normal; overflow-wrap: anywhere; }
+  .preview-pager { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 560px) {
+  .status-elapsed-tile { padding: 11px 12px; min-width: 0; }
+  .mapping-row { grid-template-columns: 1fr; gap: 6px; }
+  .mapping-row select { width: 100%; }
+  .mapping-header span:last-child { display: none; }
+  .file-meta { grid-template-columns: 96px minmax(0, 1fr); }
+  .action-bar { bottom: 8px; padding: 10px 12px; }
+  .action-bar-row > .btn, .commit-confirm-actions { flex: 1 1 auto; }
+  .action-bar-row > .btn, .commit-confirm-actions > .btn { justify-content: center; }
+  .commit-confirm-actions > .btn { flex: 1 1 0; }
+}
 </style>

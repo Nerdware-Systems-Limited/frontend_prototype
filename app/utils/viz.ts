@@ -79,13 +79,18 @@ export function maxOf(values: (number | null)[]): number {
 }
 
 /**
- * Short x-axis label for a time key. ISO dates -> "30 Sep"; ISO date-times
- * -> "14:00"; anything else is shown as given.
+ * Short x-axis label for a time key. ISO months -> "Oct 2026"; ISO dates ->
+ * "30 Sep"; ISO date-times -> "14:00" (EAT); anything else is shown as given.
  */
 const dayFmt = new Intl.DateTimeFormat('en-KE', { day: 'numeric', month: 'short', timeZone: 'Africa/Nairobi' })
 const hourFmt = new Intl.DateTimeFormat('en-KE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Nairobi' })
+const monthFmt = new Intl.DateTimeFormat('en-KE', { month: 'short', year: 'numeric', timeZone: 'Africa/Nairobi' })
 export function timeLabel(key: unknown, long = false): string {
   const s = String(key ?? '')
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}-15T12:00:00Z`)
+    return Number.isNaN(d.getTime()) ? s : monthFmt.format(d)
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const d = new Date(`${s}T12:00:00Z`)
     return Number.isNaN(d.getTime()) ? s : dayFmt.format(d)

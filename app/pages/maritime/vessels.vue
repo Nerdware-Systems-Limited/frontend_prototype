@@ -5,9 +5,9 @@
     subtitle="KMA · KPA - Full vessel registry with safety certification, and the complete port-call movement log"
   >
     <template #actions>
-      <NuxtLink to="/maritime" class="btn">Live Map →</NuxtLink>
-      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations →</NuxtLink>
-      <NuxtLink to="/maritime/accidents" class="btn">Accidents & Safety →</NuxtLink>
+      <NuxtLink to="/maritime" class="btn">Live Map<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/port-ops" class="btn">Port Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/accidents" class="btn">Accidents & Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -190,6 +190,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type { Vessel, VesselMovement } from '~/composables/api'
 

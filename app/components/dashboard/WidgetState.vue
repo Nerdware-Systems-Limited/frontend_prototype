@@ -38,7 +38,7 @@ const show = computed(() => SHOWN.has(props.state))
 const message = computed(() => {
   switch (props.state) {
     case 'loading': return `Loading ${props.source} data…`
-    case 'idle': return 'Nothing selected to show.'
+    case 'idle': return 'No data chosen yet. Pick a source and fields in the inspector.'
     case 'empty': return props.emptyText
     case 'not-integrated': return `Not yet integrated - figures appear here once the ${props.source} feed is onboarded.`
     case 'forbidden': return `Your role doesn't have access to ${props.source} data.`

@@ -28,11 +28,18 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 </script>
 
 <style scoped>
-.tab-strip { display: flex; gap: 4px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 14px; }
+/* Scrolls sideways when the tabs outgrow a narrow screen instead of being
+   clipped by the card/page; the scrollbar is hidden, the swipe still works. */
+.tab-strip {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 14px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.tab-strip::-webkit-scrollbar { display: none; }
 .tab-strip-tab {
   background: none; border: none; border-bottom: 2px solid transparent;
   padding: 8px 4px; margin-bottom: -1px; font-size: 13px; font-weight: 500;
   color: var(--fg-3); cursor: pointer; display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0; white-space: nowrap;
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .tab-strip-tab:hover:not(.active):not(.disabled) { color: var(--fg-1); }

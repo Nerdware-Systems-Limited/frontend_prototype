@@ -53,6 +53,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
   const history = ref<HistoryEntry[]>([])
   /** {agency_code: [role_name, ...]} - custom roles (Roles & Permissions page) with a base_tier set, for partitionStale's extraRoleTiers. */
   const customRoleTiers = ref<Record<string, string[]>>({})
+  /** Built-in roles from the backend's role catalog (no owning agency) - the source of the Module Access role columns. */
+  const builtInRoles = ref<string[]>([])
 
   const viewer = computed(() => auth.user as unknown as PolicyViewer | null)
   const isSuperAdmin = computed(() => viewer.value?.role_type === 'super_admin')
@@ -155,6 +157,7 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
         ;(byAgency[r.agency_code] ??= []).push(r.role_name)
       }
       customRoleTiers.value = byAgency
+      builtInRoles.value = roles.filter(r => !r.agency && !r.base_tier).map(r => r.role_name)
     } catch (err) {
       console.warn('[access-policy] could not load custom roles - their Module Access rows will look stale', err)
     }
@@ -169,6 +172,8 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
     draft.value = cloneOverrides(EMPTY_OVERRIDES)
     permissions.value = []
     history.value = []
+    customRoleTiers.value = {}
+    builtInRoles.value = []
     saveError.value = null
     loaded.value = false
     loadedFor.value = null
@@ -243,7 +248,7 @@ export const useAccessPolicyStore = defineStore('accessPolicy', () => {
 
   return {
     overrides, draft, loaded, permissions, saving, saveError, history,
-    isSuperAdmin, dirtyAgencies, isDirty, staleKeys,
+    isSuperAdmin, dirtyAgencies, isDirty, staleKeys, builtInRoles,
     canEditAgency, edit, resetAgency, discard, clearStale, load, ensureLoaded, reset, save, historyFor, refreshPermissions,
   }
 })

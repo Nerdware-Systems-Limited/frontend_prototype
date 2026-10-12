@@ -5,8 +5,8 @@
     subtitle="KAA ATC - Full flight-by-flight log with delay, passenger and cargo detail"
   >
     <template #actions>
-      <NuxtLink to="/aviation" class="btn">Aviation Overview →</NuxtLink>
-      <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats →</NuxtLink>
+      <NuxtLink to="/aviation" class="btn">Aviation Overview<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -14,10 +14,10 @@
 
   <!-- KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Flights Loaded" :value="fmtNum(flights.length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" to="#flight-log" />
-    <KpiCard label="Delayed" :value="fmtNum(flights.filter(f => f.delay_departure_min > 0).length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="Departure delay > 0" :status="loading || flError ? undefined : flights.filter(f => f.delay_departure_min > 0).length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
-    <KpiCard label="Cancelled" :value="fmtNum(flights.filter(f => f.status === 'cancelled').length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="This window" :status="loading || flError ? undefined : flights.filter(f => f.status === 'cancelled').length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
-    <KpiCard label="Avg Departure Delay" :value="avgDepDelay != null ? `${avgDepDelay.toFixed(0)} min` : '-'" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${days}D`" description="All loaded flights" />
+    <KpiCard label="Flights Loaded" :value="fmtNum(flights.length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${timeRange.period.value}`" to="#flight-log" />
+    <KpiCard label="Delayed" :value="fmtNum(flights.filter(f => f.delay_departure_min > 0).length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${timeRange.period.value}`" description="Departure delay > 0" :status="loading || flError ? undefined : flights.filter(f => f.delay_departure_min > 0).length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
+    <KpiCard label="Cancelled" :value="fmtNum(flights.filter(f => f.status === 'cancelled').length)" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${timeRange.period.value}`" description="This window" :status="loading || flError ? undefined : flights.filter(f => f.status === 'cancelled').length > 0 ? 'warning' : 'healthy'" to="#flight-log" />
+    <KpiCard label="Avg Departure Delay" :value="avgDepDelay != null ? `${avgDepDelay.toFixed(0)} min` : '-'" :unavailable="loading || flError" :unavailable-note="loading ? 'Loading…' : 'KAA ATC feed unavailable'" :period="`${timeRange.period.value}`" description="All loaded flights" />
   </div>
 
   <SectionTitle pill="KAA ATC · Live">Flight Log</SectionTitle>
@@ -37,7 +37,7 @@
           <option value="landed">Landed</option>
           <option value="scheduled">Scheduled</option>
         </select>
-        <DayRangeToggle v-model="days" :options="[7, 14, 30]" @update:model-value="load" />
+        <TimeRangeSelector :range="timeRange" @change="load" />
         <button class="btn" @click="search=''; airlineFilter=''; statusFilter=''; load()">Clear</button>
         <ExportButton filename="uapts-flight-log.csv" :rows="filteredFlights" :columns="exportColumns" style="margin-left:auto" />
       </div>
@@ -101,6 +101,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type { Airline, Flight } from '~/composables/api'
 
@@ -109,8 +111,8 @@ const flights  = ref<Flight[]>([])
 const loading  = ref(true)
 const error    = ref<string | null>(null)
 const flError  = ref(false)
-const days     = ref(7)
-
+const timeRange = useTimeRange('aviation', { default: '7d', years: true })
+const days = timeRange.days
 const search        = ref('')
 const airlineFilter = ref('')
 const statusFilter  = ref('')
@@ -123,7 +125,7 @@ async function load() {
 
   const [alRes, flRes] = await Promise.allSettled([
     avm.airlines(),
-    avm.flights({ days: days.value, airline: airlineFilter.value || undefined, status: statusFilter.value || undefined, page_size: 150 }),
+    avm.flights({ date_from: timeRange.from.value, date_to: timeRange.to.value, airline: airlineFilter.value || undefined, status: statusFilter.value || undefined, page_size: 150 }),
   ])
 
   if (alRes.status === 'fulfilled') airlines.value = (alRes.value as any).results ?? []

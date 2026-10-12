@@ -156,9 +156,18 @@
       </details>
 
       <!-- M13 · GIS & Spatial Analysis - /api/v1/gis/*, /api/v1/geojson/* -->
-      <NuxtLink v-if="canSee('/gis')" class="sidebar-group-title sidebar-link sidebar-link-top" to="/gis" :class="{ active: isActive('/gis', false) }">
-        GIS & Spatial Analysis
-      </NuxtLink>
+      <details v-if="canSeeModule('M13')" class="sidebar-group" :open="groupIsOpen('/gis')">
+        <summary class="sidebar-group-title">
+          GIS &amp; Spatial Analysis<span class="sidebar-caret">▾</span>
+        </summary>
+        <div class="sidebar-group-items">
+          <NuxtLink v-if="canSee('/gis')" class="sidebar-link" to="/gis" :class="{ active: isActive('/gis') }">GIS Explorer</NuxtLink>
+          <NuxtLink v-if="canSee('/gis/overview')" class="sidebar-link" to="/gis/overview" :class="{ active: isActive('/gis/overview') }">Layer Overview</NuxtLink>
+          <NuxtLink v-if="canSee('/gis/coverage')" class="sidebar-link" to="/gis/coverage" :class="{ active: isActive('/gis/coverage') }">Layer Coverage</NuxtLink>
+          <NuxtLink v-if="canSee('/gis/layers')" class="sidebar-link" to="/gis/layers" :class="{ active: isActive('/gis/layers', false) }">Layer Catalogue</NuxtLink>
+          <NuxtLink v-if="canSee('/gis/requests')" class="sidebar-link" to="/gis/requests" :class="{ active: isActive('/gis/requests') }">Layer Requests</NuxtLink>
+        </div>
+      </details>
 
       <!-- M14 · Training Institutes - /api/v1/training/* -->
       <details v-if="canSeeModule('M14')" class="sidebar-group" :open="groupIsOpen('/training')">
@@ -215,7 +224,7 @@
 
 <script setup lang="ts">
 const route = useRoute()
-const sidebarOpen = useState('sidebarOpen', () => false)
+const { mobileOpen: sidebarOpen } = useSidebar()
 
 // Close drawer on navigation (mobile)
 watch(() => route.path, () => {

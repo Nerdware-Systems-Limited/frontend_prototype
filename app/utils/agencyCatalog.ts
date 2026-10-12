@@ -49,7 +49,9 @@ export function catalogScopeFor(agency: string | null | undefined, ov: PolicyOve
   return { agency, routes, oversight: a.domains.some(d => BASE_SETTINGS.domains[d]?.readOnly) }
 }
 
-const sourceInScope = (sourceId: string | undefined, scope: CatalogScope): boolean => {
+/** A source is in scope when the agency can open the page its data comes from. Null scope = everything. */
+export const sourceInScope = (sourceId: string | undefined, scope: CatalogScope | null): boolean => {
+  if (!scope) return !!sourceId && !!SOURCES_BY_ID[sourceId]
   const route = sourceId ? SOURCES_BY_ID[sourceId]?.route : undefined
   return !!route && scope.routes.has(route)
 }

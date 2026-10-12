@@ -74,8 +74,13 @@ export type WidgetKind =
   | 'feed-health'  // Integration Hub status strip
   | 'text'         // heading / markdown note
   | 'embed'        // an existing full-page section, mounted as-is
+  | 'image'        // a picture from a link
   | 'breakdown'    // generic: a measure by category (binding shape 'categorical')
   | 'table'        // generic: rows (binding shape 'rows')
+  | 'points'       // generic: rows with coordinates on a map
+  | 'status'       // generic: rows ranked worst status first
+  | 'progress'     // generic: a figure against its target
+  | 'heatmap'      // generic: two categories x one measure
 
 export type WidgetCategory = 'KPIs' | 'Charts' | 'Maps' | 'Operations' | 'Agency' | 'Layout'
 
@@ -112,7 +117,23 @@ export interface WidgetDefinition {
   emits?: FilterField[]
   /** Default config, merged under the instance's own config. */
   defaultConfig?: Record<string, unknown>
+  /**
+   * The inspector's Data tab, as data: one field per config key. Generic
+   * (bound) widgets also get the binding picker above these.
+   */
+  options?: WidgetOption[]
 }
+
+/**
+ * One inspector field over `config[key]`. metric / metrics / agency are
+ * pickers that narrow to what the dashboard's owner agency can open.
+ */
+export type WidgetOption =
+  | { key: string; label: string; control: 'toggle' }
+  | { key: string; label: string; control: 'select'; choices: { value: string; label: string }[] }
+  | { key: string; label: string; control: 'number'; min?: number; max?: number; placeholder?: string }
+  | { key: string; label: string; control: 'text' | 'textarea'; placeholder?: string }
+  | { key: string; label: string; control: 'metric' | 'metrics' | 'agency' }
 
 export interface WidgetStyle {
   /** Show / hide the frame title bar. */

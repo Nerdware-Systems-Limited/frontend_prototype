@@ -20,12 +20,18 @@
  * instead of showing unfiltered numbers as filtered.
  */
 import type { Component } from 'vue'
-import type { FilterField, WidgetDefinition } from '~/types/dashboard'
+import type { FilterField, WidgetDefinition, WidgetOption } from '~/types/dashboard'
 import { METRICS, METRICS_BY_KEY, type Domain } from '~/utils/metricRegistry'
 import { DOMAIN_PERMISSIONS, SOURCES_BY_ID } from '~/utils/dataSources'
 import { PRESETS_BY_ID } from '~/utils/widgetPresets'
 import type { WidgetSize } from '~/types/dashboard'
 import type { Binding } from '~/types/frame'
+
+// Shared inspector fields.
+const METRIC: WidgetOption = { key: 'metricKey', label: 'Metric', control: 'metric' }
+const LABEL = (label: string, placeholder: string): WidgetOption => ({ key: 'label', label, control: 'text', placeholder })
+const DRILL: WidgetOption = { key: 'to', label: 'Drill-down route', control: 'text', placeholder: "Defaults to the data's page, e.g. /traffic" }
+const LARGE = (label: string): WidgetOption => ({ key: 'prominent', label, control: 'toggle' })
 
 export const WIDGETS: WidgetDefinition[] = [
   // ── KPIs ───────────────────────────────────────────────────────────
@@ -38,6 +44,7 @@ export const WIDGETS: WidgetDefinition[] = [
     // see widgetPermissions() / widgetFilterFields().
     filterFields: [],
     defaultConfig: { metricKey: 'safety.active_incidents', prominent: false },
+    options: [METRIC, LABEL('Card label', 'Defaults to the metric name'), DRILL, LARGE('Large figure')],
   },
   {
     type: 'kpi-row', kind: 'kpi-row', category: 'KPIs',
@@ -51,6 +58,7 @@ export const WIDGETS: WidgetDefinition[] = [
         'aviation.otp_7d', 'maritime.teu_30d', 'infra.good_condition'],
       prominent: true,
     },
+    options: [{ key: 'metricKeys', label: 'Metrics in the ribbon', control: 'metrics' }, LARGE('Large figures')],
   },
   // ── Charts ─────────────────────────────────────────────────────────
   {
@@ -82,6 +90,7 @@ export const WIDGETS: WidgetDefinition[] = [
     filterFields: [],
     emits: ['road'],
     defaultConfig: { showRoads: true, hotspotLimit: 30 },
+    options: [{ key: 'showRoads', label: 'Show road network', control: 'toggle' }, { key: 'hotspotLimit', label: 'Hotspots to plot', control: 'number', min: 5, max: 200 }],
   },
   // ── Operations ─────────────────────────────────────────────────────
   {
@@ -108,6 +117,7 @@ export const WIDGETS: WidgetDefinition[] = [
     filterFields: [],
     emits: ['agency'],
     defaultConfig: { agency: 'NTSA' },
+    options: [{ key: 'agency', label: 'Agency', control: 'agency' }],
   },
   // ── Generic primitives (placed through presets in widgetPresets.ts) ──
   // Permission, filters and clicks all come from the instance's binding -
@@ -116,6 +126,7 @@ export const WIDGETS: WidgetDefinition[] = [
     type: 'stat', kind: 'kpi', category: 'KPIs', palette: false, framed: false,
     title: 'Stat', description: 'One figure from any source, with its shared threshold.',
     defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, filterFields: [],
+    options: [LABEL('Card label', 'Defaults to the measure name'), { key: 'description', label: 'Caption', control: 'text', placeholder: 'e.g. Vehicles counted' }, { key: 'period', label: 'Period tag', control: 'text', placeholder: 'e.g. 24H, 7D, LIVE' }, DRILL, LARGE('Large figure')],
   },
   {
     type: 'series', kind: 'trend', category: 'Charts', palette: false,
@@ -132,6 +143,26 @@ export const WIDGETS: WidgetDefinition[] = [
     title: 'Table', description: 'Rows from any source, sortable.',
     defaultSize: { w: 6, h: 4 }, minSize: { w: 2, h: 2 }, filterFields: [],
   },
+  {
+    type: 'points', kind: 'points', category: 'Maps', palette: false,
+    title: 'Map', description: 'Rows with coordinates as markers, fitted to the data.',
+    defaultSize: { w: 6, h: 5 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
+  {
+    type: 'status-list', kind: 'status', category: 'Operations', palette: false,
+    title: 'Status list', description: 'Rows ranked worst status first.',
+    defaultSize: { w: 4, h: 4 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
+  {
+    type: 'progress', kind: 'progress', category: 'KPIs', palette: false,
+    title: 'Progress', description: 'One figure against its target.',
+    defaultSize: { w: 3, h: 2 }, minSize: { w: 2, h: 1 }, filterFields: [],
+  },
+  {
+    type: 'heatmap', kind: 'heatmap', category: 'Charts', palette: false,
+    title: 'Heatmap', description: 'A measure across two categories, e.g. hour of day by weekday.',
+    defaultSize: { w: 8, h: 4 }, minSize: { w: 2, h: 2 }, filterFields: [],
+  },
   // ── Layout ─────────────────────────────────────────────────────────
   {
     type: 'text', kind: 'text', category: 'Layout',
@@ -139,6 +170,25 @@ export const WIDGETS: WidgetDefinition[] = [
     defaultSize: { w: 12, h: 1 }, minSize: { w: 2, h: 1 },
     framed: false,
     defaultConfig: { text: 'Section heading', variant: 'section' },
+    options: [
+      { key: 'variant', label: 'Style', control: 'select', choices: [
+        { value: 'section', label: 'Section label (small caps + rule)' }, { value: 'heading', label: 'Heading' }, { value: 'note', label: 'Note / paragraph' },
+      ] },
+      { key: 'text', label: 'Text', control: 'textarea' },
+    ],
+  },
+  // ── General (authored content) ──────────────────────────────────────
+  {
+    type: 'image', kind: 'image', category: 'Layout',
+    title: 'Image', description: 'A picture from a link: a logo, map, diagram or photo.',
+    defaultSize: { w: 3, h: 3 }, minSize: { w: 1, h: 1 }, filterFields: [],
+    defaultConfig: { url: '', alt: '', fit: 'contain' },
+    options: [
+      { key: 'url', label: 'Image address (https://…)', control: 'text', placeholder: 'https://example.com/logo.png' },
+      { key: 'alt', label: 'Description (for screen readers)', control: 'text', placeholder: 'What the image shows' },
+      { key: 'caption', label: 'Caption', control: 'text' },
+      { key: 'fit', label: 'Fit', control: 'select', choices: [{ value: 'contain', label: 'Show whole image' }, { value: 'cover', label: 'Fill the box (crop)' }] },
+    ],
   },
   {
     type: 'national-command-centre', kind: 'embed', category: 'Layout',
@@ -153,7 +203,7 @@ export const WIDGETS_BY_TYPE: Record<string, WidgetDefinition> =
   Object.fromEntries(WIDGETS.map(w => [w.type, w]))
 
 /** Generic widget types whose data comes from a binding in their config. */
-export const BOUND_TYPES = new Set(['stat', 'series', 'breakdown', 'table'])
+export const BOUND_TYPES = new Set(['stat', 'series', 'breakdown', 'table', 'points', 'status-list', 'progress', 'heatmap'])
 const bindingIn = (type: string, config: Record<string, unknown> = {}): Binding | null =>
   BOUND_TYPES.has(type) && config.binding && typeof config.binding === 'object' ? config.binding as Binding : null
 
@@ -175,6 +225,11 @@ export const WIDGET_COMPONENTS: Record<string, () => Promise<Component>> = {
   'series': () => import('~/components/dashboard/widgets/SeriesWidget.vue').then(m => m.default),
   'breakdown': () => import('~/components/dashboard/widgets/BreakdownWidget.vue').then(m => m.default),
   'table': () => import('~/components/dashboard/widgets/TableWidget.vue').then(m => m.default),
+  'points': () => import('~/components/dashboard/widgets/PointsWidget.vue').then(m => m.default),
+  'status-list': () => import('~/components/dashboard/widgets/StatusListWidget.vue').then(m => m.default),
+  'progress': () => import('~/components/dashboard/widgets/ProgressWidget.vue').then(m => m.default),
+  'heatmap': () => import('~/components/dashboard/widgets/HeatmapWidget.vue').then(m => m.default),
+  'image': () => import('~/components/dashboard/widgets/ImageWidget.vue').then(m => m.default),
   'national-command-centre': () => import('~/components/NationalCommandCentre.vue').then(m => m.default),
 }
 
@@ -240,7 +295,25 @@ export function widgetEmits(type: string, config: Record<string, unknown> = {}):
  * preset ("preset:traffic.volume_24h"), which places a generic widget with
  * the preset's binding.
  */
+/**
+ * Empty General widgets: a table / chart with no data chosen yet. The inspector's
+ * data picker (BindingEditor) then offers only the sources and fields the
+ * dashboard's agency can open, and the server hides the widget from viewers
+ * who lack the chosen source's permission.
+ */
+export const STARTERS = [
+  { id: 'table', title: 'Table', category: 'Operations' as const, type: 'table', size: { w: 6, h: 4 },
+    description: 'An empty table. Pick a data source, then the columns to show.' },
+  { id: 'chart', title: 'Chart', category: 'Charts' as const, type: 'series', size: { w: 6, h: 3 },
+    description: 'An empty chart. Pick a data source and fields, then bars, line, area, breakdown or heatmap.' },
+]
+export const STARTERS_BY_ID = Object.fromEntries(STARTERS.map(s => [s.id, s]))
+
 export function resolveCatalogItem(item: string): { type: string; size: WidgetSize; config: Record<string, unknown>; title?: string } | null {
+  if (item.startsWith('starter:')) {
+    const st = STARTERS_BY_ID[item.slice('starter:'.length)]
+    return st ? { type: st.type, size: st.size, title: st.title, config: {} } : null
+  }
   if (item.startsWith('preset:')) {
     const p = PRESETS_BY_ID[item.slice('preset:'.length)]
     if (!p) return null

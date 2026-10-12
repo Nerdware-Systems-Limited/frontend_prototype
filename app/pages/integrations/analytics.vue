@@ -4,17 +4,15 @@
     title="Ingestion Analytics"
     :subtitle="statsRes?.scope === 'agency' ? 'Is your agency\'s data actually landing, and where is it not?' : 'Is data actually landing everywhere, and where is it not?'"
   >
-    <template #breadcrumb>
-      <NuxtLink to="/integrations" class="ih-crumb">← Upload &amp; Connect</NuxtLink>
-    </template>
     <template #actions>
       <BadgePill v-if="statsRes" :variant="statsRes.scope === 'agency' ? 'info' : 'neutral'">
         {{ statsRes.scope === 'agency' ? 'Your agency only' : 'All agencies' }}
       </BadgePill>
-      <div class="ih-toggle" role="tablist" aria-label="Time window">
+      <NuxtLink to="/integrations" class="btn"><ArrowLeft :size="13" aria-hidden="true" />Upload &amp; Connect</NuxtLink>
+      <div class="segmented" role="group" aria-label="Time window">
         <button
-          v-for="w in WINDOWS" :key="w" type="button" role="tab"
-          :class="{ active: windowSel === w }" :aria-selected="windowSel === w"
+          v-for="w in WINDOWS" :key="w" type="button"
+          :class="{ active: windowSel === w }" :aria-pressed="windowSel === w"
           @click="windowSel = w; loadWindowed()"
         >{{ w }}</button>
       </div>
@@ -101,16 +99,16 @@
       <EmptyState v-if="statsFailed" compact message="Could not load silent-failure data." />
       <EmptyState v-else-if="statsRes && !statsRes.silent_failures.length" compact icon="inbox" message="No silent failures in this window." />
       <div v-else-if="statsRes" class="ih-table-wrap">
-        <table class="ih-table">
+        <table class="ih-table stack-table">
           <thead><tr><th>Feed</th><th>Agency</th><th>Records lost</th></tr></thead>
           <tbody>
             <tr
               v-for="f in statsRes.silent_failures" :key="f.source_id" class="is-clickable"
               @click="router.push(`/integrations/feeds/${f.source_id}`)"
             >
-              <td class="mono-sm">{{ f.source_id }}</td>
-              <td>{{ f.agency_code || '-' }}</td>
-              <td class="ih-num-danger">{{ f.received.toLocaleString('en-KE') }}</td>
+              <td class="mono-sm stack-title">{{ f.source_id }}</td>
+              <td data-label="Agency">{{ f.agency_code || '-' }}</td>
+              <td class="ih-num-danger" data-label="Records lost">{{ f.received.toLocaleString('en-KE') }}</td>
             </tr>
           </tbody>
         </table>
@@ -144,12 +142,12 @@
         <EmptyState v-if="statsFailed" compact message="Could not load handler errors." />
         <EmptyState v-else-if="statsRes && !statsRes.top_handler_errors.length" compact message="No handler errors in this window." />
         <div v-else-if="statsRes" class="ih-table-wrap">
-          <table class="ih-table">
+          <table class="ih-table stack-table">
             <thead><tr><th>Count</th><th>Message</th></tr></thead>
             <tbody>
               <tr v-for="e in statsRes.top_handler_errors" :key="e.message">
-                <td class="mono-sm num">{{ e.count }}</td>
-                <td>{{ e.message }}</td>
+                <td class="mono-sm num" data-label="Count">{{ e.count }}</td>
+                <td class="stack-block err-msg" data-label="Message">{{ e.message }}</td>
               </tr>
             </tbody>
           </table>
@@ -186,7 +184,7 @@
           >{{ chip.label }} <span class="feed-filter-count">{{ chip.key === 'all' ? integrations.length : (feedCounts[chip.key] ?? 0) }}</span></button>
         </div>
         <div class="ih-table-wrap">
-          <table class="ih-table">
+          <table class="ih-table stack-table">
             <thead>
               <tr><th>Agency / source system</th><th>Status</th><th>Mode</th><th>Records today</th><th>Last sync</th></tr>
             </thead>
@@ -195,11 +193,11 @@
                 v-for="f in feedsPageRows" :key="f.source_id" class="is-clickable"
                 @click="router.push(f.mode === 'manual' ? `/integrations/files?source_id=${f.source_id}` : `/integrations/feeds/${f.source_id}`)"
               >
-                <td><strong>{{ f.agency_code }}</strong> <span class="hint">· {{ f.source_system }}</span></td>
-                <td><BadgePill :variant="feedStatusVariant(f.status)">{{ f.status }}</BadgePill></td>
-                <td class="mono-sm">{{ f.mode }}</td>
-                <td class="mono-sm num">{{ (f.records_today ?? 0).toLocaleString('en-KE') }}</td>
-                <td class="hint">{{ f.last_sync_at ? fmtRelative(f.last_sync_at) : '-' }}</td>
+                <td class="stack-title"><strong>{{ f.agency_code }}</strong> <span class="hint">· {{ f.source_system }}</span></td>
+                <td data-label="Status"><BadgePill :variant="feedStatusVariant(f.status)">{{ f.status }}</BadgePill></td>
+                <td class="mono-sm" data-label="Mode">{{ f.mode }}</td>
+                <td class="mono-sm num" data-label="Records today">{{ (f.records_today ?? 0).toLocaleString('en-KE') }}</td>
+                <td class="hint" data-label="Last sync">{{ f.last_sync_at ? fmtRelative(f.last_sync_at) : '-' }}</td>
               </tr>
             </tbody>
             <tbody v-else><tr><td colspan="5" class="feed-empty">No feeds match this filter.</td></tr></tbody>
@@ -213,6 +211,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft } from 'lucide-vue-next'
 
 import { useIntegrations } from '~/composables/api'
 import type { AgencyContribution, DataSource, DataUploadStatus, PlatformStats } from '~/composables/api'
@@ -339,4 +339,8 @@ onMounted(async () => {
 .feed-filter-chip--crit.active { background: var(--danger-fg); border-color: var(--danger-fg); }
 .feed-filter-count { opacity: 0.8; margin-left: 4px; font-variant-numeric: tabular-nums; }
 .feed-empty { text-align: center; color: var(--fg-3); padding: 22px; }
+.err-msg { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .upload-status-bars .ih-hbar { grid-template-columns: minmax(84px, 34%) minmax(0, 1fr) auto; }
+}
 </style>

@@ -5,7 +5,7 @@
     subtitle="NTSA - Driver identity registry, driving-licence classes, endorsements, demerit points, PSV badges and expiry tracking"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -35,6 +35,9 @@
       <EmptyState v-else :loading="loading" message="No expiry or compliance alerts in the loaded registry." icon="search" compact />
     </div>
   </div>
+
+  <!-- Renewals: driving licences that are expired or expiring, most urgent first -->
+  <CertificateExpiryPanel title="Driving licence renewals" :sources="['driver']" storage-key="driver-licensing" style="margin-bottom:16px" />
 
   <!-- PSV-endorsed drivers -->
   <SectionTitle pill="Class D / PSV Badge">PSV-Endorsed Licences</SectionTitle>
@@ -100,6 +103,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useDriverLicensing } from '~/composables/api'
 import type { Driver, DriverLicence } from '~/composables/api'
 

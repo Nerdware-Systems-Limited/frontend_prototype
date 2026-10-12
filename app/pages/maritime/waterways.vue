@@ -5,8 +5,8 @@
     subtitle="KMA - Chartered (surveyed &amp; gazetted) and unchartered navigable waterway classification, plus navigation buoys, lighthouses, dredged channel depth, and VHF coverage"
   >
     <template #actions>
-      <NuxtLink to="/maritime/infrastructure" class="btn">Port Infrastructure →</NuxtLink>
-      <NuxtLink to="/maritime/accidents" class="btn">Accidents →</NuxtLink>
+      <NuxtLink to="/maritime/infrastructure" class="btn">Port Infrastructure<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/accidents" class="btn">Accidents<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -153,6 +153,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useMaritimeWaterways } from '~/composables/api'
 import type { MaritimeWaterwaysSummary, Waterway, MaritimeNavaid, MaritimeChannel, WaterwayCategory } from '~/composables/api'
 

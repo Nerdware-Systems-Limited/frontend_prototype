@@ -1,13 +1,12 @@
 <template>
   <PageHeader
-    class="header-actions-fill"
     eyebrow="Access Control"
     title="Roles & Permissions"
     subtitle="RBAC role assignments, user status management, and organisational departments across UAPTS agencies"
   >
     <template #actions>
       <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-users" label="Export" />
-      <NuxtLink to="/users" class="btn-primary">+ Add User</NuxtLink>
+      <NuxtLink to="/users" class="btn btn-primary">+ Add User</NuxtLink>
     </template>
   </PageHeader>
 
@@ -288,7 +287,7 @@
                 <span>No base tier yet - not assignable.</span>
                 <select :value="pendingBaseTier[r.id] ?? ''" class="select-sm" aria-label="`Base tier for ${r.role_name}`" @change="pendingBaseTier[r.id] = ($event.target as HTMLSelectElement).value">
                   <option value="" disabled>Base tier…</option>
-                  <option v-for="t in CUSTOM_ROLE_BASE_TIERS" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in customBaseTiers" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <button class="btn btn-sm" :disabled="!pendingBaseTier[r.id] || settingBaseTierId === r.id" @click="setBaseTier(r)">
                   {{ settingBaseTierId === r.id ? 'Setting…' : 'Set' }}
@@ -400,7 +399,7 @@ import { useRoles as _useRoles, useDepartments as _useDepartments, useUsers as _
 import type { Role, Department, User, Agency } from '~/types/uapts'
 import {
   isUnscopedAdmin, scopedAgencyCode, agencyListQueryFor, canManageUser,
-  canChangeRole, assignableRoleTypes, canViewRole, ROLE_TYPES,
+  canChangeRole, assignableBuiltInRoles, customRoleBaseTiers, canViewRole,
 } from '~/composables/useAgencyScope'
 import { roleBadgeVariant, roleSummary } from '~/utils/accessLabels'
 
@@ -452,9 +451,9 @@ const newRoleAgencyId = ref('')
 // A custom role can be based on any built-in tier except super_admin (already
 // bypasses everything - a "custom" sub-role adds nothing) and public (the
 // resolver hard-denies it unconditionally - see the Role model's docstring
-// on the backend, apps/accounts/models.py). Derived from ROLE_TYPES, not a
-// separately maintained list.
-const CUSTOM_ROLE_BASE_TIERS = ROLE_TYPES.filter(t => t !== 'super_admin' && t !== 'public')
+// on the backend, apps/accounts/models.py). Follows the role catalog the page
+// already loads, so it adapts to the roles that exist instead of a fixed list.
+const customBaseTiers = computed(() => customRoleBaseTiers(roles.value))
 // A role is always created without a base tier - it's set afterward via the
 // inline "Set" control below (setBaseTier), keeping the creation form to
 // just a name (and agency, for a super_admin). Not assignable to a user
@@ -602,14 +601,14 @@ function isBuiltinRole(r: Role) { return r.agency == null }
 // ── Metric strip ─────────────────────────────────────────────────────────
 
 const metricsUnavailable = computed(() => loading.value || usersError.value)
-// One tile per assignable built-in tier (CUSTOM_ROLE_BASE_TIERS, not a
-// separate hardcoded set) - counts every account on that tier OR on a
+// One tile per assignable built-in tier (customBaseTiers, which follows the
+// role catalog) - counts every account on that tier OR on a
 // custom role based on it, since role_type is always the base tier
 // (see the Role model's docstring on the backend).
 const metrics = computed(() => [
   { label: 'Total Users',  value: users.value.length,                                    sub: 'Platform accounts' },
   { label: 'Active',       value: users.value.filter(u => u.is_active !== false).length,  sub: 'Enabled accounts' },
-  ...CUSTOM_ROLE_BASE_TIERS.map(t => ({
+  ...customBaseTiers.value.map(t => ({
     label: `${t.charAt(0).toUpperCase()}${t.slice(1)}s`, value: byRoleType(t), sub: 'Incl. custom roles based on it',
   })),
   { label: 'MFA Enrolled', value: users.value.filter(u => u.mfa_active).length,            sub: '2FA active' },
@@ -730,8 +729,11 @@ function startEdit(u: User) {
 
 function cancelEdit() { editingId.value = null }
 
-/** Built-in role_types the viewer may pick for `u` - super_admin is only offered to (and only changeable by) a super_admin. */
-function roleOptionsFor(u: User) { return assignableRoleTypes(viewerScope.value, u.role_type) }
+/**
+ * Built-in roles the viewer may pick for `u`, from the role catalog. super_admin and the platform-wide
+ * ministry roles are only offered to (and only changeable by) a super_admin; the account's own role always stays.
+ */
+function roleOptionsFor(u: User) { return assignableBuiltInRoles(viewerScope.value, roles.value, u.role_type) }
 /** Custom roles the viewer may pick for `u` - always its own agency's, never another's. */
 function customRoleOptionsFor(u: User) { return roles.value.filter(r => r.base_tier && r.agency_code === u.agency_code) }
 

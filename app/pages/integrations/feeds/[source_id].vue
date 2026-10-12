@@ -4,10 +4,8 @@
     :title="sourceId"
     :subtitle="source ? `${source.source_system} · ${source.mode} · last synced ${source.last_sync_at ? fmtDate(source.last_sync_at) : 'never'}` : ''"
   >
-    <template #breadcrumb>
-      <NuxtLink to="/integrations/files?segment=feeds" class="ih-crumb">← Files &amp; Feeds</NuxtLink>
-    </template>
     <template #actions>
+      <NuxtLink to="/integrations/files?segment=feeds" class="btn"><ArrowLeft :size="13" aria-hidden="true" />Files &amp; Feeds</NuxtLink>
       <button class="btn" :disabled="actionBusy" @click="trigger">Trigger sync</button>
       <button v-if="source?.status !== 'paused'" class="btn" :disabled="actionBusy" @click="pause">Pause</button>
       <button v-else class="btn" :disabled="actionBusy" @click="resume">Resume</button>
@@ -102,12 +100,12 @@
   <div v-if="stats?.top_handler_errors.length" class="ih-card ih-rise ih-rise-3">
     <div class="ih-card-head"><h2>Top handler errors · last 7 days</h2></div>
     <div class="ih-card-body ih-table-wrap">
-      <table class="ih-table">
+      <table class="ih-table stack-table">
         <thead><tr><th>Count</th><th>Message</th></tr></thead>
         <tbody>
           <tr v-for="e in stats.top_handler_errors" :key="e.message">
-            <td class="mono-sm num">{{ e.count }}</td>
-            <td>{{ e.message }}</td>
+            <td class="mono-sm num" data-label="Count">{{ e.count }}</td>
+            <td class="stack-block err-msg" data-label="Message">{{ e.message }}</td>
           </tr>
         </tbody>
       </table>
@@ -137,6 +135,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowLeft } from 'lucide-vue-next'
 
 import { useIntegrations } from '~/composables/api'
 import type { DataSource, DataSourceStats, RegisterAuthMethod, RegisterProtocol, TestConnectionResult } from '~/composables/api'
@@ -269,4 +269,13 @@ onMounted(load)
 .conn-meta dd { margin: 0; color: var(--fg-1); overflow-wrap: anywhere; }
 .test-ok { color: var(--success-fg); font-weight: 600; }
 .test-bad { color: var(--danger-fg); font-weight: 600; }
+.err-msg { overflow-wrap: anywhere; }
+
+@media (max-width: 560px) {
+  /* Caption above value - a 140px caption column leaves an endpoint URL
+     a sliver of the card to wrap into. */
+  .conn-meta { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .conn-meta dd { margin-bottom: 8px; }
+  .payload-item { padding: 9px 10px; min-width: 0; }
+}
 </style>

@@ -5,10 +5,10 @@
     subtitle="KPA · KMA · KenTrade · NCTTCA - Real-time AIS vessel traffic, port performance, KenTrade cargo single-window, and NCTTCA corridor transit KPIs"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
-      <NuxtLink to="/maritime/services" class="btn">Port Services →</NuxtLink>
-      <NuxtLink to="/maritime/performance" class="btn">Performance →</NuxtLink>
-      <NuxtLink to="/maritime/port-ops" class="btn-primary">Port Ops →</NuxtLink>
+      <TimeRangeSelector :range="timeRange" @change="load" />
+      <NuxtLink to="/maritime/services" class="btn">Port Services<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/performance" class="btn">Performance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/port-ops" class="btn">Port Ops<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -60,8 +60,7 @@
 
   <!-- Live vessel map + container by port -->
   <div class="two-col-map">
-    <div class="card map-card">
-      <div class="card-header">Live Vessel Positions (AIS)</div>
+    <CollapsibleSection class="card map-card" title="Live Vessel Positions (AIS)" storage-key="map:maritime/index">
       <ClientOnly>
         <UaptsMap
           :markers="vesselMarkers"
@@ -78,7 +77,7 @@
         <span class="mk"><span class="dot" style="background:#22c55e" /> General Cargo</span>
         <span class="mk"><span class="dot" style="background:#ef4444" /> Delayed / Alert</span>
       </div>
-    </div>
+    </CollapsibleSection>
 
     <div class="right-col">
       <!-- Port performance cards -->
@@ -107,7 +106,7 @@
 
       <!-- Container by port -->
       <div class="card" style="margin-top:12px">
-        <div class="card-header">Container Throughput by Port ({{ days }}d)</div>
+        <div class="card-header">Container Throughput by Port ({{ timeRange.period.value.toLowerCase() }})</div>
         <div class="card-body">
           <div v-if="containers.length" class="cong-list">
             <div v-for="c in containers" :key="c.port__unlocode" class="cong-row">
@@ -247,6 +246,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Port, Berth, Vessel, VesselMovement, ContainerByPort } from '~/composables/api'
 
@@ -265,8 +266,9 @@ const lastRefreshed  = ref('-')
 
 const route = useRoute()
 const queryWindow = Number.parseInt(String(route.query.window ?? ''), 10)
-const days = ref([7, 30, 90].includes(queryWindow) ? queryWindow : 30)
-
+const timeRange = useTimeRange('maritime', { default: '30d' })
+{ const w = presetFromDays(queryWindow); if (w) timeRange.setMode(w) }
+const days = timeRange.days
 const portFilter     = ref('')
 const vesselTypeFilter = ref('')
 

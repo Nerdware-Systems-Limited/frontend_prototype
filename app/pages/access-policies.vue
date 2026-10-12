@@ -9,7 +9,7 @@
         Unsaved changes in {{ store.dirtyAgencies.length }} {{ store.dirtyAgencies.length === 1 ? 'agency' : 'agencies' }}
       </span>
       <button type="button" class="btn" :disabled="!store.isDirty || store.saving" @click="store.discard()">Discard</button>
-      <button type="button" class="btn-primary" :disabled="!store.isDirty || store.saving" @click="store.save()">
+      <button type="button" class="btn btn-primary" :disabled="!store.isDirty || store.saving" @click="store.save()">
         {{ store.saving ? 'Saving…' : 'Save changes' }}
       </button>
     </template>
@@ -71,7 +71,7 @@
       />
       <AccessRolesTab
         v-else-if="tab === 'roles'"
-        :code="selected" :overrides="store.draft" :filter="moduleFilter"
+        :code="selected" :overrides="store.draft" :filter="moduleFilter" :built-in-roles="store.builtInRoles"
         :can-edit-ceiling="isSuper" :can-edit-enabled="canEditEnabled"
         @edit="onEdit"
       />
@@ -88,7 +88,7 @@
       :subtitle="`${agencyName}${store.isDirty ? ', including unsaved changes' : ''}`"
       @close="drawer = null"
     >
-      <AccessPreviewPanel :code="selected" :overrides="store.draft" />
+      <AccessPreviewPanel :code="selected" :overrides="store.draft" :built-in-roles="store.builtInRoles" />
     </SideDrawer>
     <SideDrawer
       :open="drawer === 'history'" title="Permission history"
@@ -204,7 +204,7 @@ function runExport(format: ExportFormat) {
   const code = selected.value
   if (!code) return
   exportOpen.value = false
-  const data = buildPermissionExport(store.draft, code, store.isDirty)
+  const data = buildPermissionExport(store.draft, code, store.isDirty, store.builtInRoles)
   const base = `uapts-module-access-${code.toLowerCase()}-${data.generatedAt.slice(0, 10)}`
   if (format === 'csv') return exportCsv(base, data.pages, pageColumns(data))
   if (format === 'json') return download(`${base}.json`, 'application/json', JSON.stringify(data, null, 2))

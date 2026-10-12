@@ -5,7 +5,7 @@
     subtitle="KeNHA · KURA · KMD - Volume trends, speed compliance, vehicle class breakdown, O-D matrix, and AI forecasts"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[1, 7, 30]" @update:model-value="load" />
+      <TimeRangeSelector :range="timeRange" @change="load" />
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
@@ -49,7 +49,7 @@
       :value="topPairs[0] ? `${topPairs[0].trips} trips` : '-'"
       :unavailable="loading || odError"
       :unavailable-note="loading ? 'Loading…' : 'KeNHA OD Survey feed unavailable'"
-      :period="`${days}D`"
+      :period="`${timeRange.period.value}`"
       :description="topPairs[0] ? `${topPairs[0].origin_zone} → ${topPairs[0].destination_zone}` : ''"
       to="#od-pairs-table"
     />
@@ -88,7 +88,7 @@
     </div>
 
     <div class="card">
-      <div class="card-header">Vehicle Class Mix ({{ days }}d)</div>
+      <div class="card-header">Vehicle Class Mix ({{ timeRange.period.value.toLowerCase() }})</div>
       <div class="card-body">
         <div v-if="classData.length" class="class-list">
           <div v-for="c in classData" :key="c.vehicle_class" class="class-row">
@@ -173,7 +173,7 @@
   </div>
 
   <!-- Top O-D pairs -->
-  <SectionTitle :pill="`KeNHA OD Survey · ${days}d`">Top Origin-Destination Pairs</SectionTitle>
+  <SectionTitle :pill="`KeNHA OD Survey · ${timeRange.period.value.toLowerCase()}`">Top Origin-Destination Pairs</SectionTitle>
 
   <div id="od-pairs-table" class="card drill-target">
     <div class="card-body">
@@ -235,8 +235,8 @@ const speedError = ref(false)
 const odError    = ref(false)
 const forecastError = ref(false)
 const lastRefreshed = ref('-')
-const days = ref(7)
-
+const timeRange = useTimeRange('traffic', { default: '7d' })
+const days = timeRange.days
 const { sourceLabel } = useDataSources()
 
 async function load() {

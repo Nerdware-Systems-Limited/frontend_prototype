@@ -266,6 +266,8 @@ function drillToAnchor() {
     router.replace({ query: { ...route.query, ...props.filter } })
   }
   emit('activate', props.filter)
+  // A drill target inside a collapsed section has to open before it can be scrolled to.
+  window.dispatchEvent(new CustomEvent('uapts:reveal', { detail: { id } }))
   nextTick(() => {
     const el = document.getElementById(id)
     if (!el) return

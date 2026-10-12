@@ -6,7 +6,14 @@
   -->
   <nav class="top-nav">
     <div class="top-nav-left">
-      <button class="hamburger-btn" aria-label="Toggle navigation" @click="toggleSidebar">☰</button>
+      <button
+        class="hamburger-btn"
+        :aria-label="sidebarExpanded ? 'Collapse navigation' : 'Expand navigation'"
+        :title="sidebarExpanded ? 'Collapse navigation' : 'Expand navigation'"
+        :aria-expanded="sidebarExpanded"
+        aria-controls="app-sidebar"
+        @click="toggleSidebar"
+      >☰</button>
       <div class="top-nav-brand">
         <div class="top-nav-logo">
           <NuxtLink to="/"><img src="/uapts-logo.png" alt="UAPTS" /></NuxtLink>
@@ -135,8 +142,7 @@ import {
 const notificationStore = useNotificationStore()
 const router = useRouter()
 
-const sidebarOpen = useState('sidebarOpen', () => false)
-function toggleSidebar() { sidebarOpen.value = !sidebarOpen.value }
+const { toggle: toggleSidebar, expanded: sidebarExpanded } = useSidebar()
 
 const theme = useTheme()
 const isDark = theme.isDark
@@ -264,6 +270,10 @@ const searchItems: SearchItem[] = [
   { label: 'Files & Feeds', group: 'Overview', to: '/integrations/files', icon: Cable },
   { label: 'Ingestion Analytics', group: 'Overview', to: '/integrations/analytics', icon: Cable },
   { label: 'GIS & Spatial Analysis', group: 'Overview', to: '/gis', icon: MapPinned },
+  { label: 'GIS Layer Overview', group: 'GIS & Spatial Analysis', to: '/gis/overview', icon: MapPinned },
+  { label: 'GIS Layer Coverage', group: 'GIS & Spatial Analysis', to: '/gis/coverage', icon: MapPinned },
+  { label: 'GIS Layer Catalogue', group: 'GIS & Spatial Analysis', to: '/gis/layers', icon: MapPinned },
+  { label: 'GIS Layer Requests', group: 'GIS & Spatial Analysis', to: '/gis/requests', icon: MapPinned },
 
   { label: 'Training Overview', group: 'Training Institutes', to: '/training', icon: GraduationCap },
   { label: 'Cohorts', group: 'Training Institutes', to: '/training/cohorts', icon: GraduationCap },

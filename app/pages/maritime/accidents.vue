@@ -5,8 +5,8 @@
     subtitle="KMA - Tracked using the same framework as the UAPTS Road Safety Module: location, incident classification, severity, investigation status, and marine pollution"
   >
     <template #actions>
-      <NuxtLink to="/safety" class="btn">Road Safety Module →</NuxtLink>
-      <NuxtLink to="/maritime" class="btn">Vessel Movements →</NuxtLink>
+      <NuxtLink to="/safety" class="btn">Road Safety Module<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime" class="btn">Vessel Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -54,16 +54,15 @@
 
   <!-- Incident map -->
   <SectionTitle pill="KMA · Live">Incident Locations</SectionTitle>
-  <div class="card map-card">
+  <CollapsibleSection class="card map-card" title="Incident Locations" storage-key="map:maritime/accidents">
     <ClientOnly>
       <UaptsMap :markers="incidentMarkers" :center="[-3.5, 40.0]" :zoom="6" height="380px" show-legend />
     </ClientOnly>
     <EmptyState v-if="!incidentMarkers.length" :loading="loading" message="No incident could be matched to a known port position." compact />
-  </div>
+  </CollapsibleSection>
 
   <!-- Incident log -->
-  <SectionTitle pill="KMA · Live">Incident Log</SectionTitle>
-  <div id="incident-log" class="card drill-target">
+  <CollapsibleSection id="incident-log" class="card drill-target" default-open title="Incident Log" source="KMA · Live" :count="filteredIncidents.length" :tone="filteredIncidents.some(i => i.severity === 'fatal') ? 'danger' : filteredIncidents.length ? 'warning' : ''" storage-key="inc:maritime/accidents:incident-log">
     <div class="card-body">
       <div class="filter-row">
         <select v-model="severityFilter" class="select-sm">
@@ -114,11 +113,13 @@
         />
       </div>
     </div>
-  </div>
+  </CollapsibleSection>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type { Port } from '~/composables/api'
 

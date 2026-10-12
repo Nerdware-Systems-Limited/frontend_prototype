@@ -5,8 +5,8 @@
     subtitle="NTSA - Roadworthiness inspection records, pass/fail outcomes, re-inspection chains, and inspection-centre/inspector workload"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/vehicle-registration" class="btn">Vehicle Registration →</NuxtLink>
-      <NuxtLink to="/public-transport/operators" class="btn">Public Operators →</NuxtLink>
+      <NuxtLink to="/public-transport/vehicle-registration" class="btn">Vehicle Registration<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -145,6 +145,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useVehicleInspections } from '~/composables/api'
 import type { VehicleInspection } from '~/composables/api'
 

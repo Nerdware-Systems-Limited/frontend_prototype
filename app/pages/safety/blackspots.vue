@@ -73,7 +73,7 @@
   <!-- Map -->
   <SectionTitle pill="NTSA KDE · Batch">Black Spot & Hotspot Map</SectionTitle>
 
-  <div class="card map-card">
+  <CollapsibleSection class="card map-card" title="Black Spot &amp; Hotspot Map" storage-key="map:safety/blackspots">
     <ClientOnly>
       <UaptsMap
         :markers="mapMarkers"
@@ -90,7 +90,7 @@
       <span class="mk-item"><span class="mk-dot" style="background:#f59e0b" /> Medium / Low</span>
       <span class="mk-item"><span class="mk-dot" style="background:#a855f7" /> Predictive hotspot</span>
     </div>
-  </div>
+  </CollapsibleSection>
 
   <!-- Black spot table -->
   <SectionTitle>Black Spot Inventory</SectionTitle>

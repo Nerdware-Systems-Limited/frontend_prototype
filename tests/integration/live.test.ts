@@ -20,10 +20,10 @@ import { describe, it, expect, beforeAll } from 'vitest'
 // Vitest + happy-dom doesn't always expose Node's process.env - fall back
 // to import.meta.env if the conventional one is missing.
 const _env: any = (typeof process !== 'undefined' && process.env) ? process.env : (import.meta as any).env ?? {}
-const BASE = _env.UAPTS_API_BASE ?? 'http://127.0.0.1:8000'
+const BASE = _env.NUXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000'
 const SKIP = _env.UAPTS_SKIP_LIVE === '1' || _env.VITEST_SKIP_LIVE === '1'
 
-const EMAIL    = _env.UAPTS_TEST_EMAIL    ?? 'tricrck@gmail.com'
+const EMAIL    = _env.UAPTS_TEST_EMAIL    ?? 'test@gmail.com'
 // Default password matches the superuser seeded by `seed_admin.py`.
 // Override via env var `UAPTS_TEST_PASSWORD` for CI / staging.
 const PASSWORD = _env.UAPTS_TEST_PASSWORD ?? 'devpass123'
@@ -130,7 +130,7 @@ describe('live backend @ ' + BASE + (SKIP ? ' [SKIPPED via env]' : ''), () => {
     expect(Array.isArray(r.body.results)).toBe(true)
   })
 
-  it('POST /api/v1/accounts/agencies/ duplicate → 409 conflict envelope', async () => {
+  it('POST /api/v1/accounts/agencies/ duplicate → rejected with a clear error', async () => {
     if (SKIP) return
     if (!liveAvailable) { expect.fail('Backend not reachable') ; return }
     if (!accessToken) { expect.fail('Login failed') ; return }
@@ -138,11 +138,19 @@ describe('live backend @ ' + BASE + (SKIP ? ' [SKIPPED via env]' : ''), () => {
       method: 'POST',
       body: JSON.stringify({ agency_code: 'NTSA', agency_name: 'X', contact_email: 'x@ntsa.go.ke' }),
     }, accessToken)
-    // Either 201 (no NTSA in the db yet) or 409 (already exists) - both valid.
-    expect([201, 409]).toContain(r.status)
+    // 201: NTSA didn't exist, so the call created it (removed again below - the test must not leave data behind).
+    // 400: the serializer's UniqueValidator caught the duplicate - the normal case, with the error on the field.
+    // 409: the database raised IntegrityError first (a race) - the view's conflict envelope.
+    expect([201, 400, 409]).toContain(r.status)
+    if (r.status === 400) {
+      expect(Array.isArray(r.body.agency_code)).toBe(true)
+    }
     if (r.status === 409) {
       expect(r.body.code).toBe('conflict')
       expect(Array.isArray(r.body.errors)).toBe(true)
+    }
+    if (r.status === 201 && r.body?.id) {
+      await req(`/api/v1/accounts/agencies/${r.body.id}/`, { method: 'DELETE' }, accessToken)
     }
   })
 

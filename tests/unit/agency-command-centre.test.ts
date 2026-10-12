@@ -15,6 +15,8 @@ import { createPinia } from 'pinia'
 // RBAC resolution against the real access-control.json, same idiom the
 // KpiCard test uses for useRouter()/useRoute().
 import { useAccessControl } from '~/composables/useAccessControl'
+// The tiles come from this shared composable (also used by the HQ summary); Nuxt auto-imports it.
+import { useModuleSummaries } from '~/composables/useModuleSummaries'
 // Nuxt also auto-registers every app/components/*.vue file as a global
 // component (no explicit import needed in production). Outside Nuxt's
 // build, @vue/test-utils needs them registered explicitly so the real
@@ -28,6 +30,7 @@ beforeAll(() => {
   ;(globalThis as any).useRouter = () => ({ push: vi.fn(), replace: vi.fn() })
   ;(globalThis as any).useRoute  = () => ({ query: {} })
   ;(globalThis as any).useAccessControl = useAccessControl
+  ;(globalThis as any).useModuleSummaries = useModuleSummaries
 })
 
 const userRef = ref<any>(null)

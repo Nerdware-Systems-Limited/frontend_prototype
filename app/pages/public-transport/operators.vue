@@ -5,8 +5,8 @@
     subtitle="NaMATA · NTSA · NCTTCA - Operator registry, service quality, fleet & route compliance, revenue and complaint drill-down"
   >
     <template #actions>
-      <NuxtLink to="/public-transport/compliance" class="btn">PSV Compliance →</NuxtLink>
-      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
+      <NuxtLink to="/public-transport/compliance" class="btn">PSV Compliance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -329,6 +329,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport } from '~/composables/api'
 import type {
   Sacco, Route, OperatorMetric, ServiceQualityScore,

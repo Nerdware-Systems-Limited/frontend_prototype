@@ -6,7 +6,7 @@
   >
     <template #actions>
       <DayRangeToggle v-model="registeredDays" :options="[7, 14, 30]" deselectable />
-      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections →</NuxtLink>
+      <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -276,6 +276,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useFleet, useVehicleInspections } from '~/composables/api'
 import type { Vehicle, FleetSummary, VehicleType, DriverBehaviorEvent, RouteAdherence } from '~/composables/api'
 import type { VehicleInspection } from '~/composables/api'

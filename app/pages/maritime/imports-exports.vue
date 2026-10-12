@@ -5,8 +5,8 @@
     subtitle="KPA - Container throughput by loaded (export) &amp; unloaded (import) direction, yard dwell time, and the KRC/KPA port-rail container reconciliation"
   >
     <template #actions>
-      <NuxtLink to="/maritime/cargo" class="btn">Cargo Tracking →</NuxtLink>
-      <NuxtLink to="/railway/freight" class="btn">Full Rail Reconciliation Log →</NuxtLink>
+      <NuxtLink to="/maritime/cargo" class="btn">Cargo Tracking<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/freight" class="btn">Full Rail Reconciliation Log<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -108,7 +108,7 @@
     <div class="card-body">
       <div class="recon-note">
         Rail-nominated containers are KRC freight manifests with a KPA customs clearance reference or declared port origin - i.e. containers unloaded here and moved onward by rail.
-        Showing a sample of the most recent {{ railManifests.length }} manifests; see the full log on the Railway Freight page.
+        Showing the most recent {{ railManifests.length }} port-linked manifests; see the full log on the Railway Freight page.
       </div>
       <div class="table-scroll">
         <table>
@@ -143,6 +143,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime, useRailway } from '~/composables/api'
 import type { ContainerThroughputRecord, ContainerByPort, ContainerTrendPoint, YardDwellRecord, ContainerDirection, FreightManifest } from '~/composables/api'
 
@@ -167,7 +169,7 @@ async function load() {
     avm.containerByPort(),
     avm.containerTrend(60),
     avm.yardDwell({ page_size: 100 }),
-    rail.freight({ page_size: 100 }),
+    rail.freight({ page_size: 100, port_linked: true }),
   ])
 
   if (tpRes.status === 'fulfilled') rawThroughput.value = tpRes.value.results ?? []

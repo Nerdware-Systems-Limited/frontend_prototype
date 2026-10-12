@@ -5,8 +5,8 @@
     subtitle="KCAA - Certificate of Registration, Certificate of Airworthiness, AOC, noise/insurance/radio certificates, and pilot licences - with renewal tracking"
   >
     <template #actions>
-      <NuxtLink to="/aviation" class="btn">Aviation Overview →</NuxtLink>
-      <NuxtLink to="/aviation/infrastructure" class="btn">Infrastructure →</NuxtLink>
+      <NuxtLink to="/aviation" class="btn">Aviation Overview<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/aviation/infrastructure" class="btn">Infrastructure<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -24,34 +24,8 @@
     <KpiCard label="Registered Aircraft" :value="fmtNum(aircraft.length)" :unavailable="loading || acError" :unavailable-note="loading ? 'Loading…' : 'KCAA feed unavailable'" period="LIVE" description="Live registry" to="#aircraft-registry" />
   </div>
 
-  <!-- Renewals due -->
-  <SectionTitle pill="KCAA · Pending Integration">Renewals Due (Next 90 Days)</SectionTitle>
-  <div id="renewals-due" class="card drill-target">
-    <div class="card-body">
-      <table>
-        <thead>
-          <tr><th>Holder</th><th>Category</th><th>Certificate No.</th><th>Expiry</th><th>Days Left</th><th>Status</th></tr>
-        </thead>
-        <tbody v-if="renewalsDue.length">
-          <tr v-for="l in renewalsPageRows" :key="l.id">
-            <td style="font-weight:600;font-size:12px">{{ holderLabel(l) }}</td>
-            <td><BadgePill variant="info">{{ categoryLabel(l.category) }}</BadgePill></td>
-            <td style="font-family:monospace;font-size:12px">{{ l.certificate_number }}</td>
-            <td style="font-size:12px">{{ fmtDay(l.expiry_date) }}</td>
-            <td :style="{ fontWeight:'700', color: daysLeft(l.expiry_date) <= 14 ? 'var(--danger-fg)' : daysLeft(l.expiry_date) <= 30 ? 'var(--warning-fg)' : 'var(--success-fg)' }">
-              {{ daysLeft(l.expiry_date) }}d
-            </td>
-            <td><BadgePill :variant="statusBadge(l.status)">{{ l.status.replace(/_/g,' ') }}</BadgePill></td>
-          </tr>
-        </tbody>
-        <tbody v-else><tr><td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Renewal tracking has not been integrated from KCAA yet.' }}</td></tr></tbody>
-      </table>
-      <TablePagination
-        :page="renewalsPage" :total-pages="renewalsTotalPages" :total="renewalsTotal"
-        @prev="renewalsPrev" @next="renewalsNext"
-      />
-    </div>
-  </div>
+  <!-- Renewals due: every aviation certificate that is expired or expiring, most urgent first -->
+  <CertificateExpiryPanel id="renewals-due" class="drill-target" title="Renewals due" :sources="['aviation']" storage-key="aviation" style="margin-bottom:16px" />
 
   <!-- Full certificate register -->
   <SectionTitle pill="KCAA · Pending Integration">Certificate / Licence Register</SectionTitle>
@@ -171,12 +145,13 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime, useAviationLicensing } from '~/composables/api'
 import type { Aircraft, Airline, AviationLicensingSummary, AviationLicence, AviationLicenceCategory, AviationLicenceHolderType, AviationLicenceStatus } from '~/composables/api'
 
 const summary   = ref<AviationLicensingSummary | null>(null)
 const licences  = ref<AviationLicence[]>([])
-const renewals  = ref<AviationLicence[]>([])
 const aircraft  = ref<Aircraft[]>([])
 const airlines  = ref<Airline[]>([])
 const loading   = ref(true)
@@ -193,23 +168,21 @@ async function load() {
   const lic = useAviationLicensing()
   const avm = useAviationMaritime()
 
-  const [sumRes, listRes, expRes, acRes, alRes] = await Promise.allSettled([
+  const [sumRes, listRes, acRes, alRes] = await Promise.allSettled([
     lic.summary(),
     lic.list({ page_size: 100 }),
-    lic.expiring(90),
     avm.aircraft({ page_size: 100 }),
     avm.airlines({ page_size: 50 }),
   ])
 
   if (sumRes.status  === 'fulfilled') summary.value = sumRes.value
   if (listRes.status === 'fulfilled') licences.value = (listRes.value as any).results ?? []
-  if (expRes.status  === 'fulfilled') renewals.value = Array.isArray(expRes.value) ? expRes.value : (expRes.value as any).results ?? []
   if (acRes.status   === 'fulfilled') aircraft.value = (acRes.value as any).results ?? []
   if (alRes.status   === 'fulfilled') airlines.value = (alRes.value as any).results ?? []
 
   acError.value = acRes.status === 'rejected'
 
-  if ([sumRes, listRes, expRes].every(r => r.status === 'rejected') && acRes.status === 'rejected')
+  if ([sumRes, listRes].every(r => r.status === 'rejected') && acRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Aviation API.'
 
   loading.value = false
@@ -217,7 +190,6 @@ async function load() {
 
 onMounted(load)
 
-const renewalsDue = computed(() => [...renewals.value].sort((a, b) => daysLeft(a.expiry_date) - daysLeft(b.expiry_date)))
 
 const filteredLicences = computed(() => licences.value.filter(l => {
   if (categoryFilter.value && l.category !== categoryFilter.value) return false
@@ -227,10 +199,6 @@ const filteredLicences = computed(() => licences.value.filter(l => {
 }))
 
 // ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: renewalsPageRows, page: renewalsPage, totalPages: renewalsTotalPages,
-  total: renewalsTotal, next: renewalsNext, prev: renewalsPrev,
-} = usePagination(renewalsDue, 15)
 
 const {
   pageRows: licencesPageRows, page: licencesPage, totalPages: licencesTotalPages,

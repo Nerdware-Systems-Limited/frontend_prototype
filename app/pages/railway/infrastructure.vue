@@ -5,8 +5,8 @@
     subtitle="KRC - Track section condition, level crossings, signalling, culverts, and the capital works pipeline"
   >
     <template #actions>
-      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory →</NuxtLink>
-      <NuxtLink to="/railway/safety" class="btn">Rail Safety →</NuxtLink>
+      <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/railway/safety" class="btn">Rail Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
@@ -265,6 +265,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useRailway, useRailInfrastructure } from '~/composables/api'
 import type { RailLine, TrackSection, LevelCrossing, RailCapitalWork, RailCulvert, RailSignal } from '~/composables/api'
 

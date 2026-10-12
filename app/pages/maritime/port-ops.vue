@@ -12,8 +12,8 @@
           {{ p.port_name }}
         </option>
       </select>
-      <NuxtLink to="/maritime/cargo" class="btn">Cargo →</NuxtLink>
-      <NuxtLink to="/maritime/performance" class="btn">Performance & Ranking →</NuxtLink>
+      <NuxtLink to="/maritime/cargo" class="btn">Cargo<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
+      <NuxtLink to="/maritime/performance" class="btn">Performance & Ranking<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
@@ -142,8 +142,7 @@
 
   <!-- Berth occupancy table -->
   <SectionTitle pill="KPA · Berth Registry">Port &amp; Berth Map</SectionTitle>
-  <div class="card map-card">
-    <div class="card-header">Ports with Berth Counts</div>
+  <CollapsibleSection class="card map-card" title="Ports with Berth Counts" storage-key="map:maritime/port-ops">
     <ClientOnly>
       <UaptsMap
         :markers="portMarkers"
@@ -152,7 +151,7 @@
         height="380px"
       />
     </ClientOnly>
-  </div>
+  </CollapsibleSection>
 
   <SectionTitle pill="KPA · Berth Registry">Berth Directory & Status</SectionTitle>
 
@@ -250,6 +249,8 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
+
+import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Berth } from '~/composables/api'
 
