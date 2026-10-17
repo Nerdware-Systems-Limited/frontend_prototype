@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Compliance & Governance"
     title="Audit Trail"
-    subtitle="Full platform audit log - every user action, data change, and system event across all modules"
+    :subtitle="scopeSubtitle"
   >
     <template #actions>
       <ExportButton
@@ -14,6 +14,12 @@
     </template>
   </PageHeader>
 
+  <div v-if="isSuperAdmin && chainEnabled" class="chain-bar">
+    <button class="btn" :disabled="verifying" @click="verifyChain">{{ verifying ? 'Verifying…' : 'Verify log integrity' }}</button>
+    <span v-if="chain && chain.ok" class="chain-ok">✔ Chain intact - {{ fmtNum(chain.checked) }} entries verified</span>
+    <span v-else-if="chain" class="chain-bad">✖ Chain broken at entry {{ chain.broken_at ?? '?' }}: {{ chain.reason }}</span>
+  </div>
+
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- WebSocket status -->
@@ -23,7 +29,7 @@
 
   <!-- Filter bar -->
   <div class="filter-bar filter-bar--grid">
-    <input v-model="filters.user_id" class="select-sm filter-input filter-span" placeholder="User ID (UUID)…" aria-label="Filter by user ID" @change="reload" />
+    <input v-if="isSuperAdmin || isAgencyAdmin" v-model="filters.user_id" class="select-sm filter-input filter-span" placeholder="User ID (UUID)…" aria-label="Filter by user ID" @change="reload" />
     <select v-model="filters.action" class="select-sm filter-select" aria-label="Filter by action" @change="reload">
       <option value="">All actions</option>
       <option v-for="a in actionOptions" :key="a.value" :value="a.value">{{ a.label }}</option>
@@ -49,6 +55,14 @@
     <span class="result-count filter-span">Showing {{ entries.length }} of {{ fmtNum(total) }}</span>
   </div>
 
+  <!-- Active pivot chips -->
+  <div v-if="activePivots.length" class="pivot-chips">
+    <span class="filter-label">Pivot:</span>
+    <button v-for="p in activePivots" :key="p.key" class="pivot-chip" :title="`Remove ${p.label} filter`" @click="clearPivot(p.key)">
+      {{ p.label }}: <code>{{ p.value }}</code> ✕
+    </button>
+  </div>
+
   <!-- Audit table -->
   <div class="card">
     <div class="card-body">
@@ -68,7 +82,7 @@
           <!-- One loop, two rows per entry: the diff row has to sit directly
                under the entry it belongs to, not after the last entry. -->
           <template v-for="e in entries" :key="e.id">
-            <tr class="audit-row" :class="{ 'is-open': expanded === e.id && entryDiffKeys(e).length }" @click="toggleExpand(e)">
+            <tr class="audit-row" :class="{ 'is-open': expanded === e.id && entryDiffKeys(e).length }" @click="openDetail(e)">
               <!-- Timestamp: API field is created_at -->
               <td class="cell-time stack-title">{{ fmtTime(entryField(e, 'created_at') ?? e.timestamp) }}</td>
               <!-- User: username (nullable) → user_id → 'System' -->
@@ -98,7 +112,7 @@
               <td class="cell-ip" data-label="IP Address">{{ entryField(e, 'ip_address') ?? '-' }}</td>
               <!-- Changes: built from old_values / new_values diff -->
               <td class="cell-changes" data-label="Changes">
-                <span v-if="entryDiffKeys(e).length" class="diff-toggle">{{ expanded === e.id ? '▾' : '▸' }} {{ entryDiffKeys(e).length }} fields</span>
+                <span v-if="entryDiffKeys(e).length" class="diff-toggle" role="button" tabindex="0" @click.stop="toggleExpand(e)" @keydown.enter.stop="toggleExpand(e)">{{ expanded === e.id ? '▾' : '▸' }} {{ entryDiffKeys(e).length }} fields</span>
                 <span v-else class="dim">-</span>
               </td>
             </tr>
@@ -132,28 +146,116 @@
       </div>
     </div>
   </div>
+
+  <!-- Row detail drawer -->
+  <SideDrawer :open="!!selected" :title="selected ? `${selected.action} · ${selected.outcome || 'unknown'}` : ''"
+              :subtitle="selected ? fmtTime(selected.created_at) : ''" @close="selected = null">
+    <template v-if="selected">
+      <p v-if="selected.description" class="dr-desc">{{ selected.description }}</p>
+
+      <section class="dr-sec">
+        <h3>Who</h3>
+        <dl>
+          <dt>User</dt><dd>{{ entryUser(selected) }}</dd>
+          <template v-if="selected.actor_type"><dt>Actor type</dt><dd>{{ selected.actor_type }}</dd></template>
+          <template v-if="selected.attempted_username"><dt>Attempted login</dt><dd>{{ selected.attempted_username }}</dd></template>
+          <template v-if="selected.impersonator_username || selected.impersonator_id">
+            <dt>Impersonated by</dt><dd class="dr-warn">{{ selected.impersonator_username || selected.impersonator_id }}</dd>
+          </template>
+          <template v-if="selected.token_jti"><dt>Token (jti)</dt><dd><code>{{ selected.token_jti }}</code></dd></template>
+        </dl>
+      </section>
+
+      <section class="dr-sec">
+        <h3>What</h3>
+        <dl>
+          <dt>Severity</dt><dd><span :style="{ color: severityColor(selected.severity) }">{{ selected.severity || '-' }}</span></dd>
+          <template v-if="selected.resource_type || selected.resource_repr">
+            <dt>Resource</dt><dd>{{ selected.resource_repr || selected.resource_type }}
+              <span v-if="selected.resource_type && selected.resource_repr" class="dim">({{ selected.resource_type }})</span></dd>
+          </template>
+          <template v-if="selected.resource_id"><dt>Resource ID</dt><dd><code>{{ selected.resource_id }}</code></dd></template>
+          <template v-if="selected.changed_fields?.length"><dt>Changed fields</dt><dd>{{ selected.changed_fields.join(', ') }}</dd></template>
+        </dl>
+      </section>
+
+      <section class="dr-sec">
+        <h3>Request</h3>
+        <dl>
+          <dt>Method · Status</dt><dd>{{ selected.request_method || '-' }} {{ selected.status_code ?? '' }}</dd>
+          <dt>Path</dt><dd class="dr-wrap"><code>{{ selected.request_path || '-' }}{{ selected.request_query ? '?' + selected.request_query : '' }}</code></dd>
+          <template v-if="selected.view_name"><dt>View</dt><dd>{{ selected.view_name }}</dd></template>
+          <template v-if="selected.origin"><dt>Origin</dt><dd>{{ selected.origin }}</dd></template>
+          <template v-if="selected.response_time != null"><dt>Response time</dt><dd>{{ Math.round(selected.response_time * 1000) }} ms</dd></template>
+          <template v-if="selected.request_id"><dt>Request ID</dt><dd><code>{{ selected.request_id }}</code></dd></template>
+        </dl>
+      </section>
+
+      <section class="dr-sec">
+        <h3>Where from</h3>
+        <dl>
+          <dt>IP</dt><dd>{{ selected.ip_address || '-' }}<span v-if="selected.ip_is_private" class="dim"> (private)</span></dd>
+          <template v-if="selected.geo_country || selected.geo_city"><dt>Location</dt><dd>{{ [selected.geo_city, selected.geo_country].filter(Boolean).join(', ') }}</dd></template>
+          <template v-if="selected.asn"><dt>ASN</dt><dd>{{ selected.asn }}</dd></template>
+          <template v-if="selected.browser || selected.os || selected.device_type">
+            <dt>Client</dt><dd>{{ [selected.browser, selected.os, selected.device_type].filter(Boolean).join(' · ') }}</dd>
+          </template>
+          <template v-if="selected.user_agent"><dt>User agent</dt><dd class="dr-wrap dim">{{ selected.user_agent }}</dd></template>
+        </dl>
+      </section>
+
+      <section v-if="entryDiffKeys(selected).length" class="dr-sec">
+        <h3>Changes</h3>
+        <table class="diff-table">
+          <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>
+            <tr v-for="f in entryDiffKeys(selected)" :key="f">
+              <td class="diff-field">{{ f }}</td>
+              <td class="diff-before">{{ JSON.stringify(entryField(selected,'old_values')?.[f] ?? null) }}</td>
+              <td class="diff-after">{{ JSON.stringify(entryField(selected,'new_values')?.[f] ?? null) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <JsonViewer v-if="hasMetadata(selected)" :value="selected.metadata" label="Metadata" collapsible />
+    </template>
+
+    <template #footer>
+      <div v-if="selected" class="dr-pivots">
+        <span class="filter-label">Show all…</span>
+        <button v-if="selected.request_id" class="btn" @click="pivot('request_id', selected.request_id)">from this request</button>
+        <button v-if="selected.token_jti" class="btn" @click="pivot('token_jti', selected.token_jti)">from this token</button>
+        <button v-if="selected.resource_type && selected.resource_id" class="btn" @click="pivotResource(selected)">on this resource</button>
+        <button v-if="canPivotUser && selected.user_id && selected.user_id !== 'None'" class="btn" @click="pivot('user_id', selected.user_id)">by this user</button>
+        <button v-if="selected.ip_address" class="btn" @click="pivot('ip_address', selected.ip_address)">from this IP</button>
+      </div>
+    </template>
+  </SideDrawer>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
 import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
-// Known gap, not fixed here: unlike /users.vue and /roles.vue, this page is
-// NOT scoped to the viewer's own agency - every admin sees the full
-// platform-wide audit log. Scoping it properly needs backend support that
-// doesn't exist yet: `AuditQuery` (useAudit.ts) has no `agency`/`agency_code`
-// filter param (confirmed against the real `_build_queryset()` params), and
-// `AuditEntry` carries no agency field per row to filter by client-side
-// either - only `user_id`/`username`. A client-side "filter by whether
-// user_id belongs to my agency's roster" approximation was considered and
-// rejected: it would silently misattribute system/anonymous events and any
-// user who has since changed agencies, which is worse than the honest
-// platform-wide view this page already shows. Revisit once the backend adds
-// per-entry agency attribution or an `agency` query param.
+// Visibility is enforced by the backend (apps/audit/views.py
+// scope_audit_queryset): super_admin sees the whole platform, an agency admin
+// sees every user in their own agency, everyone else sees only their own
+// entries. The page just reflects that in its wording, user-ID filter and
+// live feed (the full /ws/audit/ feed is super_admin only; others get /me/).
 import { useAudit } from '~/composables/api'
-import type { AuditEntry, AuditQuery } from '~/composables/api'
+import type { AuditChainStatus, AuditEntry, AuditQuery } from '~/composables/api'
+import { isUnscopedAdmin } from '~/composables/useAgencyScope'
 import { useAuditSocket } from '~/composables/useAuditSocket'
 import type { AuditLog } from '~/composables/useAuditSocket'
+
+const { user: viewer } = useAuth()
+const isSuperAdmin  = computed(() => isUnscopedAdmin(viewer.value as any))
+const isAgencyAdmin = computed(() => !isSuperAdmin.value && (viewer.value as any)?.role_type === 'admin')
+const scopeSubtitle = computed(() =>
+  isSuperAdmin.value  ? 'Full platform audit log - every user action, data change, and system event across all agencies'
+  : isAgencyAdmin.value ? `Audit log for ${(viewer.value as any)?.agency_code || 'your agency'} - every action by users in your agency`
+  : 'Your audit trail - the actions you have performed and the events on your account')
 
 const entries  = ref<AuditEntry[]>([])
 const total    = ref(0)
@@ -179,25 +281,16 @@ const filters = ref({
   outcome:       '',
   since:         '',
   until:         '',
+  // Pivot filters - set from the row drawer, shown as removable chips.
+  resource_id:   '',
+  request_id:    '',
+  token_jti:     '',
+  ip_address:    '',
 })
 
-// AuditLog.Severity / AuditLog.Outcome choices (apps/audit/models.py) - no
-// backend "choices" endpoint exists for these (only /audit/actions/ does),
-// so mirrored here directly. Order matches the model's TextChoices order.
-const severityOptions = [
-  { value: 'debug',    label: 'Debug' },
-  { value: 'info',     label: 'Info' },
-  { value: 'notice',   label: 'Notice' },
-  { value: 'warning',  label: 'Warning' },
-  { value: 'critical', label: 'Critical' },
-]
-const outcomeOptions = [
-  { value: 'success', label: 'Success' },
-  { value: 'failure', label: 'Failure' },
-  { value: 'denied',  label: 'Denied' },
-  { value: 'error',   label: 'Error' },
-  { value: 'unknown', label: 'Unknown' },
-]
+// Severity / outcome / action choices come from /audit/meta/ (see loadMeta).
+const severityOptions = ref<Array<{ value: string; label: string }>>([])
+const outcomeOptions  = ref<Array<{ value: string; label: string }>>([])
 // Server default page size is small (10-20 rows) unless `limit` is passed
 // explicitly - this is what was making the log feel like it was missing entries.
 const pageSize = ref(15)
@@ -224,6 +317,10 @@ async function load() {
   if (filters.value.outcome)       q.outcome       = filters.value.outcome
   if (filters.value.since)         q.since         = filters.value.since
   if (filters.value.until)         q.until         = filters.value.until
+  if (filters.value.resource_id)   q.resource_id   = filters.value.resource_id
+  if (filters.value.request_id)    q.request_id    = filters.value.request_id
+  if (filters.value.token_jti)     q.token_jti     = filters.value.token_jti
+  if (filters.value.ip_address)    q.ip_address    = filters.value.ip_address
 
   try {
     applyPage(await useAudit().list(q))
@@ -253,19 +350,34 @@ async function loadUrl(absoluteUrl: string) {
 function reload() { load() }
 
 function resetFilters() {
-  filters.value = { user_id: '', action: '', resource_type: '', severity: '', outcome: '', since: '', until: '' }
+  filters.value = { user_id: '', action: '', resource_type: '', severity: '', outcome: '', since: '', until: '', resource_id: '', request_id: '', token_jti: '', ip_address: '' }
   reload()
 }
 
-// Action filter options - fetched from the real backend rather than
-// hardcoded, so this never drifts from the actual set of audited actions.
+// Filter options + hash-chain status - fetched from the backend rather than
+// hardcoded, so they never drift from the model's choices.
 const actionOptions = ref<Array<{ value: string; label: string }>>([])
-async function loadActions() {
-  try { actionOptions.value = await useAudit().actions() } catch { /* keep dropdown empty on failure */ }
+const chain = ref<AuditChainStatus | null>(null)
+const chainEnabled = ref(false)
+const verifying = ref(false)
+async function loadMeta() {
+  try {
+    const m = await useAudit().meta()
+    actionOptions.value  = m.actions
+    severityOptions.value = m.severities
+    outcomeOptions.value  = m.outcomes
+    chainEnabled.value    = m.hash_chain_enabled
+  } catch { /* leave dropdowns empty on failure */ }
+}
+async function verifyChain() {
+  verifying.value = true
+  try { chain.value = (await useAudit().meta({ verify: true })).chain ?? null }
+  catch { chain.value = { ok: false, checked: 0, broken_at: null, reason: 'Verification request failed.' } }
+  finally { verifying.value = false }
 }
 
 onMounted(() => load())
-onMounted(loadActions)
+onMounted(loadMeta)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(() => load(), 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
@@ -278,7 +390,7 @@ onUnmounted(() => { if (t) clearInterval(t) })
 // useAuditSocket.ts for why a bare onUnmounted(disconnect) only stays safe
 // as long as it's used directly like this, in exactly one component.
 const { logs: liveLogs, isConnected: streamConnected, error: streamError, connect, disconnect }
-  = useAuditSocket()
+  = useAuditSocket(undefined, !isSuperAdmin.value)
 
 onMounted(connect)
 onUnmounted(disconnect)
@@ -290,7 +402,8 @@ const isDefaultView = computed(() =>
   page.value === 1 &&
   !filters.value.user_id && !filters.value.action &&
   !filters.value.resource_type && !filters.value.severity && !filters.value.outcome &&
-  !filters.value.since && !filters.value.until,
+  !filters.value.since && !filters.value.until &&
+  !filters.value.resource_id && !filters.value.request_id && !filters.value.token_jti && !filters.value.ip_address,
 )
 
 watch(
@@ -340,6 +453,39 @@ const exportRows = computed(() => entries.value.map(e => ({
   status_code: entryField(e, 'status_code'),
   ip_address: entryField(e, 'ip_address'),
 })))
+
+// ── Row detail drawer + pivots ───────────────────────────────────────────
+// The list endpoint already returns every serializer field, so the drawer
+// renders straight from the row. Pivots just set a server-side filter (all
+// still bounded by the viewer's scope) and reload.
+const selected = ref<AuditEntry | null>(null)
+const canPivotUser = computed(() => isSuperAdmin.value || isAgencyAdmin.value)
+function openDetail(e: AuditEntry) { selected.value = e }
+function hasMetadata(e: AuditEntry) { return !!e.metadata && Object.keys(e.metadata).length > 0 }
+
+type PivotKey = 'request_id' | 'token_jti' | 'user_id' | 'ip_address' | 'resource_id'
+function pivot(key: PivotKey, value: string) {
+  filters.value[key] = value
+  selected.value = null
+  reload()
+}
+function pivotResource(e: AuditEntry) {
+  filters.value.resource_type = e.resource_type
+  pivot('resource_id', e.resource_id)
+}
+const PIVOT_LABELS: Record<string, string> = {
+  request_id: 'Request', token_jti: 'Token', ip_address: 'IP', resource_id: 'Resource ID',
+}
+const activePivots = computed(() =>
+  (Object.keys(PIVOT_LABELS) as PivotKey[])
+    .filter(k => filters.value[k])
+    .map(k => ({ key: k, label: PIVOT_LABELS[k], value: filters.value[k] })),
+)
+function clearPivot(key: string) {
+  ;(filters.value as Record<string, string>)[key] = ''
+  if (key === 'resource_id') filters.value.resource_type = ''
+  reload()
+}
 
 // ── Field-access helpers (bridge REST AuditEntry ↔ raw API shape) ────────
 // The REST serializer uses snake_case field names that may not be typed on
@@ -416,6 +562,23 @@ function fmtNum(v: number) {
 </script>
 
 <style scoped>
+.chain-bar { display:flex; align-items:center; gap:10px; margin:0 0 10px; font-size:13px; }
+.chain-ok { color:var(--success-fg); }
+.chain-bad { color:var(--danger-fg); font-weight:600; }
+.pivot-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 10px; }
+.pivot-chip { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid var(--border-strong); background:var(--primary-wash); color:var(--fg-1); cursor:pointer; }
+.pivot-chip code { font-size:11px; }
+.diff-toggle { cursor:pointer; }
+.dr-desc { margin:0 0 12px; color:var(--fg-2); font-size:13px; }
+.dr-sec { margin-bottom:16px; }
+.dr-sec h3 { margin:0 0 6px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--fg-2); }
+.dr-sec dl { display:grid; grid-template-columns:120px 1fr; gap:4px 10px; margin:0; font-size:13px; }
+.dr-sec dt { color:var(--fg-2); }
+.dr-sec dd { margin:0; overflow-wrap:anywhere; }
+.dr-warn { color:var(--warning-fg); font-weight:600; }
+.dr-wrap { word-break:break-all; }
+.dr-pivots { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+
 /* Filter bar - every control gets min-width:0 so it can actually shrink
    below its content's natural width (the flexbox default is min-width:auto,
    which silently blocks shrinking and forces the row to wrap awkwardly

@@ -78,7 +78,7 @@ function buildUrl(baseUrl: string, token: string | null): string {
   return url.toString()
 }
 
-export function useAuditSocket(urlOverride?: string) {
+export function useAuditSocket(urlOverride?: string, personal = false) {
   const config = useRuntimeConfig()
   const authStore = useAuthStore()
 
@@ -96,7 +96,11 @@ export function useAuditSocket(urlOverride?: string) {
 
   // wsUrl() is currently a passthrough - see its own docstring for why
   // WebSockets connect straight to the backend instead of through the dev proxy.
-  const baseUrl = wsUrl(urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase())
+  // `personal` swaps the full platform feed (/ws/audit/, super_admin only on
+  // the backend) for the own-rows-only feed (/ws/audit/me/, any user).
+  let rawUrl = urlOverride || (config.public.wsUrl as string) || deriveUrlFromApiBase()
+  if (personal && !/\/me\/?$/.test(rawUrl)) rawUrl = rawUrl.replace(/\/?$/, '/') + 'me/'
+  const baseUrl = wsUrl(rawUrl)
 
   const logs = ref<AuditLog[]>([])
   const metrics = ref<Metrics | null>(null)

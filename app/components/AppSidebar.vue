@@ -74,6 +74,7 @@
           Road Infrastructure<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
+          <NuxtLink v-if="canSee('/infrastructure/overview')" class="sidebar-link" to="/infrastructure/overview" :class="{ active: isActive('/infrastructure/overview') }">Overview</NuxtLink>
           <NuxtLink v-if="canSee('/infrastructure')" class="sidebar-link" to="/infrastructure" :class="{ active: isActive('/infrastructure') }">Road Network Inventory</NuxtLink>
           <NuxtLink v-if="canSee('/infrastructure/projects')" class="sidebar-link" to="/infrastructure/projects" :class="{ active: isActive('/infrastructure/projects') }">Road Infrastructure Status</NuxtLink>
           <NuxtLink v-if="canSee('/infrastructure/bridges')" class="sidebar-link" to="/infrastructure/bridges" :class="{ active: isActive('/infrastructure/bridges') }">Bridges & Assets</NuxtLink>
@@ -87,6 +88,7 @@
           Aviation<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
+          <NuxtLink v-if="canSee('/aviation/overview')" class="sidebar-link" to="/aviation/overview" :class="{ active: isActive('/aviation/overview') }">Overview</NuxtLink>
           <NuxtLink v-if="canSee('/aviation')" class="sidebar-link" to="/aviation" :class="{ active: isActive('/aviation') }">Flight Movements</NuxtLink>
           <NuxtLink v-if="canSee('/aviation/flights')" class="sidebar-link" to="/aviation/flights" :class="{ active: isActive('/aviation/flights') }">Flight Log</NuxtLink>
           <NuxtLink v-if="canSee('/aviation/passenger-stats')" class="sidebar-link" to="/aviation/passenger-stats" :class="{ active: isActive('/aviation/passenger-stats') }">Passenger Stats</NuxtLink>
@@ -101,6 +103,7 @@
           Maritime<span class="sidebar-caret">▾</span>
         </summary>
         <div class="sidebar-group-items">
+          <NuxtLink v-if="canSee('/maritime/overview')" class="sidebar-link" to="/maritime/overview" :class="{ active: isActive('/maritime/overview') }">Overview</NuxtLink>
           <NuxtLink v-if="canSee('/maritime')" class="sidebar-link" to="/maritime" :class="{ active: isActive('/maritime') }">Vessel Movements</NuxtLink>
           <NuxtLink v-if="canSee('/maritime/vessels')" class="sidebar-link" to="/maritime/vessels" :class="{ active: isActive('/maritime/vessels') }">Vessel Registry</NuxtLink>
           <NuxtLink v-if="canSee('/maritime/port-ops')" class="sidebar-link" to="/maritime/port-ops" :class="{ active: isActive('/maritime/port-ops') }">Port Operations</NuxtLink>
@@ -128,6 +131,20 @@
           <NuxtLink v-if="canSee('/railway/infrastructure')" class="sidebar-link" to="/railway/infrastructure" :class="{ active: isActive('/railway/infrastructure') }">Rail Infrastructure</NuxtLink>
           <NuxtLink v-if="canSee('/railway/network-inventory')" class="sidebar-link" to="/railway/network-inventory" :class="{ active: isActive('/railway/network-inventory') }">Rail Network Inventory</NuxtLink>
           <NuxtLink v-if="canSee('/railway/safety')" class="sidebar-link" to="/railway/safety" :class="{ active: isActive('/railway/safety') }">Rail Safety</NuxtLink>
+        </div>
+      </details>
+
+      <!-- M15 · Corridor & Trade - /api/v1/corridor/* (NCTTCA · KenTrade · LAPSSET) -->
+      <details v-if="canSeeModule('M15')" class="sidebar-group" :open="groupIsOpen('/corridor')">
+        <summary class="sidebar-group-title">
+          Corridor &amp; Trade<span class="sidebar-caret">▾</span>
+        </summary>
+        <div class="sidebar-group-items">
+          <NuxtLink v-if="canSee('/corridor')" class="sidebar-link" to="/corridor" :class="{ active: isActive('/corridor') }">Overview</NuxtLink>
+          <NuxtLink v-if="canSee('/corridor/northern')" class="sidebar-link" to="/corridor/northern" :class="{ active: isActive('/corridor/northern') }">Northern Corridor</NuxtLink>
+          <NuxtLink v-if="canSee('/corridor/border-crossings')" class="sidebar-link" to="/corridor/border-crossings" :class="{ active: isActive('/corridor/border-crossings') }">Border Crossings</NuxtLink>
+          <NuxtLink v-if="canSee('/corridor/transit')" class="sidebar-link" to="/corridor/transit" :class="{ active: isActive('/corridor/transit') }">Transit Declarations</NuxtLink>
+          <NuxtLink v-if="canSee('/corridor/lapsset')" class="sidebar-link" to="/corridor/lapsset" :class="{ active: isActive('/corridor/lapsset') }">LAPSSET Corridor</NuxtLink>
         </div>
       </details>
 

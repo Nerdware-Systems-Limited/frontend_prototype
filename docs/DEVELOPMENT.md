@@ -57,7 +57,7 @@ root `tsconfig.json` references.
 
 ## 4. Testing
 
-State at the time of writing: **51 files, 747 tests, all passing** (`npm test`, about 20 s).
+State at the time of writing: **57 files, 813 tests, all passing** (`npm test`, about 15 s).
 
 - **Environment.** Vitest with `happy-dom` and `globals: true`. `tests/integration/**` runs under `node` because
   happy-dom's fetch strips `Authorization` on cross-origin requests.

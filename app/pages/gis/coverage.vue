@@ -14,7 +14,7 @@
 
   <div class="ih-ribbon">
     <KpiTile label="Expected layers" :value="cov?.total ?? ''" :state="kpi" sub="active requirements in scope" />
-    <KpiTile label="Complete" :value="cov ? fmtPct(cov.complete_pct) : ''" :state="kpi" :sub="cov ? `${cov.uploaded} uploaded` : ''" />
+    <KpiTile label="Complete" :value="cov ? fmtGisPct(cov.complete_pct) : ''" :state="kpi" :sub="cov ? `${cov.uploaded} uploaded` : ''" />
     <KpiTile label="Missing" :value="cov?.missing ?? ''" :state="kpi" sub="nobody asked yet" />
     <KpiTile label="In progress" :value="cov ? cov.requested + cov.processing : ''" :state="kpi" :sub="cov ? `${cov.requested} requested · ${cov.processing} processing` : ''" />
     <KpiTile label="Failed" :value="cov?.failed ?? ''" :state="kpi" sub="needs a retry or a new file" />
@@ -98,7 +98,7 @@
 
 <script setup lang="ts">
 import { useGisLayers, type GeoLayerRequirement, type GisCoverage, type RequirementStatus } from '~/composables/api/useGisLayers'
-import { fmtDate, fmtInt, fmtPct, GEOM_LABEL, REQ_BADGE, share } from '~/utils/gisFormat'
+import { fmtDate, fmtInt, fmtGisPct, GEOM_LABEL, REQ_BADGE, share } from '~/utils/gisFormat'
 
 definePageMeta({ layout: 'default' })
 useHead({ title: 'GIS Layer Coverage' })

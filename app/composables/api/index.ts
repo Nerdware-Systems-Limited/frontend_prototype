@@ -91,3 +91,12 @@ export { useMaritimeWaterways, type WaterwayCategory, type Waterway, type Waterw
 export { useMaritimeGreenTransport, type VesselFuelType, type VesselEmissionRecord, type EVFleetVehicleType, type EVFleetRecord, type GreenModeWaterStat, type GreenModeEvStat, type GreenTransportModeStat, type ReeferEnergyRecord, type GreenSummaryPort, type MaritimeGreenSummary, type MaritimeGreenQuery } from './useMaritimeGreenTransport'
 export { useMaritimePerformance, type PerformanceSummaryPort, type MaritimePerformanceSummary, type TrackedKpiField, type PortPerformanceKpi, type RankingCategory, type PortRankingScore, type MaritimeRanking, RANK_WEIGHTS } from './useMaritimePerformance'
 export { useTraining, type TrainingCourse, type TrainingCohort, type TrainingEnrollment, type TrainingCompletion, type TrainingSession, type TrainingAttendance, type TrainingRevenue, type CourseCategory, type DeliveryMode, type CertificationBody, type CohortStatus, type EnrollmentStatus, type PaymentStatus, type CompletionOutcome, type RevenueStream, type PaymentMethod, type SessionType, type AttendanceStatus, type TrainingQuery } from './useTraining'
+export {
+  useCorridor, kpiCardBind,
+  kpiKind, benchmarkTone, changeFavourable, fmtNum as fmtCorridorNum, fmtKpi, fmtHours, fmtKes, alignmentLines, CORRIDOR_LINE_COLOR, monthLabel, waitTone,
+  STATUS_VARIANT as CORRIDOR_STATUS_VARIANT, STATUS_LABEL as CORRIDOR_STATUS_LABEL, CAUSE_LABEL as CORRIDOR_CAUSE_LABEL, TONE_COLOR as CORRIDOR_TONE_COLOR,
+  type Corridor, type CorridorCode, type CorridorAlignment, type CorridorSummary, type CorridorCompareRow,
+  type KpiSeries, type KpiPoint, type KpiKind, type Tone as CorridorTone,
+  type BorderPostStatus, type BorderCrossingDay, type BorderTrendPoint, type DelayCauseRow, type DelayCause,
+  type TransitShipment, type TransitSummary, type CustomsStatus, type ShipmentQuery, type BorderCrossingQuery,
+} from './useCorridor'

@@ -18,7 +18,7 @@
       <KpiTile :label="measureLabel" :value="fmtMeasure(sum?.totals.measure, sum?.totals.unit)" :state="sumState" :sub="sum?.totals.unit ? 'computed on the ellipsoid' : 'points have no extent'" />
       <KpiTile label="Skipped" :value="fmtInt(layer.error_count)" :state="sumState" sub="failed validation" />
       <KpiTile label="Filtered out" :value="fmtInt(layer.filtered_count)" :state="sumState" :sub="describeFilter(layer.row_filter) || 'no row filter'" />
-      <KpiTile label="Attribute completeness" :value="fmtPct(avgFilled)" :state="sumState" :sub="`${sum?.fields.length ?? 0} attributes`" />
+      <KpiTile label="Attribute completeness" :value="fmtGisPct(avgFilled)" :state="sumState" :sub="`${sum?.fields.length ?? 0} attributes`" />
     </div>
 
     <div class="card"><div class="card-body meta-grid">
@@ -81,7 +81,7 @@
               <td data-label="Attribute"><code>{{ f.name }}</code></td>
               <td data-label="Kind"><BadgePill size="sm" :variant="f.kind === 'numeric' ? 'info' : f.kind === 'categorical' ? 'success' : 'neutral'">{{ f.kind }}</BadgePill></td>
               <td data-label="Distinct">{{ f.kind === 'empty' ? '-' : f.distinct >= 40 ? '40+' : f.distinct }}</td>
-              <td data-label="Filled">{{ fmtInt(f.filled) }} · {{ fmtPct(f.filled_pct) }}</td>
+              <td data-label="Filled">{{ fmtInt(f.filled) }} · {{ fmtGisPct(f.filled_pct) }}</td>
               <td data-label="Completeness"><ProgressBar :pct="f.filled_pct" :variant="f.filled_pct >= 95 ? 'success' : f.filled_pct >= 70 ? 'warning' : 'danger'" :label="`${f.name} completeness`" /></td>
             </tr>
           </tbody>
@@ -142,7 +142,7 @@
 <script setup lang="ts">
 import { useGisLayers, type GeoLayer, type LayerFeatures, type LayerSummary } from '~/composables/api/useGisLayers'
 import { describeFilter } from '~/utils/gisFile'
-import { fmtBbox, fmtDate, fmtInt, fmtMeasure, fmtPct, GEOM_LABEL, LAYER_BADGE, share } from '~/utils/gisFormat'
+import { fmtBbox, fmtDate, fmtInt, fmtMeasure, fmtGisPct, GEOM_LABEL, LAYER_BADGE, share } from '~/utils/gisFormat'
 
 definePageMeta({ layout: 'default' })
 

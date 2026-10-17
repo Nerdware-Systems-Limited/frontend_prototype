@@ -16,7 +16,7 @@
     <KpiTile label="Layers loaded" :value="readyCount" :state="kpi" :sub="`of ${reqs.length} expected`" />
     <KpiTile label="Features" :value="fmtInt(totalFeatures)" :state="kpi" sub="across loaded layers" />
     <KpiTile label="Line network" :value="fmtMeasure(totalKm, 'km')" :state="summariesLoading ? 'loading' : kpi" sub="sum of line layers (layers overlap)" />
-    <KpiTile label="Data quality" :value="fmtPct(avgFilled)" :state="summariesLoading ? 'loading' : kpi" sub="avg attribute completeness" />
+    <KpiTile label="Data quality" :value="fmtGisPct(avgFilled)" :state="summariesLoading ? 'loading' : kpi" sub="avg attribute completeness" />
   </div>
 
   <FilterBar>
@@ -54,7 +54,7 @@
           <div><span class="ov-label">{{ unitLabel(r) }}</span>
             <span class="ov-val">{{ sums[r.layer.id] ? fmtMeasure(sums[r.layer.id].totals.measure, sums[r.layer.id].totals.unit) : summaryFailed[r.layer.id] ? '-' : '…' }}</span></div>
           <div><span class="ov-label">Complete</span>
-            <span class="ov-val">{{ sums[r.layer.id] ? fmtPct(avgOf(sums[r.layer.id])) : '…' }}</span></div>
+            <span class="ov-val">{{ sums[r.layer.id] ? fmtGisPct(avgOf(sums[r.layer.id])) : '…' }}</span></div>
         </div>
 
         <div v-if="sums[r.layer.id] && topBreakdown(sums[r.layer.id])" class="ov-bars">
@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import { useGisLayers, type GeoLayerRequirement, type LayerSummary } from '~/composables/api/useGisLayers'
-import { fmtDate, fmtInt, fmtMeasure, fmtPct, GEOM_LABEL, REQ_BADGE, share } from '~/utils/gisFormat'
+import { fmtDate, fmtInt, fmtMeasure, fmtGisPct, GEOM_LABEL, REQ_BADGE, share } from '~/utils/gisFormat'
 
 definePageMeta({ layout: 'default' })
 useHead({ title: 'GIS Layer Overview' })

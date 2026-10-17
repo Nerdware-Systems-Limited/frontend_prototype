@@ -65,7 +65,7 @@ Anything denied redirects to the safe space (`/dashboard`, in restricted mode), 
 
 ## What each agency can access
 
-Module codes are the same M01 to M14 codes used throughout the codebase; see `README.md`'s page map for the full route list per module. "Full" means read and write; "read" means view only. Every agency also gets `/notifications` at least read-only and `/dashboard` at least read-only, via baseline routes or an explicit grant, not repeated per row below.
+Module codes are the same M01 to M15 codes used throughout the codebase; see `README.md`'s page map for the full route list per module. "Full" means read and write; "read" means view only. Every agency also gets `/notifications` at least read-only and `/dashboard` at least read-only, via baseline routes or an explicit grant, not repeated per row below.
 
 | Agency | Full name | Domain(s) | Seeded tiers | Full access | Read-only extras | Explicitly denied |
 | --- | --- | --- | --- | --- | --- | --- |

@@ -48,7 +48,7 @@ classified, so a new page or module cannot silently fall outside the policy.
 defaults      safeSpace {route, mode}, denyRedirect, newAccountTier, failClosed, baselineRoutes
 roles         tier number + bypassScope / capabilities / crossAgencyRead / write
 domains       named module bundles (roads, fleet, urban_transit, regulation, rail, maritime, aviation, corridor, oversight)
-modules       M01..M14 (+ routes[])
+modules       M01..M15 (+ routes[])
 routes        per route: module, minTier, allowRoles?, agencyScoped, categories?, minTierDomainOverride?
 agencies      per agency: domains, landing, roleTiers?, grants {full, read, routes}, denies {modules, routes, categories}
 publicView    the single route the public tier sees

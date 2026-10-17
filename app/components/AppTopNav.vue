@@ -231,16 +231,22 @@ const searchItems: SearchItem[] = [
   { label: 'Blackspot Analysis', group: 'Safety & Incidents', to: '/safety/blackspots', icon: ShieldAlert },
   { label: 'Safety KPIs', group: 'Safety & Incidents', to: '/safety/kpis', icon: ShieldAlert },
 
+  { label: 'Overview', group: 'Road Infrastructure', to: '/infrastructure/overview', icon: Construction },
+
   { label: 'Road Network Inventory', group: 'Road Infrastructure', to: '/infrastructure', icon: Construction },
   { label: 'Road Infrastructure Status', group: 'Road Infrastructure', to: '/infrastructure/projects', icon: Construction },
   { label: 'Bridges & Assets', group: 'Road Infrastructure', to: '/infrastructure/bridges', icon: Construction },
   { label: 'Funding Allocations', group: 'Road Infrastructure', to: '/infrastructure/funding', icon: Construction },
+
+  { label: 'Overview', group: 'Aviation', to: '/aviation/overview', icon: Plane },
 
   { label: 'Flight Movements', group: 'Aviation', to: '/aviation', icon: Plane },
   { label: 'Flight Log', group: 'Aviation', to: '/aviation/flights', icon: Plane },
   { label: 'Passenger Stats', group: 'Aviation', to: '/aviation/passenger-stats', icon: Plane },
   { label: 'Aircraft Licencing', group: 'Aviation', to: '/aviation/licensing', icon: Plane },
   { label: 'Aviation Infrastructure', group: 'Aviation', to: '/aviation/infrastructure', icon: Plane },
+
+  { label: 'Overview', group: 'Maritime', to: '/maritime/overview', icon: Ship },
 
   { label: 'Vessel Movements', group: 'Maritime', to: '/maritime', icon: Ship },
   { label: 'Vessel Registry', group: 'Maritime', to: '/maritime/vessels', icon: Ship },

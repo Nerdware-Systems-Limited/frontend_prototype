@@ -21,7 +21,7 @@ code-level reference.
 - **lucide-vue-next** icons, **Leaflet** + protomaps for maps, **d3-scale/shape/array** for chart maths (marks are
   Vue templates, no chart library)
 - **TypeScript** strict mode
-- **Vitest** for unit + integration tests (51 files, 747 tests)
+- **Vitest** for unit + integration tests (57 files, 813 tests)
 
 ## API wiring
 
@@ -55,6 +55,7 @@ app/composables/api/
 ├── useRailway.ts                 # M08 - Railway Management
 ├── useRailInfrastructure.ts      # M08 - Rail infrastructure assets
 ├── useRailSafety.ts              # M08 - Rail safety compliance
+├── useCorridor.ts                # M15 - Corridor & Trade (transit, border crossings, corridor KPIs)
 ├── useReports.ts                 # M09/M15 - Reporting & BI
 ├── useQuery.ts                   # M15 - Ad-hoc Query Builder
 ├── useMlPredictive.ts            # M16 - ML model registry + Ask assistant
@@ -94,19 +95,22 @@ Routes live under `app/pages/`, grouped by module:
 - `/fleet`, `/fleet/live`, `/fleet/behaviour`, `/fleet/geofences`, `/fleet/trip-playbacks` - M03 Fleet
 - `/public-transport` and subpages (`brt`, `compliance`, `driver-licensing`, `operators`, `vehicle-inspections`, `vehicle-registration`) - M04
 - `/safety` and subpages (`incidents`, `blackspots`, `kpis`) - M05
-- `/infrastructure` and subpages (`bridges`, `funding`, `maintenance`, `projects`) - M06
-- `/aviation` and subpages (`flights`, `infrastructure`, `licensing`, `passenger-stats`) - M07a
-- `/maritime` and subpages (`vessels`, `port-ops`, `infrastructure`, `services`, `cargo`, `waterways`, `accidents`, `green-transport`, `performance`, `imports-exports`) - M07b
+- `/infrastructure` and subpages (`overview`, `bridges`, `funding`, `maintenance`, `projects`) - M06
+- `/aviation` and subpages (`overview`, `flights`, `infrastructure`, `licensing`, `passenger-stats`) - M07a
+- `/maritime` and subpages (`overview`, `vessels`, `port-ops`, `infrastructure`, `services`, `cargo`, `waterways`, `accidents`, `green-transport`, `performance`, `imports-exports`) - M07b
 - `/railway` and subpages (`live`, `freight`, `schedules`, `infrastructure`, `network-inventory`, `safety`) - M08
-- `/analytics`, `/query-builder`, `/reports` - M09/M15
+- `/corridor` and subpages (`northern`, `border-crossings`, `transit`, `lapsset`) - M15 Corridor & Trade
+  (NCTTCA, KenTrade, LAPSSET; backend `/api/v1/corridor/`, read-only)
+- `/analytics`, `/query-builder`, `/reports` - M09
 - `/agencies`, `/users`, `/roles`, `/access-policies`, `/audit` - M10 access control
+  (`/audit` is scoped by viewer: platform, own agency or own actions only; see `docs/Reference.md`)
   (`/access-policies` is "Module Access": per-agency and per-role module, page,
   data-category and capability access; see `docs/ACCESS_CONTROL.md`)
 - `/admin/dashboards`, `/admin/dashboards/[id]` - Dashboard Manager: list and
   editor (needs `dashboards.manage` or `dashboards.manage_agency`; see
   `docs/DASHBOARD_MANAGER.md`)
 - `/notifications`, `/notifications/rules` - M11
-- `/integrations` - M12
+- `/integrations` and subpages (`analytics`, `files`, `files/[id]`, `feeds/[source_id]`) - M12
 - `/gis` and subpages (`overview`, `coverage`, `layers`, `layers/[id]`, `requests`) - M13 GIS & Spatial Analysis
   (the five subpages cover agency-uploaded layers; see `docs/Reference.md` M13)
 - `/training` and subpages (`cohorts`, `enrollments`, `completions`) - M14
@@ -189,7 +193,7 @@ npm run test:watch   # dev mode
 npm run test:ui      # vitest --ui
 ```
 
-51 files, 747 tests. Beyond the contract tests below there is one file per subsystem (access control, session
+57 files, 813 tests. Beyond the contract tests below there is one file per subsystem (access control, session
 sync, dashboard bindings, widgets, thresholds, query sources, and so on); the list and conventions are in
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 

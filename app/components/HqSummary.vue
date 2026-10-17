@@ -14,13 +14,6 @@
     the viewer's agency scope allows is fetched or shown.
   -->
   <section class="hq" aria-labelledby="hq-title">
-    <div class="hq-bar">
-      <div>
-        <h2 id="hq-title" class="hq-title">Cross-module summary</h2>
-        <p class="hq-dek">Live status, then performance over the range you choose</p>
-      </div>
-      <TimeRangeSelector :range="range" @change="loadHistory" />
-    </div>
 
     <div v-if="issues.length" class="hq-issues" role="status" aria-label="Needs attention">
       <strong class="hq-issues-h"><AlertTriangle :size="14" aria-hidden="true" />Needs attention</strong>

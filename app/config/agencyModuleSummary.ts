@@ -15,7 +15,7 @@
 
 import {
   useTraffic, useFleet, usePublicTransport, useSafety, useInfrastructure,
-  useAviationInfrastructure, useMaritimeCargo, useRailway,
+  useAviationInfrastructure, useMaritimeCargo, useRailway, useCorridor,
 } from '~/composables/api'
 
 export interface ModuleSummaryKpi {
@@ -35,7 +35,7 @@ export interface ModuleSummaryEntry {
 }
 
 export const OPERATIONAL_MODULES = [
-  'M02', 'M03', 'M04', 'M05', 'M06', 'M07a', 'M07b', 'M08',
+  'M02', 'M03', 'M04', 'M05', 'M06', 'M07a', 'M07b', 'M08', 'M15',
 ] as const
 
 /** Utility modules with no natural single-number KPI - quick-links only, never a tile. Exists so the completeness test can assert every real module in access-control.json is accounted for one way or the other. */
@@ -127,6 +127,17 @@ export const agencyModuleSummary: Record<string, ModuleSummaryEntry> = {
       { label: 'Trains in service', get: s => s?.kpis?.trains_in_service ?? null },
       { label: 'Freight shipments (30d)', get: s => s?.kpis?.freight_30d_shipments ?? null },
       { label: 'Passenger bookings (30d)', get: s => s?.kpis?.passenger_bookings_30d ?? null },
+    ],
+  },
+  M15: {
+    label: 'Corridor & Trade',
+    route: '/corridor',
+    period: '30D',
+    fetch: () => useCorridor().summary(30),
+    kpis: [
+      { label: 'Transit declarations (30d)', get: s => s?.kpis?.shipments ?? null },
+      { label: 'Avg border wait', get: s => s?.kpis?.avg_border_wait_hours ?? null, unit: 'h' },
+      { label: 'On the road now', get: s => s?.kpis?.in_transit ?? null },
     ],
   },
 }

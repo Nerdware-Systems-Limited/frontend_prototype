@@ -33,8 +33,8 @@
     "rail":           { "label": "Rail",                        "modules": ["M01", "M08", "M09", "M13", "M14"] },
     "maritime":       { "label": "Maritime and Ports",          "modules": ["M01", "M07b", "M09", "M13"] },
     "aviation":       { "label": "Aviation",                    "modules": ["M01", "M07a", "M09", "M13"], "note": "Not bound to any agency's domains list - KAA and KCAA (added 2026-09-18 to match the RBAC test seed) are granted M07a directly instead, since neither has a real assessment return confirming full domain membership is appropriate. Revisit once KCAA's assessment lands." },
-    "corridor":       { "label": "Corridor and Trade",          "modules": ["M01", "M09", "M12", "M13"] },
-    "oversight":      { "label": "Ministry Oversight",          "modules": ["M01", "M02", "M03", "M04", "M05", "M06", "M07a", "M07b", "M08", "M09", "M10", "M11", "M12", "M13", "M14"], "readOnly": true, "note": "Read scope, not a module bundle in the ordinary sense - grants cross-agency visibility with no write right anywhere. Actual breadth per tenant is narrowed by that agency's own grants.read/grants.routes below (section 9 open decision: SDR-R's oversight breadth is currently roads-domain only, not this full list)." }
+    "corridor":       { "label": "Corridor and Trade",          "modules": ["M01", "M09", "M12", "M13", "M15"] },
+    "oversight":      { "label": "Ministry Oversight",          "modules": ["M01", "M02", "M03", "M04", "M05", "M06", "M07a", "M07b", "M08", "M09", "M10", "M11", "M12", "M13", "M14", "M15"], "readOnly": true, "note": "Read scope, not a module bundle in the ordinary sense - grants cross-agency visibility with no write right anywhere. Actual breadth per tenant is narrowed by that agency's own grants.read/grants.routes below (section 9 open decision: SDR-R's oversight breadth is currently roads-domain only, not this full list)." }
   },
 
   "modules": {
@@ -43,16 +43,17 @@
     "M03": { "label": "Fleet and Vehicle Tracking", "routes": ["/fleet", "/fleet/live", "/fleet/behaviour", "/fleet/geofences", "/fleet/trip-playbacks"] },
     "M04": { "label": "Public Transport", "routes": ["/public-transport", "/public-transport/brt", "/public-transport/compliance", "/public-transport/driver-licensing", "/public-transport/vehicle-registration", "/public-transport/vehicle-inspections", "/public-transport/operators"] },
     "M05": { "label": "Safety and Incidents", "routes": ["/safety", "/safety/incidents", "/safety/blackspots", "/safety/kpis"] },
-    "M06": { "label": "Road Infrastructure", "routes": ["/infrastructure", "/infrastructure/bridges", "/infrastructure/maintenance", "/infrastructure/projects", "/infrastructure/funding"] },
-    "M07a": { "label": "Aviation", "routes": ["/aviation", "/aviation/flights", "/aviation/infrastructure", "/aviation/licensing", "/aviation/passenger-stats"] },
-    "M07b": { "label": "Maritime", "routes": ["/maritime", "/maritime/vessels", "/maritime/port-ops", "/maritime/cargo", "/maritime/imports-exports", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"] },
+    "M06": { "label": "Road Infrastructure", "routes": ["/infrastructure", "/infrastructure/overview", "/infrastructure/bridges", "/infrastructure/maintenance", "/infrastructure/projects", "/infrastructure/funding"] },
+    "M07a": { "label": "Aviation", "routes": ["/aviation", "/aviation/overview", "/aviation/flights", "/aviation/infrastructure", "/aviation/licensing", "/aviation/passenger-stats"] },
+    "M07b": { "label": "Maritime", "routes": ["/maritime", "/maritime/overview", "/maritime/vessels", "/maritime/port-ops", "/maritime/cargo", "/maritime/imports-exports", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"] },
     "M08": { "label": "Railway", "routes": ["/railway", "/railway/live", "/railway/schedules", "/railway/freight", "/railway/infrastructure", "/railway/network-inventory", "/railway/safety"] },
     "M09": { "label": "Reporting and Query Builder", "routes": ["/reports", "/query-builder", "/analytics"] },
     "M10": { "label": "Access Control", "routes": ["/agencies", "/users", "/roles", "/audit", "/access-policies", "/admin/dashboards", "/admin/dashboards/[id]"], "note": "Every agency's grants.full now includes M10 (added 2026-09-19) - every agency admin manages its own tenant's users/roles/audit, same as KMA already did (its own note here predates the rollout and assumed every other agency already had this; they didn't - only KMA and, via the 'oversight' domain, SDR/SDT had any M10 access at all, so every other agency's admins could not open Access Control). /agencies stays separately gated (minTier 'oversight' + page-level isUnscopedAdmin write check) since it's the platform-wide agency directory, not a tenant's own data - see its own route note." },
     "M11": { "label": "Notifications", "routes": ["/notifications", "/notifications/rules"] },
     "M12": { "label": "Data Integration Hub", "routes": ["/integrations", "/integrations/analytics", "/integrations/files", "/integrations/files/[id]", "/integrations/feeds/[source_id]"] },
     "M13": { "label": "GIS", "routes": ["/gis", "/gis/overview", "/gis/coverage", "/gis/layers", "/gis/layers/[id]", "/gis/requests"] },
-    "M14": { "label": "Training Institutes", "routes": ["/training", "/training/cohorts", "/training/enrollments", "/training/completions"] }
+    "M14": { "label": "Training Institutes", "routes": ["/training", "/training/cohorts", "/training/enrollments", "/training/completions"] },
+    "M15": { "label": "Corridor and Trade", "routes": ["/corridor", "/corridor/northern", "/corridor/border-crossings", "/corridor/transit", "/corridor/lapsset"], "note": "Cross-agency corridor monitoring: NCTTCA (Northern Corridor, border crossings), KenTrade (transit declarations), LAPSSET (corridor development). Added with apps.corridor." }
   },
 
   "routes": {
@@ -68,6 +69,7 @@
     "/admin/dashboards/[id]": { "module": "M10", "minTier": "admin", "agencyScoped": true, "note": "Dashboard Manager editor - same gate as /admin/dashboards." },
     "/notifications/rules": { "module": "M11", "minTier": "admin", "agencyScoped": true },
     "/integrations/feeds/[source_id]": { "module": "M12", "minTier": "analyst", "agencyScoped": true },
+    "/infrastructure/overview": { "module": "M06", "minTier": "operator", "agencyScoped": true, "categories": ["procurement"], "note": "Landing summary. Budget utilisation and open maintenance value are the same procurement-category figures as /infrastructure/funding and /infrastructure/maintenance, so the category applies here too." },
     "/infrastructure/funding": { "module": "M06", "minTier": "analyst", "agencyScoped": true, "categories": ["procurement"] },
     "/infrastructure/maintenance": { "module": "M06", "minTier": "operator", "agencyScoped": true, "categories": ["procurement"] },
     "/gis": { "module": "M13", "minTier": "operator", "agencyScoped": true, "categories": ["critical_infrastructure", "road_reserve_boundary", "high_res_geometry"], "note": "Category filtering here is layer-level, not route-level - see section 6." },
@@ -84,7 +86,8 @@
     "/public-transport/vehicle-registration": { "module": "M04", "minTier": "operator", "agencyScoped": true, "categories": ["vehicle_owner_pii"] },
     "/railway/freight": { "module": "M08", "minTier": "operator", "agencyScoped": true, "categories": ["passenger_pii"] },
     "/maritime/cargo": { "module": "M07b", "minTier": "operator", "agencyScoped": true, "categories": ["cargo_commercial"] },
-    "/maritime/imports-exports": { "module": "M07b", "minTier": "operator", "agencyScoped": true, "categories": ["cargo_commercial"] }
+    "/maritime/imports-exports": { "module": "M07b", "minTier": "operator", "agencyScoped": true, "categories": ["cargo_commercial"] },
+    "/corridor/transit": { "module": "M15", "minTier": "analyst", "agencyScoped": true, "note": "Shipment-level transit declarations (truck registration, transporter, seal). Trader identity is never ingested (apps/corridor/upload_templates.py), but this is still commercially sensitive, so analyst tier rather than operator." }
   },
 
   "agencies": {
@@ -105,7 +108,7 @@
       },
       "denies": {
         "modules": ["M04", "M07a", "M14"],
-        "routes": ["/maritime", "/maritime/vessels", "/maritime/cargo", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"],
+        "routes": ["/maritime", "/maritime/overview", "/maritime/vessels", "/maritime/cargo", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"],
         "categories": ["crash_victim", "anpr_plate"],
         "note": "land_parcel and resettlement are NOT denied here - KeNHA's own tenant may see its own records (section 4.1: 'not visible outside KeNHA' means outsiders, not KeNHA itself). Those two are denied on the cross-agency viewer side instead (see SDR-R). crash_victim and anpr_plate are genuine platform-wide blocks (ingestion refusal / feature flag off) that apply to every viewer including KeNHA."
       }
@@ -163,7 +166,7 @@
       "roleTiers": ["oversight", "analyst"],
       "grants": {
         "full": ["M06", "M09", "M10", "M13"],
-        "read": ["M02", "M05"],
+        "read": ["M02", "M05", "M15"],
         "routes": {
           "/fleet": "read", "/fleet/behaviour": "read",
           "/integrations/analytics": "read",
@@ -296,8 +299,8 @@
       "roleTiers": ["admin", "analyst"],
       "grants": {
         "full": ["M12", "M09", "M10"],
-        "read": [],
-        "routes": { "/dashboard": "read", "/maritime/port-ops": "read", "/notifications": "read" }
+        "read": ["M15"],
+        "routes": { "/dashboard": "read", "/maritime/port-ops": "read", "/notifications": "read", "/corridor/transit": "full" }
       },
       "denies": { "modules": [], "routes": [], "categories": [],
         "note": "Provisional - added 2026-09-18, no assessment return on file. KenTrade runs the national single-window trade platform, so it is scoped to Data Integration Hub plus a single route-level read into port operations, not the whole Maritime module. Confirm before treating as real policy." }
@@ -338,7 +341,7 @@
       "roleTiers": ["oversight", "admin", "analyst", "operator", "auditor"],
       "grants": {
         "full": ["M09", "M10", "M13"],
-        "read": [],
+        "read": ["M15"],
         "routes": {
           "/notifications": "read"
         }
@@ -367,7 +370,7 @@
       },
       "denies": {
         "modules": ["M07a", "M07b", "M08", "M14"],
-        "routes": ["/infrastructure/bridges", "/infrastructure/maintenance", "/infrastructure/projects", "/infrastructure/funding"],
+        "routes": ["/infrastructure/overview", "/infrastructure/bridges", "/infrastructure/maintenance", "/infrastructure/projects", "/infrastructure/funding"],
         "categories": [],
         "note": "vehicle_owner_pii is NTSA's own category - Agency Admin tier within NTSA (restrictedCategories.minTier), not denied to its own tenant outright."
       }
@@ -415,7 +418,7 @@
       },
       "denies": {
         "modules": ["M02", "M04", "M05", "M06", "M07a"],
-        "routes": ["/maritime", "/maritime/vessels", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"],
+        "routes": ["/maritime", "/maritime/overview", "/maritime/vessels", "/maritime/infrastructure", "/maritime/performance", "/maritime/services", "/maritime/waterways", "/maritime/accidents", "/maritime/green-transport"],
         "categories": ["cargo_commercial"],
         "note": "passenger_pii is blocked at ingestion platform-wide (only station-pair/class/date aggregates ever enter the platform), so there is nothing to deny client-side. cargo_commercial IS denied here - KRC reads KPA's port-ops/imports-exports/cargo routes read-only and KPA's masked commercial cargo fields must not surface through that cross-agency read."
       }
@@ -430,7 +433,7 @@
         "full": ["M12", "M09", "M10"],
         "read": [],
         "routes": {
-          "/maritime": "full", "/maritime/port-ops": "full", "/maritime/cargo": "full", "/maritime/imports-exports": "full", "/maritime/infrastructure": "full", "/maritime/performance": "full", "/maritime/services": "full", "/maritime/green-transport": "full",
+          "/maritime": "full", "/maritime/overview": "full", "/maritime/port-ops": "full", "/maritime/cargo": "full", "/maritime/imports-exports": "full", "/maritime/infrastructure": "full", "/maritime/performance": "full", "/maritime/services": "full", "/maritime/green-transport": "full",
           "/dashboard": "read",
           "/railway/freight": "read",
           "/gis": "read", "/gis/overview": "read", "/gis/coverage": "read", "/gis/layers": "read", "/gis/layers/[id]": "read", "/gis/requests": "read",
@@ -456,7 +459,7 @@
         "read": [],
         "routes": {
           "/maritime/vessels": "full", "/maritime/accidents": "full", "/maritime/waterways": "full", "/maritime/services": "full", "/maritime/infrastructure": "full",
-          "/maritime": "read", "/maritime/port-ops": "read", "/maritime/performance": "read",
+          "/maritime": "read", "/maritime/overview": "read", "/maritime/port-ops": "read", "/maritime/performance": "read",
           "/dashboard": "read",
           "/notifications": "read"
         }
@@ -475,7 +478,7 @@
       "landing": "/dashboard",
       "roleTiers": ["admin", "analyst"],
       "grants": {
-        "full": ["M12", "M09", "M10"],
+        "full": ["M12", "M09", "M10", "M15"],
         "read": [],
         "routes": {
           "/maritime/port-ops": "read", "/maritime/performance": "read", "/maritime/imports-exports": "read",
@@ -499,7 +502,7 @@
       "landing": "/gis",
       "roleTiers": ["admin", "analyst"],
       "grants": {
-        "full": ["M13", "M09", "M10", "M12"],
+        "full": ["M13", "M09", "M10", "M12", "M15"],
         "read": [],
         "routes": {
           "/infrastructure/projects": "read",

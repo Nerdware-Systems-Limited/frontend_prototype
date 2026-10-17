@@ -105,6 +105,7 @@ real, current copy, not a paraphrase.
 ### M06 — Road Infrastructure
 | Route | Purpose |
 |---|---|
+| `/infrastructure/overview` | "Road Infrastructure Overview" — network condition, assets, projects and budget at a glance, with links to the detail pages (`OverviewLinks`) |
 | `/infrastructure` | "Road Network Inventory" — per-agency inventory, pavement quality (IRI/PCI), AI deterioration forecasts |
 | `/infrastructure/bridges` | "Bridge & Asset Registry" — bridges, streetlights, signals, WIM stations, closures |
 | `/infrastructure/maintenance` | "Maintenance Orders" — work orders, contractor progress, budget allocation |
@@ -114,6 +115,7 @@ real, current copy, not a paraphrase.
 ### M07a — Aviation
 | Route | Purpose |
 |---|---|
+| `/aviation/overview` | "Aviation Overview" — fleet, flights, punctuality, passengers and cargo for the chosen time range, with links to the detail pages |
 | `/aviation` | "Aviation Operations" — ADS-B tracking, OTP, passenger volumes, cargo, weather advisories, safety oversight |
 | `/aviation/flights` | "Flight Movements" — full flight-by-flight log |
 | `/aviation/infrastructure` | "Aviation Infrastructure" — airport registry, runway/navaid condition, capital works |
@@ -123,6 +125,7 @@ real, current copy, not a paraphrase.
 ### M07b — Maritime
 | Route | Purpose |
 |---|---|
+| `/maritime/overview` | "Maritime Overview" (summary page) — port, vessel, inspection and safety figures for the chosen time range, with links to the detail pages |
 | `/maritime` | "Maritime Overview" — real-time AIS traffic, port performance, cargo single-window, corridor KPIs |
 | `/maritime/vessels` | "Vessel Registry & Movements" |
 | `/maritime/port-ops` | "Port Operations" — berth occupancy, throughput, corridor dwell analysis, 60-day trends |
@@ -146,7 +149,18 @@ real, current copy, not a paraphrase.
 | `/railway/network-inventory` | "Rail Network Inventory" — line/station/rolling-stock registry, SGR/MGR comparison |
 | `/railway/safety` | "Rail Safety" — incident tracking, crossing safety, compliance, predictive risk |
 
-### M09/M15 — Reporting & Query Builder
+### M15 — Corridor & Trade
+| Route | Purpose |
+|---|---|
+| `/corridor` | "Corridor & Trade Overview" — transit declarations, average transit time and border wait, trucks crossed, OSBP utilisation, open transit bond, border-post map |
+| `/corridor/northern` | "Northern Corridor" — Transport Observatory indicators against benchmark, route condition, port-to-border transit chain (`CorridorSchematic`, `CorridorKpiScorecard`) |
+| `/corridor/border-crossings` | "Border Crossings" — one-stop border posts: queues, waiting and clearance times, truck volumes, main delay cause |
+| `/corridor/transit` | "Transit Declarations" — KenTrade shipments: customs status, destination, time in transit, tamper and deviation alerts |
+| `/corridor/lapsset` | "LAPSSET Corridor" — port operations, highway and railway construction, investment against plan |
+
+M15 is in the access baseline (`corridor` domain, oversight) and the agency Command Centre summary (`config/agencyModuleSummary.ts`). Backend data comes from Integration Hub templates CT-01 (shipments), CT-02 (border crossings) and CT-03 (corridor KPIs). Note: several composables (`useReports`, `useQuery`) still label the reporting and query modules "M15" in comments; in the access baseline M15 is Corridor and Trade and reporting is M09.
+
+### M09 — Reporting & Query Builder
 | Route | Purpose |
 |---|---|
 | `/reports` | "Reports" — scheduled and on-demand, PDF/XLSX, across all modules |
@@ -160,7 +174,7 @@ real, current copy, not a paraphrase.
 | `/users` | "Users" — account directory, create accounts, manage status, view profiles |
 | `/roles` | "Roles & Permissions" — RBAC role assignments, status management, departments |
 | `/access-policies` | "Module Access" — which modules, pages, restricted data categories and capabilities each agency (and each role inside it) can reach. super_admin sets every agency's limit; an agency admin manages its own agency within that limit. Admin tier. See §9.7 |
-| `/audit` | "Audit Trail" — full platform audit log, every user action/data change/system event |
+| `/audit` | "Audit Trail" — scope follows the viewer (`meta().scope`: whole platform for super admin, own agency for agency admins, own actions otherwise). Row detail drawer (who, what, request, where from, changes) with "show all from this request / token / resource / user / IP" pivots, and a super-admin "Verify log integrity" hash-chain check |
 | `/admin/dashboards` | "Dashboards" — Dashboard Manager list: templates, status, audiences, archive/duplicate. Admin tier, plus `dashboards.manage` or `dashboards.manage_agency` (`dashboard-manager.global.ts`). See [DASHBOARD_MANAGER.md](DASHBOARD_MANAGER.md) |
 | `/admin/dashboards/[id]` | Dashboard editor: palette, live canvas, inspector (Data / Actions / Style / JSON), filters, audience, versions, publish. Same gate |
 
@@ -279,7 +293,7 @@ with the post-auth redirect (`?redirect=` query param, default
 | `useDataSources()` | Single source of truth for "which agency, which system, how often updated" labels — sourced from the agency UAPTS Needs Assessment questionnaires; an unanswered cadence is recorded as `"Not specified"`, never guessed. `meta(key)`, `sourceLabel(key)` → e.g. `"KeNHA · DRIMS / ARICS · Annual survey (per financial year)"`. |
 | `useDashboardSubtitle()` (exports `useNavSubtitle`) | Shared `useState` for the top-nav's persistent subtitle; every `PageHeader` calls this via its `eyebrow`/`title`. |
 | `useNotificationSocket(wsBaseUrl?)` | WebSocket client for `/ws/notifications/` (JWT via `?token=` query string — browsers can't set a custom header on a WS handshake). Message types: `hello`/`notification`/`count`/`ping`/`pong`. 30s client keepalive ping, 3s auto-reconnect, caps the in-memory list at 200. Wrapped by the `notifications` store — don't call directly outside it. |
-| `useAuditSocket(urlOverride?)` | WebSocket client for `/ws/audit/` (same JWT-in-query-string pattern). `initial` (last 50 logs) / `new_log` (prepend, cap 200) / `metrics` message types. Used directly by `audit.vue` only (not wrapped in a store — see the file's own comment on why that's only safe as long as exactly one component uses it). |
+| `useAuditSocket(urlOverride?, personal = false)` | WebSocket client for `/ws/audit/`, or `/ws/audit/me/` (own rows only) when `personal` is true; `audit.vue` passes `personal` for non-super-admins (same JWT-in-query-string pattern). `initial` (last 50 logs) / `new_log` (prepend, cap 200) / `metrics` message types. Used directly by `audit.vue` only (not wrapped in a store — see the file's own comment on why that's only safe as long as exactly one component uses it). |
 | `useUploadPoll(fetcher, isInFlight)` | See §10.4 — Integration Hub's shared backoff poller. |
 | `useAccessControl()` | The agency-scope resolver from the RBAC spec (section 7). Second axis alongside `usePermissions()`'s role-tier gate — that answers "what may this person do", this answers "whose data and which modules may they see"; a route needs both to pass. A thin reactive wrapper over the pure resolver in `app/utils/resolveAccess.ts`, bound to the signed-in user and the **saved** Module Access overrides (never the unsaved draft; outside a Pinia app it uses the baseline alone). `resolveRoute(path)` runs the spec's 8-step algorithm (deny by default → domain bundle → agency grants → agency denials always win → Module Access ceiling / enabled / role layers → route's minimum tier → category masks → safe space if nothing resolved) and returns `{allowed, scopeLevel, module, deniedCategories, isSafeSpace}`; `canAccessRoute()`/`canAccessModule()`/`moduleScope()` are convenience wrappers and `hasCapability(cap)` answers the capability layers. Called by `auth.global.ts` (route guard), `AppSidebar.vue`, `AppTopNav.vue`'s command palette, `useFieldMask()` and the agency Command Centre. |
 | `useTimeRange(key, opts)` | The selected reporting window for one module (24h / 7d / 30d or a year), shared by that module's pages for the session: `days`, `from`, `to`, `period`, `label`, `setMode`, `setYear`, `stepYear`. Calendar days in East Africa Time (`utils/timeRange.ts`). |
@@ -439,7 +453,7 @@ Base `/api/v1/railway/`. `lines`, `stations`, `trains`, `schedules`,
 `liveOperations`, `onTimeStats(days=30)`, `freightByCorridor(days=30)`,
 `incidentStats(days=90)`, `revenueByRoute(days=30)`.
 
-### `useReports.ts` — M09/M15
+### `useReports.ts` — M09
 Base `/api/v1/reports/`. `catalog()` → `ReportTemplate[]`, `template(id)`,
 `runs(q?)`, `generate(body)`.
 
@@ -505,11 +519,14 @@ Base `/api/v1/training/`. `courses`, `course(id)`, `cohorts`, `cohort(id)`,
 `revenueSummary`.
 
 ### `useAudit.ts` — M10
-`list(q?)`, `get(id)`, `listFromUrl(url)`, `myLogs(q?)`, `actions()`. Full
+`list(q?)`, `get(id)`, `listFromUrl(url)`, `myLogs(q?)`, `userLogs(userId, q?)` (`/audit/users/{id}/logs/`), `actions()`, `meta({verify?, limit?})` (`/audit/meta/`: filter choices, viewer scope `platform|agency|self`, hash-chain status; `verify` is super-admin only). Full
 type/query docs in §10.4's sibling section (identical composable, just also
 used by `audit.vue` outside the Integration Hub).
 
-### `useQuery.ts` — M09/M15
+### `useCorridor.ts` — M15
+Base `/api/v1/corridor/`, read-only. `summary(days)`, `corridors()`, `alignments()`, `compare()`, `kpiSeries({corridor?, months?})`, `borderPerformance(days)`, `borderTrend(days, borderPost?)`, `delayCauses(days)`, `borderCrossings(q)`, `shipments(q)`, `transitSummary(days)`. Also exports formatters and tone helpers (`fmtKpi`, `fmtHours`, `fmtKes`, `benchmarkTone`, `waitTone`, `kpiCardBind`, ...), re-exported from `~/composables/api` with a `Corridor` prefix where names would clash (`fmtCorridorNum`, `CORRIDOR_STATUS_LABEL`, ...).
+
+### `useQuery.ts` — M09
 `datasets()` → `Record<QueryDatasetKey, Dataset>`. `execute(payload)` /
 `executeJoin(payload)` (visual query builder). `savedList()` /
 `savedCreate(payload)` / `savedDelete(id)` / `savedRun(id)`. `schema()` →
@@ -552,13 +569,15 @@ Pure re-export barrel — no logic of its own.
 
 ## 6. Shared components
 
-`app/components/`, 53 flat files plus the `dashboard/` tree (below). Grouped by role.
+`app/components/`, 62 flat files plus the `dashboard/` tree (below). Grouped by role.
 
 ### Layout / chrome
 | Component | Purpose |
 |---|---|
 | `AppTopNav.vue` | Full top bar (331 lines): ⌘K command palette (~55 hardcoded entries mirroring the sidebar routes), live clock, light/dark toggle, notification bell (shake animation on new item), and the app's one connection point for the notification WebSocket (`notificationStore.connect()`/`disconnect()`). |
-| `AppSidebar.vue` | The authoritative module→route nav map (M01–M14, with M10–M12 grouped). Collapsible groups, active-route highlighting, role-gated items. **The best single source of truth for the whole-system route map** — more authoritative than inferring from page titles. |
+| `AppSidebar.vue` | The authoritative module→route nav map (M01–M15, with M10–M12 grouped). Collapsible groups, active-route highlighting, role-gated items. **The best single source of truth for the whole-system route map** — more authoritative than inferring from page titles. |
+| `OverviewLinks.vue` | "Explore" card grid at the foot of the aviation, maritime and road-infrastructure overview pages; links filtered by `canAccessRoute`. |
+| `CorridorSchematic.vue`, `CorridorKpiScorecard.vue` | Northern Corridor route schematic (Mombasa to Malaba/Busia) and indicator-vs-benchmark table, used by `/corridor/northern`. |
 | `PageHeader.vue` | `title` (required) + optional `eyebrow`/`subtitle` + actions slot. Also the one place that sets the top-nav's persistent subtitle (`useNavSubtitle(eyebrow \|\| title)`). |
 | `SectionTitle.vue` | Small uppercase heading + optional `pill` badge. |
 | `BackToTop.vue` | Self-contained fixed scroll-to-top button, appears after 800px scroll, respects `prefers-reduced-motion`. No props. |
@@ -914,7 +933,7 @@ fails closed: only the baseline routes are open.
 It encodes: `roles` (the tier ladder: `super_admin`, `oversight`, `admin`,
 `analyst`, `auditor`, `operator`, `public`), `domains` (9 transport-domain
 bundles, `oversight` marked `readOnly`), `modules` (route membership per
-M01-M14), `routes` (per-route `minTier`, `allowRoles`, `agencyScoped`,
+M01-M15), `routes` (per-route `minTier`, `allowRoles`, `agencyScoped`,
 `categories`, `minTierDomainOverride`), the 22 agency profiles
 (`grants.full`/`grants.read`/`grants.routes`, `denies.modules`/`routes`/
 `categories`), `publicView`, `defaults` (safe space, deny redirect, baseline

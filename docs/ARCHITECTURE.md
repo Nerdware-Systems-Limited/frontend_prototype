@@ -49,14 +49,14 @@ app/
   types/             uapts.ts (API shapes), dashboard.ts (dashboard schema), frame.ts (widget data frames)
   utils/             pure TypeScript: access resolver, bindings, data sources, thresholds, units, layout engine ...
 tests/
-  unit/              one file per subsystem (51 files, 747 tests at the time of writing)
+  unit/              one file per subsystem (56 files, 813 tests with the integration file, at the time of writing)
   integration/       live.test.ts, probes a running backend
   fixtures/          access-control.json (copy of the backend's baseline policy)
 docs/                this folder
 ```
 
 `utils/` is deliberately free of Nuxt and Vue state wherever possible (the access resolver, tab sync, layout
-engine, bindings and thresholds are plain functions), which is what makes the 747 unit tests fast and
+engine, bindings and thresholds are plain functions), which is what makes the 813 tests fast and
 Nuxt-free.
 
 ## 4. Boot sequence

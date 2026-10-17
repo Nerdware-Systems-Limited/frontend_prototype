@@ -9,7 +9,7 @@ export function fmtMeasure(n: number | null | undefined, unit: 'km' | 'km2' | nu
   return `${v.toLocaleString('en-KE')} ${unit === 'km2' ? 'km²' : 'km'}`
 }
 
-export const fmtPct = (n: number | null | undefined) => (n == null ? '-' : `${Math.round(n * 10) / 10}%`)
+export const fmtGisPct = (n: number | null | undefined) => (n == null ? '-' : `${Math.round(n * 10) / 10}%`)
 
 export const fmtDate = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'

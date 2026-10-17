@@ -1,6 +1,6 @@
 # UAPTS frontend documentation
 
-_Index. Last reviewed 2026-10-12._
+_Index. Last reviewed 2026-10-16._
 
 Start with the root [`README.md`](../README.md) for setup, then pick the document for your task.
 

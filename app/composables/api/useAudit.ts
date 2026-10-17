@@ -25,6 +25,13 @@ export interface AuditEntry {
   // actor
   user_id: string | null              // "None" string or null → treat as absent
   username: string | null
+  actor_type?: 'user' | 'anonymous' | 'system' | string
+  attempted_username?: string         // identity supplied on a FAILED auth attempt
+  impersonator_id?: string
+  impersonator_username?: string
+  token_jti?: string
+  session_key?: string
+  request_id?: string                 // correlates every row of one request
 
   // what happened
   action: 'create' | 'update' | 'delete' | 'export' | 'login' | 'logout' | 'view' | string
@@ -32,7 +39,9 @@ export interface AuditEntry {
   severity: 'debug' | 'info' | 'notice' | 'warning' | 'critical' | string
   resource_type: string               // may be empty string
   resource_id: string                 // may be empty string
+  resource_repr?: string              // str() of the object at write time - survives deletion
   description: string
+  changed_fields?: string[]
 
   // change data
   old_values: Record<string, unknown>
@@ -41,7 +50,17 @@ export interface AuditEntry {
 
   // request context
   ip_address: string | null       // GenericIPAddressField(null=True) - can be null
+  ip_is_private?: boolean
   user_agent: string
+  device_type?: string
+  browser?: string
+  os?: string
+  geo_country?: string
+  geo_city?: string
+  asn?: string
+  origin?: string                     // http | ws | celery | cli | signal
+  request_query?: string
+  view_name?: string
   request_path: string
   request_method: string
   status_code: number | null      // PositiveSmallIntegerField(null=True) - can be null
@@ -76,6 +95,12 @@ export interface AuditQuery {
   /** Exact match on AuditLog.resource_type, e.g. "accounts.User". */
   resource_type?: string
   resource_id?: string
+  /** Forensic pivots - exact match, still bounded by the viewer's scope server-side. */
+  request_id?: string
+  token_jti?: string
+  actor_type?: string
+  origin?: string
+  ip_address?: string
   /** ISO-8601 (or plain YYYY-MM-DD) lower bound, inclusive - created_at__gte. */
   since?: string
   /** ISO-8601 (or plain YYYY-MM-DD) upper bound, inclusive - created_at__lte. */
@@ -88,6 +113,20 @@ export interface AuditPage {
   next: string | null
   previous: string | null
   results: AuditEntry[]
+}
+
+type Choice = { value: string; label: string }
+export interface AuditChainStatus { ok: boolean; checked: number; broken_at: number | null; reason: string }
+export interface AuditMeta {
+  actions: Choice[]
+  severities: Choice[]
+  outcomes: Choice[]
+  actor_types: Choice[]
+  /** What this viewer's list shows: whole platform, own agency, or only themselves. */
+  scope: 'platform' | 'agency' | 'self'
+  hash_chain_enabled: boolean
+  /** Only present when requested with verify (super_admin). */
+  chain?: AuditChainStatus
 }
 
 // ── Composable ─────────────────────────────────────────────────────────────
@@ -119,19 +158,18 @@ export function useAudit() {
       return normalisePage(await api<AuditPage>(path))
     },
 
-    /** GET /api/v1/audit/logs/{id}/ - single entry. */
-    get: async (id: string) => {
-      const entry = await api<AuditEntry>(`/api/v1/audit/logs/${id}/`)
-      return { ...entry, id: String(entry.id) }
-    },
-
-    /** GET /api/v1/audit/my-logs/ - actions performed by the current user. */
-    myLogs: async (q?: AuditQuery): Promise<AuditPage> => {
-      const page = await api<AuditPage>('/api/v1/audit/my-logs/', { query: cleanQuery(q as Record<string, unknown>) })
+    /** GET /api/v1/audit/users/{userId}/logs/ - one user's history (scoped server-side; out-of-scope users return an empty page). */
+    userLogs: async (userId: string, q?: AuditQuery): Promise<AuditPage> => {
+      const page = await api<AuditPage>(`/api/v1/audit/users/${encodeURIComponent(userId)}/logs/`, { query: cleanQuery(q as Record<string, unknown>) })
       return normalisePage(page)
     },
 
-    /** GET /api/v1/audit/actions/ - distinct action types available to filter by. */
-    actions: () => api<Array<{ value: string; label: string }>>('/api/v1/audit/actions/'),
+    /**
+     * GET /api/v1/audit/meta/ - filter choices straight from the model, the
+     * viewer's visibility scope and hash-chain status. Pass `verify` (super_admin
+     * only) to also walk the tamper-evidence chain.
+     */
+    meta: (opts?: { verify?: boolean; limit?: number }) =>
+      api<AuditMeta>('/api/v1/audit/meta/', { query: cleanQuery({ verify: opts?.verify ? 1 : undefined, limit: opts?.limit }) }),
   }
 }

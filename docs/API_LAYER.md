@@ -73,11 +73,12 @@ Domain index (module code, file):
 | M07a Aviation | `useAviationMaritime` (shared), `useAviationInfrastructure`, `useAviationLicensing` |
 | M07b Maritime | `useMaritimeInfrastructure`, `useMaritimeServices`, `useMaritimeCargo`, `useMaritimeWaterways`, `useMaritimeGreenTransport`, `useMaritimePerformance` |
 | M08 Railway | `useRailway`, `useRailInfrastructure`, `useRailSafety` |
-| M09/M15 Reporting, query | `useReports`, `useQuery` |
+| M09 Reporting, query | `useReports`, `useQuery` |
 | M11 Notifications | `useNotifications` |
 | M12 Integration Hub | `useIntegrations` |
 | M13 GIS | `useGis` (map GeoJSON), `useGisLayers` (uploaded layers, coverage, requests) |
 | M14 Training | `useTraining` |
+| M15 Corridor & Trade | `useCorridor` |
 | M16 ML | `useMlPredictive` |
 
 Dashboard Manager and access policy clients are **not** in `api/`: see `composables/useDashboardApi.ts` and
@@ -113,7 +114,7 @@ this is `WidgetSource.backend === 'ahead-of-backend'`: a 404 or 501 from such a 
 | Socket | Composable | Used by | Messages |
 |---|---|---|---|
 | `/ws/notifications/` | `useNotificationSocket` wrapped by `stores/notifications.ts` | `layouts/default.vue` connects on mount, disconnects on unmount | `hello`, `notification`, `count`, `ping`, `pong` |
-| `/ws/audit/` | `useAuditSocket` | `pages/audit.vue` only | `initial` (last 50), `new_log` (prepended, capped 200), `metrics` |
+| `/ws/audit/` (platform feed, super_admin) or `/ws/audit/me/` (own rows, any user; `useAuditSocket(url, personal)`) | `useAuditSocket` | `pages/audit.vue` only | `initial` (last 50), `new_log` (prepended, capped 200), `metrics` |
 
 Shared behaviour: the JWT goes in `?token=` (browsers cannot set a handshake header), 30 s client keepalive
 ping, reconnect after 3 s unless closed with code 1000. The notification socket skips a refresh when

@@ -100,7 +100,7 @@ view today: super admins and SDT. Below the six-domain health ribbon it adds:
 2. **Operational status (live):** the remaining modules (traffic, public transport) as KPI tiles, from
    `useModuleSummaries` (the same loader the agency workspace uses).
 3. **Performance over the range (history):** rail and flight on-time, fare revenue, vehicles classified, driven by
-   the time-range selector (`config/hqPerformance.ts`). Status colours use the shared thresholds, so a figure is
+   the shared `hq` time range (`config/hqPerformance.ts`; `HqSummary` no longer renders its own selector, so it stays at the 7-day default until one is mounted). Status colours use the shared thresholds, so a figure is
    "warning" here exactly when it is on its own page.
 4. **Certificate and licence renewals** across every source the viewer can open.
 
@@ -110,7 +110,7 @@ Only modules whose route resolves above "none" for the viewer are fetched.
 
 ## 5. Module overview pages
 
-Every operational module already has an overview built on the same parts (KPI ribbon, trend and breakdown cards,
+Every operational module has an overview (aviation, maritime and road infrastructure each have a dedicated `/…/overview` page that links to their detail pages through `OverviewLinks`; corridor and trade has `/corridor`), built on the same parts (KPI ribbon, trend and breakdown cards,
 map, recent events, links to detail pages). They now share the same controls: the time-range selector for
 time-dependent data, collapsible map and incident sections, and the certificate panel where the module owns
 certificates. Utility modules (Reporting M09, Access Control M10, Notifications M11, Integration Hub M12) have no
