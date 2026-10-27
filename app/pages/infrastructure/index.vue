@@ -12,8 +12,8 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- Agency tabs -->
-  <div class="agency-tabs">
+  <!-- Agency tabs: a viewer who can only see one agency (the server scopes by_agency) has nothing to switch between -->
+  <div v-if="agencyOptions.length > 1" class="agency-tabs">
     <button class="agency-tab" :class="{ active: selectedAgency === '' }" @click="selectAgency('')">
       All Agencies
       <span class="agency-tab-count">{{ summary ? fmtNum(summary.network.total_segments) : fmtNum(segments.length) }}</span>
@@ -583,7 +583,9 @@ const agencyOptions = computed(() => {
     .map(([code, count]) => ({ code, count, name: agencyNames.value[code] ?? code }))
     .sort((a, b) => a.code.localeCompare(b.code))
 })
-const agencyLabel = computed(() => selectedAgency.value ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value) : 'All Agencies')
+const agencyLabel = computed(() => selectedAgency.value
+  ? (agencyNames.value[selectedAgency.value] ?? selectedAgency.value)
+  : agencyOptions.value.length === 1 ? agencyOptions.value[0]!.name : 'All Agencies')
 
 // RoadSegmentFilter's `agency` param matches on the Agency UUID, not its
 // code - build the mapping from `by_agency` (covers every agency, not just

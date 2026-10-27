@@ -91,19 +91,8 @@
   <div class="two-col-map">
     <CollapsibleSection class="card map-card" title="Airport Network (KAA)" storage-key="map:aviation/index">
       <ClientOnly>
-        <UaptsMap
-          :markers="airportMarkers"
-          :center="[0.3, 37.9]"
-          :zoom="6"
-          height="460px"
-          show-legend
-        />
+        <AirportsMap :airports="airports" :runways="runwayLines" :show-airstrips="false" height="460px" />
       </ClientOnly>
-      <div class="map-key">
-        <span class="mk"><span class="dot" style="background:#ef4444" /> International</span>
-        <span class="mk"><span class="dot" style="background:#3b82f6" /> Regional</span>
-        <span class="mk"><span class="dot" style="background:#22c55e" /> Domestic</span>
-      </div>
     </CollapsibleSection>
 
     <div class="right-col">
@@ -265,15 +254,18 @@
       <EmptyState v-else :loading="loading" message="No meteorological data available." compact />
     </div>
   </div>
+  <AviationRawPanel id="air-cargo" dataset="air-cargo" />
+  <AviationRawPanel id="occurrences" dataset="occurrences" />
+  <AviationRawPanel id="aviation-weather" dataset="weather" />
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useAviationMaritime } from '~/composables/api'
+import { useAviationMaritime, useAviationInfrastructure } from '~/composables/api'
 import type {
-  AviationSummary, Airport, Airline, Flight, FlightOTP, CargoByCommodity, PassengerByAirport,
+  RunwayFeature, AviationSummary, Airport, Airline, Flight, FlightOTP, CargoByCommodity, PassengerByAirport,
 } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
@@ -281,6 +273,7 @@ type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtit
 const summary    = ref<AviationSummary | null>(null)
 const otp        = ref<FlightOTP | null>(null)
 const airports   = ref<Airport[]>([])
+const runwayLines = ref<RunwayFeature[]>([])
 const airlines   = ref<Airline[]>([])
 const flights    = ref<Flight[]>([])
 const cargo      = ref<CargoByCommodity[]>([])
@@ -302,11 +295,12 @@ async function load() {
   loading.value = true
   error.value = null
   const avm = useAviationMaritime()
+  const ai = useAviationInfrastructure()
 
-  const [sumRes, otpRes, apRes, alRes, flRes, cgRes, pxRes, stRes, metRes, sfRes] = await Promise.allSettled([
+  const [sumRes, otpRes, apRes, alRes, flRes, cgRes, pxRes, stRes, metRes, sfRes, rlRes] = await Promise.allSettled([
     avm.aviationSummary(days.value),
     avm.flightsOTP(days.value),
-    avm.airports(),
+    avm.airportsAll(),
     avm.airlines(),
     avm.flights({ days: days.value, page_size: 8 }),
     avm.cargoByCommodity(days.value),
@@ -314,6 +308,7 @@ async function load() {
     avm.flightsByStatus({ days: days.value }),
     avm.metObservationsLatest(),
     avm.safetyReportStats(365),
+    ai.runwaysGeoJSON(),
   ])
 
   if (sumRes.status === 'fulfilled') {
@@ -321,7 +316,8 @@ async function load() {
     statusDist.value = sumRes.value.by_status ?? []
   }
   if (otpRes.status === 'fulfilled') otp.value         = otpRes.value
-  if (apRes.status  === 'fulfilled') airports.value    = (apRes.value as any).results ?? []
+  if (apRes.status  === 'fulfilled') airports.value    = apRes.value
+  if (rlRes.status  === 'fulfilled') runwayLines.value = rlRes.value.features ?? []
   if (alRes.status  === 'fulfilled') airlines.value    = (alRes.value as any).results ?? []
   if (flRes.status  === 'fulfilled') flights.value     = (flRes.value as any).results ?? []
   if (cgRes.status  === 'fulfilled') cargo.value       = (cgRes.value as any).results ?? []
@@ -350,20 +346,6 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const airportMarkers = computed((): MarkerSpec[] =>
-  airports.value
-    .filter(a => a.latitude != null && a.longitude != null)
-    .map(a => ({
-      id: `ap-${a.id}`,
-      lat: a.latitude!,
-      lon: a.longitude!,
-      title: a.name,
-      subtitle: `${a.iata_code} / ${a.icao_code} · ${a.city} · Cap: ${fmtNum(a.design_capacity_passengers)}/yr`,
-      color: a.airport_type === 'international' ? 'red' : a.airport_type === 'regional' ? 'blue' : 'green',
-      size: a.airport_type === 'international' ? 'lg' : 'md',
-    })),
-)
-
 const maxStatusCount = computed(() => Math.max(1, ...statusDist.value.map(s => s.c)))
 const maxCargo       = computed(() => Math.max(1, ...cargo.value.map(c => c.total_kg)))
 

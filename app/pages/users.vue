@@ -309,10 +309,6 @@
             <input type="checkbox" v-model="form.is_active" />
             Account active immediately
           </label>
-          <label class="check-label">
-            <input type="checkbox" v-model="form.is_staff" />
-            Grant staff (admin console) access
-          </label>
         </div>
         <div v-if="createApiError" class="api-error">⚠ {{ createApiError }}</div>
       </div>
@@ -384,7 +380,7 @@ const creating     = ref(false)
 const createApiError = ref<string | null>(null)
 // roleSelection is either a built-in role_type ('admin', ...) or a custom
 // Role's id - doCreate() below resolves it back to role_type + role.
-const form         = ref({ email: '', roleSelection: '' as string, agency: '', department: '', is_active: true, is_staff: false })
+const form         = ref({ email: '', roleSelection: '' as string, agency: '', department: '', is_active: true })
 const formErrors   = ref({ email: '', role: '' })
 
 function tierLabel(t: string) { return t.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') }
@@ -706,7 +702,7 @@ async function runConfirmAction() {
 
 function openCreate() {
   if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
-  form.value = { email: '', roleSelection: '', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true, is_staff: false }
+  form.value = { email: '', roleSelection: '', agency: unscoped.value ? '' : (viewerScope.value?.agency ?? ''), department: '', is_active: true }
   formErrors.value = { email: '', role: '' }
   createApiError.value = null
   showModal.value = true
@@ -739,7 +735,6 @@ async function doCreate() {
       email:     form.value.email,
       role_type: roleType,
       is_active: form.value.is_active,
-      is_staff:  form.value.is_staff,
     }
     if (customRole) payload.role = customRole.id
     if (form.value.agency)     payload.agency     = form.value.agency

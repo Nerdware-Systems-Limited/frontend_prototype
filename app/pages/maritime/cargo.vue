@@ -161,6 +161,11 @@
       />
     </div>
   </div>
+
+  <!-- KPA container and bulk cargo uploads -->
+  <MaritimeRawPanel id="container-movements" dataset="container-movements" />
+  <MaritimeRawPanel id="container-dwell" dataset="container-dwell" />
+  <MaritimeRawPanel id="bulk-cargo" dataset="bulk-cargo" />
 </template>
 
 <script setup lang="ts">

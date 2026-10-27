@@ -47,6 +47,13 @@ export type QueryDatasetKey =
   | 'blackspots'
   | 'traffic_counts'
   | 'gps_tracks'
+  | 'road_segments'
+  | 'bridges'
+  | 'maintenance_orders'
+  | 'construction_projects'
+  | 'maintenance_budgets'
+  | 'streetlights'
+  | 'traffic_signals'
 
 export type FilterOp =
   | 'eq' | 'neq'

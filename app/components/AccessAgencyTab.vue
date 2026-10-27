@@ -39,15 +39,19 @@
                 />
               </td>
               <td :data-testid="`ceiling-${m}`" data-label="Allowed by super admin">
+                <AccessScopeStatus v-if="!canEditCeiling" :scope="moduleStatus('ceiling', m)" />
                 <AccessScopeToggle
+                  v-else
                   :model-value="raw('ceiling', m)" allow-inherit
                   :inherited-label="moduleInherited('ceiling', m)"
-                  :disabled="!canEditCeiling" :label="`${label(m)}, allowed`"
+                  :label="`${label(m)}, allowed`"
                   @update:model-value="v => emitScope('ceiling', m, v)"
                 />
               </td>
               <td :data-testid="`enabled-${m}`" data-label="Enabled for agency">
+                <AccessScopeStatus v-if="enabledIsStatus" :scope="moduleStatus('enabled', m)" />
                 <AccessScopeToggle
+                  v-else
                   :model-value="raw('enabled', m)" allow-inherit
                   :inherited-label="moduleInherited('enabled', m)"
                   :max="ceilingScope(m)"
@@ -60,15 +64,19 @@
               <tr v-for="r in shownRoutes(m, routes)" :key="r" class="page-row">
                 <td class="page-cell stack-title"><code>{{ r }}</code></td>
                 <td :data-testid="`ceiling-${r}`" data-label="Allowed by super admin">
+                  <AccessScopeStatus v-if="!canEditCeiling" :scope="pageScope(overrides, code, 'ceiling', null, r)" />
                   <AccessScopeToggle
+                    v-else
                     :model-value="raw('ceiling', r)" allow-inherit compact
                     :inherited-label="pageScope(overrides, code, 'ceiling', null, r, { layer: 'ceiling', key: 'route' })"
-                    :disabled="!canEditCeiling" :label="`${r}, allowed`"
+                    :label="`${r}, allowed`"
                     @update:model-value="v => emitScope('ceiling', r, v)"
                   />
                 </td>
                 <td :data-testid="`enabled-${r}`" data-label="Enabled for agency">
+                  <AccessScopeStatus v-if="enabledIsStatus" :scope="pageScope(overrides, code, 'enabled', null, r)" />
                   <AccessScopeToggle
+                    v-else
                     :model-value="raw('enabled', r)" allow-inherit compact
                     :inherited-label="pageScope(overrides, code, 'enabled', null, r, { layer: 'enabled', key: 'route' })"
                     :max="pageScope(overrides, code, 'ceiling', null, r)"
@@ -146,6 +154,12 @@ function raw(layer: EditableLayer, key: string): ScopeLevel | null {
 }
 function moduleInherited(layer: EditableLayer, m: string): string {
   const s = moduleSummary(props.overrides, props.code, layer, null, m, { layer, key: 'module' })
+  return s.mixed ? 'mixed' : s.scope
+}
+/** Super admin manages what is allowed, not the agency's own switches; a view-only viewer sees status in both columns. */
+const enabledIsStatus = computed(() => props.canEditCeiling || !props.canEditEnabled)
+function moduleStatus(layer: EditableLayer, m: string): ScopeLevel | 'mixed' {
+  const s = moduleSummary(props.overrides, props.code, layer, null, m)
   return s.mixed ? 'mixed' : s.scope
 }
 function emitScope(layer: EditableLayer, key: string, value: ScopeLevel | null) {

@@ -33,8 +33,10 @@ backend is `ahead-of-backend`, and a `fetch(params, options)`.
 - 19 fixed sources: `safety.summary`, `safety.hotspots`, `safety.top-blackspots`, `fleet.summary`, `rail.summary`,
   `aviation.summary`, `aviation.infra`, `maritime.ops`, `maritime.cargo`, `infra.summary`, `integrations.feeds`,
   `traffic.summary`, `pt.summary`, `gis.roads` and five `training.*` sources.
-- 6 query sources, one per Query Builder dataset (`query.incidents`, `query.blackspots`, `query.congestion`,
-  `query.traffic_counts`, `query.vehicles`, `query.gps_tracks`) over `/query/execute/`, and 3 same-permission joins
+- 13 query sources, one per Query Builder dataset (`query.incidents`, `query.blackspots`, `query.congestion`,
+  `query.traffic_counts`, `query.vehicles`, `query.gps_tracks`, plus the M06 `query.road_segments`, `query.bridges`,
+  `query.maintenance_orders`, `query.construction_projects`, `query.maintenance_budgets`, `query.streetlights`,
+  `query.traffic_signals`) over `/query/execute/`, and 3 same-permission joins
   (`query.join.vehicles-gps`, `query.join.incidents-blackspots`, `query.join.congestion-counts`) over
   `/query/execute-join/`. The server returns at most `QUERY_MAX_ROWS = 500` records, and widgets say so when an
   aggregate covers only part of the data (`Frame.meta.partial`).
@@ -255,6 +257,17 @@ for the session.
 - No fabricated or sampled data in previews or palette thumbnails.
 - No number animation on refresh.
 - A widget never implies filter coverage it lacks.
+
+### Who sees what (coverage tab)
+
+The matrix resolves agency x department x role with the client copy of `resolveDashboard`, from the published
+dashboards `GET /dashboards/` returns. Notes:
+
+- An agency admin's list only holds dashboards their agency owns, so a national dashboard that wins for their users
+  is not counted; the empty cell reads "No agency dashboard" (not "Built-in fallback") and a banner says so.
+- `super_admin` and `public` are not shown as role columns.
+- An agency with no departments registered gets one "Whole agency" row (resolved with no department), so
+  agency-wide and role-wide dashboards still show.
 - Time buckets are East Africa Time (UTC+3), not UTC.
 - `FleetSummary.governor_compliance` is deliberately not bound anywhere because the backend returns hard-coded
   zeros (BACKEND item B5 in Widgets.md).
@@ -272,4 +285,5 @@ for the session.
 Tracked in [Widgets.md](Widgets.md) sections 9 to 13 (B1 to B26). The ones that most affect what ships:
 widget type and source allow-lists in `catalog.py` (B1, B2, B8 to B10), server-side catalog-scope and publish
 validation (B11, B17), a training summary endpoint (B13), per-dataset authorisation of `/query/execute/` for
-dashboard viewers (B21), and server-side aggregation (B22).
+dashboard viewers (B21, done 2026-10-26: page scope, agency rows and masked fields are checked on every read), and
+server-side aggregation (B22).

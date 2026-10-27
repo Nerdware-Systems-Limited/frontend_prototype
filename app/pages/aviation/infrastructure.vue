@@ -17,10 +17,10 @@
 
   <!-- Real registry KPIs -->
   <div class="kpi-grid">
-    <KpiCard label="Registered Airports" :value="fmtNum(airports.length)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`${fmtNum(internationalCount)} international`" to="#airport-registry" />
+    <KpiCard label="Registered Airports" :value="fmtNum(registered.length)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`${fmtNum(internationalCount)} international · ${fmtNum(airstripCount)} airstrips/heliports mapped`" to="#airport-registry" />
     <KpiCard label="Total Runways" :value="fmtNum(totalRunways)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" description="Across all registered airports" to="#airport-registry" />
     <KpiCard label="Design Capacity" :value="`${fmtNum(totalDesignCapacity)}/yr`" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" description="Sum of registered passenger design capacity" to="#terminal-capacity" />
-    <KpiCard label="Active Airports" :value="fmtNum(activeCount)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`of ${fmtNum(airports.length)} registered`" to="#airport-registry" />
+    <KpiCard label="Active Airports" :value="fmtNum(activeCount)" :unavailable="loading || apError" :unavailable-note="loading ? 'Loading…' : 'KAA Registry feed unavailable'" period="LIVE" :description="`of ${fmtNum(registered.length)} registered`" to="#airport-registry" />
   </div>
 
   <!-- TBD infra KPIs -->
@@ -68,15 +68,10 @@
   </div>
 
   <!-- Airport map -->
-  <SectionTitle pill="Live Registry">Airport Map</SectionTitle>
-  <CollapsibleSection class="card map-card" title="Registered Airports" storage-key="map:aviation/infrastructure">
+  <SectionTitle pill="KAA registry · OSM airports">Airport Map</SectionTitle>
+  <CollapsibleSection class="card map-card" title="Airports, runways and airside layout" storage-key="map:aviation/infrastructure">
     <ClientOnly>
-      <UaptsMap
-        :markers="airportMarkers"
-        :center="[0.0, 37.9]"
-        :zoom="6"
-        height="380px"
-      />
+      <AirportsMap :airports="airports" :runways="runwayLines" :show-airstrips="false" height="440px" />
     </ClientOnly>
   </CollapsibleSection>
 
@@ -85,7 +80,7 @@
   <div class="card">
     <div class="card-body">
       <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search name / IATA / city…" style="min-width:180px" />
+        <input v-model="search" class="select-sm" placeholder="Search name / IATA / city / county…" style="min-width:180px" />
         <select v-model="typeFilter" class="select-sm">
           <option value="">All types</option>
           <option value="international">International</option>
@@ -93,8 +88,11 @@
           <option value="domestic">Domestic</option>
           <option value="military">Military</option>
           <option value="private">Private</option>
+          <option value="heliport">Heliport</option>
+          <option value="airstrip">Airstrip</option>
         </select>
-        <button class="btn" @click="search=''; typeFilter=''">Clear</button>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input v-model="registeredOnly" type="checkbox"> Registered airports only (with an IATA code)</label>
+        <button class="btn" @click="search=''; typeFilter=''; registeredOnly=true">Clear</button>
       </div>
       <div class="table-scroll">
         <table>
@@ -102,8 +100,8 @@
           <tbody v-if="filteredAirports.length">
             <tr v-for="a in airportsPageRows" :key="a.id">
               <td style="font-weight:600">{{ a.name }}</td>
-              <td style="font-family:monospace;font-size:12px">{{ a.iata_code }} / {{ a.icao_code }}</td>
-              <td style="font-size:12px">{{ a.city }}</td>
+              <td style="font-family:monospace;font-size:12px">{{ a.iata_code ?? '-' }} / {{ a.icao_code ?? '-' }}</td>
+              <td style="font-size:12px">{{ a.city }}<span v-if="a.county && a.county !== a.city" style="color:var(--fg-3)"> · {{ a.county }}</span></td>
               <td><BadgePill variant="info">{{ a.airport_type }}</BadgePill></td>
               <td>{{ a.runway_count }}</td>
               <td>{{ fmtNum(a.elevation_ft) }}</td>
@@ -128,12 +126,14 @@
     <div class="card-body">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Airport</th><th>Runway</th><th>Length (m)</th><th>Surface</th><th>PCN Rating</th><th>Status</th><th>Last Inspection</th><th>Next Inspection</th><th>Defect Notes</th></tr></thead>
+          <thead><tr><th>Airport</th><th>Runway</th><th>Length (m)</th><th>TORA / LDA (m)</th><th>ILS</th><th>Surface</th><th>PCN Rating</th><th>Status</th><th>Last Inspection</th><th>Next Inspection</th><th>Defect Notes</th></tr></thead>
           <tbody v-if="runways.length">
             <tr v-for="r in runwaysPageRows" :key="r.id">
-              <td style="font-weight:600;font-family:monospace">{{ r.airport_iata }}</td>
+              <td style="font-weight:600;font-family:monospace" :title="r.airport_name">{{ r.airport_iata ?? r.airport_name ?? '-' }}</td>
               <td>{{ r.runway_id }}</td>
               <td>{{ r.length_m }}</td>
+              <td style="font-size:12px">{{ r.tora_m ?? '-' }} / {{ r.lda_m ?? '-' }}</td>
+              <td style="font-size:12px">{{ r.ils_category && r.ils_category !== 'none' ? 'CAT ' + r.ils_category : '-' }}</td>
               <td style="font-size:12px">{{ r.surface_type }}</td>
               <td>{{ r.pcn_rating ?? '-' }}</td>
               <td><BadgePill :variant="runwayBadge(r.status)">{{ r.status.replace(/_/g,' ') }}</BadgePill></td>
@@ -142,7 +142,7 @@
               <td style="font-size:12px">{{ r.defect_notes ?? '-' }}</td>
             </tr>
           </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Runway condition/PCN survey data has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
+          <tbody v-else><tr><td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'Runway condition/PCN survey data has not been integrated from KCAA asset management yet.' }}</td></tr></tbody>
         </table>
         <TablePagination
           :page="runwaysPage" :total-pages="runwaysTotalPages" :total="runwaysTotal"
@@ -231,6 +231,8 @@
       />
     </div>
   </div>
+  <AviationRawPanel id="ground-handlers" dataset="ground-handlers" />
+  <AviationRawPanel id="atm-performance" dataset="atm" />
 </template>
 
 <script setup lang="ts">
@@ -238,11 +240,12 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
 import { useAviationMaritime, useAviationInfrastructure } from '~/composables/api'
-import type { Airport, PassengerByAirport, Runway, Navaid, AviationFacility, AviationCapitalWork, AviationInfraSummary } from '~/composables/api'
+import type { Airport, PassengerByAirport, Runway, RunwayFeature, Navaid, AviationFacility, AviationCapitalWork, AviationInfraSummary } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
 
 const airports     = ref<Airport[]>([])
+const runwayLines  = ref<RunwayFeature[]>([])
 const pax          = ref<PassengerByAirport[]>([])
 const runways      = ref<Runway[]>([])
 const navaids      = ref<Navaid[]>([])
@@ -257,6 +260,7 @@ const paxDays       = ref(30)
 
 const search     = ref('')
 const typeFilter = ref('')
+const registeredOnly = ref(true)
 
 async function load() {
   loading.value = true
@@ -264,17 +268,19 @@ async function load() {
   const avm = useAviationMaritime()
   const ai  = useAviationInfrastructure()
 
-  const [apRes, paxRes, rwRes, ndRes, faRes, cwRes, sumRes] = await Promise.allSettled([
-    avm.airports(),
+  const [apRes, paxRes, rwRes, ndRes, faRes, cwRes, sumRes, rlRes] = await Promise.allSettled([
+    avm.airportsAll(),
     avm.passengersByAirport({ days: paxDays.value }),
     ai.runways({ page_size: 200 }),
     ai.navaids({ page_size: 200 }),
     ai.facilities({ page_size: 200 }),
     ai.capitalWorks({ page_size: 100 }),
     ai.summary(),
+    ai.runwaysGeoJSON(),
   ])
 
-  if (apRes.status  === 'fulfilled') airports.value     = (apRes.value as any).results ?? []
+  if (apRes.status  === 'fulfilled') airports.value     = apRes.value
+  if (rlRes.status  === 'fulfilled') runwayLines.value  = rlRes.value.features ?? []
   if (paxRes.status === 'fulfilled') pax.value          = (paxRes.value as any).results ?? []
   if (rwRes.status  === 'fulfilled') runways.value      = (rwRes.value as any).results ?? []
   if (ndRes.status  === 'fulfilled') navaids.value      = (ndRes.value as any).results ?? []
@@ -296,10 +302,13 @@ onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Real registry KPIs ───────────────────────────────────────────────────
-const internationalCount  = computed(() => airports.value.filter(a => a.has_international).length)
-const activeCount         = computed(() => airports.value.filter(a => a.active).length)
-const totalRunways        = computed(() => airports.value.reduce((s, a) => s + (a.runway_count ?? 0), 0))
-const totalDesignCapacity = computed(() => airports.value.reduce((s, a) => s + (a.design_capacity_passengers ?? 0), 0))
+// KPIs describe the registered airports (those with an IATA code); the code-less OSM airstrips are listed separately.
+const registered          = computed(() => airports.value.filter(a => a.iata_code))
+const airstripCount       = computed(() => airports.value.length - registered.value.length)
+const internationalCount  = computed(() => registered.value.filter(a => a.has_international).length)
+const activeCount         = computed(() => registered.value.filter(a => a.active).length)
+const totalRunways        = computed(() => registered.value.reduce((s, a) => s + (a.runway_count ?? 0), 0))
+const totalDesignCapacity = computed(() => registered.value.reduce((s, a) => s + (a.design_capacity_passengers ?? 0), 0))
 
 const openCapitalWorks  = computed(() => capitalWorks.value.filter(c => c.physical_progress_pct != null && c.physical_progress_pct < 100))
 // value_kes comes back as a string (Django DecimalField JSON serialization) -
@@ -346,26 +355,14 @@ const {
   total: capitalWorksTotal, next: capitalWorksNext, prev: capitalWorksPrev,
 } = usePagination(capitalWorks, 15)
 
-const airportMarkers = computed((): MarkerSpec[] =>
-  airports.value
-    .filter(a => a.latitude != null && a.longitude != null)
-    .map(a => ({
-      id: `ap-${a.id}`,
-      lat: a.latitude!,
-      lon: a.longitude!,
-      title: a.name,
-      subtitle: `${a.iata_code} / ${a.icao_code} · ${a.runway_count} runway(s) · ${a.active ? 'active' : 'inactive'}`,
-      color: a.airport_type === 'international' ? 'red' : a.airport_type === 'regional' ? 'blue' : 'green',
-      size: a.airport_type === 'international' ? 'lg' : 'md',
-    })),
-)
-
 // ── Registry filters ─────────────────────────────────────────────────────
 const filteredAirports = computed(() => airports.value.filter(a => {
   if (search.value) {
     const q = search.value.toLowerCase()
-    if (!a.name.toLowerCase().includes(q) && !a.iata_code.toLowerCase().includes(q) && !a.city.toLowerCase().includes(q)) return false
+    if (!a.name.toLowerCase().includes(q) && !(a.iata_code ?? '').toLowerCase().includes(q) && !a.city.toLowerCase().includes(q)
+        && !(a.county ?? '').toLowerCase().includes(q)) return false
   }
+  if (registeredOnly.value && !a.iata_code) return false
   if (typeFilter.value && a.airport_type !== typeFilter.value) return false
   return true
 }))

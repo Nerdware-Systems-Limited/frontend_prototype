@@ -6,7 +6,7 @@
   >
     <template #actions>
       <NuxtLink to="/notifications" class="btn"><ArrowLeft :size="14" aria-hidden="true" />Notifications</NuxtLink>
-      <button class="btn btn-primary" @click="openCreate">+ Create Rule</button>
+      <button v-if="canConfigureRules" class="btn btn-primary" @click="openCreate">+ Create Rule</button>
     </template>
   </PageHeader>
 
@@ -40,7 +40,7 @@
     <div id="alert-rules-list" class="card drill-target">
       <div class="card-header">
         Threshold-Based Alert Rules
-        <button class="mini-btn" @click="openCreate">+ Add Rule</button>
+        <button v-if="canConfigureRules" class="mini-btn" @click="openCreate">+ Add Rule</button>
       </div>
       <div class="card-body" style="padding:12px">
         <div v-if="rulesPageRows.length" class="rule-list">
@@ -59,9 +59,9 @@
               <span v-if="r.escalation_policy_id" class="rule-meta-chip rule-meta-chip--esc">⚡ {{ policyName(r.escalation_policy_id) }}</span>
             </div>
             <div class="rule-card-actions">
-              <button class="toggle-btn" :class="{ active: r.active }" :disabled="togglingId === r.id" @click="toggleRule(r)">{{ r.active ? 'On' : 'Off' }}</button>
-              <button class="btn" @click="openEdit(r)">Edit</button>
-              <button class="btn btn-tone-danger" :disabled="deletingId === r.id" @click="deleteRule(r.id)">{{ deletingId === r.id ? '…' : 'Delete' }}</button>
+              <button class="toggle-btn" :class="{ active: r.active }" :disabled="togglingId === r.id || !canConfigureRules" @click="toggleRule(r)">{{ r.active ? 'On' : 'Off' }}</button>
+              <button v-if="canConfigureRules" class="btn" @click="openEdit(r)">Edit</button>
+              <button v-if="canConfigureRules" class="btn btn-tone-danger" :disabled="deletingId === r.id" @click="deleteRule(r.id)">{{ deletingId === r.id ? '…' : 'Delete' }}</button>
             </div>
           </div>
         </div>
@@ -74,7 +74,7 @@
     <div class="card">
       <div class="card-header">
         Escalation Workflow Designer
-        <button class="mini-btn" @click="openPolicyCreate">+ New Workflow</button>
+        <button v-if="canConfigureRules" class="mini-btn" @click="openPolicyCreate">+ New Workflow</button>
       </div>
       <div class="card-body" style="padding:12px">
         <div v-if="policies.length" class="policy-list">
@@ -85,8 +85,8 @@
                 <div class="policy-desc">{{ p.description || 'No description' }}</div>
               </div>
               <div class="policy-actions">
-                <button class="mini-btn" @click="openPolicyEdit(p)">Edit</button>
-                <button class="mini-btn mini-btn--danger" :disabled="deletingPolicyId === p.id" @click="deletePolicy(p.id)">{{ deletingPolicyId === p.id ? '…' : 'Delete' }}</button>
+                <button v-if="canConfigureRules" class="mini-btn" @click="openPolicyEdit(p)">Edit</button>
+                <button v-if="canConfigureRules" class="mini-btn mini-btn--danger" :disabled="deletingPolicyId === p.id" @click="deletePolicy(p.id)">{{ deletingPolicyId === p.id ? '…' : 'Delete' }}</button>
               </div>
             </div>
 
@@ -327,6 +327,9 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowLeft } from 'lucide-vue-next'
 import { useNotifications } from '~/composables/api'
+
+const { hasCapability } = usePermissions()
+const canConfigureRules = computed(() => hasCapability('configure_rules'))
 import type {
   AlertRule, AlertStats, AlertActivityItem, EscalationPolicy, EscalationPolicyRequest,
   EscalationRun, EscalationRunStatus, EscalationQuickStats, EscalationStepInput,

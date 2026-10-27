@@ -8,7 +8,7 @@
       <TimeRangeSelector :range="timeRange" @change="load" />
       <select v-model="airportFilter" class="select-sm" @change="load">
         <option value="">All airports</option>
-        <option v-for="a in airports" :key="a.iata_code" :value="a.iata_code">{{ a.iata_code }} - {{ a.name }}</option>
+        <option v-for="a in airports.filter(x => x.iata_code)" :key="a.iata_code!" :value="a.iata_code!">{{ a.iata_code }} - {{ a.name }}</option>
       </select>
     </template>
   </PageHeader>
@@ -209,7 +209,7 @@ async function load() {
 
   const [byApRes, apRes, recRes] = await Promise.allSettled([
     avm.passengersByAirport({ days: days.value }),
-    avm.airports(),
+    avm.airports({ registered: true, page_size: 100 }),
     avm.passengerStats({ airport: airportFilter.value || undefined, days: days.value, page_size: 50 }),
   ])
 

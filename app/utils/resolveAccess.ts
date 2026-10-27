@@ -452,7 +452,12 @@ export function resolveFor(ov: PolicyOverrides, subject: AccessSubject | null, p
   const override = routeMeta?.minTierDomainOverride
   if (override && agency.domains.includes(override.domain)) minTier = override.minTier
   // allowRoles admits the named roles whatever their tier; every other role has to clear minTier.
-  if (!(routeMeta?.allowRoles ?? []).includes(roleTier) && tierRank(roleTier) < tierRank(minTier)) {
+  // An explicit role-level grant (Module Access, Roles tab) lifts the floor for that role on tenant-scoped
+  // routes: the agency admin chose to open the page to this role. Still clamped to the agency's enabled
+  // level above, and platform-wide routes (agencyScoped false, e.g. /agencies) keep the floor.
+  const roleGrant = pick(ov.agencies[code]?.roles?.[subject.custom_role || roleTier], moduleId, routeKey)
+  const floorLifted = (routeMeta?.agencyScoped ?? true) && !!roleGrant && roleGrant !== 'none'
+  if (!floorLifted && !(routeMeta?.allowRoles ?? []).includes(roleTier) && tierRank(roleTier) < tierRank(minTier)) {
     return denyResult(`role tier below ${minTier} for ${routeKey}`)
   }
 

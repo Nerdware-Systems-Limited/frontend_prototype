@@ -23,6 +23,7 @@ import { BASE_SETTINGS } from '~/utils/resolveAccess'
 import Page from '~/pages/access-policies.vue'
 import TabStrip from '~/components/TabStrip.vue'
 import AccessScopeToggle from '~/components/AccessScopeToggle.vue'
+import AccessScopeStatus from '~/components/AccessScopeStatus.vue'
 import AccessAgencyTab from '~/components/AccessAgencyTab.vue'
 import AccessRolesTab from '~/components/AccessRolesTab.vue'
 import AccessCategoriesTab from '~/components/AccessCategoriesTab.vue'
@@ -68,7 +69,7 @@ function mountPage() {
     global: {
       plugins: [pinia],
       components: {
-        TabStrip, AccessScopeToggle, AccessScopeLegend, AccessModuleCell, AccessModuleFilters,
+        TabStrip, AccessScopeToggle, AccessScopeStatus, AccessScopeLegend, AccessModuleCell, AccessModuleFilters,
         OverflowMenu, SideDrawer, AccessHistoryList, AccessExportDialog,
         AccessAgencyTab, AccessRolesTab, AccessCategoriesTab, AccessPreviewPanel, SectionTitle,
       },
@@ -110,7 +111,9 @@ describe('access-policies page - agency access', () => {
     await flushPromises()
     expect(w.find('#agency-select').exists()).toBe(false)
     expect(w.find('.agency-name').text()).toContain('Kenya Ports Authority')
-    expect(btn(w, 'ceiling-M12', 'none').attributes('disabled')).toBeDefined()
+    // Allowed is a status badge for an agency admin, not a (disabled) selector.
+    expect(w.find('[data-testid="ceiling-M12"] .scope-seg').exists()).toBe(false)
+    expect(w.find('[data-testid="ceiling-M12"] .badge').exists()).toBe(true)
     // KPA's JSON denies M02 entirely (ceiling 'none') - nothing an agency
     // admin could do with it, so unlike M12 it isn't listed for them at all.
     expect(w.find('[data-testid="ceiling-M02"]').exists()).toBe(false)
@@ -243,7 +246,7 @@ describe('access-policies page - preview', () => {
     expect(routes()).toContain('/traffic')
     expect(routes()).not.toContain('/analytics') // minTier analyst
 
-    await btn(w, 'enabled-M02', 'none').trigger('click')
+    await btn(w, 'ceiling-M02', 'none').trigger('click')
     expect(routes()).not.toContain('/traffic')
   })
 })
@@ -322,11 +325,11 @@ describe('access-policies page - overflow menu', () => {
     await chooseMenu(w, 'history')
     expect(w.text()).toContain('No saved changes for this agency yet.')
 
-    await btn(w, 'enabled-M02', 'read').trigger('click')
+    await btn(w, 'ceiling-M02', 'read').trigger('click')
     await useAccessPolicyStore().save()
     await flushPromises()
     expect(w.find('.history-entry').text()).toContain('Changed Road Traffic')
-    expect(w.find('.history-entry').text()).toContain('Agency access')
+    expect(w.find('.history-entry').text()).toContain('Agency limit')
   })
 
   it('export opens a format dialog', async () => {

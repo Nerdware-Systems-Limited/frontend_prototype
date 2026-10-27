@@ -368,8 +368,6 @@ import { useAviationMaritime, useMaritimeInfrastructure } from '~/composables/ap
 import type { Port, Berth, ContainerByPort, MaritimeChannel, MaritimeNavaid, DryDock, InlandContainerDepot, MaritimeCapitalWork, MaritimeInfraSummary, CapitalWorkStatus } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
-// Kenya's two KPA-operated ports - same fixed lookup used across the maritime module's maps.
-const PORT_COORDS: Record<string, [number, number]> = { KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92] }
 
 const ports        = ref<Port[]>([])
 const berths        = ref<Berth[]>([])
@@ -491,18 +489,19 @@ const capacityUtilisation = computed(() => containers.value.map(c => {
 }).sort((a, b) => (b.utilizationPct ?? 0) - (a.utilizationPct ?? 0)))
 
 const portMarkers = computed((): MarkerSpec[] =>
-  ports.value.map((p, i) => {
-    const coords = PORT_COORDS[p.unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
-    const portBerths = berths.value.filter(b => b.port_unlocode === p.unlocode)
-    return {
-      id: `port-${p.unlocode}`,
-      lat: coords[0], lon: coords[1],
-      title: p.name,
-      subtitle: `${p.port_type.replace(/_/g, ' ')} · ${portBerths.length} berths · ${p.active ? 'active' : 'inactive'}`,
-      color: p.active ? 'blue' : 'gray',
-      size: 'lg',
-    }
-  }),
+  ports.value
+    .filter(p => p.latitude != null && p.longitude != null)
+    .map((p) => {
+      const portBerths = berths.value.filter(b => b.port_unlocode === p.unlocode)
+      return {
+        id: `port-${p.unlocode}`,
+        lat: p.latitude as number, lon: p.longitude as number,
+        title: p.name,
+        subtitle: `${p.port_type.replace(/_/g, ' ')} · ${portBerths.length} berths · ${p.active ? 'active' : 'inactive'}`,
+        color: p.active ? 'blue' : 'gray',
+        size: 'lg',
+      }
+    }),
 )
 
 // ── Filters ──────────────────────────────────────────────────────────────

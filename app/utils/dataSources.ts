@@ -154,11 +154,11 @@ async function agencyIdFor(code: string): Promise<string> {
 // below just picks its slice, in the shape the presets already bind to.
 const trainingSummary = (p: SummaryFilterParams) => useTraining().summary(p)
 
-// ── Query sources (M15 /query/execute/) ──────────────────────────────────
+// ── Query sources (/query/execute/) ──────────────────────────────────
 // "Any dataset on a dashboard" (docs/Widgets.md phase 5). One source per
 // allow-listed dataset; the binding's `params` carry the dataset fields,
 // filters, sort and limit. The server validates all of them and applies
-// the viewer's row-level access, so these are as safe as the summaries.
+// the viewer's access (page scope, agency rows, masked fields), so these are as safe as the summaries.
 
 /** The server returns at most this many records per request. */
 export const QUERY_MAX_ROWS = 500
@@ -201,6 +201,22 @@ export const QUERY_DATASETS: QueryDatasetSpec[] = [
     filterMap: {} },
   { dataset: 'gps_tracks', module: 'M03', route: '/fleet', label: 'GPS tracks (sample records)', source: 'NTSA iTIMS', permission: DOMAIN_PERMISSIONS.fleet,
     filterMap: { date_range: 'timestamp' } },
+  // M06 - the data behind the infrastructure pages. `route` is the dataset's primary page (apps/analytics/query.py
+  // DATASETS and apps/dashboards/catalog.py SOURCES say the same); the server admits any of the dataset's pages.
+  { dataset: 'road_segments', module: 'M06', route: '/infrastructure', label: 'Road segments (records)', source: 'KeNHA / KURA / KeRRA', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { county: 'county', road: 'road_code', agency: 'agency_code' } },
+  { dataset: 'bridges', module: 'M06', route: '/infrastructure/bridges', label: 'Bridges (records)', source: 'KeNHA / KRB / LAPSSET', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { agency: 'agency_code' } },
+  { dataset: 'maintenance_orders', module: 'M06', route: '/infrastructure/maintenance', label: 'Maintenance orders (records)', source: 'KeNHA / KURA / KeRRA', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { date_range: 'scheduled_at', road: 'segment_road_code' } },
+  { dataset: 'construction_projects', module: 'M06', route: '/infrastructure/projects', label: 'Construction projects (records)', source: 'KeNHA / KURA / KeRRA', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { county: 'county', agency: 'agency_code' } },
+  { dataset: 'maintenance_budgets', module: 'M06', route: '/infrastructure/funding', label: 'Maintenance budgets (records)', source: 'KRB / agency budgets', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { agency: 'agency_code' } },
+  { dataset: 'streetlights', module: 'M06', route: '/infrastructure/bridges', label: 'Streetlights (records)', source: 'KURA / KeNHA', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { road: 'segment_road_code', agency: 'agency_code' } },
+  { dataset: 'traffic_signals', module: 'M06', route: '/infrastructure', label: 'Traffic signals (records)', source: 'KURA / KeNHA', permission: DOMAIN_PERMISSIONS.infra,
+    filterMap: { agency: 'agency_code' } },
 ]
 export const QUERY_DATASETS_BY_KEY = Object.fromEntries(QUERY_DATASETS.map(d => [d.dataset, d])) as Record<QueryDatasetKey, QueryDatasetSpec>
 

@@ -49,10 +49,12 @@ export function useAuth() {
     isLoading:       computed(() => store.isLoading),
     userInitials:    computed(() => store.userInitials),
     showMfaNudge:    computed(() => store.showMfaNudge),
+    mfaSetupRequired: computed(() => store.mfaSetupRequired),
     // actions
     login,
     logout,
     dismissMfaNudge: store.dismissMfaNudge,
+    skipMfaNudge: store.skipMfaNudge,
     fetchMe: store.fetchMe,
     mfaVerify,
     mfaResend: store.mfaResend,
@@ -63,4 +65,4 @@ export function useAuth() {
     confirmPasswordReset: store.confirmPasswordReset,
     changePassword: store.changePassword,
   }
-}
+}

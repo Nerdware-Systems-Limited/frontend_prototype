@@ -6,7 +6,7 @@
   >
     <template #actions>
       <span class="freshness-badge">{{ runs.length ? `${runs.length} recent runs` : 'No recent runs' }}</span>
-      <button class="btn btn-primary" @click="showGenerateModal = true">+ Generate Report</button>
+      <button v-if="hasCapability('run_reports')" class="btn btn-primary" @click="showGenerateModal = true">+ Generate Report</button>
     </template>
   </PageHeader>
 
@@ -174,6 +174,8 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight, Download } from 'lucide-vue-next'
+
+const { hasCapability } = usePermissions()
 import { useReports, useQuery } from '~/composables/api'
 import type { ReportTemplate, ReportRun, SavedQuery, ScheduleFrequency, SavedQueryFormat } from '~/composables/api'
 

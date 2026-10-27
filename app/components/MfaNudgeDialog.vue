@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition name="nudge-fade">
       <div
-        v-if="showMfaNudge"
+        v-if="open"
         class="nudge-backdrop"
         role="dialog"
         aria-modal="true"
@@ -110,7 +110,15 @@
             </div>
           </template>
 
-          <button type="button" class="nudge-skip" :disabled="busy" @click="dismissMfaNudge">
+          <template v-if="mfaSetupRequired">
+            <p class="nudge-forced">
+              You've skipped this {{ skipLimit }} times. Two-factor authentication is now required to continue.
+            </p>
+            <button type="button" class="nudge-skip" :disabled="busy" @click="logout">
+              <LogOut :size="14" /> Log out
+            </button>
+          </template>
+          <button v-else type="button" class="nudge-skip" :disabled="busy" @click="skip">
             Skip securing my account
           </button>
         </div>
@@ -120,12 +128,18 @@
 </template>
 
 <script setup lang="ts">
-import { ShieldAlert, KeyRound, Database, Mail, Smartphone, AlertCircle } from 'lucide-vue-next'
+import { ShieldAlert, KeyRound, Database, Mail, Smartphone, AlertCircle, LogOut } from 'lucide-vue-next'
 
 const {
-  user, userInitials, showMfaNudge, dismissMfaNudge,
+  user, userInitials, showMfaNudge, mfaSetupRequired, dismissMfaNudge, skipMfaNudge, logout,
   mfaEnroll, mfaEnrollVerify, mfaResend,
 } = useAuth()
+
+// Forced once the account's skips are used up - the skip button goes away and
+// the dialog stays up (even after a reload) until MFA is enrolled.
+const open = computed(() => showMfaNudge.value || mfaSetupRequired.value)
+const skipLimit = computed(() => user.value?.mfa_skip_limit ?? 3)
+const skipsLeft = computed(() => Math.max(0, skipLimit.value - (user.value?.mfa_skip_count ?? 0)))
 
 const step = ref<'choose' | 'code'>('choose')
 const channel = ref<'email' | 'sms'>('email')
@@ -140,6 +154,22 @@ function errorDetail(err: unknown, fallback: string): string {
   const detail = (err as { data?: { detail?: string } })?.data?.detail
   if (status === 429) return 'Too many attempts. Please wait and try again.'
   return detail ?? fallback
+}
+
+async function skip() {
+  busy.value = true
+  error.value = ''
+  try {
+    await skipMfaNudge()
+  } catch (err) {
+    // 403 = limit already reached elsewhere; the store has synced the counts,
+    // so `mfaSetupRequired` flips and the dialog becomes non-dismissable.
+    if ((err as { status?: number })?.status !== 403) {
+      error.value = errorDetail(err, 'Could not skip right now. Please try again.')
+    }
+  } finally {
+    busy.value = false
+  }
 }
 
 async function sendCode() {
@@ -190,8 +220,8 @@ async function confirm() {
 }
 
 // Reset internal state each time the nudge is (re)shown by a fresh sign-in.
-watch(showMfaNudge, (open) => {
-  if (open) {
+watch(open, (isOpen) => {
+  if (isOpen) {
     step.value = 'choose'
     channel.value = 'email'
     code.value = ''
@@ -200,8 +230,8 @@ watch(showMfaNudge, (open) => {
 })
 
 // Lock body scroll while the dialog is up.
-watch(showMfaNudge, (open) => {
-  if (typeof document !== 'undefined') document.body.style.overflow = open ? 'hidden' : ''
+watch(open, (isOpen) => {
+  if (typeof document !== 'undefined') document.body.style.overflow = isOpen ? 'hidden' : ''
 }, { immediate: true })
 onUnmounted(() => {
   if (typeof document !== 'undefined') document.body.style.overflow = ''
@@ -369,8 +399,10 @@ onUnmounted(() => {
 }
 .nudge-link { color: var(--link); }
 .nudge-link:hover:not(:disabled) { text-decoration: underline; }
-.nudge-skip { align-self: center; padding: 6px 10px; font-size: .875rem; }
+.nudge-skip { display: inline-flex; align-items: center; gap: 6px; align-self: center; padding: 6px 10px; font-size: .875rem; }
 .nudge-skip:hover:not(:disabled) { color: var(--fg); text-decoration: underline; }
+.nudge-skip-left { color: var(--fg3); }
+.nudge-forced { margin: 0; text-align: center; font-size: .8125rem; color: var(--danger-fg); }
 .nudge-link:disabled, .nudge-skip:disabled { opacity: .5; cursor: not-allowed; }
 
 .nudge-error {

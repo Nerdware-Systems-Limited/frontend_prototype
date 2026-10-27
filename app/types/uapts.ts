@@ -53,6 +53,10 @@ export interface User {
   mfa_active?: boolean
   /** Delivery channel for MFA codes - set once enrollment completes. */
   mfa_channel?: 'email' | 'sms' | ''
+  /** Times the user has skipped the "Secure your account" prompt. */
+  mfa_skip_count?: number
+  /** Per-account skips allowed before MFA setup is forced (default 3). */
+  mfa_skip_limit?: number
   /** E.164 format, e.g. +254712345678. Required for the SMS MFA channel. */
   phone_number?: string
   is_active?: boolean
@@ -77,6 +81,8 @@ export interface LoginResponse {
   access: string
   refresh: string
   user: AuthUser
+  /** True once the account has used up its MFA skips - setup can no longer be dismissed. */
+  mfa_setup_required?: boolean
 }
 
 /** Token refresh response. */
@@ -166,4 +172,4 @@ export interface ApiError {
   code?: string
   errors?: Array<{ field: string; message: string; code?: string }>
   request_id?: string
-}
+}

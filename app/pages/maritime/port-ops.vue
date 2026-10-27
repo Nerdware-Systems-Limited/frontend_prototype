@@ -255,8 +255,6 @@ import { useAviationMaritime } from '~/composables/api'
 import type { MaritimeOps, Berth } from '~/composables/api'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
-// Kenya's two KPA-operated ports - same fixed lookup used on the maritime overview map.
-const PORT_COORDS: Record<string, [number, number]> = { KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92] }
 
 const opsData        = ref<MaritimeOps | null>(null)
 const berths         = ref<Berth[]>([])
@@ -328,18 +326,19 @@ const {
 } = usePagination(yardDwell, 15)
 
 const portMarkers = computed((): MarkerSpec[] =>
-  (opsData.value?.ports ?? []).map((p, i) => {
-    const coords = PORT_COORDS[p.port_unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
-    const portBerths = berths.value.filter(b => b.port_unlocode === p.port_unlocode)
-    return {
-      id: `port-${p.port_unlocode}`,
-      lat: coords[0], lon: coords[1],
-      title: p.port_name,
-      subtitle: `${portBerths.filter(b => b.active).length}/${portBerths.length} berths active · ${p.currently_in_port} vessels in port`,
-      color: 'blue',
-      size: 'lg',
-    }
-  }),
+  (opsData.value?.ports ?? [])
+    .filter(p => p.latitude != null && p.longitude != null)
+    .map((p) => {
+      const portBerths = berths.value.filter(b => b.port_unlocode === p.port_unlocode)
+      return {
+        id: `port-${p.port_unlocode}`,
+        lat: p.latitude as number, lon: p.longitude as number,
+        title: p.port_name,
+        subtitle: `${portBerths.filter(b => b.active).length}/${portBerths.length} berths active · ${p.currently_in_port} vessels in port`,
+        color: 'blue',
+        size: 'lg',
+      }
+    }),
 )
 
 // ── Helpers ────────────────────────────────────────────────────────────────

@@ -16,11 +16,19 @@ import type { Paged } from '~/types/uapts'
 
 // ── Domain types ──────────────────────────────────────────────────────
 
-export type AirportType = 'international' | 'regional' | 'domestic' | 'military' | 'private'
+export type AirportType = 'international' | 'regional' | 'domestic' | 'military' | 'private' | 'heliport' | 'airstrip'
 export interface Airport {
   id: string
-  iata_code: string
-  icao_code: string
+  /** Null for airstrips / heliports loaded from the OSM airports layer (they have no IATA code). */
+  iata_code: string | null
+  icao_code: string | null
+  osm_id?: string | null
+  county?: string
+  certificate_no?: string
+  certificate_issued?: string | null
+  certificate_expires?: string | null
+  certificate_status?: '' | 'certified' | 'provisional' | 'restricted' | 'closed'
+  fire_category?: number | null
   name: string
   city: string
   country: string
@@ -119,7 +127,7 @@ export type SafetyReportType = 'accident' | 'serious_incident' | 'incident' | 'o
 
 // ── Maritime types ───────────────────────────────────────────────────
 
-export type PortType = 'sea' | 'inland_dry' | 'oil' | 'fishing' | 'marina'
+export type PortType = 'sea' | 'inland_dry' | 'oil' | 'fishing' | 'marina' | 'ferry'
 export interface Port {
   id: string
   unlocode: string
@@ -148,9 +156,25 @@ export interface Berth {
   max_vessel_loa: number
   crane_count: number
   active: boolean
+  latitude: number | null
+  longitude: number | null
+  terminal: string
+  terminal_operator: string
+  draught_restriction_m: number | null
+  sts_crane_count: number
+  rtg_crane_count: number
+  mobile_crane_count: number
+  yard_area_ha: number
+  teu_ground_slots: number
+  reefer_plug_count: number
+  gate_lanes_in: number
+  gate_lanes_out: number
+  warehouse_area_m2: number
+  equipment_availability_pct: number | null
+  operational_status: 'operational' | 'limited' | 'maintenance' | 'closed'
 }
 
-export type VesselType = 'container' | 'bulk_carrier' | 'tanker' | 'general_cargo' | 'vehicle' | 'cruise' | 'fishing' | 'other'
+export type VesselType = 'container' | 'bulk_carrier' | 'tanker' | 'general_cargo' | 'vehicle' | 'cruise' | 'fishing' | 'other' | 'passenger' | 'tug' | 'supply' | 'dredger'
 export interface Vessel {
   id: string
   imo_number: string
@@ -167,6 +191,20 @@ export interface Vessel {
   owner: string
   operator: string
   safety_cert_status: 'valid' | 'expired' | 'pending'
+  registration_number: string
+  licensing_status: string
+  registered_at: string | null
+  net_tonnage: number
+  home_port: string
+  managing_company: string
+  owner_address: string
+  registry_certificate_number: string
+  registry_certificate_issued: string | null
+  class_society: string
+  seaworthiness_certificate_number: string
+  seaworthiness_expiry: string | null
+  trading_area: string
+  operational_status: '' | 'in_service' | 'laid_up' | 'under_survey' | 'total_loss' | 'deregistered'
 }
 
 export type VesselMovementType = 'arrival' | 'berthing' | 'departure' | 'anchor' | 'pilot_board' | 'tug'
@@ -277,6 +315,8 @@ export interface PortOps {
   port_unlocode: string
   port_name: string
   port_type: PortType
+  latitude: number | null
+  longitude: number | null
   arrivals_30d: number
   departures_30d: number
   currently_in_port: number
@@ -349,8 +389,21 @@ export function useAviationMaritime() {
 
   return {
     // ── Aviation catalog ──────────────────────────────────────────
-    airports: (q?: { iata?: string; city?: string; airport_type?: string }) =>
+    /** `registered` drops the code-less airstrips (OSM layer); `page_size` is capped at 100 server-side. */
+    airports: (q?: { iata?: string; city?: string; airport_type?: string; county?: string; registered?: boolean; page_size?: number; page?: number }) =>
       api<Paged<Airport>>(`${AV}/airports/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    /** Every airport, following the pages (a few hundred rows once the OSM airstrips are loaded). */
+    airportsAll: async (q?: { registered?: boolean; airport_type?: string }) => {
+      const out: Airport[] = []
+      for (let page = 1; page <= 20; page++) {
+        const res = await api<Paged<Airport>>(`${AV}/airports/`, { query: cleanQuery({ ...q, page, page_size: 100 } as Record<string, unknown>) })
+        out.push(...(res.results ?? []))
+        if (!res.next) break
+      }
+      return out
+    },
+    airportPerformance: (q?: { airport?: string; date_from?: string; date_to?: string; hourly?: '0' | '1'; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/airport-performance/`, { query: cleanQuery(q as Record<string, unknown>) }),
     airlines: (q?: { aoc_status?: string; cargo_only?: boolean; page_size?: number }) =>
       api<Paged<Airline>>(`${AV}/airlines/`, { query: cleanQuery(q as Record<string, unknown>) }),
     aircraft: (q?: { aircraft_type?: string; airline?: string; page_size?: number }) =>
@@ -377,7 +430,22 @@ export function useAviationMaritime() {
       api<{ results: PassengerByAirport[] }>(`${AV}/passenger-stats/by-airport/`, {
         query: withDaysAsDateFrom(cleanQuery(q as Record<string, unknown>)),
       }),
-    safetyReports: (q?: { airport?: string; airline?: string; severity?: string; days?: number }) =>
+    airCargoStats: (q?: { airport?: string; airline?: string; cargo_category?: string; customs_status?: string; days?: number; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/air-cargo-stats/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    airCargoByCategory: (q?: { airport?: string; days?: number }) =>
+      api<{ results: Array<{ cargo_category: string; import_t: number; export_t: number; transit_t: number; total_t: number; avg_dwell_h: number | null; rows: number }> }>(
+        `${AV}/air-cargo-stats/by-category/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    groundHandlers: (q?: { airport?: string; compliance_status?: string; expiring_days?: number; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/ground-handlers/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    airOperatorCertificates: (q?: { status?: string; ops_spec_type?: string; expiring_days?: number; search?: string; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/air-operator-certificates/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    airOperatorCertificateStats: () =>
+      api<{ total: number; valid: number; suspended: number; revoked: number; under_renewal: number; expiring_90d: number }>(`${AV}/air-operator-certificates/stats/`),
+    atmPerformance: (q?: { sector?: string; days?: number; page_size?: number }) =>
+      api<Paged<any>>(`${AV}/atm-performance/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    atmPerformanceSummary: (days = 30) =>
+      api<{ results: Array<Record<string, number | string | null>> }>(`${AV}/atm-performance/summary/?days=${days}`),
+    safetyReports: (q?: { airport?: string; airline?: string; severity?: string; days?: number; page_size?: number }) =>
       api<Paged<any>>(`${AV}/safety-reports/`, { query: cleanQuery(q as Record<string, unknown>) }),
     safetyReportStats: (days = 365) =>
       api<{ days: number; total_reports: number; fatal: number; serious: number; casualties: number }>(
@@ -425,6 +493,21 @@ export function useAviationMaritime() {
     maritimeIncidentStats: (days = 90) =>
       api<{ days: number; total_incidents: number; fatal_incidents: number; casualties: number; pollution_tons: number }>(
         `${MA}/maritime-incidents/stats/?days=${days}`,
+      ),
+    // KPA / KMA upload tables (read-only)
+    vesselCalls: (q?: { port?: string; vessel?: string; stage?: string; search?: string; page_size?: number }) =>
+      api<Paged<any>>(`${MA}/vessel-calls/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    containerMovements: (q?: { port?: string; movement_type?: string; container_number?: string; page_size?: number }) =>
+      api<Paged<any>>(`${MA}/container-movements/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    containerDwell: (q?: { port?: string; container_number?: string; exam_type?: string; detention_alert?: string; page_size?: number }) =>
+      api<Paged<any>>(`${MA}/container-dwell/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    bulkCargo: (q?: { port?: string; cargo_category?: string; page_size?: number }) =>
+      api<Paged<any>>(`${MA}/bulk-cargo/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    pollutionIncidents: (q?: { containment_status?: string; substance?: string; days?: number; page_size?: number }) =>
+      api<Paged<any>>(`${MA}/pollution-incidents/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    pollutionStats: (days = 365) =>
+      api<{ days: number; total: number; ongoing: number; legal_action: number; by_substance: { substance: string; count: number }[] }>(
+        `${MA}/pollution-incidents/stats/?days=${days}`,
       ),
     maritimeOperations: (days = 30, params?: SummaryFilterParams) =>
       api<MaritimeOps>(`${MA}/operations/`, { query: cleanQuery({ ...params, days }) }),

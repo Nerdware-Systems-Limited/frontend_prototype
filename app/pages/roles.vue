@@ -77,7 +77,6 @@
             <th>Role</th>
             <th>Status</th>
             <th>MFA</th>
-            <th>Staff</th>
             <th>Joined</th>
             <th>Actions</th>
           </tr>
@@ -106,9 +105,6 @@
               </td>
               <td data-label="MFA">
                 <BadgePill :variant="u.mfa_active ? 'success' : 'neutral'">{{ u.mfa_active ? 'On' : 'Off' }}</BadgePill>
-              </td>
-              <td data-label="Staff">
-                <BadgePill :variant="u.is_staff ? 'warning' : 'neutral'">{{ u.is_staff ? 'Staff' : 'No' }}</BadgePill>
               </td>
               <td class="dim date-cell" data-label="Joined">{{ fmtDate(u.created_at) }}</td>
               <td class="stack-actions">
@@ -159,12 +155,6 @@
               <td data-label="MFA">
                 <BadgePill :variant="u.mfa_active ? 'success' : 'neutral'">{{ u.mfa_active ? 'On' : 'Off' }}</BadgePill>
               </td>
-              <td data-label="Staff">
-                <label class="toggle-label">
-                  <input type="checkbox" v-model="editForm.is_staff" />
-                  <span>{{ editForm.is_staff ? 'Staff' : 'No' }}</span>
-                </label>
-              </td>
               <td class="dim date-cell" data-label="Joined">{{ fmtDate(u.created_at) }}</td>
               <td class="stack-actions">
                 <div class="action-group">
@@ -182,7 +172,7 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="8" class="empty-row">
+            <td colspan="7" class="empty-row">
               {{ loading ? 'Loading users…' : 'No users match the current filters.' }}
             </td>
           </tr>
@@ -345,18 +335,41 @@
             <th>Code</th>
             <th>Agency</th>
             <th>Parent</th>
+            <th v-if="canManageUsers" aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody v-if="departments.length">
           <tr v-for="d in departmentsPageRows" :key="d.id">
-            <td class="stack-title" style="font-weight:600">{{ d.department_name }}</td>
-            <td class="mono-sm" data-label="Code">{{ d.department_code }}</td>
+            <template v-if="editingDeptId === d.id">
+              <td class="stack-title">
+                <input v-model="editDeptName" class="select-sm" aria-label="Department name" style="width:100%" @keyup.enter="saveDepartment(d)" @keyup.escape="cancelEditDepartment" />
+              </td>
+              <td data-label="Code">
+                <input v-model="editDeptCode" class="select-sm mono-sm" aria-label="Department code" style="width:110px" @keyup.enter="saveDepartment(d)" @keyup.escape="cancelEditDepartment" />
+              </td>
+            </template>
+            <template v-else>
+              <td class="stack-title" style="font-weight:600">{{ d.department_name }}</td>
+              <td class="mono-sm" data-label="Code">{{ d.department_code }}</td>
+            </template>
             <td data-label="Agency"><BadgePill variant="neutral">{{ d.agency_code ?? d.agency }}</BadgePill></td>
             <td class="dim" data-label="Parent" style="font-size:12px">{{ d.parent_department ?? '-' }}</td>
+            <td v-if="canManageUsers" class="stack-actions">
+              <div class="action-group">
+                <template v-if="editingDeptId === d.id">
+                  <button class="btn btn-sm btn-primary" :disabled="savingDept || !editDeptName.trim() || !editDeptCode.trim()" @click="saveDepartment(d)">{{ savingDept ? 'Saving…' : 'Save' }}</button>
+                  <button class="btn btn-sm" :disabled="savingDept" @click="cancelEditDepartment">Cancel</button>
+                </template>
+                <template v-else>
+                  <button class="btn btn-sm" @click="startEditDepartment(d)">Edit</button>
+                  <button class="btn btn-sm btn-tone-danger" :disabled="deletingDeptId === d.id" @click="confirmDeleteDepartment(d)">{{ deletingDeptId === d.id ? '…' : 'Delete' }}</button>
+                </template>
+              </div>
+            </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="4" class="empty-row">{{ loading ? 'Loading…' : 'No departments found.' }}</td></tr>
+          <tr><td :colspan="canManageUsers ? 5 : 4" class="empty-row">{{ loading ? 'Loading…' : 'No departments found.' }}</td></tr>
         </tbody>
       </table>
       <TablePagination
@@ -444,7 +457,7 @@ const editingId = ref<string | null>(null)
 const savingId  = ref<string | null>(null)
 // roleSelection is either a built-in role_type ('admin', ...) or a custom
 // Role's id - saveEdit() below resolves it back to role_type + role.
-const editForm  = reactive({ roleSelection: 'public' as string, is_active: true, is_staff: false })
+const editForm  = reactive({ roleSelection: 'public' as string, is_active: true })
 
 const newRoleName    = ref('')
 const newRoleAgencyId = ref('')
@@ -624,7 +637,6 @@ const exportColumns = [
   { key: 'role',   label: 'Role' },
   { key: 'status', label: 'Status' },
   { key: 'mfa',    label: 'MFA' },
-  { key: 'staff',  label: 'Staff' },
   { key: 'joined', label: 'Joined' },
 ]
 const exportRows = computed(() => filteredUsers.value.map(u => ({
@@ -633,7 +645,6 @@ const exportRows = computed(() => filteredUsers.value.map(u => ({
   role:   u.role_type,
   status: u.is_active !== false ? 'Active' : 'Inactive',
   mfa:    u.mfa_active ? 'On' : 'Off',
-  staff:  u.is_staff ? 'Staff' : 'No',
   joined: fmtDate(u.created_at),
 })))
 
@@ -722,7 +733,6 @@ function startEdit(u: User) {
   editingId.value        = u.id
   editForm.roleSelection = customRoleOf(u)?.id ?? u.role_type
   editForm.is_active     = u.is_active !== false
-  editForm.is_staff      = u.is_staff ?? false
   actionError.value      = null
   actionSuccess.value    = null
 }
@@ -757,7 +767,6 @@ async function saveEdit(u: User) {
       // because its base_tier happens to match the new role_type.
       role: customRole?.id ?? null,
       is_active: editForm.is_active,
-      is_staff:  editForm.is_staff,
     }) as User
     const idx = users.value.findIndex(x => x.id === u.id)
     if (idx !== -1) users.value[idx] = { ...users.value[idx], ...updated }
@@ -873,6 +882,67 @@ async function createRole() {
     actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to create role.'
   } finally {
     creatingRole.value = false
+  }
+}
+
+// ── Editing and deleting a department ──────────────────────────────────
+const editingDeptId = ref<string | null>(null)
+const editDeptName = ref('')
+const editDeptCode = ref('')
+const savingDept = ref(false)
+const deletingDeptId = ref<string | null>(null)
+
+function startEditDepartment(d: Department) {
+  editingDeptId.value = d.id
+  editDeptName.value = d.department_name
+  editDeptCode.value = d.department_code
+}
+function cancelEditDepartment() {
+  editingDeptId.value = null
+}
+async function saveDepartment(d: Department) {
+  const name = editDeptName.value.trim()
+  const code = editDeptCode.value.trim()
+  if (!name || !code || savingDept.value) return
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
+  if (name === d.department_name && code === d.department_code) { editingDeptId.value = null; return }
+  savingDept.value = true
+  actionError.value = null
+  try {
+    const updated = await _useDepartments().update(d.id, { department_name: name, department_code: code }) as Department
+    const idx = departments.value.findIndex(x => x.id === d.id)
+    if (idx !== -1) departments.value[idx] = { ...departments.value[idx], ...updated }
+    editingDeptId.value = null
+    flash(`Department "${name}" updated.`)
+  } catch (err: any) {
+    actionError.value = err?.data?.detail ?? err?.data?.department_code?.[0] ?? err?.data?.department_name?.[0] ?? err?.message ?? 'Failed to update department.'
+  } finally {
+    savingDept.value = false
+  }
+}
+async function deleteDepartment(d: Department) {
+  if (!canManageUsers.value) { actionError.value = MANAGE_USERS_OFF; return }
+  deletingDeptId.value = d.id
+  actionError.value = null
+  try {
+    await _useDepartments().remove(d.id)
+    departments.value = departments.value.filter(x => x.id !== d.id)
+    flash(`Department "${d.department_name}" deleted.`)
+  } catch (err: any) {
+    // A department that still has users assigned is refused by the server with a reassign-first message.
+    actionError.value = err?.data?.detail ?? err?.message ?? 'Failed to delete department.'
+  } finally {
+    deletingDeptId.value = null
+  }
+}
+function confirmDeleteDepartment(d: Department) {
+  confirmAction.value = {
+    title: 'Delete department',
+    message: `Delete department "${d.department_name}" (${d.department_code})?\n\nA department that still has users assigned can't be deleted - reassign them first.`,
+    confirmLabel: 'Delete',
+    danger: true,
+    busyKey: d.id,
+    run: () => deleteDepartment(d),
   }
 }
 
@@ -1012,9 +1082,6 @@ function fmtDate(d?: string | null) {
 .dim          { color:var(--fg-3); }
 
 /* Tablet - shed the least-important columns before forcing horizontal scroll */
-@media (max-width:1100px) {
-  .users-table th:nth-child(6), .users-table td:nth-child(6) { display:none; } /* Staff */
-}
 @media (max-width:900px) {
   .users-table th:nth-child(5), .users-table td:nth-child(5) { display:none; } /* MFA */
 }
@@ -1085,9 +1152,9 @@ function fmtDate(d?: string | null) {
 .empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 
 /* Mobile - the stacked-card layout itself is .stack-table (theme.css). The
-   MFA/Staff columns are hidden on tablet above, so bring them back for cards. */
+   MFA column is hidden on tablet above, so bring it back for cards. */
 @media (max-width:768px) {
-  .users-table td:nth-child(5), .users-table td:nth-child(6) { display:flex; }
+  .users-table td:nth-child(5) { display:flex; }
   /* Row-state tints live on the <tr>; the shared card background outranks the
      plain class rules above, so restate them at card specificity. */
   .users-table > tbody > tr.row-editing  { background:var(--warning-bg); }

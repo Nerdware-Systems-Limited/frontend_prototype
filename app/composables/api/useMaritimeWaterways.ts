@@ -12,10 +12,12 @@
 // - `infrastructure()` returns the *same* NavigationAid/Channel rows
 // used by useMaritimeInfrastructure() (§6), just filtered to ones that
 // carry a `waterway` link - re-uses those types rather than redefining
-// a parallel shape. "Vessel traffic count" and "incidents" per waterway
-// are explicitly untracked on this backend (neither VesselMovement nor
-// MaritimeIncident carries a waterway FK) - `summary()` reports them as
-// `{tracked: false}` rather than a fabricated number.
+// a parallel shape. "Vessel traffic count" per waterway is untracked
+// (VesselMovement carries a port, not a waterway) - `summary()` reports it
+// as `{tracked: false}` rather than a fabricated number. "Incidents" are
+// tracked once MaritimeIncident.waterway is set (`manage.py link_waterways`).
+// `geometry(id)` returns the waterway's shape from the OSM hydrology layers,
+// matched by name - empty when the layers hold no feature with that name.
 // ─────────────────────────────────────────────────────────────────────
 
 import { useApi, cleanQuery } from './_client'
@@ -81,6 +83,8 @@ export function useMaritimeWaterways() {
     summary: () => api<MaritimeWaterwaysSummary>(`${M}/summary/`),
     list: (q?: MaritimeWaterwaysQuery) =>
       api<Paged<Waterway>>(`${M}/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    geometry: (id: string) =>
+      api<{ type: 'FeatureCollection'; features: unknown[] }>(`${M}/${id}/geometry/`),
     infrastructure: (q?: { waterway?: string }) =>
       api<WaterwayInfrastructure>(`${M}/infrastructure/`, { query: cleanQuery(q as Record<string, unknown>) }),
   }

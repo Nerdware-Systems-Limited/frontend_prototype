@@ -333,22 +333,16 @@ const {
 } = usePagination(berths, 15)
 
 const vesselMarkers = computed((): MarkerSpec[] => {
-  const portCoords: Record<string, [number, number]> = {
-    KEMBA: [-4.05, 39.68], KELAU: [-2.27, 40.92],
-  }
-  return ops.value?.ports
-    ? ops.value.ports.map((p, i) => {
-        const coords = portCoords[p.port_unlocode] ?? [-4.0 + i * 0.5, 39.7 + i * 0.3]
-        return {
-          id: `port-${p.port_unlocode}`,
-          lat: coords[0], lon: coords[1],
-          title: p.port_name,
-          subtitle: `${p.currently_in_port} vessels · ${fmtNum(p.teu_throughput_30d)} TEU/30d`,
-          color: 'blue',
-          size: 'lg',
-        }
-      })
-    : []
+  return (ops.value?.ports ?? [])
+    .filter(p => p.latitude != null && p.longitude != null)
+    .map(p => ({
+      id: `port-${p.port_unlocode}`,
+      lat: p.latitude as number, lon: p.longitude as number,
+      title: p.port_name,
+      subtitle: `${p.currently_in_port} vessels · ${fmtNum(p.teu_throughput_30d)} TEU/30d`,
+      color: 'blue' as const,
+      size: 'lg' as const,
+    }))
 })
 
 const maxTEU = computed(() => Math.max(1, ...containers.value.map(c => c.teus)))

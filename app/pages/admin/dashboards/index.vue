@@ -149,6 +149,11 @@
         </label>
       </div>
 
+      <div v-if="!canManageDashboards && directory" class="notice" role="note">
+        <Info :size="15" class="notice-icon" aria-hidden="true" />
+        <p>This matrix only counts dashboards your agency owns. A national dashboard assigned to your users can still take precedence, so "No agency dashboard" means none of yours applies, not that the built-in view is shown.</p>
+      </div>
+
       <EmptyState v-if="directoryLoading" loading />
       <div v-else-if="directory" class="card">
         <div class="card-header">
@@ -171,7 +176,7 @@
                 <th scope="row">{{ row.dept.name }}</th>
                 <td v-for="(cell, i) in row.cells" :key="i">
                   <NuxtLink v-if="cell" :to="`/admin/dashboards/${cell.id}`" class="dm-cell-link">{{ cell.name }}</NuxtLink>
-                  <span v-else class="dm-muted">Built-in fallback</span>
+                  <span v-else class="dm-muted">{{ canManageDashboards ? 'Built-in fallback' : 'No agency dashboard' }}</span>
                 </td>
               </tr>
             </tbody>
@@ -389,7 +394,10 @@ onMounted(async () => {
   const match = directory.value?.agencies.find(a => a.code.toLowerCase() === own)
   coverageAgency.value = match?.code ?? directory.value?.agencies[0]?.code ?? ''
 })
-const coverageRoles = computed(() => (directory.value?.roles ?? []).filter(r => !r.agency || r.agency === coverageAgency.value))
+// super_admin has no agency and public only ever gets the fixed restricted view, so neither is an audience here.
+const NOT_AN_AUDIENCE = new Set(['super_admin', 'public'])
+const coverageRoles = computed(() => (directory.value?.roles ?? [])
+  .filter(r => (!r.agency || r.agency === coverageAgency.value) && !NOT_AN_AUDIENCE.has(r.code)))
 const coverageRows = computed(() => {
   const agency = directory.value?.agencies.find(a => a.code === coverageAgency.value)
   if (!agency) return []
@@ -397,7 +405,10 @@ const coverageRows = computed(() => {
     userId: '__coverage__', agencyCode: agency.code, departmentCode: dept, roles: role ? [role] : [], permissions: [], isSuperAdmin: false,
   }).winner?.dashboard ?? null
   // The backend's default directory comes from settings and may omit departments.
-  return (agency.departments ?? []).map(dept => ({
+  // Agency- and role-level assignments don't need a department, so an agency with none registered
+  // still gets one row (resolved with no department) instead of an empty matrix.
+  const depts = agency.departments?.length ? agency.departments : [{ code: '', name: 'Whole agency (no departments registered)' }]
+  return depts.map(dept => ({
     dept,
     cells: [who(dept.code), ...coverageRoles.value.map(r => who(dept.code, r.code))],
   }))

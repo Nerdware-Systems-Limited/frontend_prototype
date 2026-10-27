@@ -305,7 +305,7 @@
         <button v-if="upload.duplicate_rows" class="btn" :disabled="includingDuplicates" @click="includeDuplicates">
           {{ includingDuplicates ? 'Including…' : `Include ${upload.duplicate_rows} duplicate row(s)` }}
         </button>
-        <button class="btn btn-primary" :disabled="!upload.valid_rows" @click="confirmingCommit = true">
+        <button v-if="hasCapability('approve_uploads')" class="btn btn-primary" :disabled="!upload.valid_rows" @click="confirmingCommit = true">
           Commit {{ upload.valid_rows.toLocaleString('en-KE') }} row(s)
         </button>
       </template>
@@ -321,6 +321,8 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
+
+const { hasCapability } = usePermissions()
 
 import { useIntegrations } from '~/composables/api'
 import type { DataUploadDetail, ExpectedColumn, FieldError, IngestedRecord, IngestedRowStatus, PreviewResult } from '~/composables/api'

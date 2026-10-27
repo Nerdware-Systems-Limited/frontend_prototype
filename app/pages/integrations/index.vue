@@ -348,9 +348,10 @@ const auth = useAuth()
 // Server-side enforcement is core.permissions.IsAdminRole - this is only a
 // UX nicety so a non-admin doesn't fill out the whole form before hitting
 // a 403; the real boundary is the backend either way.
+const { hasCapability } = usePermissions()
 const isAdmin = computed(() => {
   const rt = auth.user.value?.role_type
-  return rt === 'admin' || rt === 'super_admin' || !!auth.user.value?.is_staff
+  return (rt === 'admin' || rt === 'super_admin' || !!auth.user.value?.is_staff) && hasCapability('register_feeds')
 })
 
 const tab = ref<'upload' | 'api' | 'gis'>(route.query.tab === 'gis' ? 'gis' : 'upload')

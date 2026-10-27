@@ -76,14 +76,19 @@ Deny by default.
    `minTier`, or the agency's enabled layer denies it. This masks fields, it never blocks the route.
 9. Scope `none`: denied.
 10. **Route minimum tier** (`minTier`, optionally lowered by `minTierDomainOverride` for agencies in a domain,
-    and bypassed for roles listed in `allowRoles`): below it, denied.
+    and bypassed for roles listed in `allowRoles`): below it, denied. **An explicit role-level grant lifts the
+    floor**: if the Roles tab sets this role's module or page to `read`/`full` (an inherited value does not count),
+    the role clears `minTier` on tenant-scoped routes (`agencyScoped: true`). The grant is still clamped by the
+    agency's enabled layer, and platform-wide routes such as `/agencies` keep the floor. This is how an analyst can
+    be given Access Control (every M10 page is `minTier: admin`). The backend resolver does the same.
 11. Otherwise allowed at the resolved scope.
 
 A denial redirects to the safe space, never to an error page. `auth.global.ts` does not redirect when the user is
 already on the safe-space route.
 
 `custom_role` (a per-agency custom Role's name, when it differs from `role_type`) replaces the tier for **page and
-module scope only**. Capabilities and the route's `minTier` stay on `role_type`. The backend's
+module scope only**. Capabilities stay on `role_type`, and so does the route's `minTier` (the role-grant lift above
+looks up the override under `customRole || roleTier`). The backend's
 `apps/access_control/resolver.py` implements the same algorithm; keep both in step.
 
 ## 4. Module Access: three override layers
@@ -102,11 +107,23 @@ absent key means "inherit from the layer above". A layer can only narrow the one
 
 Platform-wide category blocks (`ingestion_validation`, `not_ingested`, `feature_flag_off`) cannot be changed.
 
-Capabilities are tier defaults that an agency can switch off. The list (`CAPABILITIES`) is built at runtime from the
+Capabilities are tier defaults that an agency can switch off (a switched-on capability does not widen what the
+role's own tier gate allows; the server checks both). The list (`CAPABILITIES`) is built at runtime from the
 `capabilities` arrays on the baseline's roles: currently `export`, `query_builder`, `manage_users`,
 `approve_uploads`, `register_feeds`, `configure_rules`, `run_reports`, `acknowledge_alerts`, `update_incidents`
 and `submit_uploads`. A gated control needs **both** the tier and the capability (`usePermissions().canExport`,
-`canUseQueryBuilder`, `canManageUsers`).
+`canUseQueryBuilder`, `canManageUsers`, or `hasCapability(name)`).
+
+| Capability | UI gate | Backend gate (`capability_permission`) |
+|---|---|---|
+| `manage_users` | `/users` and `/roles` write controls, departments Edit/Delete | user and role create/update/delete |
+| `query_builder` | query builder Run, Save, saved list | query execute/join, saved queries, SQL console |
+| `export` | `ExportButton`, query builder export | the shared `/export/` action |
+| `run_reports` | "+ Generate Report" | report generate (POST) |
+| `approve_uploads` | "Commit rows" on an upload | upload commit, GIS layer promote |
+| `register_feeds` | Register an API tab | feed register and test-connection |
+| `configure_rules` | alert rule and escalation policy create/edit/delete/toggle | alert rule and escalation policy writes |
+| `acknowledge_alerts`, `update_incidents`, `submit_uploads` | not read anywhere | **not enforced** (see section 8) |
 
 ## 5. The policy store
 
@@ -136,6 +153,10 @@ Pure helpers shared by the resolver, store and page: `accessEdits.ts` (`AccessEd
   and *Reset to agency defaults*.
 - Tabs: **Agency access**, **Role permissions**, **Data categories**. The first two share a search, an Access
   filter (Any / Full / Read / Restricted) and a Filter (All / Inherited / Custom).
+- Who gets a selector and who gets a status: **super admin** edits *Allowed by super admin* and sees *Enabled for
+  agency* and the role layers as status badges (Full access / Read only / No access / Mixed, `AccessScopeStatus`;
+  capability cells show a tick or dash). An **agency admin** edits Enabled and the roles and sees *Allowed* as a
+  status badge. A view-only viewer sees status everywhere. The Data categories tab still uses disabled checkboxes.
 - Edits are a draft until *Save changes*. *Discard*, a leave-page guard and `beforeunload` protect unsaved work.
   A super admin is asked to confirm edits with a serious consequence.
 
@@ -152,8 +173,18 @@ Pure helpers shared by the resolver, store and page: `accessEdits.ts` (`AccessEd
 
 ## 8. Known limits
 
-- **Capability gates are client-side only.** Switching a capability off hides the control but the backend's
-  export, query and user endpoints still gate on role tier alone.
+- **The API enforces page scope for only some modules.** Maritime/aviation, infrastructure (M06) and the query
+  datasets check the viewer's own page access server-side; traffic, fleet, safety, public transport, railway,
+  training, integrations, GIS, analytics and notifications do not yet, so for those a `none`/`read` setting hides
+  the page but does not stop a direct API call. Tracked as gap 4b in [SECURITY.md](SECURITY.md) with the rollout
+  order and per-app steps; helper `apps/access_control/wiring.gate`.
+- **Three capabilities are not enforced anywhere:** `acknowledge_alerts`, `update_incidents` and `submit_uploads`.
+  By default only the operator tier holds them, so enforcing them would lock admins (and analysts, for incidents)
+  out of existing workflows. Decide the default holders in the baseline first.
+- **Capability gates only narrow.** The other seven are enforced server-side next to the existing role gate. Granting
+  one to a role does not widen what that role's gate allows (for example an analyst granted `manage_users` is still
+  refused by `IsAdminRole`). Accounts with no agency that are not super admin hold no capabilities.
+- **Operators and analysts cannot commit uploads** by default: `approve_uploads` is admin-only.
 - **The baseline is vendored twice** (backend data file and the test fixture). Change them together.
 - **PDF export** uses the browser print dialog; there is no PDF library.
 - If the baseline request fails the whole app stays at "baseline routes only" until reload.

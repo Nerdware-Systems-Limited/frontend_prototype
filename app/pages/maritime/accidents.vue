@@ -58,7 +58,7 @@
     <ClientOnly>
       <UaptsMap :markers="incidentMarkers" :center="[-3.5, 40.0]" :zoom="6" height="380px" show-legend />
     </ClientOnly>
-    <EmptyState v-if="!incidentMarkers.length" :loading="loading" message="No incident could be matched to a known port position." compact />
+    <EmptyState v-if="!incidentMarkers.length" :loading="loading" message="No incident has a GPS position or a known port to plot." compact />
   </CollapsibleSection>
 
   <!-- Incident log -->
@@ -71,6 +71,9 @@
           <option value="serious">Serious</option>
           <option value="minor">Minor</option>
           <option value="none">None</option>
+          <option value="very_serious">Very serious (KMA)</option>
+          <option value="less_serious">Less serious (KMA)</option>
+          <option value="injury_only">Injury only (KMA)</option>
         </select>
         <button class="btn" @click="severityFilter=''">Clear</button>
         <ExportButton filename="uapts-maritime-incidents.csv" :rows="filteredIncidents" :columns="incidentExportColumns" style="margin-left:auto" />
@@ -100,6 +103,12 @@
                     <div class="dd-item"><span class="dd-label">Port</span><span>{{ portLabel(inc.port_unlocode) }} ({{ inc.port_unlocode }})</span></div>
                     <div class="dd-item"><span class="dd-label">Reporting Agency</span><span>{{ inc.agency_code ?? '-' }}</span></div>
                     <div class="dd-item"><span class="dd-label">Description</span><span>{{ inc.description || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Deaths / Missing / Injured</span><span>{{ inc.deaths ?? 0 }} / {{ inc.missing ?? 0 }} / {{ inc.injuries ?? 0 }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Investigation</span><span>{{ [inc.investigation_authority, inc.investigation_status].filter(Boolean).join(' - ') || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Cause</span><span>{{ inc.cause || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Structural damage</span><span>{{ inc.structural_damage || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Safety recommendations</span><span>{{ inc.safety_recommendations || '-' }}</span></div>
+                    <div class="dd-item"><span class="dd-label">Corrective actions</span><span>{{ inc.corrective_actions || '-' }}</span></div>
                   </div>
                 </td>
               </tr>
@@ -114,6 +123,10 @@
       </div>
     </div>
   </CollapsibleSection>
+
+  <!-- Upload tables: KMA pollution reports and PSC inspections -->
+  <MaritimeRawPanel id="pollution-reports" dataset="pollution" default-open />
+  <MaritimeRawPanel id="psc-inspections" dataset="inspections" />
 </template>
 
 <script setup lang="ts">
@@ -140,8 +153,19 @@ interface MaritimeIncident {
   port_unlocode: string
   occurred_at: string
   description: string
+  latitude: number | null
+  longitude: number | null
   casualties: number
+  deaths: number
+  missing: number
+  injuries: number
   pollution_tons: number
+  investigation_authority: string
+  investigation_status: string
+  cause: string
+  safety_recommendations: string
+  corrective_actions: string
+  structural_damage: string
   status: string
   reported_by_agency: string | null
   agency_code: string | null
@@ -206,12 +230,24 @@ const incidentExportColumns = [
 ]
 
 const incidentMarkers = computed((): MarkerSpec[] => {
+  const markers: MarkerSpec[] = []
+  // KMA reports a GPS position for most incidents - plot those where they happened ...
+  for (const inc of incidents.value.filter(i => i.latitude != null && i.longitude != null)) {
+    markers.push({
+      id: `incident-${inc.id}`,
+      lat: inc.latitude as number, lon: inc.longitude as number,
+      title: `${inc.incident_ref} - ${inc.incident_type.replace(/_/g, ' ')}`,
+      subtitle: `${inc.severity} · ${inc.vessel_name ?? 'no vessel'} · ${fmtDate(inc.occurred_at)}`,
+      color: severityColor(inc.severity),
+      size: 'md',
+    })
+  }
+  // ... and group the rest (shore-side / at-berth reports) at their port.
   const byPort = new Map<string, MaritimeIncident[]>()
-  for (const inc of incidents.value) {
+  for (const inc of incidents.value.filter(i => i.latitude == null || i.longitude == null)) {
     if (!byPort.has(inc.port_unlocode)) byPort.set(inc.port_unlocode, [])
     byPort.get(inc.port_unlocode)!.push(inc)
   }
-  const markers: MarkerSpec[] = []
   for (const [unlocode, list] of byPort) {
     const port = portByUnlocode.value.get(unlocode)
     if (!port || port.latitude == null || port.longitude == null) continue
@@ -229,15 +265,15 @@ const incidentMarkers = computed((): MarkerSpec[] => {
 })
 
 function severityRank(s: string) {
-  const m: Record<string, number> = { fatal: 3, serious: 2, minor: 1, none: 0 }
+  const m: Record<string, number> = { very_serious: 4, fatal: 3, serious: 2, less_serious: 1.5, injury_only: 1.2, minor: 1, none: 0 }
   return m[s] ?? 0
 }
 function severityColor(s: string): MarkerSpec['color'] {
-  const m: Record<string, MarkerSpec['color']> = { fatal: 'red', serious: 'orange', minor: 'yellow', none: 'gray' }
+  const m: Record<string, MarkerSpec['color']> = { very_serious: 'red', fatal: 'red', serious: 'orange', less_serious: 'yellow', injury_only: 'yellow', minor: 'yellow', none: 'gray' }
   return m[s] ?? 'gray'
 }
 function severityBadge(s: string | undefined) {
-  const m: Record<string,string> = { fatal:'danger', serious:'warning', minor:'neutral', none:'success' }
+  const m: Record<string,string> = { very_serious:'danger', fatal:'danger', serious:'warning', less_serious:'neutral', injury_only:'warning', minor:'neutral', none:'success' }
   return s ? (m[s] ?? 'neutral') : 'neutral'
 }
 function statusBadge(s: string | undefined) {

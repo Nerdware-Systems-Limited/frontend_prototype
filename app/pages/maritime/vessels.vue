@@ -47,6 +47,10 @@
           <option value="">All vessel types</option>
           <option value="container">Container</option>
           <option value="bulk_carrier">Bulk Carrier</option>
+          <option value="passenger">Passenger</option>
+          <option value="tug">Tug</option>
+          <option value="supply">Supply</option>
+          <option value="dredger">Dredger</option>
           <option value="tanker">Tanker</option>
           <option value="general_cargo">General Cargo</option>
           <option value="vehicle">Vehicle Carrier</option>
@@ -186,6 +190,9 @@
       </div>
     </div>
   </div>
+
+  <!-- KPA vessel calls (kpa-vessel-calls upload) -->
+  <MaritimeRawPanel id="vessel-calls" dataset="vessel-calls" default-open />
 </template>
 
 <script setup lang="ts">

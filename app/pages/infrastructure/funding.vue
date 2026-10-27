@@ -13,7 +13,7 @@
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
   <!-- Agency tabs -->
-  <div class="agency-tabs">
+  <div v-if="agencyOptions.length > 1" class="agency-tabs">
     <button class="agency-tab" :class="{ active: selectedAgency === '' }" @click="selectAgency('')">
       All Agencies <span class="agency-tab-count">{{ budgets.length }}</span>
     </button>

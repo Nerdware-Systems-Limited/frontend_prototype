@@ -80,6 +80,8 @@ function normaliseUser(raw: Partial<User> & { email?: string }): AuthUser {
     department: raw.department ?? null,
     mfa_active: raw.mfa_active ?? false,
     mfa_channel: raw.mfa_channel ?? '',
+    mfa_skip_count: raw.mfa_skip_count ?? 0,
+    mfa_skip_limit: raw.mfa_skip_limit ?? 3,
     phone_number: raw.phone_number ?? '',
     is_active: raw.is_active ?? true,
     is_staff: raw.is_staff ?? false,
@@ -105,6 +107,43 @@ export const useAuthStore = defineStore('auth', () => {
   // page view, and dismissing it just for this session is exactly "skip".
   const showMfaNudge = ref(false)
   function dismissMfaNudge() { showMfaNudge.value = false }
+
+  // The backend counts skips per account (User.mfa_skip_count / mfa_skip_limit).
+  // Once they're used up the nudge can't be dismissed. Derived from the user
+  // record (not the memory-only flag above) so a page reload doesn't escape it.
+  // Set by a successful skip so the final allowed skip actually dismisses the
+  // dialog for this session; the lock applies from the next sign-in/reload.
+  const mfaSkipDismissed = ref(false)
+  const mfaSetupRequired = computed(() => {
+    const u = user.value
+    return !mfaSkipDismissed.value && !!u && !u.mfa_active && (u.mfa_skip_count ?? 0) >= (u.mfa_skip_limit ?? 3)
+  })
+
+  /** Records a skip server-side, then closes the nudge. Throws if the limit was already reached. */
+  async function skipMfaNudge(): Promise<void> {
+    try {
+      const res = await $fetch<{ mfa_skip_count: number; mfa_skip_limit: number }>('/api/v1/auth/mfa/skip/', {
+        baseURL: BASE_URL,
+        method: 'POST',
+        headers: _authHeaders(),
+      })
+      _applyMfaSkips(res.mfa_skip_count, res.mfa_skip_limit)
+      mfaSkipDismissed.value = true
+      showMfaNudge.value = false
+    } catch (err) {
+      const data = (err as { data?: { mfa_skip_count?: number; mfa_skip_limit?: number } })?.data
+      if ((err as { status?: number })?.status === 403 && data?.mfa_skip_limit != null) {
+        _applyMfaSkips(data.mfa_skip_count ?? data.mfa_skip_limit, data.mfa_skip_limit)
+      }
+      throw err
+    }
+  }
+
+  function _applyMfaSkips(count: number, limit: number) {
+    if (!user.value) return
+    user.value = { ...user.value, mfa_skip_count: count, mfa_skip_limit: limit }
+    setItem('uapts_user', JSON.stringify(user.value), preferLocal())
+  }
 
   // "Remember me" as chosen on the login form - captured when a login comes
   // back as an MFA challenge (no tokens yet) so mfaVerify() can honour the
@@ -213,6 +252,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       const loggedInUser = normaliseUser(res.user)
       _storeTokens(res.access, res.refresh ?? '', loggedInUser, remember)
+      mfaSkipDismissed.value = false
       showMfaNudge.value = !loggedInUser.mfa_active
       return { mfaRequired: false }
     } finally {
@@ -462,15 +502,16 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     user.value         = null
     showMfaNudge.value = false
+    mfaSkipDismissed.value = false
     removeItem('uapts_refresh')
     removeItem('uapts_user')
   }
 
   return {
-    accessToken, refreshToken, user, isLoading, showMfaNudge,
+    accessToken, refreshToken, user, isLoading, showMfaNudge, mfaSetupRequired,
     isAuthenticated, userInitials,
     hydrate, initTabSync, adoptFromOtherTab, login, logout, forceLogout, refreshAccessToken, fetchMe, isAccessTokenFresh,
-    dismissMfaNudge,
+    dismissMfaNudge, skipMfaNudge,
     mfaVerify, mfaResend, mfaEnroll, mfaEnrollVerify, mfaDisable,
     requestPasswordReset, confirmPasswordReset, changePassword,
   }

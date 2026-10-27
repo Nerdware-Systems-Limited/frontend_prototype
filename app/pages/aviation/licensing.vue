@@ -141,6 +141,7 @@
       />
     </div>
   </div>
+  <AviationRawPanel id="aoc-register" dataset="aoc" default-open />
 </template>
 
 <script setup lang="ts">

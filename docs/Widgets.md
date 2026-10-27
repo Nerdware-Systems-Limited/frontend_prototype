@@ -618,7 +618,9 @@ Shipped, frontend only:
 Shipped, frontend only:
 
 - **One source per Query Builder dataset** (`query.incidents`, `query.blackspots`, `query.congestion`,
-  `query.traffic_counts`, `query.vehicles`, `query.gps_tracks`) over `/query/execute/`, plus three
+  `query.traffic_counts`, `query.vehicles`, `query.gps_tracks`, and the M06 infrastructure datasets
+  `query.road_segments`, `query.bridges`, `query.maintenance_orders`, `query.construction_projects`,
+  `query.maintenance_budgets`, `query.streetlights`, `query.traffic_signals`) over `/query/execute/`, plus three
   **same-permission joins** over `/query/execute-join/` (`query.join.vehicles-gps`,
   `query.join.incidents-blackspots`, `query.join.congestion-counts`). See `QUERY_DATASETS` in
   `utils/dataSources.ts`.
@@ -641,9 +643,9 @@ Shipped, frontend only:
 | # | Item | Where | Detail |
 | --- | --- | --- | --- |
 | B20 | **"All of" permissions** for cross-domain joins | `catalog.py` widget permission rule | Widget permissions mean "any one of". A join of incidents (safety) with congestion (traffic) needs both, so the frontend offers only joins whose datasets share one permission. Add a `requiredAll` rule server-side (and in `widgetPermissions()`) to unlock mixed joins |
-| B21 | **Authorise `/query/execute/` per dataset domain** for dashboard viewers | `apps/query` permission check | `/query-builder` is oversight-only in `access-control.json`. If execute is gated on that page, every non-oversight viewer sees "Your role doesn't have access" on query widgets. Execute should check the dataset's domain (`safety.view` for incidents, …) and keep applying row-level scope |
+| B21 | ~~**Authorise `/query/execute/` per dataset domain** for dashboard viewers~~ **Done 2026-10-26** | `apps/analytics/query.py` | Every dataset names its module and pages (`routes`); execute, execute-join and `/query/datasets/` require the *viewer's own* resolved access to one of them (role layer included), refuse with 403 otherwise, scope rows to the viewer's agency where the dataset declares a `tenant` lookup, and mask restricted-category fields (e.g. `procurement`). `/query-builder` itself stays oversight-only; the datasets are authorised by their own pages. Agency rows: incidents (reporting agency or road owner), vehicles and GPS tracks are scoped to the viewer's agency; congestion, blackspots and traffic counts are marked `national` (network-wide analysis any agency with the page may read). Oversight agencies (SDT, SDR) read across agencies |
 | B22 | **Server-side aggregation** `POST /query/aggregate/` (`group_by`, `fn`, `measure`, `bucket`) | `apps/query` | Aggregates are computed on at most 500 records today, and widgets say so. A `GROUP BY` endpoint returning `{ total, rows: [{ <by>: …, value }] }` makes them exact. The binding already holds everything the endpoint needs (`aggregate` + `params.filters`) |
-| B23 | **Dataset fields for agency and county**, and `vehicle_type` enum values | `/query/datasets/` | No dataset exposes an agency or county field, so those dashboard filters can't narrow query widgets. `vehicles.vehicle_type` is an enum with no `values` list, so the editor can't offer choices |
+| B23 | **Dataset fields for agency and county** (done for the M06 datasets: `agency_code`, `county`; the six original datasets still lack them), and `vehicle_type` enum values | `/query/datasets/` | No dataset exposes an agency or county field, so those dashboard filters can't narrow query widgets. `vehicles.vehicle_type` is an enum with no `values` list, so the editor can't offer choices |
 | B24 | **Decision #2 (§8)** | Product | Query widgets carry their dataset's domain permission like any other widget, so they publish to any audience that holds it. If query-built widgets should be analyst-only, that needs a separate rule |
 
 ---

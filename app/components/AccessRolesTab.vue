@@ -37,11 +37,13 @@
                   <AccessModuleCell :module-id="m" :label="label(m)" :expanded="isOpen(m)" @toggle="toggle(m)" />
                 </td>
                 <td v-for="t in tiers" :key="t" :data-testid="`role-${t}-${m}`" :data-label="t">
+                  <AccessScopeStatus v-if="rolesAreStatus" :scope="roleStatus(t, m)" />
                   <AccessScopeToggle
+                    v-else
                     compact allow-inherit
                     :model-value="rawRole(t, m)" :inherited-label="roleInherited(t, m)"
                     :max="moduleSummary(overrides, code, 'enabled', null, m).scope"
-                    :disabled="!canEditEnabled" :label="`${label(m)} for ${t}`"
+                    :label="`${label(m)} for ${t}`"
                     @update:model-value="v => emit('edit', { kind: 'roleScope', tier: t, key: m, value: v })"
                   />
                 </td>
@@ -50,12 +52,14 @@
                 <tr v-for="r in shownRoutes(m, routes)" :key="r" class="page-row">
                   <td class="page-cell stack-title"><code>{{ r }}</code></td>
                   <td v-for="t in tiers" :key="t" :data-testid="`role-${t}-${r}`" :data-label="t">
+                    <AccessScopeStatus v-if="rolesAreStatus" :scope="pageScope(overrides, code, 'role', t, r)" />
                     <AccessScopeToggle
+                      v-else
                       compact allow-inherit
                       :model-value="rawRole(t, r)"
                       :inherited-label="pageScope(overrides, code, 'role', t, r, { layer: 'role', key: 'route' })"
                       :max="pageScope(overrides, code, 'enabled', null, r)"
-                      :disabled="!canEditEnabled" :label="`${r} for ${t}`"
+                      :label="`${r} for ${t}`"
                       @update:model-value="v => emit('edit', { kind: 'roleScope', tier: t, key: r, value: v })"
                     />
                   </td>
@@ -92,22 +96,34 @@
             <tr v-for="c in CAPABILITIES" :key="c">
               <th scope="row" class="cap-name">{{ capabilityLabel(c) }}</th>
               <td class="group-start">
+                <span v-if="!canEditCeiling" class="cap-state" :class="{ on: ceilingCaps.has(c) }" :data-testid="`cap-ceiling-${c}`" :aria-label="`${capabilityLabel(c)}, allowed: ${ceilingCaps.has(c) ? 'yes' : 'no'}`">
+                  <Check v-if="ceilingCaps.has(c)" :size="15" aria-hidden="true" /><Minus v-else :size="15" aria-hidden="true" />
+                </span>
                 <input
-                  type="checkbox" :checked="ceilingCaps.has(c)" :disabled="!canEditCeiling"
+                  v-else
+                  type="checkbox" :checked="ceilingCaps.has(c)"
                   :aria-label="`${capabilityLabel(c)}, allowed`" :data-testid="`cap-ceiling-${c}`"
                   @change="ev => onBox(ev, ceilingCaps.has(c), () => toggleAgencyCap('ceiling', c))"
                 />
               </td>
               <td>
+                <span v-if="rolesAreStatus" class="cap-state" :class="{ on: enabledCaps.has(c) }" :data-testid="`cap-enabled-${c}`" :aria-label="`${capabilityLabel(c)}, enabled: ${enabledCaps.has(c) ? 'yes' : 'no'}`">
+                  <Check v-if="enabledCaps.has(c)" :size="15" aria-hidden="true" /><Minus v-else :size="15" aria-hidden="true" />
+                </span>
                 <input
-                  type="checkbox" :checked="enabledCaps.has(c)" :disabled="!canEditEnabled || !ceilingCaps.has(c)"
+                  v-else
+                  type="checkbox" :checked="enabledCaps.has(c)" :disabled="!ceilingCaps.has(c)"
                   :aria-label="`${capabilityLabel(c)}, enabled`" :data-testid="`cap-enabled-${c}`"
                   @change="ev => onBox(ev, enabledCaps.has(c), () => toggleAgencyCap('enabled', c))"
                 />
               </td>
               <td v-for="(t, i) in tiers" :key="t" :class="{ 'group-start': i === 0 }">
+                <span v-if="rolesAreStatus" class="cap-state" :class="{ on: roleCaps(t).has(c) }" :data-testid="`cap-${t}-${c}`" :aria-label="`${capabilityLabel(c)} for ${t}: ${roleCaps(t).has(c) ? 'yes' : 'no'}`">
+                  <Check v-if="roleCaps(t).has(c)" :size="15" aria-hidden="true" /><Minus v-else :size="15" aria-hidden="true" />
+                </span>
                 <input
-                  type="checkbox" :checked="roleCaps(t).has(c)" :disabled="!canEditEnabled || !enabledCaps.has(c)"
+                  v-else
+                  type="checkbox" :checked="roleCaps(t).has(c)" :disabled="!enabledCaps.has(c)"
                   :aria-label="`${capabilityLabel(c)} for ${t}`" :data-testid="`cap-${t}-${c}`"
                   @change="ev => onBox(ev, roleCaps(t).has(c), () => toggleRoleCap(t, c))"
                 />
@@ -122,6 +138,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Check, Minus } from 'lucide-vue-next'
 import {
   BASE_SETTINGS, CAPABILITIES, agencyRoleColumns, capabilitySet, editableModules, editableRoutes, moduleSummary, pageScope,
   ungovernedBuiltInRoles, type PolicyOverrides, type ScopeLevel,
@@ -196,6 +213,12 @@ function toggle(m: string) {
 function label(m: string) {
   return BASE_SETTINGS.modules[m]?.label ?? m
 }
+/** Super admin manages what is allowed, not the agency's enabled/role layers; a view-only viewer sees status throughout. */
+const rolesAreStatus = computed(() => props.canEditCeiling || !props.canEditEnabled)
+function roleStatus(tier: string, m: string): ScopeLevel | 'mixed' {
+  const s = moduleSummary(props.overrides, props.code, 'role', tier, m)
+  return s.mixed ? 'mixed' : s.scope
+}
 function rawRole(tier: string, key: string): ScopeLevel | null {
   const l = props.overrides.agencies[props.code]?.roles?.[tier]
   return (key.startsWith('/') ? l?.routes?.[key] : l?.modules?.[key]) ?? null
@@ -248,6 +271,8 @@ function toggleRoleCap(tier: string, c: string) {
 .cap-table { min-width: 520px; }
 .cap-table td { text-align: center; vertical-align: middle; padding-top: 9px; padding-bottom: 9px; }
 .cap-table thead th:not(.col-cap) { text-align: center; }
+.cap-state { display: inline-flex; color: var(--fg-3); }
+.cap-state.on { color: var(--success-fg); }
 .cap-table .group-row th { border-bottom-color: var(--border-subtle); }
 .col-cap { width: 34%; vertical-align: bottom; }
 .cap-name { font-size: 12.5px; font-weight: 500; color: var(--fg-1); text-transform: none; letter-spacing: 0; background: transparent; white-space: normal; }

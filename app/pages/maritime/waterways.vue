@@ -46,9 +46,22 @@
       period="LIVE" description="Registered VHF stations" to="#navigation-aids"
     />
     <KpiCard
-      label="Vessel Traffic / Incidents"
-      unavailable unavailable-note="No waterway link on vessel_movements/maritime_incidents"
+      label="Incidents on Waterways" :value="fmtNum(waterwayIncidents)"
+      :unavailable="loading || !summary" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      period="LIVE" description="Incidents linked to a registered waterway" to="/maritime/accidents"
     />
+  </div>
+
+  <!-- Map -->
+  <SectionTitle pill="KMA · OSM hydrology">Waterways Map</SectionTitle>
+  <div class="card">
+    <div class="card-body">
+      <ClientOnly>
+        <WaterwaysMap :navaids="mapNavaids" :highlight="pickedShape" />
+      </ClientOnly>
+      <div v-if="pickedNote" class="source-note">{{ pickedNote }}</div>
+      <div v-else class="source-note">Click a waterway in the table below to highlight it. Rivers, streams and lakes are OpenStreetMap context, not the register of navigable waterways.</div>
+    </div>
   </div>
 
   <!-- Waterway registry -->
@@ -69,7 +82,7 @@
             <tr><th>Waterway</th><th>Category</th><th>Region</th><th>Channel Depth</th><th>Last Survey</th><th>Access Restrictions</th></tr>
           </thead>
           <tbody v-if="filteredWaterways.length">
-            <tr v-for="w in waterwaysPageRows" :key="w.id">
+            <tr v-for="w in waterwaysPageRows" :key="w.id" class="pick" :class="{ picked: pickedId === w.id }" @click="pick(w)">
               <td style="font-weight:600;font-size:12px">{{ w.name }}</td>
               <td><BadgePill :variant="w.category === 'chartered' ? 'success' : 'warning'">{{ w.category }}</BadgePill></td>
               <td style="font-size:12px">{{ w.region || '-' }}</td>
@@ -85,7 +98,7 @@
           @prev="waterwaysPrev" @next="waterwaysNext"
         />
       </div>
-      <div class="source-note">Vessel traffic counts and incident counts per waterway aren't tracked on this backend yet - neither vessel movements nor maritime incidents carry a waterway link (only a port link).</div>
+      <div class="source-note">Vessel traffic counts per waterway aren't tracked yet - vessel movements carry a port, not a waterway. Incident counts use incidents linked to a waterway (run <code>manage.py link_waterways</code> after loading incidents or navigation aids).</div>
     </div>
   </div>
 
@@ -232,6 +245,25 @@ function avgUptime(aidType: string): number | null {
 const lighthouseUptimePct = computed(() => avgUptime('lighthouse'))
 const vhfUptimePct = computed(() => avgUptime('vhf_station'))
 
+// ── Map ────────────────────────────────────────────────────────────────
+const mapNavaids = computed(() => navaids.value.filter(n => n.latitude != null && n.longitude != null))
+const pickedId = ref<string | null>(null)
+const pickedShape = ref<any | null>(null)
+const pickedNote = ref('')
+async function pick(w: Waterway) {
+  pickedId.value = w.id
+  pickedShape.value = null
+  pickedNote.value = ''
+  try {
+    const g = await useMaritimeWaterways().geometry(w.id)
+    pickedShape.value = g
+    if (!g.features.length) pickedNote.value = `"${w.name}" has no matching name in the OSM hydrology layers, so there is no shape to draw.`
+  } catch {
+    pickedNote.value = 'Could not load this waterway\'s shape.'
+  }
+}
+const waterwayIncidents = computed(() => (summary.value?.waterways ?? []).reduce((n, w) => n + (w.incidents?.value ?? 0), 0))
+
 function channelDepthLabel(waterwayName: string): string {
   const row = summary.value?.waterways.find(w => w.waterway === waterwayName)
   if (!row?.channels.length) return '-'
@@ -257,4 +289,6 @@ function statusBadge(s: string) {
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .table-scroll { overflow-x:auto; }
+.pick { cursor:pointer; }
+.pick:hover, .picked { background: var(--bg-2, rgba(59,130,246,.08)); }
 </style>

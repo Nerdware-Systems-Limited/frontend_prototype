@@ -131,6 +131,8 @@ export interface LayerUploadPayload {
   field_map?: Record<string, string>
   /** Keep only part of the file, so one national file can fill several layers. */
   row_filter?: RowFilter
+  /** After loading, copy the features into the domain tables (ports, berths, rail lines, roads ...). */
+  promote?: boolean
 }
 
 /** Settings a reload may change; anything omitted keeps its current value. `row_filter: {}` clears it. */
@@ -139,6 +141,7 @@ export interface LayerReloadPayload {
   row_filter?: RowFilter
   source_crs?: string
   classification?: Classification
+  promote?: boolean
 }
 
 export interface FieldProfile {
@@ -196,6 +199,7 @@ function uploadLayer(
   if (payload.row_filter && Object.keys(payload.row_filter).length) {
     form.append('row_filter', JSON.stringify(payload.row_filter))
   }
+  if (payload.promote) form.append('promote', 'true')
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${apiBaseUrl()}/api/v1/gis/layers/upload/`)

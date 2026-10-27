@@ -203,6 +203,13 @@
         </div>
       </div>
 
+      <label class="gis-check">
+        <input v-model="up.promote" type="checkbox" />
+        <span><strong>Also load into the domain tables</strong>
+          <span class="hint"> - once loaded, copy the features into the tables this layer feeds (ports, berths, rail
+            lines, roads ...). Untick to only store the layer on the map.</span></span>
+      </label>
+
       <p v-if="upError" class="upload-banner upload-banner-error">⚠ {{ upError }}</p>
 
       <ul v-if="targets.length" class="gis-targets" aria-live="polite">
@@ -389,6 +396,7 @@ const up = reactive({
   filterRows: [] as FilterRow[],
   extra: [] as string[],
   extraFilters: {} as Record<string, FilterRow[]>,
+  promote: true,
 })
 const sniff = ref<FileSniff>({ columns: [], samples: {} })
 const reportedColumns = ref<string[]>([])   // learnt from a backend "Available: …" error
@@ -435,7 +443,7 @@ function openUpload(requirementId: string, layer?: GeoLayer | null) {
   Object.assign(up, {
     file: null, name: layer?.name ?? '', slug: layer?.slug ?? '', requirement: requirementId, agency: '',
     source_crs: layer?.source_crs ?? '', classification: layer?.classification ?? 'internal',
-    mapping: { ...(layer?.field_map ?? {}) }, filterRows: filterToRows(layer?.row_filter), extra: [], extraFilters: {},
+    mapping: { ...(layer?.field_map ?? {}) }, filterRows: filterToRows(layer?.row_filter), extra: [], extraFilters: {}, promote: true,
   })
   // No file in hand: the layer's own attribute list stands in for the columns.
   sniff.value = { columns: layer?.fields ?? [], samples: {} }; reportedColumns.value = []
@@ -515,7 +523,7 @@ async function submitReload() {
     t.layer = await gis.layers.reload(layer.id, {
       field_map: buildFieldMap(primaryReq.value?.required_fields ?? [], columns.value, { ...up.mapping }),
       row_filter: rowsToFilter(up.filterRows),
-      source_crs: up.source_crs, classification: up.classification,
+      source_crs: up.source_crs, classification: up.classification, promote: up.promote,
     })
     t.state = 'processing'
   } catch (e) {
@@ -564,6 +572,7 @@ async function submitUpload() {
         agency: isPrimary ? up.agency || undefined : undefined,
         source_crs: up.source_crs || undefined, classification: up.classification, field_map,
         row_filter: rowsToFilter(isPrimary ? up.filterRows : up.extraFilters[t.requirement] ?? []),
+        promote: up.promote,
       }, (p) => { progress.value = p }, abortCtl.value.signal)
       t.state = 'processing'
       fileCache.set(isPrimary ? cacheKey() : t.requirement, file)

@@ -24,7 +24,10 @@ export type AviationFacilityStatus = 'operational' | 'degraded' | 'out_of_servic
 export interface Runway {
   id: string
   airport: string
-  airport_iata: string
+  airport_iata: string | null
+  airport_code?: string
+  airport_name?: string
+  has_centre_line?: boolean
   runway_id: string
   length_m: number
   surface_type: string
@@ -33,6 +36,21 @@ export interface Runway {
   last_inspection?: string | null
   next_inspection?: string | null
   defect_notes?: string | null
+  tora_m?: number | null
+  lda_m?: number | null
+  asda_m?: number | null
+  toda_m?: number | null
+  slope_pct?: number | null
+  ils_category?: '' | 'none' | 'I' | 'II' | 'III'
+  threshold_elevation_ft?: number | null
+  instrument_procedures?: string
+}
+
+export interface RunwayFeature {
+  type: 'Feature'
+  id: string
+  properties: { runway_id: string; airport: string; airport_name: string; length_m: number; surface_type: string; status: string; ils_category: string; pcn_rating: number | null }
+  geometry: { type: string; coordinates: unknown }
 }
 
 export interface Navaid {
@@ -100,6 +118,9 @@ export function useAviationInfrastructure() {
     summary: () => api<AviationInfraSummary>(`${A}/summary/`),
     runways: (q?: AviationInfraQuery) =>
       api<Paged<Runway>>(`${A}/runways/`, { query: cleanQuery(q as Record<string, unknown>) }),
+    /** Runway centre lines (those that have one) as GeoJSON. */
+    runwaysGeoJSON: (q?: { airport?: string; status?: string }) =>
+      api<{ type: 'FeatureCollection'; features: RunwayFeature[] }>(`${A}/runways/geojson/`, { query: cleanQuery(q as Record<string, unknown>) }),
     navaids: (q?: AviationInfraQuery) =>
       api<Paged<Navaid>>(`${A}/navaids/`, { query: cleanQuery(q as Record<string, unknown>) }),
     facilities: (q?: AviationInfraQuery) =>

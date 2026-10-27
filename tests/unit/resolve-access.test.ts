@@ -52,9 +52,19 @@ describe('resolveFor - agency enabled and role layers', () => {
     expect(resolveFor(o, as('KENHA', 'analyst'), '/railway').allowed).toBe(false)
   })
 
-  it('route minTier still applies after every layer', () => {
-    const o = ov({ KENHA: { roles: { operator: { modules: { M09: 'full' } } } } })
+  it('route minTier applies without an explicit role grant', () => {
+    const o = ov({ KENHA: { enabled: { modules: { M09: 'full' } } } })
     expect(resolveFor(o, as('KENHA', 'operator'), '/analytics').allowed).toBe(false)
+  })
+
+  it('an explicit role grant lifts minTier on tenant-scoped routes', () => {
+    const o = ov({ KENHA: { roles: { operator: { modules: { M09: 'full' } } } } })
+    expect(resolveFor(o, as('KENHA', 'operator'), '/analytics').allowed).toBe(true)
+  })
+
+  it('an explicit role grant does not lift minTier on platform-wide routes', () => {
+    const o = ov({ KENHA: { roles: { analyst: { routes: { '/agencies': 'full' } } } } })
+    expect(resolveFor(o, as('KENHA', 'analyst'), '/agencies').allowed).toBe(false)
   })
 
   it('/access-policies is open to agency admins and not to analysts', () => {
