@@ -35,7 +35,7 @@ import TablePagination from '~/components/TablePagination.vue'
 const mountPanel = async (props: Record<string, unknown> = {}) => {
   const w = mount(CertificateExpiryPanel, {
     props,
-    global: { components: { CollapsibleSection, EmptyState, TablePagination }, stubs: { NuxtLink: { template: '<a><slot /></a>' }, ArrowRight: true, ChevronDown: true } },
+    global: { components: { CollapsibleSection, EmptyState, TablePagination }, stubs: { NuxtLink: { template: '<a><slot /></a>' }, ArrowRight: true, SideDrawer: true, ChevronDown: true } },
   })
   await flushPromises()
   return w
