@@ -21,4 +21,7 @@ jobs:
 
       - run: npm ci
 
+      # tests/integration/live.test.ts needs a running Django backend, which CI doesn't have.
       - run: npm test
+        env:
+          UAPTS_SKIP_LIVE: '1'
