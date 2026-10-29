@@ -35,7 +35,11 @@ Thumbs.db
 PRODUCT.md
 DESIGN.md
 DESIGN_AUDIT.md
+Reference.md
 
 # Git worktrees (subagent-driven-development scratch workspaces)
 .worktrees/
 .superpowers/
+.agents/
+.claude/
+.codex/
