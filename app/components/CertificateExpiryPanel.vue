@@ -11,7 +11,7 @@
     the panel, so nobody has to guess what "soon" means.
   -->
   <CollapsibleSection
-    class="card cert-panel" default-open :title="title" :count="needAttention" :tone="headTone"
+    v-bind="$attrs" class="card cert-panel" default-open :title="title" :count="needAttention" :tone="headTone"
     :source="sourceNote" :storage-key="`certs:${storageKey}`"
   >
     <div class="card-body">
@@ -56,7 +56,7 @@
               <td class="num cert-days" :class="`cert-days--${c.status}`">{{ daysText(c) }}</td>
               <td><span class="badge" :class="STATUS_TONE[c.status]">{{ STATUS_LABEL[c.status] }}</span></td>
               <td class="cert-act">
-                <NuxtLink v-if="c.route" :to="c.route" class="link-sm">{{ c.status === 'valid' ? 'View' : 'View / renew' }}<ArrowRight :size="12" aria-hidden="true" /></NuxtLink>
+                <button v-if="c.route" type="button" class="link-sm link-btn" @click="openDetail(c)">{{ c.status === 'valid' ? 'View' : 'View / renew' }}<ArrowRight :size="12" aria-hidden="true" /></button>
               </td>
             </tr>
           </tbody>
@@ -69,6 +69,26 @@
       />
     </div>
   </CollapsibleSection>
+
+  <SideDrawer :open="!!selected" :title="selected?.name ?? ''" :subtitle="selected?.category" @close="closeDetail">
+    <template v-if="selected">
+      <dl class="cert-detail">
+        <div><dt>Status</dt><dd><span class="badge" :class="STATUS_TONE[selected.status]">{{ STATUS_LABEL[selected.status] }}</span></dd></div>
+        <div><dt>Owner</dt><dd>{{ selected.owner ?? '-' }}</dd></div>
+        <div><dt>Category</dt><dd>{{ selected.category }}</dd></div>
+        <div><dt>Expiry</dt><dd>{{ fmtDate(selected.expiry) }}</dd></div>
+        <div><dt>Time remaining</dt><dd :class="`cert-days--${selected.status}`">{{ daysText(selected) }}</dd></div>
+      </dl>
+      <p v-if="selected.status !== 'valid'" class="cert-hint">
+        {{ selected.status === 'expired' ? 'This certificate has expired and needs renewing.' : 'This certificate is due for renewal.' }}
+      </p>
+    </template>
+    <template #footer>
+      <NuxtLink v-if="selected?.route" :to="selected.route" class="btn btn-primary" @click="closeDetail">
+        {{ selected.status === 'valid' ? 'Open record' : 'Open record to renew' }}<ArrowRight :size="14" aria-hidden="true" />
+      </NuxtLink>
+    </template>
+  </SideDrawer>
 </template>
 
 <script setup lang="ts">
@@ -78,6 +98,9 @@ import {
   DEFAULT_CERT_POLICY, STATUS_LABEL, STATUS_TONE, filterCertificates, remainingText,
   type CertFilter, type CertificatePolicy, type CertificateView,
 } from '~/utils/certificateExpiry'
+
+// The drawer is a second root, so forward id/class/style to the section ourselves.
+defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -128,6 +151,10 @@ const emptyMessage = computed(() => {
   }
 })
 
+const selected = ref<CertificateView | null>(null)
+function openDetail(c: CertificateView) { selected.value = c }
+function closeDetail() { selected.value = null }
+
 function fmtDate(s: string) {
   return new Date(`${s}T00:00:00Z`).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
@@ -166,5 +193,12 @@ defineExpose({ reload: load })
 .cert-days--upcoming { color: var(--info-fg); }
 .cert-act { text-align: right; white-space: nowrap; }
 .link-sm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--link); }
+.link-btn { border: 0; background: none; padding: 0; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.cert-detail { margin: 0; display: grid; gap: 12px; }
+.cert-detail > div { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.cert-detail dt { font-size: 12px; color: var(--fg-3); }
+.cert-detail dd { margin: 0; font-size: 13px; color: var(--fg-1); text-align: right; }
+.cert-hint { margin: 14px 0 0; font-size: 12px; color: var(--fg-2); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>

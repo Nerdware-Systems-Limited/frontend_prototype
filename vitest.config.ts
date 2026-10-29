@@ -37,6 +37,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       // Integration tests need Node's fetch (Authorization headers work).
       ['tests/integration/**', 'node'],
+      ['tests/unit/{units,thresholds,time-range,field-mask,bindings,railway,agency-scope,access-filter}.test.ts', 'node'],
     ],
     globals: true,
     include: ['tests/**/*.test.ts'],
