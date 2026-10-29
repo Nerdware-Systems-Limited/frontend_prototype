@@ -1,8 +1,7 @@
 # Dashboard Manager
 
 _Verified against the code on 2026-10-12. [Widgets.md](Widgets.md) is the design audit and phase log (the "why"
-and the backend requests); [dashboard-manager-integration.md](dashboard-manager-integration.md) lists where the
-deployed backend differs from its reference package. This page is the current implementation (the "what")._
+and the backend requests). This page is the current implementation (the "what")._
 
 The Dashboard Manager lets administrators compose dashboards from widgets, assign them to audiences, publish
 versions, and lets viewers see (and optionally personalise) the one they are assigned. The mental model is

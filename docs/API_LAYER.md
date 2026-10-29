@@ -136,7 +136,7 @@ safe while exactly one component uses it.
 
 ## 7. Verifying against a live backend
 
-- `tests/integration/live.test.ts` probes a running backend (`UAPTS_API_BASE`, default `http://127.0.0.1:8000`) and
-  skips itself when unreachable or when `UAPTS_SKIP_LIVE=1`. It runs under the `node` environment because
+- `tests/integration/live.test.ts` probes a running backend (`NUXT_PUBLIC_API_BASE`, default `http://127.0.0.1:8000`).
+  It fails when the backend is unreachable unless `UAPTS_SKIP_LIVE=1` is set (CI sets it). It runs under the `node` environment because
   happy-dom's fetch strips `Authorization` on cross-origin requests.
 - `scripts/test-endpoints.mjs` is a standalone endpoint smoke script.

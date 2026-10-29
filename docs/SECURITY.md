@@ -124,7 +124,7 @@ Two things in the repos are **not** evidence and were not relied on: `README.md`
 | A05 | Security misconfiguration | **Partly.** Hardened HTTP headers and `DEBUG` off by default. Weak defaults: the known `SECRET_KEY`, an ngrok host in `ALLOWED_HOSTS`, credentialed CORS to localhost origins, public API docs. The SPA ships no CSP (gaps 5, 8, 10). |
 | A06 | Vulnerable and outdated components | **Gaps.** `npm audit` reports 26 issues, and Django is on the 4.2 line (gap 9). |
 | A07 | Identification and authentication failures | **Reasonably addressed:** throttles, lockout, MFA, rotation and blacklisting, no open registration. Refresh tokens sit in web storage and WebSocket tokens travel in the URL (gap 7). |
-| A08 | Software and data integrity failures | **Partly.** Dependencies are pinned (135 `==` pins) and lockfiles exist. Uploads have extension and size checks and per-template validation. There is no CI, signed build or dependency-update automation in either repo. |
+| A08 | Software and data integrity failures | **Partly.** Dependencies are pinned (135 `==` pins) and lockfiles exist. Uploads have extension and size checks and per-template validation. The frontend has a CI workflow that runs the unit tests (`.github/workflows/ci.yml`), but there is no signed build or dependency-update automation in either repo, and the backend has no CI. |
 | A09 | Logging and monitoring failures | **Good coverage, thin alerting** (section 8). |
 | A10 | Server-side request forgery | **Guarded.** The scheduled feed puller requires `https://`, resolves the host and rejects private addresses, disables redirects and sets timeouts (`apps/integrations/puller.py:155-165`). Minor: the host is resolved once for the check and again by `requests`. |
 
@@ -140,7 +140,7 @@ Two things in the repos are **not** evidence and were not relied on: `README.md`
 - **Server integrations** (from `requirements.txt` and settings): Africa's Talking (SMS), an email backend via django-anymail for MFA and welcome mail, and pull-style feeds from agency endpoints configured in the Integration Hub.
 - **Frontend dependencies:** 12 runtime and 12 dev packages, locked by `package-lock.json`.
 - **Backend dependencies:** all 135 entries in `requirements.txt` are pinned to exact versions.
-- **How they are kept updated:** **manually.** There is no CI, Dependabot or Renovate configuration in either repo (`.github/` is absent). A backend dependency audit was **not run**: `pip-audit` isn't installed here.
+- **How they are kept updated:** **manually.** There is no Dependabot or Renovate configuration in either repo. The frontend's `.github/workflows/ci.yml` only runs tests, not `npm audit`; the backend has no backend `.github/` (the frontend's workflow only runs tests). A backend dependency audit was **not run**: `pip-audit` isn't installed here.
 - **Current frontend audit** (`npm audit`, re-run 2026-10-26): 25 findings (3 critical, 15 high, 6 moderate, 1 low). On 2026-10-07 there were 26 (8 critical, 14 high, 4 moderate), almost all in the Nuxt toolchain (`nuxt`, `@nuxt/devtools`, `simple-git`, `nitropack`, `shell-quote`, `listhen`, `node-forge`). The app is built as a static SPA, so these mostly affect the build and dev machines, not the browser, but that depends on how it is deployed (see gap 9). Do **not** run `npm audit fix --force`: it proposes `nuxt@3.7.4`, a major downgrade from 4.4.5.
 
 ---
@@ -299,9 +299,9 @@ Ordered by severity. "Verified" gaps were confirmed against the running developm
 - **Fix:** serve the SPA with a CSP, `frame-ancestors`, `X-Content-Type-Options` and a referrer policy. Self-host the fonts.
 
 ### 9. Dependencies and update process
-- **Where:** `package.json`/`package-lock.json`; `requirements.txt` (`Django==4.2.30`); no `.github/`.
+- **Where:** `package.json`/`package-lock.json`; `requirements.txt` (`Django==4.2.30`); no backend `.github/` (the frontend's workflow only runs tests).
 - **What happens:** 25 frontend audit findings as of 2026-10-26 (3 critical, 15 high, 6 moderate, 1 low), mostly in build tooling in the earlier breakdown. Django 4.2 is a long-term-support line whose published support window ended around April 2026 (confirm against Django's release schedule). There is no automated update or audit job, and no backend audit was run.
-- **Fix:** add Dependabot or Renovate plus a CI step running `npm audit` and `pip-audit`. Plan the Django upgrade. Upgrade Nuxt within the 4.x line rather than using `--force`. Confirm that the deployed artefact is a static build so build-time packages are not on the server.
+- **Fix:** add Dependabot or Renovate, plus `npm audit` in the existing frontend CI workflow and a `pip-audit` step for the backend. Plan the Django upgrade. Upgrade Nuxt within the 4.x line rather than using `--force`. Confirm that the deployed artefact is a static build so build-time packages are not on the server.
 
 ### 10. Loose defaults in backend configuration
 - **Where:** `settings.py:37` (an ngrok hostname in default `ALLOWED_HOSTS`); `:868-870` (`CORS_ALLOW_CREDENTIALS = True` with localhost default origins); `:656` (`SessionAuthentication` kept); `:533` (`ACCOUNT_EMAIL_VERIFICATION` defaults to `none`); `:780` (API schema and docs public); `uapts/health_check.py:300` (health endpoint unauthenticated).

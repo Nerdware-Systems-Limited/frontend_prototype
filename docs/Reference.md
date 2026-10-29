@@ -634,7 +634,7 @@ blue wash, a level set on that layer drawn solid with a reset icon, "Capped" /
 |---|---|
 | `CollapsibleSection.vue` | One header that shows or hides a block; lazy-mounted then kept alive. Wraps every map card (collapsed by default) and the incident lists (open by default). |
 | `TimeRangeSelector.vue` | The unified 24 Hours / 7 Days / 30 Days (and Year) control; edits a `useTimeRange()` object. |
-| `CertificateExpiryPanel.vue` | Expired and expiring certificates and licences, urgent first, with counters and short/medium-term filters. |
+| `CertificateExpiryPanel.vue` | Expired and expiring certificates and licences, urgent first, with counters and short/medium-term filters. View / renew opens a `SideDrawer` with the details and a link to the owning page. |
 | `HqSummary.vue` | Cross-module HQ section inside the national Command Centre. |
 
 Details: [MODULE_UX.md](MODULE_UX.md).

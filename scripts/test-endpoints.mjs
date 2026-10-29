@@ -8,8 +8,8 @@
 // status lines go to stderr so you can watch progress.
 //
 // Usage:
-//   UAPTS_EMAIL=you@example.com UAPTS_PASSWORD=*** node scripts/test-endpoints.mjs > report.json
-//   UAPTS_BASE=https://uapts.eu.cc UAPTS_EMAIL=... UAPTS_PASSWORD=... node scripts/test-endpoints.mjs
+//   UAPTS__TEST_EMAIL=you@example.com UAPTS__TEST_PASSWORD=*** node scripts/test-endpoints.mjs > report.json
+//   UAPTS_BASE=https://uapts.eu.cc UAPTS__TEST_EMAIL=... UAPTS__TEST_PASSWORD=... node scripts/test-endpoints.mjs
 //
 // Findings from a given run are written up in MissingApis.md - re-run
 // this whenever the backend schema changes to check for drift.
@@ -18,11 +18,11 @@
 // ─────────────────────────────────────────────────────────────────────
 
 const BASE = process.env.UAPTS_BASE || 'http://192.168.0.110:8000'
-const EMAIL = process.env.UAPTS_EMAIL
-const PASSWORD = process.env.UAPTS_PASSWORD
+const EMAIL = process.env.UAPTS_TEST_EMAIL
+const PASSWORD = process.env.UAPTS_TEST_PASSWORD
 
 if (!EMAIL || !PASSWORD) {
-  console.error('Set UAPTS_EMAIL / UAPTS_PASSWORD env vars (never hardcode credentials in this file).')
+  console.error('Set UAPTS_TEST_EMAIL / UAPTS_TEST_PASSWORD env vars (never hardcode credentials in this file).')
   process.exit(1)
 }
 

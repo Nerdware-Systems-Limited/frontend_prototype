@@ -32,9 +32,9 @@ Test-only overrides (read by `tests/integration/live.test.ts`; vitest.config.ts 
 
 | Variable | Default |
 |---|---|
-| `UAPTS_API_BASE` | `http://127.0.0.1:8000` |
+| `NUXT_PUBLIC_API_BASE` | `http://127.0.0.1:8000` (the live suite reads the same variable as the app) |
 | `UAPTS_TEST_EMAIL` / `UAPTS_TEST_PASSWORD` | dev defaults hard-coded in `tests/integration/live.test.ts`; override for staging or CI |
-| `UAPTS_SKIP_LIVE` | unset; `1` skips the live suite |
+| `UAPTS_SKIP_LIVE` | unset; `1` skips the live suite, which otherwise fails when no backend is reachable. CI sets it |
 
 Changing `NUXT_PUBLIC_API_BASE` needs a dev-server restart because the proxy target is read when `nuxt.config.ts`
 loads.
@@ -57,7 +57,7 @@ root `tsconfig.json` references.
 
 ## 4. Testing
 
-State at the time of writing: **57 files, 813 tests, all passing** (`npm test`, about 15 s).
+State at the time of writing: **57 files, 831 tests, all passing** (`npm test`, about 15 s).
 
 - **Environment.** Vitest with `happy-dom` and `globals: true`. `tests/integration/**` runs under `node` because
   happy-dom's fetch strips `Authorization` on cross-origin requests.
@@ -158,7 +158,14 @@ wording in `accessHistory.ts`, and tests in `access-policy-store.test.ts`.
 | `tests/fixtures/access-control.json` | `apps/access_control/data/access-control.json` | Copy; refresh on change |
 | `types/uapts.ts` and composable types | DRF serializers | `types.test.ts` fixtures catch drift |
 
-## 8. Build and deploy notes
+## 8. Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request: `actions/setup-node` with Node 24 and npm caching,
+`npm ci`, then `npm test` with `UAPTS_SKIP_LIVE=1` (CI has no Django backend, so the live suite is skipped). It
+does not build, lint, type-check or audit dependencies. Node 24 matters: the lockfile is written by npm 11, and
+`npm ci` on npm 10 (Node 22) rejects it as out of sync. To reproduce locally: `UAPTS_SKIP_LIVE=1 npm test`.
+
+## 9. Build and deploy notes
 
 - `ssr: false` for every route, so the output is a client bundle plus Nitro. `npm run generate` is enough for
   static hosting behind Nginx.
@@ -172,7 +179,7 @@ wording in `accessHistory.ts`, and tests in `access-policy-store.test.ts`.
   `/integrations/uploads/:id` redirect to `/integrations/files`. Do not add a top-level `:param` rule under
   `/integrations`, because Nitro would match it before the file-based pages and swallow real routes.
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|

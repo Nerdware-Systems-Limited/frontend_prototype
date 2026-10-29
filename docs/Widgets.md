@@ -91,27 +91,27 @@ what the **frontend API layer** (`app/composables/api/*.ts`) exposes today, and 
 can draw.
 
 Legend: **W** = drawable by a current widget · **A** = API type/method exists, no widget ·
-**—** = nothing in the API layer (so it needs a backend endpoint, a scheduled file or a manual template).
+**-** = nothing in the API layer (so it needs a backend endpoint, a scheduled file or a manual template).
 "A" came from a keyword pass over the API types and still needs confirming field by field.
 
 | Agency | Expected KPI group | Today | Primitive needed |
 | --- | --- | --- | --- |
 | **KeNHA** | IRI, bridge health | **W** (`infra.good_condition`, `infra.critical_bridges`) | Stat, Breakdown |
-| | AADT per corridor | — | Series / Breakdown by corridor |
+| | AADT per corridor | - | Series / Breakdown by corridor |
 | | Black spots, accidents **by chainage**, construction-zone incidents | A (black spots, chainage in infra/rail infra) | **Chainage strip** (new) |
 | | Axle-load / weighbridge overload compliance | A (`useFleet` weighbridge stations/events) | Stat + Progress, Table |
-| | Boundary markers, permit turnaround, RAP progress, % PAPs compensated | — | **Milestone tracker** (new), Progress |
-| **KURA** | NMT km built, signal timing efficiency | — | Progress, Stat |
+| | Boundary markers, permit turnaround, RAP progress, % PAPs compensated | - | **Milestone tracker** (new), Progress |
+| **KURA** | NMT km built, signal timing efficiency | - | Progress, Stat |
 | | Street lighting functional %, pavement condition (G/F/P) across 86 urban areas | A (`infra.streetlights`, condition distribution, `by_agency`) | Stat, Breakdown, Table by town |
 | | APRP absorption, paid certificates vs pending bills, physical completion | partial A (`budget.utilization_pct`, construction `by_agency`) | **Budget flow** (new), Progress |
 | **KeRRA** | Low-volume sealed km, rural bridges/culverts | partial A (bridges) | Progress, Breakdown |
-| | RMLF utilisation, ARMWP progress | — | Budget flow, Progress |
+| | RMLF utilisation, ARMWP progress | - | Budget flow, Progress |
 | **SDR Roads** | National network G/F/P of 165,000 km | **W** (partial: % good only) | Breakdown (full G/F/P) |
 | | Road Fund allocation → disbursement → absorption | partial A | **Budget flow** |
 | | Unified fatality trend, blackspot intervention completion | **W** (fatality trend, intervention effectiveness) | Series, Progress |
 | **SDR MTD** | Fleet & plant serviceability % | A (`useFleet` government fleet, `serviceability`) | Stat, Breakdown |
 | | Lease program: run-hours, contracts, lease letters, km worked | A (`/equipment-leases/`) | Stat, Series, Table |
-| | Rental revenue vs O&M cost, downtime, parts lag | — | Series (2-measure), Stat |
+| | Rental revenue vs O&M cost, downtime, parts lag | - | Series (2-measure), Stat |
 | **NTSA** | Daily fatalities **by road-user category**, causes | partial **W** (fatalities only; `incidents_by_type` unused) | Series + Breakdown |
 | | Registration and smart-DL volumes | A (`useDriverLicensing`, fleet registry) | Series, Stat |
 | | Inspection throughput, PSV compliance, IVMS speed/route violations | A (`useVehicleInspections`, PT compliance, fleet behaviour) | Stat, Breakdown, StatusList |
@@ -120,20 +120,20 @@ Legend: **W** = drawable by a current widget · **A** = API type/method exists, 
 | | BRT corridor milestones | A? (`brt` page exists) | **Milestone tracker** |
 | **KPA** | Vessel turnaround, berth occupancy, AIS milestones (ETA/ATA/ETB/ATB) | A (`useMaritimePerformance`, which is ahead of backend) | Stat + target band, **Milestone tracker** (per vessel) |
 | | Throughput, dwell, crane moves/hr, truck turnaround | partial **W** (TEU, dwell) | Stat, Series |
-| | SGR evacuation: nominated containers, SGR-bound dwell, daily volume | — (no container-number type found) | Series, Stat |
+| | SGR evacuation: nominated containers, SGR-bound dwell, daily volume | - (no container-number type found) | Series, Stat |
 | | Reefer temperature / power exceptions | A (`useMaritimeCargo` / performance) | StatusList |
 | **KRC** | Freight runs, train length, gross/net tonnes, wagon deployment | partial **W** (tonnage); A (wagons) | Stat, Series |
 | | Passenger run times, volumes, coach occupancy, revenue **by class** | partial **W** (ridership); A (`TicketClass`) | Breakdown by class, Series |
-| | KPA manifest sync, rail-nominated queue | — | Table (joined on container no.) |
+| | KPA manifest sync, rail-nominated queue | - | Table (joined on container no.) |
 | **KMA** | Registered vessels (IMO), PSC pass/fail | partial A (inspections/detentions in `MaritimeOps.kpis`) | Stat, Progress |
-| | SAR alerts, casualties, response times | — (only `incidents_30d`) | StatusList, Series |
+| | SAR alerts, casualties, response times | - (only `incidents_30d`) | StatusList, Series |
 | | Agent licensing turnaround | A? (`useMaritimeServices`) | Stat vs SLA |
-| **NCTTCA** | End-to-end transit time split into port dwell / road / border | — | **Segmented duration bar** (new) |
-| | OSBP clearance time, queue length, capacity vs traffic | — | Progress (capacity), Series, Table per OSBP |
-| | Weekly trucks per checkpoint, freight rate per tonne-km | — | Series, Table |
-| **LAPSSET** | Milestones, delays, % complete (Lamu Port, highway, pipeline) | — | **Milestone tracker** |
-| | Spend vs plan per department | — | **Budget flow** / Progress |
-| | ESMP indicators, audit frequency | — | StatusList, Table |
+| **NCTTCA** | End-to-end transit time split into port dwell / road / border | - | **Segmented duration bar** (new) |
+| | OSBP clearance time, queue length, capacity vs traffic | - | Progress (capacity), Series, Table per OSBP |
+| | Weekly trucks per checkpoint, freight rate per tonne-km | - | Series, Table |
+| **LAPSSET** | Milestones, delays, % complete (Lamu Port, highway, pipeline) | - | **Milestone tracker** |
+| | Spend vs plan per department | - | **Budget flow** / Progress |
+| | ESMP indicators, audit frequency | - | StatusList, Table |
 
 **What this shows:**
 
@@ -162,7 +162,7 @@ The brief describes three tiers: **live API** (NTSA, KPA), **scheduled file tran
 
 | Tier | Footer | Stale rule | Empty copy |
 | --- | --- | --- | --- |
-| Live | `KPA KWATOS · LIVE · 14:02 EAT` + pulse dot | stale after 2× refresh interval | "Data unavailable — retry to refresh" |
+| Live | `KPA KWATOS · LIVE · 14:02 EAT` + pulse dot | stale after 2× refresh interval | "Data unavailable - retry to refresh" |
 | Scheduled file | `KeRRA · BATCH · file of 30 Sep` | stale after the expected cadence (daily/weekly) | "Awaiting next scheduled file (due {date})" |
 | Manual template | `LAPSSET · MANUAL · submitted 12 Sep by …` | stale after the reporting period | "No submission for {period} yet", plus a link to the upload page for operators of that agency |
 
@@ -416,8 +416,8 @@ const { frame, state, refreshedAt, reload } = useWidgetData(binding, filterConte
 - **`refreshing` keeps the previous frame on screen.** Only the very first load shows a skeleton.
 - Maps HTTP 404 on an `ahead-of-backend` source to **`not-integrated`** and 403 to **`forbidden`**, so the copy
   is truthful (finding 16).
-- `<WidgetState>` renders each state with fixed system copy: "Data unavailable — retry to refresh",
-  "Not yet integrated — appears when the {source} feed is onboarded", and so on. It reuses `EmptyState` and the
+- `<WidgetState>` renders each state with fixed system copy: "Data unavailable - retry to refresh",
+  "Not yet integrated - appears when the {source} feed is onboarded", and so on. It reuses `EmptyState` and the
   existing tone.
 - `WidgetFrame` gains a quiet footer: `SOURCE · LIVE/BATCH · 14:02 EAT`, in mono, so the "which agency /
   which feed / how fresh" labelling from Product Principle 1 is on every widget, not only KPI cards.

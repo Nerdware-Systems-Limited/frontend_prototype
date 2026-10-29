@@ -84,7 +84,9 @@ One list of every certificate and licence the viewer may see, urgent first.
 - **Panel:** counters (expired / critical / expiring soon / upcoming, click to filter), filters (needs attention,
   expired, short-term, medium-term), sorted list (expired first, longest overdue first, then fewest days left),
   days left in words ("Expired 3 days ago", "12 days left"), status badge, owner, expiry date, and a "View / renew"
-  link to the source page. Per-filter empty states. 15 rows per page.
+  button that opens a `SideDrawer` with the certificate's details, whose footer links to the source page. Per-filter
+  empty states. 15 rows per page. The panel renders the drawer as a second root, so it sets `inheritAttrs: false` and
+  forwards `id`/`class`/`style` to the section.
 - **Where:** Public Transport overview (PSV + driving), PSV compliance, driver licensing, aviation licensing (replaces
   the old renewals table and its duplicate request), maritime services, and the HQ summary (all sources).
 - **Not tracked yet** (no list endpoint to read): vehicle insurance and inspection expiry, training certificates.

@@ -1,6 +1,6 @@
 # UAPTS frontend documentation
 
-_Index. Last reviewed 2026-10-16._
+_Index. Last reviewed 2026-10-29._
 
 Start with the root [`README.md`](../README.md) for setup, then pick the document for your task.
 
@@ -35,16 +35,14 @@ Start with the root [`README.md`](../README.md) for setup, then pick the documen
 | Document | What it is |
 |---|---|
 | [Widgets.md](Widgets.md) | Dashboard widget audit, phased plan and the log of backend items B1 to B26 |
-| [dashboard-manager-integration.md](dashboard-manager-integration.md) | Where the deployed backend differs from the Dashboard Manager reference package |
-| [BACKEND_FIXES.md](BACKEND_FIXES.md) | Backend defects that stop data reaching the dashboards |
 | [DESIGN_AUDIT.md](DESIGN_AUDIT.md) | Earlier combined frontend and backend audit (historical snapshot) |
 
-## Product and design (repository root)
+## Product and design
 
 | Document | What it is |
 |---|---|
-| [`../PRODUCT.md`](../PRODUCT.md) | Audience, purpose, principles, constraints |
-| [`../DESIGN.md`](../DESIGN.md) | Visual design system and its named rules |
+| [PRODUCT.md](PRODUCT.md) | Audience, purpose, principles, constraints |
+| [DESIGN.md](DESIGN.md) | Visual design system and its named rules |
 
 ## Keeping these current
 

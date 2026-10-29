@@ -4,8 +4,8 @@ The Unified Analytics and Predictive Transport System dashboard SPA for Kenyan t
 data: every figure, role and permission comes from the Django backend over REST and two WebSockets.
 
 **Documentation:** this file is the quick start. Detailed docs live in [`docs/`](docs/README.md): architecture,
-development guide, auth and sessions, API layer, access control, Dashboard Manager, security and the full
-code-level reference.
+development guide, auth and sessions, API layer, access control, Dashboard Manager, security, the product and design
+briefs, and the full code-level reference.
 
 ## Stack
 
@@ -21,7 +21,28 @@ code-level reference.
 - **lucide-vue-next** icons, **Leaflet** + protomaps for maps, **d3-scale/shape/array** for chart maths (marks are
   Vue templates, no chart library)
 - **TypeScript** strict mode
-- **Vitest** for unit + integration tests (57 files, 813 tests)
+- **Vitest** for unit + integration tests (57 files, 831 tests), run on every push by GitHub Actions
+
+## Project layout
+
+```
+app/
+├── pages/         file-based routes, grouped by module (see Pages below)
+├── components/    shared UI: SideDrawer, CollapsibleSection, CertificateExpiryPanel, widgets, maps, tables
+├── composables/   domain API clients (api/), sockets, access control, pagination, time range, dashboard data
+├── stores/        Pinia: auth, accessPolicy (Module Access), notifications
+├── middleware/    auth.global.ts (session + access guard), dashboard-manager.global.ts
+├── plugins/       api ($api client), auth-sync, access-policy, theme, leaflet
+├── layouts/       default (app shell) and auth (login screens)
+├── utils/         pure TypeScript: access resolver, bindings, thresholds, units, layout engine
+├── config/        static catalogs, e.g. certificate sources
+├── types/         API response types (uapts.ts)
+└── assets/css/    theme.css design system, main.css Tailwind base
+tests/             unit/ (one file per subsystem), integration/ (live backend), fixtures/, setup.ts
+scripts/           test-endpoints.mjs, a live endpoint-drift checker
+docs/              all documentation, product brief and design system
+.github/workflows/ ci.yml
+```
 
 ## API wiring
 
@@ -170,6 +191,8 @@ than literal hex, so it repaints correctly under both themes.
 
 ## Setup
 
+Requires Node 24 (npm 11); CI and the lockfile use that version.
+
 ```bash
 npm install
 ```
@@ -180,20 +203,21 @@ npm install
 npm run dev
 ```
 
-Dev server runs on `http://localhost:3000` (or the next free port). API
-calls go directly to `NUXT_PUBLIC_API_BASE`, which defaults to the deployed
-backend at `https://uapts.eu.cc`. To point at a local backend instead, set
+Dev server runs on `http://localhost:3000` (or the next free port). The Nuxt
+dev server proxies `/api` and `/media` to `NUXT_PUBLIC_API_BASE`, which defaults
+to the deployed backend at `https://uapts.eu.cc`. To point at a local backend instead, set
 `NUXT_PUBLIC_API_BASE=http://127.0.0.1:8000` in `.env`.
 
 ## Tests
 
 ```bash
-npm run test         # one-shot run (CI mode)
-npm run test:watch   # dev mode
-npm run test:ui      # vitest --ui
+npm run test                      # one-shot run
+UAPTS_SKIP_LIVE=1 npm run test    # what CI runs: skips the live-backend suite
+npm run test:watch                # dev mode
+npm run test:ui                   # vitest --ui
 ```
 
-57 files, 813 tests. Beyond the contract tests below there is one file per subsystem (access control, session
+57 files, 831 tests. Beyond the contract tests below there is one file per subsystem (access control, session
 sync, dashboard bindings, widgets, thresholds, query sources, and so on); the list and conventions are in
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
@@ -207,13 +231,32 @@ sync, dashboard bindings, widgets, thresholds, query sources, and so on); the li
 - **`tests/unit/notifications.test.ts`**, **`notifications-shape.test.ts`** -
   notifications store/composable behaviour and payload shapes.
 - **`tests/unit/railway.test.ts`** - railway composable coverage.
+- **`tests/unit/certificate-panel.test.ts`**, **`certificate-expiry.test.ts`** -
+  the certificate renewals panel (including its detail drawer) and the expiry
+  classification rules.
 - **`tests/integration/live.test.ts`** - live HTTP probes against
-  `UAPTS_API_BASE` (defaults to `http://127.0.0.1:8000`). Skips
-  automatically if the backend is unreachable or `UAPTS_SKIP_LIVE=1`.
+  `NUXT_PUBLIC_API_BASE` (defaults to `http://127.0.0.1:8000`). It **fails**
+  when the backend is unreachable; set `UAPTS_SKIP_LIVE=1` to skip it.
 
 Integration tests run under the `node` Vitest environment (not happy-dom)
 because happy-dom's fetch implementation strips `Authorization` headers on
 cross-origin requests.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request: `npm ci` on Node 24, then `npm test` with
+`UAPTS_SKIP_LIVE=1`, because CI has no Django backend. The live-backend suite therefore only runs locally.
+Run `UAPTS_SKIP_LIVE=1 npm test` to reproduce CI. Keep Node at 24: the lockfile is written by npm 11 and
+`npm ci` on npm 10 (Node 22) reports it as out of sync. CI does not build, lint or audit dependencies.
+
+## Scripts
+
+`scripts/test-endpoints.mjs` logs in, GETs every endpoint the API composables reference and diffs the response fields
+against the TypeScript interfaces, printing a JSON report. Use it when the backend schema changes:
+
+```bash
+UAPTS_TEST_EMAIL=you@example.com UAPTS_TEST_PASSWORD=... UAPTS_BASE=https://uapts.eu.cc node scripts/test-endpoints.mjs > report.json
+```
 
 ## Environment
 
@@ -234,7 +277,7 @@ a same-host `ws(s)://` URL from `NUXT_PUBLIC_API_BASE` instead.
 Overrides for the integration test suite (`tests/integration/live.test.ts`):
 
 ```
-UAPTS_API_BASE=http://127.0.0.1:8000
+NUXT_PUBLIC_API_BASE=http://127.0.0.1:8000
 UAPTS_TEST_EMAIL=<a backend test account>
 UAPTS_TEST_PASSWORD=<its password>
 UAPTS_SKIP_LIVE=1
@@ -250,16 +293,21 @@ npm run preview     # local preview
 
 ## Documentation map
 
+Everything lives in [`docs/`](docs/README.md).
+
 | Document | Contents |
 |---|---|
 | [`docs/README.md`](docs/README.md) | Index of everything below |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, layout, boot sequence, data flow |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Setup, env vars, tests, conventions, recipes, deploy notes |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Setup, env vars, tests, CI, conventions, recipes, deploy notes |
 | [`docs/AUTH_AND_SESSIONS.md`](docs/AUTH_AND_SESSIONS.md) | Login, MFA, tokens, cross-tab sessions |
 | [`docs/API_LAYER.md`](docs/API_LAYER.md) | `$api`, composables, proxy, WebSockets |
 | [`docs/ACCESS_CONTROL.md`](docs/ACCESS_CONTROL.md) | Resolver, Module Access, policy store |
+| [`docs/ROLES_AND_PERMISSIONS.md`](docs/ROLES_AND_PERMISSIONS.md) | Who can see what, per agency and role, in plain language |
 | [`docs/DASHBOARD_MANAGER.md`](docs/DASHBOARD_MANAGER.md) | Widgets, bindings, editor, runtime |
+| [`docs/Widgets.md`](docs/Widgets.md) | Widget audit, phased plan and the backend request log (B1 to B26) |
 | [`docs/MODULE_UX.md`](docs/MODULE_UX.md) | Collapsible maps and incidents, time range, certificate alerts, HQ summary |
 | [`docs/Reference.md`](docs/Reference.md) | Code-level index of routes, stores, composables, components |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Security overview and known gaps |
-| [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md) | Product intent and visual design system |
+| [`docs/SECURITY.md`](docs/SECURITY.md), [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) | Security overview, known gaps, and the frontend's role in the requested controls |
+| [`docs/DESIGN_AUDIT.md`](docs/DESIGN_AUDIT.md) | Earlier combined frontend and backend audit (historical) |
+| [`docs/PRODUCT.md`](docs/PRODUCT.md), [`docs/DESIGN.md`](docs/DESIGN.md) | Product intent and visual design system |
