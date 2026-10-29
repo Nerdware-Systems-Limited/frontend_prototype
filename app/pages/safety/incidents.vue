@@ -4,10 +4,9 @@
     title="Incident Command"
     subtitle="NTSA · NPS · KMD - Real-time active incidents, NPS emergency dispatch coordination, KMD weather context, and investigation workflows"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
+    <template #actions>
+      <TimeRangeSelector :range="range" @change="onRangeChange" />
+    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -26,23 +25,23 @@
       to="#active-queue"
     />
     <KpiCard
-      label="Incidents Today"
-      :value="summary ? fmtNum(summary.kpis.total_24h) : '-'"
+      label="Incidents"
+      :value="summary ? fmtNum(summary.kpis.total_window ?? summary.kpis.total_30d) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="24H"
-      sub="All severities"
+      :period="range.period.value"
+      :sub="`All severities · ${range.label.value}`"
       status="monitoring"
       to="#all-incidents"
     />
     <KpiCard
-      label="Fatalities (30d)"
-      :value="summary ? fmtNum(summary.kpis.fatal_30d) : '-'"
+      label="Fatalities"
+      :value="summary ? fmtNum(windowFatalities) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="30D"
-      sub="People killed this month"
-      :status="!summary ? undefined : summary.kpis.fatal_30d > 20 ? 'critical' : summary.kpis.fatal_30d > 10 ? 'below' : 'monitoring'"
+      :period="range.period.value"
+      :sub="`People killed · ${range.label.value}`"
+      :status="fatalityStatus"
       to="#all-incidents"
       :filter="{ severity: 'fatal' }"
     />
@@ -61,7 +60,7 @@
   <!-- Incidents table with filtering -->
   <CollapsibleSection
     id="all-incidents" class="drill-target" plain default-open style="margin-bottom:16px"
-    title="All Incidents" :count="filteredIncidents.length" storage-key="incidents:safety/all"
+    title="All Incidents" :count="incidentsCount" storage-key="incidents:safety/all"
   >
   <div class="filter-row">
     <input v-model="incidentSearch" class="select-sm" placeholder="Search reference / title…" style="min-width:180px" />
@@ -84,8 +83,8 @@
       <option value="true">Verified only</option>
       <option value="false">Unverified only</option>
     </select>
-    <button class="btn" @click="load">Apply</button>
-    <button class="btn" @click="incidentSearch = ''; severityFilter = ''; statusFilter = ''; verifiedFilter = ''; load()">Clear</button>
+    <button class="btn" @click="applyFilters">Apply</button>
+    <button class="btn" @click="incidentSearch = ''; severityFilter = ''; statusFilter = ''; verifiedFilter = ''; applyFilters()">Clear</button>
     <ExportButton filename="uapts-incidents.csv" :rows="filteredIncidents" :columns="incidentExportColumns" style="margin-left:auto" />
   </div>
 
@@ -174,6 +173,15 @@
         :page="incidentsPage" :total-pages="incidentsTotalPages" :total="incidentsTotal"
         @prev="incidentsPrev" @next="incidentsNext"
       />
+      <div class="range-foot">
+        <span>
+          <strong>{{ fmtNum(incidents.length) }}</strong> of <strong>{{ fmtNum(incidentsCount) }}</strong>
+          incidents loaded · {{ range.label.value }}
+        </span>
+        <button v-if="incidents.length < incidentsCount" class="btn btn-sm" :disabled="loading" @click="loadMore">
+          Load {{ fmtNum(Math.min(INCIDENT_PAGE, incidentsCount - incidents.length)) }} more
+        </button>
+      </div>
     </div>
   </div>
   </CollapsibleSection>
@@ -339,6 +347,8 @@ type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtit
 
 const summary    = ref<SafetySummary | null>(null)
 const incidents  = ref<Incident[]>([])
+// Open incidents are always live, whatever period the table is showing.
+const activeList = ref<Incident[]>([])
 const dispatches = ref<EmergencyDispatch[]>([])
 const roadsGeo   = ref<GeoJSONFeatureCollection | null>(null)
 const countyBoundary = ref<GeoJSONFeatureCollection | null>(null)
@@ -346,6 +356,11 @@ const loading    = ref(true)
 const error      = ref<string | null>(null)
 const acting     = ref<string | null>(null)
 const lastRefreshed = ref('-')
+
+// Reporting period: the presets, a calendar year, or any from/to (agencies can hold decades of
+// incidents). It sizes the KPI cards and the "All Incidents" table; active incidents and
+// dispatches are always live.
+const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
 
 const severityFilter = ref('')
 const statusFilter   = ref('')
@@ -382,20 +397,61 @@ async function openReporters(inc: Incident) {
   }
 }
 
+// The table is server-paged: the first page is fetched with the period and filters, and "Load
+// more" appends the next. A refresh re-fetches every page already loaded so rows don't vanish.
+const INCIDENT_PAGE = 100
+const incidentsCount = ref(0)
+const pagesLoaded = ref(1)
+
+function tableFilters() {
+  return {
+    ...(severityFilter.value ? { severity: severityFilter.value } : {}),
+    ...(statusFilter.value   ? { status:   statusFilter.value }   : {}),
+    ...(verifiedFilter.value ? { verified: verifiedFilter.value } : {}),
+  }
+}
+
+async function fetchIncidents() {
+  const safety = useSafety()
+  const rows: Incident[] = []
+  let count = 0
+  for (let page = 1; page <= pagesLoaded.value; page++) {
+    const res: any = await safety.incidents({
+      page, page_size: INCIDENT_PAGE,
+      ...range.query.value,
+      ...tableFilters(),
+    })
+    rows.push(...(res.results ?? []))
+    count = res.count ?? rows.length
+    if (!res.next) break
+  }
+  return { results: rows, count }
+}
+
+function applyFilters() { pagesLoaded.value = 1; load() }
+function onRangeChange() { applyFilters() }
+async function loadMore() { pagesLoaded.value++; await load() }
+
+// Same 10 / 20-a-month thresholds as the Safety Overview, scaled to the chosen period.
+const windowFatalities = computed(() => summary.value?.kpis.fatal_window ?? summary.value?.kpis.fatal_30d ?? 0)
+const fatalityStatus = computed(() => {
+  if (!summary.value) return undefined
+  const days = summary.value.window?.days ?? range.days.value
+  if (days < 7) return 'monitoring'
+  const per30 = (windowFatalities.value / days) * 30
+  return per30 > 20 ? 'critical' : per30 > 10 ? 'below' : 'monitoring'
+})
+
 async function load() {
   loading.value = true
   error.value = null
   const safety = useSafety()
   const gis    = useGis()
 
-  const [sumRes, incRes, dispRes, roadsRes, boundaryRes] = await Promise.allSettled([
-    safety.summary(),
-    safety.incidents({
-      page_size: 50,
-      ...(severityFilter.value ? { severity: severityFilter.value } : {}),
-      ...(statusFilter.value   ? { status:   statusFilter.value }   : {}),
-      ...(verifiedFilter.value ? { verified: verifiedFilter.value } : {}),
-    }),
+  const [sumRes, incRes, activeRes, dispRes, roadsRes, boundaryRes] = await Promise.allSettled([
+    safety.summary(range.query.value),
+    fetchIncidents(),
+    safety.activeIncidents({ page_size: 100, ...tableFilters() }),
     safety.dispatches({ page_size: 30 }),
     gis.roads({ limit: 300, simplify: 0.01 }),
     // 47-county polygons - used to derive the County column from an
@@ -404,7 +460,11 @@ async function load() {
   ])
 
   if (sumRes.status   === 'fulfilled') summary.value    = sumRes.value
-  if (incRes.status   === 'fulfilled') incidents.value  = (incRes.value as any).results ?? []
+  if (incRes.status   === 'fulfilled') {
+    incidents.value = incRes.value.results
+    incidentsCount.value = incRes.value.count
+  }
+  if (activeRes.status === 'fulfilled') activeList.value = (activeRes.value as any).results ?? []
   if (dispRes.status  === 'fulfilled') dispatches.value = (dispRes.value as any).results ?? []
   if (roadsRes.status === 'fulfilled') roadsGeo.value   = roadsRes.value
   if (boundaryRes.status === 'fulfilled' && boundaryRes.value) {
@@ -425,7 +485,7 @@ function adoptQueryFilters() {
   if (typeof route.query.verified === 'string') verifiedFilter.value = route.query.verified
 }
 adoptQueryFilters()
-watch(() => route.query, () => { adoptQueryFilters(); load() })
+watch(() => route.query, () => { adoptQueryFilters(); applyFilters() })
 
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
@@ -472,7 +532,7 @@ async function doUnverify(id: string) {
 
 // ── Computed ───────────────────────────────────────────────────────────
 const activeIncidents = computed(() =>
-  incidents.value.filter(i => !['resolved','closed','cancelled'].includes(i.status)),
+  activeList.value.filter(i => !['resolved','closed','cancelled'].includes(i.status)),
 )
 
 /** The header colour while the list is folded: the worst thing still open. */
@@ -510,7 +570,8 @@ const incidentExportColumns = [
 ]
 
 const incidentMarkers = computed((): MarkerSpec[] =>
-  incidents.value
+  // The period's incidents plus anything still open (which may be older than the period).
+  [...incidents.value, ...activeList.value.filter(a => !incidents.value.some(i => i.id === a.id))]
     .filter(i => i.latitude && i.longitude)
     .map(i => ({
       id: `inc-${i.id}`,
@@ -602,6 +663,7 @@ function countyFromCoords(inc: Incident): string {
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .map-card { overflow:hidden; }
 .count-badge { font-size:11px; background:var(--surface-sunken); border-radius:10px; padding:1px 7px; margin-left:6px; }
+.range-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:8px 14px; border-top:1px solid var(--border-subtle); font-size:12px; color:var(--fg-3); }
 .scroll-body { max-height:460px; overflow-y:auto; padding:0!important; }
 /* Severity is already a badge in the header - the card itself is a flat
    tinted row (no coloured border-left slab). */

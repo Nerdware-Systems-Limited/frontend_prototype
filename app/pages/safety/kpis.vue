@@ -4,10 +4,9 @@
     title="Safety KPIs"
     subtitle="NTSA · KeNHA · KURA · KeRRA - National crash rates, injury severity, county breakdowns by road authority, and traffic violation trends"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
+    <template #actions>
+      <TimeRangeSelector :range="range" @change="load" />
+    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -19,8 +18,8 @@
       :value="fmtNum(totalIncidents)"
       :unavailable="loading || countyError"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      :period="`${windowDays}D`"
-      description="Recorded accidents in window"
+      :period="range.period.value"
+      :description="`Recorded accidents · ${range.label.value}`"
       to="#county-breakdown"
     />
     <KpiCard
@@ -28,8 +27,8 @@
       :value="fmtNum(totalFatalities)"
       :unavailable="loading || countyError"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      :period="`${windowDays}D`"
-      description="People killed in window"
+      :period="range.period.value"
+      :description="`People killed · ${range.label.value}`"
       to="#county-breakdown"
     />
     <KpiCard
@@ -56,7 +55,7 @@
 
   <div class="card">
     <div class="card-header">
-      <span>Incident Trend</span>
+      <span>Incident Trend · {{ range.label.value }}</span>
       <div class="filter-row-inline">
         <select v-model="trendMetric" class="select-sm">
           <option value="incidents">Total Incidents</option>
@@ -91,7 +90,7 @@
                     height: `${maxTrendVal > 0 ? (getMetric(d) / maxTrendVal) * 100 : 0}%`,
                     background: trendMetric === 'fatalities' ? 'var(--destructive)' : 'var(--primary-fill)',
                   }"
-                  :title="`${d.date}: ${getMetric(d)}`"
+                  :title="`${shortDate(d.date)}: ${getMetric(d)}`"
                 />
               </div>
               <div class="bar-date">{{ showDateLabel(i) ? shortDate(d.date) : '' }}</div>
@@ -147,7 +146,7 @@
   </div>
 
   <!-- Violations by type -->
-  <SectionTitle pill="NTSA Traffic Enforcement">Violations by Type</SectionTitle>
+  <SectionTitle pill="NTSA Traffic Enforcement">Violations by Type · {{ range.label.value }}</SectionTitle>
 
   <div class="card">
     <div class="card-body">
@@ -183,9 +182,11 @@ const loading      = ref(true)
 const error        = ref<string | null>(null)
 const summaryError = ref(false)
 const avgEffectiveness = ref<number | null>(null)
-// Trend and county aggregates are requested over the same window so the
-// headline totals and the chart describe the same period.
-const windowDays   = 365
+// Trend, county and violation aggregates are requested over the same period so the headline
+// totals, the chart and the tables describe the same thing. Agencies can hold many years of
+// history, hence the calendar-year and free from/to choices beside the presets.
+const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
+const trendBucket = ref<'hour' | 'day' | 'month'>('day')
 const countyError  = ref(false)
 const lastRefreshed = ref('-')
 const trendMetric  = ref<'incidents' | 'fatalities' | 'injuries'>('incidents')
@@ -197,9 +198,9 @@ async function load() {
 
   const [summaryRes, trendRes, countyRes, violRes] = await Promise.allSettled([
     safety.summary(),
-    safety.kpiTrend(windowDays),
-    safety.kpiByCounty(windowDays),
-    safety.violationsByType(),
+    safety.kpiTrend(range.query.value),
+    safety.kpiByCounty(range.query.value),
+    safety.violationsByType(range.query.value),
   ])
 
   if (summaryRes.status === 'fulfilled') {
@@ -209,6 +210,7 @@ async function load() {
   if (trendRes.status  === 'fulfilled') {
     const raw = trendRes.value as any
     trendData.value = Array.isArray(raw) ? raw : (raw.results ?? raw.data ?? [])
+    trendBucket.value = raw?.bucket ?? 'day'
   }
   if (countyRes.status === 'fulfilled') {
     const raw = countyRes.value as any
@@ -256,18 +258,15 @@ const totalFatalities = computed(() => countyData.value.reduce((s, r) => s + r.f
 function getMetric(d: any): number {
   return d[trendMetric.value] ?? 0
 }
-// Bars render the last 30 days only - scale against that same visible
-// window, not the full (possibly longer) fetched history. Scaling against
-// the full history let an older, off-screen spike silently compress every
-// bar actually on screen.
-const visibleTrend = computed(() => trendData.value.slice(-30))
+// One bar per bucket for the whole chosen period; the API picks hourly, daily or monthly
+// buckets from the period's length, so a 20-year range is a few hundred bars, not thousands.
+const visibleTrend = computed(() => trendData.value)
 const maxTrendVal = computed(() => Math.max(1, ...visibleTrend.value.map(d => getMetric(d))))
-// No permanent value labels on the bars (every value is reachable via the
-// per-bar hover tooltip); every 5th date only (~6 labels across 30 bars),
-// always including the last bar - a label on all 30 bars packed into a
-// ~20px-wide column was unreadable.
+// No permanent value labels on the bars (every value is reachable via the per-bar hover
+// tooltip); about six date labels whatever the bar count, always including the last bar.
 function showDateLabel(i: number) {
-  return i % 5 === 0 || i === visibleTrend.value.length - 1
+  const step = Math.max(1, Math.ceil(visibleTrend.value.length / 6))
+  return i % step === 0 || i === visibleTrend.value.length - 1
 }
 
 // ── Chart type toggle (bar / line) ──────────────────────────────────────
@@ -294,8 +293,16 @@ function fmtPct(v: number | null | undefined) {
   return `${v.toFixed(1)}%`
 }
 function shortDate(s: string) {
-  try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short' }) }
-  catch { return s.slice(5) }
+  try {
+    const d = new Date(s)
+    if (Number.isNaN(d.getTime())) return s.slice(5)
+    const opts: Intl.DateTimeFormatOptions =
+      trendBucket.value === 'month' ? { month: 'short', year: '2-digit' }
+        : trendBucket.value === 'hour' ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }
+          : { day: '2-digit', month: 'short' }
+    // Daily buckets are bare dates (a calendar day, not an instant); the others carry an EAT offset.
+    return new Intl.DateTimeFormat('en-KE', { ...opts, timeZone: s.length <= 10 ? 'UTC' : 'Africa/Nairobi' }).format(d)
+  } catch { return s.slice(5) }
 }
 </script>
 

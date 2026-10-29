@@ -811,8 +811,8 @@ async function load() {
       ? `${failedDomains.join(', ')} ${failedDomains.length > 1 ? 'are' : 'is'} temporarily unavailable. Other sections show live data.`
       : null
 
-  // UTC, to match the utcClock on the same line of the command header.
-  lastRefreshed.value = new Date().toISOString().slice(11, 16)
+  // EAT (Africa/Nairobi), to match the clock on the same line of the command header.
+  lastRefreshed.value = eatTime.format(new Date()).slice(0, 5)
   loading.value = false
 }
 
@@ -829,14 +829,16 @@ const systemStatus = computed((): { tone: 'good' | 'warn' | 'crit'; label: strin
   return { tone: 'good', label: 'System nominal' }
 })
 
-const utcClock = ref('--:--:-- UTC')
+// East Africa Time (UTC+3, no DST), 24-hour HH:mm:ss.
+const eatTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Nairobi', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+const utcClock = ref('--:--:-- EAT')
 
-// Auto-refresh every 2 minutes + live UTC clock
+// Auto-refresh every 2 minutes + live EAT clock
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   refreshTimer = setInterval(load, 120_000)
-  const tick = () => { utcClock.value = `${new Date().toISOString().slice(11, 19)} UTC` }
+  const tick = () => { utcClock.value = `${eatTime.format(new Date())} EAT` }
   tick()
   clockTimer = setInterval(tick, 1000)
 })

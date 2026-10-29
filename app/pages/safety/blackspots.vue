@@ -4,10 +4,9 @@
     title="Blackspot Analysis"
     subtitle="NTSA · KeNHA · KMD - KDE accident cluster analysis, KeNHA road geometry context, KMD weather correlation, and predictive hotspot overlays"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
+    <template #actions>
+      <TimeRangeSelector :range="range" @change="load" />
+    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -164,7 +163,8 @@
   <!-- Accidents by cause -->
   <div class="two-col">
     <div class="card">
-      <div class="card-header">Accidents by Cause</div>
+      <div class="card-header">Accidents by Cause · {{ range.label.value }}</div>
+      <p class="range-hint">The period applies to accident causes only. Black-spot tiers and predictive hotspots come from the KDE model's own rolling window.</p>
       <div class="card-body">
         <div v-if="causeData.length" class="bar-list">
           <div v-for="c in causeData.slice(0, 10)" :key="c.cause_of_accident ?? c.label" class="bar-row">
@@ -216,6 +216,9 @@ type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtit
 const spots    = ref<BlackSpot[]>([])
 const hotspots = ref<PredictiveHotspot[]>([])
 const causeData = ref<any[]>([])
+// Accidents-by-cause follows the chosen period; the spot / hotspot figures are model output over
+// their own rolling window, so they do not.
+const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
 const roadsGeo  = ref<GeoJSONFeatureCollection | null>(null)
 const loading   = ref(true)
 const error     = ref<string | null>(null)
@@ -235,7 +238,7 @@ async function load() {
     safety.blackspots({ page_size: 100 }),
     safety.topBlackspots(),
     safety.hotspots({ page_size: 20 }),
-    safety.accidentsByCause(),
+    safety.accidentsByCause(range.query.value),
     gis.roads({ limit: 300, simplify: 0.01 }),
   ])
 
@@ -383,6 +386,7 @@ function riskBadge(t: string | null) {
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
+.range-hint { font-size:11.5px; color:var(--fg-3); margin:6px 16px 0; }
 .bar-row { display:grid; grid-template-columns:140px 1fr 50px; align-items:center; gap:8px; }
 .bar-label { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bar-track { background:var(--surface-sunken); border-radius:4px; height:10px; overflow:hidden; }

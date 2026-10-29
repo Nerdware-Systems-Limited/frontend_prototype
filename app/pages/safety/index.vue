@@ -5,8 +5,7 @@
     subtitle="NTSA · KeNHA · KMD - National road safety KPIs, active incidents, KMD weather correlation, KeNHA road intervention effectiveness, and predictive hotspot analysis"
   >
     <template #actions>
-      
-      <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
+      <TimeRangeSelector :range="range" @change="load" />
       <NuxtLink to="/safety/incidents" class="btn">Incident Command<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -18,35 +17,30 @@
     National Safety KPIs
   </SectionTitle>
 
+  <p class="range-note">
+    Showing <strong>{{ range.label.value }}</strong>. The period applies to incident, fatality and violation figures;
+    active incidents, dispatches, black spots and hotspots are always current.
+  </p>
+
   <div class="kpi-grid">
     <KpiCard
-      label="Incidents (24h)"
-      :value="summary ? fmtNum(summary.kpis.total_24h) : '-'"
+      label="Incidents"
+      :value="summary ? fmtNum(windowTotal) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="24H"
-      sub="All severity levels"
+      :period="range.period.value"
+      :sub="`All severity levels · ${range.label.value}`"
       status="monitoring"
       to="#by-severity"
     />
     <KpiCard
-      label="Incidents (7d)"
-      :value="summary ? fmtNum(summary.kpis.total_7d) : '-'"
-      :unavailable="!summary"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
-      period="7D"
-      sub="Rolling 7-day window"
-      status="monitoring"
-      to="#by-type"
-    />
-    <KpiCard
-      label="Fatalities (30d)"
-      :value="summary ? fmtNum(summary.kpis.fatal_30d) : '-'"
+      label="Fatalities"
+      :value="summary ? fmtNum(windowFatalities) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS + NPS feed unavailable'"
-      period="30D"
-      sub="People killed this month"
-      :status="!summary ? undefined : summary.kpis.fatal_30d > 20 ? 'critical' : summary.kpis.fatal_30d > 10 ? 'below' : 'monitoring'"
+      :period="range.period.value"
+      :sub="`People killed · ${range.label.value}`"
+      :status="fatalityStatus"
       :series="fatalitySeries"
       to="#fatality-trend"
     />
@@ -84,38 +78,39 @@
   <!-- 30-day fatality sparkline + severity/type breakdown -->
   <div class="three-col-stats">
     <div v-if="hasFatalityTrend" id="fatality-trend" class="card drill-target">
-      <div class="card-header">30-Day Fatality Trend</div>
+      <div class="card-header">Fatality Trend · {{ range.label.value }}</div>
       <div class="card-body sparkline-wrap">
         <div class="sparkline-bars">
           <div
-            v-for="d in summary!.fatality_trend_30d.slice(-30)"
+            v-for="d in trendRows"
             :key="d.day"
             class="spark-bar"
-            :class="d.fatalities > 5 ? 'spark-red' : d.fatalities > 2 ? 'spark-amber' : 'spark-green'"
+            :class="d.fatalities >= maxFatalities * 0.66 ? 'spark-red' : d.fatalities >= maxFatalities * 0.33 ? 'spark-amber' : 'spark-green'"
             :style="{ height: `${Math.max(6, (d.fatalities / maxFatalities) * 100)}%` }"
-            :title="`${d.day}: ${d.fatalities} fatalities`"
+            :title="`${bucketLabel(d.day)}: ${d.fatalities} fatalities`"
           />
         </div>
       </div>
       <div class="card-footer-hint">
-        <span class="hint-dot" style="background:var(--destructive)" /> &gt;5 fatal
-        <span class="hint-dot" style="background:var(--warning);margin-left:8px" /> 3–5
-        <span class="hint-dot" style="background:var(--success);margin-left:8px" /> 0–2
+        One bar per {{ bucketName }} · shaded against the peak ({{ fmtNum(maxFatalities) }}):
+        <span class="hint-dot" style="background:var(--destructive)" /> high
+        <span class="hint-dot" style="background:var(--warning);margin-left:8px" /> mid
+        <span class="hint-dot" style="background:var(--success);margin-left:8px" /> low
       </div>
     </div>
     <div v-else id="fatality-trend" class="card drill-target">
-      <div class="card-header">30-Day Fatality Trend</div>
+      <div class="card-header">Fatality Trend · {{ range.label.value }}</div>
       <EmptyState
         :loading="loading"
-        :message="summary?.fatality_trend_30d?.length
-          ? `Only ${summary.fatality_trend_30d.length} day-bucket(s) of trend data available - too sparse for a daily chart.`
+        :message="trendRows.length
+          ? `Only ${trendRows.length} ${bucketName}-bucket(s) of trend data in this period - too sparse for a chart.`
           : 'No fatality trend data for this period.'"
         compact
       />
     </div>
 
     <div v-if="summary?.incidents_by_severity" id="by-severity" class="card drill-target">
-      <div class="card-header">By Severity</div>
+      <div class="card-header">By Severity · {{ range.label.value }}</div>
       <div class="card-body">
         <div class="breakdown-list">
           <div v-for="(count, sev) in summary.incidents_by_severity" :key="sev" class="breakdown-row">
@@ -136,7 +131,7 @@
     </div>
 
     <div v-if="summary?.incidents_by_type" id="by-type" class="card drill-target">
-      <div class="card-header">By Type</div>
+      <div class="card-header">By Type · {{ range.label.value }}</div>
       <div class="card-body">
         <div class="breakdown-list">
           <div v-for="(count, type) in summary.incidents_by_type" :key="type" class="breakdown-row">
@@ -211,11 +206,11 @@
           <BadgePill variant="success">Low</BadgePill>
         </div>
 
-        <!-- Recent violations 24h -->
-        <div class="section-mini">Recent Violations (24h)</div>
+        <!-- Violations in the chosen period -->
+        <div class="section-mini">Traffic Violations · {{ range.label.value }}</div>
         <div class="stat-pair">
           <span>Total violations</span>
-          <strong>{{ summary ? fmtNum(summary.recent_violations_24h) : '-' }}</strong>
+          <strong>{{ summary ? fmtNum(summary.violations_window ?? summary.recent_violations_24h) : '-' }}</strong>
         </div>
       </div>
     </div>
@@ -314,6 +309,10 @@ const loading       = ref(true)
 const error         = ref<string | null>(null)
 const lastRefreshed = ref('-')
 
+// The reporting period for the incident / fatality / violation figures. Agencies can hold many
+// years of history, so beyond the presets there is a calendar year and a free from/to period.
+const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
+
 // ── Table pagination (max 15 rows visible per table) ───────────────────
 const {
   pageRows: interventionsPageRows, page: interventionsPage, totalPages: interventionsTotalPages,
@@ -327,7 +326,7 @@ async function load() {
   const gis    = useGis()
 
   const [sumRes, hsRes, bsRes, ivRes, roadsRes] = await Promise.allSettled([
-    safety.summary(),
+    safety.summary(range.query.value),
     safety.hotspots({ page_size: 20 }),
     safety.topBlackspots(),
     safety.interventions({ page_size: 20, ordering: '-effectiveness_pct' }),
@@ -394,16 +393,40 @@ function effectColor(v: number | null | undefined) {
 // Scale against the same last-30 slice the bars render, not the full
 // fetched history - an older, off-screen day would otherwise silently
 // compress every bar actually on screen.
-const maxFatalities = computed(() =>
-  Math.max(1, ...(summary.value?.fatality_trend_30d ?? []).slice(-30).map(d => d.fatalities)),
-)
-// A single day-bucket (or very few) renders as one misleading full-width bar
+// Older API builds only return the fixed 30-day trend, so fall back to it.
+const trendRows = computed(() => summary.value?.fatality_trend ?? summary.value?.fatality_trend_30d ?? [])
+const maxFatalities = computed(() => Math.max(1, ...trendRows.value.map(d => d.fatalities)))
+// A single bucket (or very few) renders as one misleading full-width bar
 // under the flex layout below - require a minimum spread before charting it.
-const hasFatalityTrend = computed(() => (summary.value?.fatality_trend_30d?.length ?? 0) >= 5)
+const hasFatalityTrend = computed(() => trendRows.value.length >= 5)
 const fatalitySeries = computed(() => {
-  const t = summary.value?.fatality_trend_30d ?? []
+  const t = trendRows.value
   return t.length > 1 ? t.map(d => d.fatalities) : undefined
 })
+
+const windowTotal = computed(() => summary.value?.kpis.total_window ?? summary.value?.kpis.total_30d ?? 0)
+const windowFatalities = computed(() => summary.value?.kpis.fatal_window ?? summary.value?.kpis.fatal_30d ?? 0)
+// The 10 / 20-a-month thresholds only mean something over a month-ish window, so they are
+// scaled to a 30-day rate and not applied at all to windows too short to judge.
+const fatalityStatus = computed(() => {
+  if (!summary.value) return undefined
+  const days = summary.value.window?.days ?? range.days.value
+  if (days < 7) return 'monitoring'
+  const per30 = (windowFatalities.value / days) * 30
+  return per30 > 20 ? 'critical' : per30 > 10 ? 'below' : 'monitoring'
+})
+
+const bucketName = computed(() => summary.value?.window?.bucket ?? 'day')
+function bucketLabel(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const opts: Intl.DateTimeFormatOptions =
+    bucketName.value === 'month' ? { month: 'short', year: 'numeric' }
+      : bucketName.value === 'hour' ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }
+        : { day: '2-digit', month: 'short', year: 'numeric' }
+  // A bare date (daily buckets) is a calendar day, not an instant - don't shift it by a timezone.
+  return new Intl.DateTimeFormat('en-KE', { ...opts, timeZone: iso.length <= 10 ? 'UTC' : 'Africa/Nairobi' }).format(d)
+}
 
 const maxSevCount = computed(() => {
   if (!summary.value?.incidents_by_severity) return 1
@@ -471,6 +494,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 <style scoped>
 .link-sm { font-size:12px; color:var(--link); text-decoration:none; font-weight:600; }
 .link-sm:hover { text-decoration:underline; }
+.range-note { font-size:12px; color:var(--fg-3); margin:-4px 0 10px; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }

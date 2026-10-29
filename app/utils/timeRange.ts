@@ -8,10 +8,16 @@
  */
 
 export type RangePreset = '24h' | '7d' | '30d'
-/** A preset, or one whole calendar year (see `year` in RangeSelection). */
-export type RangeMode = RangePreset | 'year'
+/** A preset, one whole calendar year (`year` in RangeSelection), or any from/to period ('custom'). */
+export type RangeMode = RangePreset | 'year' | 'custom'
 
-export interface RangeSelection { mode: RangeMode; year: number }
+export interface RangeSelection {
+  mode: RangeMode
+  year: number
+  /** 'custom' only: first and last day included, `YYYY-MM-DD` (EAT). */
+  from?: string
+  to?: string
+}
 
 export const PRESET_DAYS: Record<RangePreset, number> = { '24h': 1, '7d': 7, '30d': 30 }
 export const PRESET_LABEL: Record<RangePreset, string> = { '24h': '24 Hours', '7d': '7 Days', '30d': '30 Days' }
@@ -57,8 +63,38 @@ export function clampYear(year: number, now: Date = new Date()): number {
   return Math.min(currentYear(now), Math.max(EARLIEST_YEAR, Math.trunc(year) || currentYear(now)))
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+/** Earliest day a custom range may start on. */
+export const EARLIEST_DAY = `${EARLIEST_YEAR - 25}-01-01`
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** `2012-03-04` -> `4 Mar 2012`. */
+export function formatDay(d: string): string {
+  return `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`
+}
+
+/** A real calendar day in `YYYY-MM-DD` form (rejects 2012-02-31). */
+export function isIsoDay(v: unknown): v is string {
+  return typeof v === 'string' && ISO_DAY.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`))
+    && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v
+}
+
 export function rangeBounds(sel: RangeSelection, now: Date = new Date()): RangeBounds {
   const today = eatDate(now)
+  if (sel.mode === 'custom') {
+    // A half-filled or reversed pair is repaired rather than sent to the API as-is: a missing
+    // end means "up to today", a reversed pair is swapped, and nothing reaches into the future.
+    let from = isIsoDay(sel.from) ? sel.from : EARLIEST_DAY
+    let to = isIsoDay(sel.to) ? sel.to : today
+    if (from > to) [from, to] = [to, from]
+    if (from < EARLIEST_DAY) from = EARLIEST_DAY
+    if (to > today) to = today
+    if (from > to) from = to
+    return {
+      from, to, days: dayDiff(from, to) + 1, endsToday: to === today,
+      label: from === to ? formatDay(from) : `${formatDay(from)} – ${formatDay(to)}`,
+    }
+  }
   if (sel.mode === 'year') {
     const y = clampYear(sel.year, now)
     const from = `${y}-01-01`
@@ -75,11 +111,24 @@ export function rangeBounds(sel: RangeSelection, now: Date = new Date()): RangeB
 
 /** The short period badge KPI cards show: "24H", "7D", "30D" or the year. */
 export function periodBadge(sel: RangeSelection): string {
-  return sel.mode === 'year' ? String(sel.year) : sel.mode.toUpperCase()
+  return sel.mode === 'year' ? String(sel.year) : sel.mode === 'custom' ? 'RANGE' : sel.mode.toUpperCase()
+}
+
+/**
+ * Query parameters for endpoints that take the shared period contract: a rolling `days` for a
+ * preset (so "24 Hours" is the last 24 hours, not yesterday plus today), `date_from` / `date_to`
+ * for a year or a custom range.
+ */
+export function rangeQuery(sel: RangeSelection, now: Date = new Date()): { days: number } | { date_from: string; date_to: string } {
+  if (sel.mode === 'year' || sel.mode === 'custom') {
+    const b = rangeBounds(sel, now)
+    return { date_from: b.from, date_to: b.to }
+  }
+  return { days: PRESET_DAYS[sel.mode] }
 }
 
 export function isRangeMode(v: unknown): v is RangeMode {
-  return v === '24h' || v === '7d' || v === '30d' || v === 'year'
+  return v === '24h' || v === '7d' || v === '30d' || v === 'year' || v === 'custom'
 }
 
 /** `?window=7` style numbers (days) to the nearest preset, or null. */

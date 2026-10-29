@@ -214,6 +214,13 @@ export interface TrafficViolation {
 
 // ── Summary analytics payload ───────────────────────────────────────
 
+/** The shared period contract of the time-bound safety endpoints: a rolling `days`, or a calendar range (EAT). */
+export type SafetyPeriod = {
+  days?: number
+  date_from?: string
+  date_to?: string
+}
+
 export interface SafetySummary {
   kpis: {
     total_24h: number
@@ -221,7 +228,18 @@ export interface SafetySummary {
     total_30d: number
     active: number
     fatal_30d: number
+    /** Incidents (incl. unlinked accident rows) in the requested period; defaults to the last 30 days. */
+    total_window?: number
+    /** People killed in the requested period. */
+    fatal_window?: number
+    /** Fatal incident records in the requested period. */
+    fatal_incidents_window?: number
   }
+  /** The period the `*_window` figures, breakdowns and `fatality_trend` describe. */
+  window?: { from: string | null; to: string; days: number | null; bucket: 'hour' | 'day' | 'month' }
+  /** Over the requested period, bucketed by `window.bucket` (`day` holds the bucket start). */
+  fatality_trend?: Array<{ day: string; fatalities: number; incidents: number }>
+  violations_window?: number
   incidents_by_severity: Record<string, number>
   incidents_by_type: Record<string, number>
   fatality_trend_30d: Array<{ day: string; fatalities: number }>
@@ -287,7 +305,7 @@ export function useSafety() {
 
   return {
     // ── Dashboard / summary ────────────────────────────────────────
-    summary: (params?: SummaryFilterParams) =>
+    summary: (params?: SummaryFilterParams & SafetyPeriod) =>
       api<SafetySummary>(`${S}/summary/`, { query: cleanQuery(params) }),
 
     // ── Incidents ──────────────────────────────────────────────────
@@ -304,7 +322,8 @@ export function useSafety() {
       api<Incident>(`${S}/incidents/${id}/resolve/`, { method: 'POST' }),
     closeIncident: (id: string) =>
       api<Incident>(`${S}/incidents/${id}/close/`, { method: 'POST' }),
-    activeIncidents: () => api<Paged<Incident>>(`${S}/incidents/active/`),
+    activeIncidents: (q?: SafetyQuery) =>
+      api<Paged<Incident>>(`${S}/incidents/active/`, { query: cleanQuery(q as Record<string, unknown>) }),
     incidentDispatches: (id: string) =>
       api<Paged<EmergencyDispatch>>(`${S}/incidents/${id}/dispatches/`),
     incidentsByChannel: () => api<unknown>(`${S}/incidents/by-channel/`),
@@ -318,8 +337,8 @@ export function useSafety() {
     // ── Accidents ──────────────────────────────────────────────────
     accidents: (q?: SafetyQuery) =>
       api<Paged<Accident>>(`${S}/accidents/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    fatalityTrend: () => api<unknown>(`${S}/accidents/fatality-trend/`),
-    accidentsByCause: () => api<unknown>(`${S}/accidents/by-cause/`),
+    fatalityTrend: (p?: SafetyPeriod) => api<unknown>(`${S}/accidents/fatality-trend/`, { query: cleanQuery(p) }),
+    accidentsByCause: (p?: SafetyPeriod) => api<unknown>(`${S}/accidents/by-cause/`, { query: cleanQuery(p) }),
 
     // ── Black spots ────────────────────────────────────────────────
     blackspots: (q?: SafetyQuery) =>
@@ -347,8 +366,10 @@ export function useSafety() {
     hotspotHeatmap: () => api<PredictiveHotspotHeatmap>(`${S}/predictive-hotspots/heatmap/`),
 
     // ── KPIs ───────────────────────────────────────────────────────
-    kpiTrend: (days?: number) => api<unknown>(`${S}/kpis/trend/`, { query: cleanQuery({ days }) }),
-    kpiByCounty: (days?: number) => api<unknown>(`${S}/kpis/by-county/`, { query: cleanQuery({ days }) }),
+    kpiTrend: (p?: number | SafetyPeriod) =>
+      api<unknown>(`${S}/kpis/trend/`, { query: cleanQuery(typeof p === 'number' ? { days: p } : p) }),
+    kpiByCounty: (p?: number | SafetyPeriod) =>
+      api<unknown>(`${S}/kpis/by-county/`, { query: cleanQuery(typeof p === 'number' ? { days: p } : p) }),
 
     // ── Interventions ──────────────────────────────────────────────
     interventions: (q?: SafetyQuery) =>
@@ -363,6 +384,6 @@ export function useSafety() {
       api<Paged<TrafficViolation>>(`${S}/traffic-violations/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    violationsByType: () => api<unknown>(`${S}/traffic-violations/by-type/`),
+    violationsByType: (p?: SafetyPeriod) => api<unknown>(`${S}/traffic-violations/by-type/`, { query: cleanQuery(p) }),
   }
 }

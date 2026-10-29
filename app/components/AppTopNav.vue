@@ -187,9 +187,13 @@ const clock = ref('--:--:--')
 let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
+  // East Africa Time (UTC+3, no DST). sv-SE formats as 'YYYY-MM-DD HH:mm:ss'.
+  const fmt = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  })
   const tick = () => {
-    const iso = new Date().toISOString()
-    clock.value = `${iso.slice(0, 10)} ${iso.slice(11, 19)} UTC`
+    clock.value = `${fmt.format(new Date())} EAT`
   }
   tick()
   timer = setInterval(tick, 1000)

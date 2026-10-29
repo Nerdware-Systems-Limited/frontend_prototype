@@ -4,7 +4,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import {
-  EARLIEST_YEAR, clampYear, currentYear, dayDiff, daysUntilEat, eatDate, periodBadge, presetFromDays, rangeBounds,
+  EARLIEST_YEAR, clampYear, currentYear, dayDiff, daysUntilEat, eatDate, isIsoDay, periodBadge, presetFromDays, rangeBounds,
+  rangeQuery,
 } from '~/utils/timeRange'
 import { useTimeRange } from '~/composables/useTimeRange'
 
@@ -105,5 +106,79 @@ describe('useTimeRange', () => {
     expect(r.year.value).toBe(EARLIEST_YEAR)
     r.setYear(3000)
     expect(r.year.value).toBe(currentYear())
+  })
+})
+
+describe('custom period', () => {
+  const sel = (from?: string, to?: string) => ({ mode: 'custom' as const, year: 2026, from, to })
+
+  it('is exactly the days asked for, ends inclusive, and labels itself', () => {
+    const b = rangeBounds(sel('2012-03-01', '2012-03-31'), NOW)
+    expect(b).toMatchObject({ from: '2012-03-01', to: '2012-03-31', days: 31, endsToday: false })
+    expect(b.label).toBe('1 Mar 2012 – 31 Mar 2012')
+    expect(rangeBounds(sel('2020-02-29', '2020-02-29'), NOW)).toMatchObject({ days: 1, label: '29 Feb 2020' })
+  })
+  it('handles decades of history', () => {
+    expect(rangeBounds(sel('2006-01-01', '2025-12-31'), NOW).days).toBe(7305)
+  })
+  it('repairs a reversed, half-filled or future pair instead of sending it on', () => {
+    expect(rangeBounds(sel('2012-03-31', '2012-03-01'), NOW)).toMatchObject({ from: '2012-03-01', to: '2012-03-31' })
+    expect(rangeBounds(sel('2026-01-01'), NOW)).toMatchObject({ from: '2026-01-01', to: '2026-10-12', endsToday: true })
+    expect(rangeBounds(sel('2026-10-01', '2030-01-01'), NOW).to).toBe('2026-10-12')
+    expect(rangeBounds(sel('2031-01-01', '2032-01-01'), NOW)).toMatchObject({ from: '2026-10-12', to: '2026-10-12' })
+    expect(rangeBounds(sel('not-a-date', '2026-10-05'), NOW).to).toBe('2026-10-05')
+  })
+  it('rejects impossible calendar days', () => {
+    expect(isIsoDay('2012-02-30')).toBe(false)
+    expect(isIsoDay('2012-02-29')).toBe(true)
+    expect(isIsoDay('12/03/2012')).toBe(false)
+  })
+  it('badge reads RANGE', () => {
+    expect(periodBadge(sel('2012-03-01', '2012-03-31'))).toBe('RANGE')
+  })
+})
+
+describe('rangeQuery', () => {
+  it('presets are a rolling `days`, so 24 Hours really is 24 hours', () => {
+    expect(rangeQuery({ mode: '24h', year: 2026 }, NOW)).toEqual({ days: 1 })
+    expect(rangeQuery({ mode: '30d', year: 2026 }, NOW)).toEqual({ days: 30 })
+  })
+  it('a year or custom period is a calendar date_from / date_to', () => {
+    expect(rangeQuery({ mode: 'year', year: 2024 }, NOW)).toEqual({ date_from: '2024-01-01', date_to: '2024-12-31' })
+    expect(rangeQuery({ mode: 'custom', year: 2026, from: '2012-03-01', to: '2012-03-31' }, NOW))
+      .toEqual({ date_from: '2012-03-01', date_to: '2012-03-31' })
+  })
+})
+
+describe('useTimeRange custom', () => {
+  const store = new Map<string, any>()
+  beforeEach(() => {
+    store.clear()
+    ;(globalThis as any).useState = (k: string, init: () => any) => { if (!store.has(k)) store.set(k, ref(init())); return store.get(k) }
+  })
+
+  it('only where the data supports it', () => {
+    const r = useTimeRange('c1', { default: '7d' })
+    r.setCustom('2012-03-01', '2012-03-31')
+    r.setMode('custom')
+    expect(r.isCustom.value).toBe(false)
+    expect(r.days.value).toBe(7)
+  })
+  it('switching to Custom starts from the period already on screen, then follows the dates', () => {
+    const r = useTimeRange('c2', { default: '30d', years: true, custom: true })
+    r.setMode('custom')
+    expect(r.isCustom.value).toBe(true)
+    expect(r.days.value).toBe(30)
+    r.setCustom('2012-03-01', '2012-03-31')
+    expect(r.query.value).toEqual({ date_from: '2012-03-01', date_to: '2012-03-31' })
+    expect(r.period.value).toBe('RANGE')
+    r.setMode('7d')
+    expect(r.query.value).toEqual({ days: 7 })
+  })
+  it('a page without custom support falls back to its default when the module is on a custom period', () => {
+    useTimeRange('c3', { default: '7d', custom: true }).setCustom('2012-03-01', '2012-03-31')
+    const other = useTimeRange('c3', { default: '30d' })
+    expect(other.isCustom.value).toBe(false)
+    expect(other.query.value).toEqual({ days: 30 })
   })
 })
