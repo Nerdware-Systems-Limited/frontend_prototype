@@ -171,9 +171,9 @@
 
         <template v-else>
           <div class="ih-card ih-rise">
-            <div class="ih-card-head"><h2>1 · Identity &amp; protocol</h2><span class="hint">who this feed belongs to, and how it connects</span></div>
+            <div class="ih-card-head"><h2>1 · Protocol</h2><span class="hint">how this feed connects</span></div>
             <div class="ih-card-body">
-              <div class="field-grid" style="margin-bottom:16px">
+              <div v-if="protocol.direction === 'push'" class="field-grid" style="margin-bottom:16px">
                 <label class="field">
                   <span class="field-label">Agency</span>
                   <select v-model="agencyCode" class="select-sm field-input">
@@ -201,7 +201,7 @@
             </div>
           </div>
 
-          <div class="ih-card ih-rise ih-rise-2">
+          <div v-if="!isSimplePull" class="ih-card ih-rise ih-rise-2">
             <div class="ih-card-head">
               <h2>2 · Authentication</h2>
               <span class="hint">{{ protocol.direction === 'push' ? 'we issue the credential on save' : "their credential, encrypted at rest" }}</span>
@@ -238,7 +238,78 @@
             </div>
           </div>
 
-          <div class="ih-card ih-rise ih-rise-3">
+          <!-- REST pull: just a link and (optionally) a key. Everything else is derived or tucked under Advanced. -->
+          <div v-if="isSimplePull" class="ih-card ih-rise ih-rise-2">
+            <div class="ih-card-head">
+              <h2>2 · Link &amp; key</h2>
+              <span class="hint">paste the API link; add a key only if it needs one</span>
+            </div>
+            <div class="ih-card-body">
+              <div class="field-grid field-grid--3">
+                <label class="field field--span2">
+                  <span class="field-label">API link</span>
+                  <input
+                    v-model="endpointValue" class="select-sm field-input" :placeholder="protocol.endpointPlaceholder"
+                    autocomplete="off" spellcheck="false" @input="testState = 'idle'"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">
+                    API key <span class="hint">(optional)</span>
+                    <button type="button" class="reveal-btn" @click="simpleKeyShown = !simpleKeyShown">{{ simpleKeyShown ? 'hide' : 'reveal' }}</button>
+                  </span>
+                  <input
+                    v-model="simpleKey" class="select-sm field-input" :type="simpleKeyShown ? 'text' : 'password'"
+                    autocomplete="off" spellcheck="false" placeholder="leave empty for open APIs"
+                  />
+                </label>
+              </div>
+              <p class="hint" style="margin-top:8px">
+                A full sample call with <code>?key=…</code> works too - the key is lifted out of the link and stored encrypted.
+              </p>
+              <details class="advanced">
+                <summary>Advanced (optional)</summary>
+                <div class="field-grid" style="margin-top:10px">
+                  <label class="field">
+                    <span class="field-label">Agency</span>
+                    <select v-model="agencyCode" class="select-sm field-input">
+                      <option value="">My agency</option>
+                      <option v-for="a in agencies" :key="a.agency_code" :value="a.agency_code">{{ a.agency_code }} - {{ a.agency_name }}</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Feed ID</span>
+                    <input v-model="registerSourceId" class="select-sm field-input" placeholder="auto from the link" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Pull schedule (cron)</span>
+                    <input v-model="cron" class="select-sm field-input" autocomplete="off" />
+                  </label>
+                  <div class="field">
+                    <span class="field-label">Other authentication</span>
+                    <div class="pill-row">
+                      <button type="button" class="pill" :class="{ active: !authOverride || authOverride === 'api_key' }" @click="authOverride = null">API key</button>
+                      <button
+                        v-for="m in protocol.auth.filter(x => x !== 'api_key')" :key="m" type="button" class="pill"
+                        :class="{ active: m === authOverride }" @click="authOverride = m; testState = 'idle'"
+                      >{{ AUTH_LABELS[m] }}</button>
+                    </div>
+                  </div>
+                  <template v-if="authOverride && authOverride !== 'api_key'">
+                    <label v-for="f in AUTH_FIELDS[authOverride]" :key="fieldKey(f.id)" class="field">
+                      <span class="field-label">{{ f.label }}</span>
+                      <input
+                        v-model="credentials[fieldKey(f.id)]" class="select-sm field-input"
+                        :type="f.secret ? 'password' : 'text'" autocomplete="off" spellcheck="false"
+                      />
+                    </label>
+                  </template>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div v-if="!isSimplePull" class="ih-card ih-rise ih-rise-3">
             <div class="ih-card-head">
               <h2>3 · {{ protocol.direction === 'push' ? 'Where they push' : 'Endpoint & schedule' }}</h2>
               <span class="hint">{{ protocol.direction === 'push' ? 'generated from the Feed ID above' : 'where events land and how often to reconcile' }}</span>
@@ -263,7 +334,7 @@
 
           <div class="ih-card ih-rise ih-rise-4">
             <div class="ih-card-head">
-              <h2>4 · Test &amp; save</h2>
+              <h2>{{ isSimplePull ? '3' : '4' }} · Test &amp; save</h2>
               <span class="hint">{{ protocol.direction === 'push' ? 'validates the Feed ID shape' : 'a real, SSRF-guarded reachability check' }}</span>
             </div>
             <div class="ih-card-body">
@@ -274,7 +345,7 @@
                 </button>
                 <button type="button" class="btn btn-primary" :disabled="registering" @click="saveFeed">{{ registering ? 'Saving…' : 'Save feed' }}</button>
                 <span class="hint">
-                  {{ protocol.name }} · {{ AUTH_LABELS[authMethod] }}<template v-if="protocol.direction === 'pull'"> · {{ cron }}</template>
+                  {{ protocol.name }} · {{ sentAuthMethod ? AUTH_LABELS[sentAuthMethod] : 'no key' }}<template v-if="protocol.direction === 'pull'"> · {{ cron }}</template>
                 </span>
               </div>
 
@@ -579,7 +650,7 @@ const AUTH_LABELS: Record<AuthMethodId, string> = {
 }
 interface AuthField { id: string; label: string; secret?: boolean }
 const AUTH_FIELDS: Record<AuthMethodId, AuthField[]> = {
-  api_key: [{ id: 'header', label: 'Header name' }, { id: 'key', label: 'API key', secret: true }],
+  api_key: [{ id: 'key', label: 'API key', secret: true }],
   hmac: [{ id: 'header', label: 'Signature header' }, { id: 'secret', label: 'Signing secret', secret: true }],
   bearer: [{ id: 'token', label: 'Bearer token', secret: true }],
   basic: [{ id: 'user', label: 'Username' }, { id: 'pass', label: 'Password', secret: true }],
@@ -596,7 +667,7 @@ const PROTOCOLS: Protocol[] = [
   { id: 'rest_push', name: 'REST push', meta: 'agency POSTs batches to us', direction: 'push', auth: ['api_key', 'hmac'], endpointLabel: 'Feed key (source_id)', endpointPlaceholder: 'kws-park-traffic' },
   { id: 'webhook', name: 'Webhook', meta: 'event-driven push', direction: 'push', auth: ['hmac', 'bearer'], endpointLabel: 'Feed key (source_id)', endpointPlaceholder: 'kaa-flight-events' },
   { id: 'streaming', name: 'Streaming', meta: 'Kafka / MQTT relay', direction: 'push', auth: ['api_key', 'mtls'], endpointLabel: 'Feed key (source_id)', endpointPlaceholder: 'kpa-vessel-stream' },
-  { id: 'rest_pull', name: 'REST pull', meta: 'we poll their API', direction: 'pull', auth: ['bearer', 'oauth2', 'basic'], endpointLabel: "Agency's API base URL", endpointPlaceholder: 'https://api.agency.go.ke/v1' },
+  { id: 'rest_pull', name: 'REST pull', meta: 'we poll their API', direction: 'pull', auth: ['api_key', 'bearer', 'oauth2', 'basic'], endpointLabel: "Agency's API base URL", endpointPlaceholder: 'https://api.agency.go.ke/v1' },
   { id: 'sftp', name: 'SFTP drop', meta: 'scheduled file pickup', direction: 'pull', auth: ['basic', 'mtls'], endpointLabel: 'SFTP host and path', endpointPlaceholder: 'sftp://files.agency.go.ke/outbound/' },
   { id: 'database', name: 'Database pull', meta: 'direct read replica', direction: 'pull', auth: ['basic', 'mtls'], endpointLabel: 'Connection string', endpointPlaceholder: 'postgres://reader@host:5432/agency_db' },
 ]
@@ -609,7 +680,17 @@ const authOverride = ref<AuthMethodId | null>(null)
 const authMethod = computed<AuthMethodId>(() =>
   authOverride.value && protocol.value.auth.includes(authOverride.value) ? authOverride.value : protocol.value.auth[0]!,
 )
+/** What actually gets sent: simple pull infers api_key from a typed key and sends nothing when there is none. */
+const sentAuthMethod = computed<AuthMethodId | undefined>(() => {
+  if (!isSimplePull.value) return authMethod.value
+  if (authOverride.value && authOverride.value !== 'api_key') return authOverride.value
+  return simpleKey.value.trim() ? 'api_key' : undefined
+})
 const credentials = reactive<Record<string, string>>({})
+const simpleKey = ref('')
+const simpleKeyShown = ref(false)
+/** REST pull = the whole form is a link and an optional key. */
+const isSimplePull = computed(() => protocol.value.id === 'rest_pull')
 const revealed = reactive<Record<string, boolean>>({})
 const endpointValue = ref('')
 const cron = ref('*/15 * * * *')
@@ -634,6 +715,9 @@ function fieldKey(id: string) { return `${protocol.value.id}:${authMethod.value}
  *  (ignored server-side for push protocols, which generate their own). */
 const currentCredentials = computed(() => {
   const out: Record<string, string> = {}
+  if (isSimplePull.value && (!authOverride.value || authOverride.value === 'api_key')) {
+    return simpleKey.value.trim() ? { key: simpleKey.value.trim() } : out
+  }
   for (const f of AUTH_FIELDS[authMethod.value]) {
     const v = credentials[fieldKey(f.id)]
     if (v) out[f.id] = v
@@ -648,6 +732,7 @@ async function runTest() {
     const res = await api.testConnection({
       protocol: protocol.value.id,
       endpoint_value: protocol.value.direction === 'push' ? registerSourceId.value.trim() : endpointValue.value.trim(),
+      key: isSimplePull.value && simpleKey.value.trim() ? simpleKey.value.trim() : undefined,
     })
     testState.value = res.ok ? 'passed' : 'failed'
     testDetail.value = res.detail
@@ -660,8 +745,8 @@ async function runTest() {
 async function saveFeed() {
   registerError.value = null
   const id = registerSourceId.value.trim().toLowerCase()
-  if (!id) { registerError.value = 'Feed ID is required.'; return }
-  if (!agencyCode.value) { registerError.value = 'Choose an agency first.'; return }
+  if (!id && protocol.value.direction === 'push') { registerError.value = 'Feed ID is required.'; return }
+  if (!agencyCode.value && protocol.value.direction === 'push') { registerError.value = 'Choose an agency first.'; return }
   if (protocol.value.direction === 'pull' && !endpointValue.value.trim()) {
     registerError.value = `${protocol.value.endpointLabel} is required.`
     return
@@ -669,10 +754,10 @@ async function saveFeed() {
   registering.value = true
   try {
     const result = await api.registerFeed({
-      source_id: id,
-      agency_code: agencyCode.value,
+      source_id: id || undefined,
+      agency_code: agencyCode.value || undefined,
       protocol: protocol.value.id,
-      auth_method: authMethod.value,
+      auth_method: sentAuthMethod.value,
       endpoint_value: protocol.value.direction === 'push' ? id : endpointValue.value.trim(),
       reconcile_cron: protocol.value.direction === 'pull' ? cron.value : undefined,
       credentials: currentCredentials.value,
@@ -703,6 +788,7 @@ function resetRegisterForm() {
   registerError.value = null
   registerSourceId.value = ''
   endpointValue.value = ''
+  simpleKey.value = ''
   for (const k of Object.keys(credentials)) delete credentials[k]
   for (const k of Object.keys(revealed)) delete revealed[k]
   testState.value = 'idle'
@@ -729,6 +815,8 @@ const curlExample = computed(() => {
 </script>
 
 <style scoped>
+.advanced { margin-top: 14px; font-size: 12.5px; }
+.advanced summary { cursor: pointer; color: var(--fg-3); }
 /* minmax(0, 1fr) so a long curl line or feed name can't widen the flow
    column past the viewport (a bare 1fr won't shrink below its content). */
 .hub-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
