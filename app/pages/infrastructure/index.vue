@@ -444,6 +444,9 @@ function clearTableFilters() {
   loadTablePage()
 }
 
+// County filter, shared across the Infrastructure pages and following the global filter until this module picks its own.
+const county = useCountyScope('infrastructure')
+
 async function load() {
   loading.value = true
   error.value = null
@@ -451,12 +454,12 @@ async function load() {
   const agenciesApi = useAgencies()
 
   const [sumRes, sampleRes, bridgeRes, budgetRes, riskRes, sigRes, agencyRes] = await Promise.allSettled([
-    infra.summary(),
-    infra.segments({ page_size: 300 }),
-    infra.bridges({ page_size: 200 }),
+    infra.summary(county.query.value),
+    infra.segments({ page_size: 300, ...county.query.value }),
+    infra.bridges({ page_size: 200, ...county.query.value }),
     infra.budgets({ page_size: 50 }),
     infra.atRiskForecasts(),
-    infra.signalFaults(),
+    infra.signalFaults(county.query.value),
     agenciesApi.list({ page_size: 50 }),
   ])
 
@@ -501,7 +504,7 @@ async function loadAgencySegments(code: string) {
     // backend, so it must be resolved to the UUID via agencyCodeToId first.
     const agencyId = agencyCodeToId.value[code]
     if (!agencyId) { segments.value = []; segmentsTotal.value = 0; return }
-    const res = await infra.segments({ agency: agencyId, page_size: 300 }) as any
+    const res = await infra.segments({ agency: agencyId, page_size: 300, ...county.query.value }) as any
     segments.value = res.results ?? []
     segmentsTotal.value = res.count ?? segments.value.length
   } catch {
@@ -518,7 +521,7 @@ async function loadAgencySummary(code: string) {
   const agencyId = agencyCodeToId.value[code]
   if (!agencyId) { agencySummary.value = null; return }
   try {
-    agencySummary.value = await infra.summary({ agency: agencyId })
+    agencySummary.value = await infra.summary({ agency: agencyId, ...county.query.value })
   } catch {
     agencySummary.value = null
   }
@@ -531,7 +534,7 @@ async function loadAgencySummary(code: string) {
 async function loadConditionMap() {
   const infra = useInfrastructure()
   try {
-    const res = await infra.segmentConditionMap({ page_size: 500 }) as any
+    const res = await infra.segmentConditionMap({ page_size: 500, ...county.query.value }) as any
     // Only rows with coordinates count. Today the API returns a (fabricated) position
     // for every segment, so this is a no-op; once it returns null for segments with
     // no stored geometry, the "on map" column and Missing Geometry panel become truthful.
@@ -553,6 +556,8 @@ watch(selectedAgency, async (code) => {
   loadTablePage()
 })
 
+// County changed - here, on another Infrastructure page, or from the global filter in the top bar.
+watch(() => county.county.value, () => { load(); loadConditionMap(); loadTablePage() })
 onMounted(load)
 onMounted(loadConditionMap)
 let t: ReturnType<typeof setInterval> | null = null
@@ -713,6 +718,7 @@ async function loadTablePage() {
       road_class: classFilter.value || undefined,
       surface: surfaceFilter.value || undefined,
       condition: conditionFilter.value || undefined,
+      ...county.query.value,
     }) as any
     tableSegments.value = res.results ?? []
     tableTotal.value = res.count ?? 0

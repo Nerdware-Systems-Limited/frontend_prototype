@@ -5,13 +5,8 @@
     subtitle="KRC · NCTTCA - Real-time SGR &amp; MGR train positions, delays, rolling stock status, and NCTTCA corridor transit performance - refreshes every 30 seconds"
   >
     <template #actions>
-      <BadgePill variant="danger">{{ delayedOps.length }} delayed</BadgePill>
-      <BadgePill variant="success">{{ onTimeOps.length }} on-time</BadgePill>
-      <select v-model="networkFilter" class="select-sm">
-        <option value="">All networks</option>
-        <option value="sgr">SGR</option>
-        <option value="mgr">MGR</option>
-      </select>
+      <BadgePill variant="danger">{{ fmtNum(delayedCount) }} delayed</BadgePill>
+      <BadgePill variant="success">{{ fmtNum(onTimeCount) }} on-time</BadgePill>
       <NuxtLink to="/railway/network-inventory" class="btn">Rolling Stock Registry<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/railway/safety" class="btn">Incidents & Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
@@ -19,64 +14,14 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPIs -->
+  <!-- KPIs: counted by the server over every operation of today's service, not over the first page -->
   <div class="kpi-grid">
-    <KpiCard
-      label="Live Operations"
-      :value="fmtNum(allOps.length)"
-      :unavailable="loading || liveError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="LIVE"
-      description="Active right now"
-      to="#active-operations"
-    />
-    <KpiCard
-      label="In Transit"
-      :value="fmtNum(countByStatus('in_transit'))"
-      :unavailable="loading || liveError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="LIVE"
-      description="Running between stations"
-      to="#active-operations"
-    />
-    <KpiCard
-      label="On-Time"
-      :value="fmtNum(onTimeOps.length)"
-      :unavailable="loading || liveError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="LIVE"
-      description="0 delay or ahead of schedule"
-      to="#active-operations"
-    />
-    <KpiCard
-      label="Delayed"
-      :value="fmtNum(delayedOps.length)"
-      :unavailable="loading || liveError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="LIVE"
-      :description="maxDelay > 0 ? `Max delay ${maxDelay} min` : 'No delays'"
-      :status="loading || liveError ? undefined : delayedOps.length === 0 ? 'healthy' : 'warning'"
-      to="#delay-alerts"
-    />
-    <KpiCard
-      label="Cancelled Today"
-      :value="fmtNum(countByStatus('cancelled'))"
-      :unavailable="loading || liveError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="LIVE"
-      description="Service cancelled"
-      :status="loading || liveError ? undefined : countByStatus('cancelled') === 0 ? 'healthy' : 'warning'"
-      to="#active-operations"
-    />
-    <KpiCard
-      label="Rolling Stock - Service"
-      :value="fmtNum(trains.filter(t => t.status === 'in_service').length)"
-      :unavailable="loading || trainsError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(trains.length)} registered`"
-      to="#rolling-stock-status"
-    />
+    <KpiCard label="Live Operations" :value="fmtNum(activeStats.count.value)" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Active right now" to="#active-operations" />
+    <KpiCard label="In Transit" :value="fmtNum(todayStats.groupCount('status', 'in_transit'))" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Running between stations" to="#active-operations" />
+    <KpiCard label="On-Time" :value="fmtNum(onTimeCount)" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="0 delay or ahead of schedule" to="#active-operations" />
+    <KpiCard label="Delayed" :value="fmtNum(delayedCount)" :unavailable="unavailable" :unavailable-note="note" period="LIVE" :description="maxDelay != null && maxDelay > 0 ? `Max delay ${maxDelay} min` : 'No delays'" :status="unavailable ? undefined : delayedCount === 0 ? 'healthy' : 'warning'" to="#delay-alerts" />
+    <KpiCard label="Cancelled Today" :value="fmtNum(todayStats.groupCount('status', 'cancelled'))" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Service cancelled" :status="unavailable ? undefined : todayStats.groupCount('status', 'cancelled') === 0 ? 'healthy' : 'warning'" to="#active-operations" />
+    <KpiCard label="Rolling Stock - Service" :value="fmtNum(stockStats.groupCount('status', 'in_service'))" :unavailable="stockStats.count.value === null" :unavailable-note="note" period="LIVE" :description="`of ${fmtNum(stockStats.count.value)} registered`" to="#rolling-stock-status" />
   </div>
 
   <!-- Live map + delayed alerts -->
@@ -103,23 +48,23 @@
     </CollapsibleSection>
 
     <div class="right-col">
-      <!-- Delayed alerts -->
+      <!-- Delayed alerts: the worst few, ranked by the server -->
       <div id="delay-alerts" class="card drill-target">
         <div class="card-header">
           Delay Alerts
-          <BadgePill v-if="delayedOps.length" variant="danger">{{ delayedOps.length }}</BadgePill>
+          <BadgePill v-if="delayedCount" variant="danger">{{ delayedCount }}</BadgePill>
         </div>
         <div class="card-body">
-          <div v-if="delayedOps.length">
+          <div v-if="delayAlerts.length">
             <AlertItem
-              v-for="op in delayedOps.slice(0, 8)"
+              v-for="op in delayAlerts"
               :key="op.id"
               severity="warning"
               :title="`Train ${op.schedule_train_number}: ${op.origin_code} → ${op.destination_code}`"
               :meta="`+${op.delay_arrival_min} min · ${(op.delay_reason ?? 'other').replace(/_/g,' ')} · ${op.current_station_code ?? 'En route'}`"
             />
           </div>
-          <EmptyState v-else message="No active delays." compact />
+          <EmptyState v-else :loading="alertsLoading" message="No active delays." compact />
         </div>
       </div>
 
@@ -131,15 +76,15 @@
             <div v-for="st in trainStatuses" :key="st.status" class="rs-row">
               <BadgePill :variant="trainStatusBadge(st.status)">{{ st.status.replace(/_/g,' ') }}</BadgePill>
               <div class="rs-bar-wrap">
-                <div class="rs-bar" :style="{ transform: `scaleX(${trains.length > 0 ? st.count / trains.length : 0})`, background: trainStatusColor(st.status) }" />
+                <div class="rs-bar" :style="{ transform: `scaleX(${(stockStats.count.value ?? 0) > 0 ? st.count / (stockStats.count.value ?? 1) : 0})`, background: trainStatusColor(st.status) }" />
               </div>
               <span class="rs-val">{{ st.count }}</span>
             </div>
           </div>
-          <div v-if="maintenanceDue.length" class="maint-alert">
-            <div class="maint-alert-head">⚠ {{ maintenanceDue.length }} unit{{ maintenanceDue.length > 1 ? 's' : '' }} - maintenance due</div>
-            <div v-for="t in maintenanceDue.slice(0,4)" :key="t.id" class="maint-unit">
-              {{ t.unit_id }} · {{ t.train_type.replace(/_/g,' ') }} · Due {{ fmtDate(t.next_maintenance) }}
+          <div v-if="maintenanceStats.count.value" class="maint-alert">
+            <div class="maint-alert-head">⚠ {{ maintenanceStats.count.value }} unit{{ maintenanceStats.count.value > 1 ? 's' : '' }} - maintenance due</div>
+            <div v-for="t in maintenanceUnits" :key="t.id" class="maint-unit">
+              {{ t.unit_id }} · {{ String(t.train_type).replace(/_/g,' ') }} · Due {{ fmtDate(t.next_maintenance) }}
             </div>
           </div>
         </div>
@@ -147,72 +92,29 @@
     </div>
   </div>
 
-  <!-- Full live operations table -->
-  <SectionTitle pill="KRC OCC · Live">All Active Operations</SectionTitle>
+  <!-- Today's operations -->
+  <SectionTitle pill="KRC OCC · Live">All Operations Today</SectionTitle>
 
   <div id="active-operations" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="statusFilter" class="select-sm">
-          <option value="">All statuses</option>
-          <option value="in_transit">In Transit</option>
-          <option value="boarding">Boarding</option>
-          <option value="delayed">Delayed</option>
-          <option value="departed">Departed</option>
-          <option value="arrived">Arrived</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <input v-model="trainSearch" class="select-sm" placeholder="Search train number…" style="min-width:160px" />
-        <button class="btn" @click="statusFilter=''; trainSearch=''">Clear</button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Train</th>
-            <th>Route</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th>Current Station</th>
-            <th>Act. Departure</th>
-            <th>Act. Arrival</th>
-            <th>Dep Delay</th>
-            <th>Arr Delay</th>
-            <th>Passengers</th>
-            <th>Occupancy</th>
-          </tr>
-        </thead>
-        <tbody v-if="filteredOps.length">
-          <tr v-for="op in filteredOpsPageRows" :key="op.id">
-            <td style="font-family:monospace;font-weight:700">{{ op.schedule_train_number }}</td>
-            <td style="font-size:12px">{{ op.origin_code }} → {{ op.destination_code }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ op.service_date }}</td>
-            <td><BadgePill :variant="opBadge(op.status)">{{ op.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-family:monospace;font-size:12px">{{ op.current_station_code ?? '-' }}</td>
-            <td style="font-size:11px;white-space:nowrap">{{ op.actual_departure ? fmtTime(op.actual_departure) : '-' }}</td>
-            <td style="font-size:11px;white-space:nowrap">{{ op.actual_arrival ? fmtTime(op.actual_arrival) : '-' }}</td>
-            <td :style="{ color: op.delay_departure_min > 30 ? 'var(--danger-fg)' : op.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
-              {{ op.delay_departure_min > 0 ? `+${op.delay_departure_min}` : '✓' }}
-            </td>
-            <td :style="{ color: op.delay_arrival_min > 30 ? 'var(--danger-fg)' : op.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
-              {{ op.delay_arrival_min > 0 ? `+${op.delay_arrival_min}` : '✓' }}
-            </td>
-            <td style="font-size:12px">{{ op.passengers_actual != null ? fmtNum(op.passengers_actual) : '-' }}</td>
-            <td>
-              <div v-if="op.occupancy_pct != null" class="occ-wrap">
-                <div class="occ-bar" :style="{ width: `${op.occupancy_pct}%`, background: op.occupancy_pct >= 90 ? 'var(--destructive)' : op.occupancy_pct >= 70 ? 'var(--warning)' : 'var(--success)' }" />
-              </div>
-              <span style="font-size:11px">{{ op.occupancy_pct != null ? `${op.occupancy_pct.toFixed(0)}%` : '-' }}</span>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No operations match filters.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="filteredOpsPage" :total-pages="filteredOpsTotalPages" :total="filteredOpsTotal"
-        @prev="filteredOpsPrev" @next="filteredOpsNext"
-      />
+      <DataTable :table="opsTable" row-key="id" title="Train operations today" export-name="uapts-train-operations-today" filters-open
+                 placeholder="Search train number, station…" empty="No operations match the current filters.">
+        <template #cell-schedule_train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.schedule_train_number }}</span></template>
+        <template #cell-route="{ row }">{{ row.origin_code }} → {{ row.destination_code }}</template>
+        <template #cell-delay_departure_min="{ row }">
+          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min}` : '✓' }}</span>
+        </template>
+        <template #cell-delay_arrival_min="{ row }">
+          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min}` : '✓' }}</span>
+        </template>
+        <template #cell-occupancy_pct="{ row }">
+          <template v-if="row.occupancy_pct != null">
+            <div class="occ-wrap"><div class="occ-bar" :style="{ width: `${row.occupancy_pct}%`, background: row.occupancy_pct >= 90 ? 'var(--destructive)' : row.occupancy_pct >= 70 ? 'var(--warning)' : 'var(--success)' }" /></div>
+            <span style="font-size:11px">{{ Number(row.occupancy_pct).toFixed(0) }}%</span>
+          </template>
+          <span v-else>-</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -222,73 +124,95 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
 import { useRailway } from '~/composables/api'
-import type { TrainOperation, Train } from '~/composables/api'
+import type { TrainOperation } from '~/composables/api'
+import { useApi } from '~/composables/api/_client'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { eatDate } from '~/utils/timeRange'
+import type { TableColumn } from '~/types/dataTable'
 
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
 
-const allOps       = ref<TrainOperation[]>([])
-const trains       = ref<Train[]>([])
-const railLines    = ref<any[]>([])
-const loading      = ref(true)
-const error        = ref<string | null>(null)
-const liveError    = ref(false)
-const trainsError  = ref(false)
-const lastRefreshed = ref('-')
-const networkFilter = ref('')
-const statusFilter  = ref('')
-const trainSearch   = ref('')
+// The table, every KPI and the alerts ask the server about TODAY's service (EAT) in the county in force, so a count and the
+// rows behind it can never disagree. Only the map holds a list - the live positions the OCC feed reports.
+const RAIL = '/api/v1/railway'
+const OPS = `${RAIL}/operations/`
+const api = useApi()
+const county = useCountyScope('railway')
+const today = () => eatDate(new Date())
+const scope = () => county.query.value
+const todayQ = () => ({ ...scope(), 'f.service_date__exact': today() })
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const rail = useRailway()
+const STATUSES = ['scheduled', 'boarding', 'departed', 'in_transit', 'delayed', 'arrived', 'cancelled', 'diverted'].map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const OP_BADGE: Record<string, string> = { in_transit: 'info', boarding: 'fair', arrived: 'success', delayed: 'danger', cancelled: 'danger', scheduled: 'neutral', departed: 'info', diverted: 'warning' }
 
-  const [liveRes, trainRes, mapRes] = await Promise.allSettled([
-    rail.liveOperations(),
-    rail.trains({ page_size: 100 }),
-    rail.mapData(),
+// ── Today's operations table ─────────────────────────────────────────────
+const opColumns: TableColumn[] = [
+  { key: 'schedule_train_number', label: 'Train', priority: 1, pin: 'left' },
+  { key: 'route', label: 'Route', sortable: 'origin_code', filter: false, exportAs: r => `${r.origin_code} - ${r.destination_code}`, priority: 2 },
+  { key: 'service_date', label: 'Date', type: 'date', priority: 3 },
+  { key: 'status', label: 'Status', type: 'badge', badge: OP_BADGE, options: STATUSES, priority: 1 },
+  { key: 'current_station_code', label: 'Current Station', type: 'mono', priority: 2 },
+  { key: 'actual_departure', label: 'Act. Departure', type: 'datetime', priority: 3 },
+  { key: 'actual_arrival', label: 'Act. Arrival', type: 'datetime', priority: 3 },
+  { key: 'delay_departure_min', label: 'Dep Delay', type: 'num', priority: 2 },
+  { key: 'delay_arrival_min', label: 'Arr Delay', type: 'num', priority: 1 },
+  { key: 'passengers_actual', label: 'Passengers', type: 'num', priority: 3 },
+  { key: 'occupancy_pct', label: 'Occupancy', type: 'num', digits: 0, priority: 2 },
+]
+const opsTable = useEndpointTable({
+  key: 'rail-operations-today', path: OPS, columns: opColumns, countyKey: 'railway', pageSize: 15,
+  params: () => ({ 'f.service_date__exact': today() }), defaultSort: [{ key: 'delay_arrival_min', dir: 'desc' }],
+})
+
+// ── KPIs: counted by the server ──────────────────────────────────────────
+const todayStats = useServerCount(OPS, todayQ, { aggregate: ['max:delay_arrival_min'], groupBy: ['status'] })
+const activeStats = useServerCount(OPS, () => ({ ...scope(), 'f.status__in': 'boarding,departed,in_transit,delayed' }))
+const delayStats = useServerCount(OPS, () => ({ ...todayQ(), 'f.delay_arrival_min__gt': 0 }), { groupBy: ['status'] })
+const punctualStats = useServerCount(OPS, () => ({ ...todayQ(), 'f.delay_arrival_min__lte': 0 }), { groupBy: ['status'] })
+const stockStats = useServerCount(`${RAIL}/trains/`, scope, { groupBy: ['status'] })
+const maintenanceStats = useServerCount(`${RAIL}/trains/`, () => ({ ...scope(), 'f.next_maintenance__lte': today() }))
+const allStats = [todayStats, activeStats, delayStats, punctualStats, stockStats, maintenanceStats]
+
+// Cancelled runs are neither "delayed" nor "on time".
+const notCancelled = (s: typeof delayStats) => {
+  const total = s.count.value, cancelled = s.groupCount('status', 'cancelled')
+  return total === null || cancelled === null ? null : total - cancelled
+}
+const delayedCount = computed(() => notCancelled(delayStats))
+const onTimeCount = computed(() => notCancelled(punctualStats))
+const maxDelay = computed(() => todayStats.agg('max', 'delay_arrival_min'))
+const unavailable = computed(() => todayStats.count.value === null)
+const note = computed(() => todayStats.loading.value ? 'Loading…' : 'KRC OCC feed unavailable')
+const error = computed(() => todayStats.failed.value && !todayStats.loading.value ? 'Unable to reach the UAPTS Railway API.' : null)
+
+const trainStatuses = computed(() => (stockStats.groups.value.status ?? []).map(g => ({ status: String(g.value), count: g.count })))
+
+// ── Alerts and maintenance units: the worst few, ranked by the server ────
+const delayAlerts = ref<any[]>([])
+const alertsLoading = ref(true)
+const maintenanceUnits = ref<any[]>([])
+async function loadLists() {
+  const q = (path: string, query: Record<string, unknown>) => api<any>(path, { query: { page_size: 8, ...query } }).then(r => r?.results ?? []).catch(() => [])
+  const [alerts, units] = await Promise.all([
+    q(OPS, { ...todayQ(), 'f.delay_arrival_min__gt': 0, 'f.status__in': 'boarding,departed,in_transit,delayed,arrived,diverted,scheduled', ordering: '-delay_arrival_min' }),
+    q(`${RAIL}/trains/`, { ...scope(), 'f.next_maintenance__lte': today(), page_size: 4, ordering: 'next_maintenance' }),
   ])
-
-  if (liveRes.status  === 'fulfilled') allOps.value   = Array.isArray(liveRes.value) ? liveRes.value : (liveRes.value as any).results ?? []
-  if (trainRes.status === 'fulfilled') trains.value   = (trainRes.value as any).results ?? []
-  if (mapRes.status   === 'fulfilled') railLines.value = mapRes.value.lines ?? []
-
-  liveError.value   = liveRes.status  === 'rejected'
-  trainsError.value = trainRes.status === 'rejected'
-
-  if ([liveRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Railway API.'
-
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-  loading.value = false
+  delayAlerts.value = alerts; maintenanceUnits.value = units; alertsLoading.value = false
 }
 
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 30_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-// ── Computed ──────────────────────────────────────────────────────────────
-const filteredOps = computed(() =>
-  allOps.value.filter(op => {
-    if (statusFilter.value && op.status !== statusFilter.value) return false
-    if (trainSearch.value  && !op.schedule_train_number.toLowerCase().includes(trainSearch.value.toLowerCase())) return false
-    return true
-  }),
-)
-
-const delayedOps = computed(() => allOps.value.filter(op => op.delay_arrival_min > 0 && op.status !== 'cancelled'))
-const onTimeOps  = computed(() => allOps.value.filter(op => op.delay_arrival_min === 0 && op.status !== 'cancelled'))
-const maxDelay   = computed(() => Math.max(0, ...allOps.value.map(op => op.delay_arrival_min)))
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: filteredOpsPageRows, page: filteredOpsPage, totalPages: filteredOpsTotalPages,
-  total: filteredOpsTotal, next: filteredOpsNext, prev: filteredOpsPrev,
-} = usePagination(filteredOps, 15)
-
+// ── Live positions for the map (what the OCC feed reports right now) ─────
+const liveOps = ref<TrainOperation[]>([])
+const railLines = ref<any[]>([])
+async function loadMap() {
+  const rail = useRailway()
+  const [liveRes, mapRes] = await Promise.allSettled([rail.liveOperations(), rail.mapData()])
+  if (liveRes.status === 'fulfilled') liveOps.value = Array.isArray(liveRes.value) ? liveRes.value : (liveRes.value as any).results ?? []
+  if (mapRes.status === 'fulfilled') railLines.value = mapRes.value.lines ?? []
+}
 const trainMarkers = computed((): MarkerSpec[] =>
-  allOps.value
+  liveOps.value
     .filter(op => op.current_lat != null && op.current_lon != null)
     .map(op => ({
       id: `op-${op.id}`,
@@ -304,35 +228,22 @@ const trainMarkers = computed((): MarkerSpec[] =>
     })),
 )
 
-const trainStatuses = computed(() => {
-  const counts = new Map<string, number>()
-  trains.value.forEach(t => counts.set(t.status, (counts.get(t.status) ?? 0) + 1))
-  return Array.from(counts.entries()).map(([status, count]) => ({ status, count }))
-})
-
-const maintenanceDue = computed(() =>
-  trains.value.filter(t => t.next_maintenance && new Date(t.next_maintenance).getTime() <= Date.now()),
-)
-
-function countByStatus(s: string) { return allOps.value.filter(op => op.status === s).length }
+onMounted(() => { void loadLists(); void loadMap() })
+function refreshAll() { void Promise.all([opsTable.refresh(), ...allStats.map(s => s.refresh()), loadLists(), loadMap()]) }
+watch(() => county.county.value, () => { void loadLists(); void loadMap() })
+let t: ReturnType<typeof setInterval> | null = null
+onMounted(() => { t = setInterval(refreshAll, 30_000) })
+onUnmounted(() => { if (t) clearInterval(t) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
-function fmtTime(iso: string) {
-  try { return new Date(iso).toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' }) }
-  catch { return iso }
-}
 function fmtDate(s: string | null | undefined) {
   if (!s) return '-'
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
   catch { return s }
-}
-function opBadge(s: string) {
-  const m: Record<string,string> = { in_transit:'info', boarding:'fair', arrived:'success', delayed:'danger', cancelled:'danger', scheduled:'neutral', departed:'info', diverted:'warning' }
-  return m[s] ?? 'neutral'
 }
 function trainStatusBadge(s: string) {
   const m: Record<string,string> = { in_service:'success', standby:'fair', maintenance:'warning', retired:'neutral', inspection:'info' }
@@ -373,5 +284,4 @@ function trainStatusColor(s: string) {
 /* ── Operations table ── */
 .occ-wrap { background:var(--surface-sunken); border-radius:3px; height:5px; overflow:hidden; margin-bottom:2px; }
 .occ-bar { height:100%; border-radius:3px; }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 </style>

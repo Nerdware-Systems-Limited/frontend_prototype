@@ -115,6 +115,8 @@ export interface MaritimeCargoSummary {
 }
 
 export interface MaritimeCargoQuery {
+  /** County from the global scope (top bar); the endpoint ignores it when it has no county column. */
+  county?: string
   page?: number
   page_size?: number
   port?: string
@@ -127,15 +129,15 @@ export function useMaritimeCargo() {
   const M = '/api/v1/aviation-maritime/maritime/cargo'
 
   return {
-    summary: (days = 30) => api<MaritimeCargoSummary>(`${M}/summary/`, { query: { days } }),
-    byType: (q?: { days?: number }) =>
+    summary: (days = 30, county?: string) => api<MaritimeCargoSummary>(`${M}/summary/`, { query: cleanQuery({ days, county }) }),
+    byType: (q?: { days?: number; county?: string }) =>
       api<{ days: number; cargo_types: CargoTypeStat[] }>(`${M}/by-type/`, { query: cleanQuery(q as Record<string, unknown>) }),
     pipeline: (q?: MaritimeCargoQuery) =>
       api<Paged<PipelineShipment>>(`${M}/pipeline/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    handlingStageKpis: (days = 30) =>
-      api<HandlingStageKpis>(`${M}/handling-stage-kpis/`, { query: { days } }),
-    onwardTransport: (days = 30) =>
-      api<{ days: number; modes: OnwardTransportStat[] }>(`${M}/onward-transport/`, { query: { days } }),
+    handlingStageKpis: (days = 30, county?: string) =>
+      api<HandlingStageKpis>(`${M}/handling-stage-kpis/`, { query: cleanQuery({ days, county }) }),
+    onwardTransport: (days = 30, county?: string) =>
+      api<{ days: number; modes: OnwardTransportStat[] }>(`${M}/onward-transport/`, { query: cleanQuery({ days, county }) }),
 
     // ── Supporting catalogues (§3.1/§3.4 raw rows, not just the rollups above) ─
     cargoTypeRecords: (q?: MaritimeCargoQuery & { cargo_type?: MaritimeCargoType; direction?: CargoDirection }) =>

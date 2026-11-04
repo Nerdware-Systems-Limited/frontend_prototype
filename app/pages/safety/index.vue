@@ -5,7 +5,6 @@
     subtitle="NTSA · KeNHA · KMD - National road safety KPIs, active incidents, KMD weather correlation, KeNHA road intervention effectiveness, and predictive hotspot analysis"
   >
     <template #actions>
-      <TimeRangeSelector :range="range" @change="load" />
       <NuxtLink to="/safety/incidents" class="btn">Incident Command<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -18,7 +17,7 @@
   </SectionTitle>
 
   <p class="range-note">
-    Showing <strong>{{ range.label.value }}</strong>. The period applies to incident, fatality and violation figures;
+    Showing <strong>{{ range.label.value }}</strong><template v-if="county.county.value"> in <strong>{{ county.county.value }}</strong></template>. The period applies to incident, fatality and violation figures;
     active incidents, dispatches, black spots and hotspots are always current.
   </p>
 
@@ -312,6 +311,7 @@ const lastRefreshed = ref('-')
 // The reporting period for the incident / fatality / violation figures. Agencies can hold many
 // years of history, so beyond the presets there is a calendar year and a free from/to period.
 const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
+const county = useCountyScope('safety')
 
 // ── Table pagination (max 15 rows visible per table) ───────────────────
 const {
@@ -326,7 +326,7 @@ async function load() {
   const gis    = useGis()
 
   const [sumRes, hsRes, bsRes, ivRes, roadsRes] = await Promise.allSettled([
-    safety.summary(range.query.value),
+    safety.summary({ ...range.query.value, ...county.query.value }),
     safety.hotspots({ page_size: 20 }),
     safety.topBlackspots(),
     safety.interventions({ page_size: 20, ordering: '-effectiveness_pct' }),
@@ -347,6 +347,8 @@ async function load() {
 }
 
 onMounted(load)
+// Period or county changed - here, on another Safety page, or from the global filter in the top bar.
+watch(() => JSON.stringify([range.query.value, county.query.value]), load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })

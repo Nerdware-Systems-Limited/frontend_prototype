@@ -24,7 +24,7 @@
       :value="summary ? fmtNum(summary.kpis.total_vehicles) : '-'"
       :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
       period="LIVE" description="NTSA iTIMS national registry"
-      to="#fleet-composition"
+      to="/public-transport/vehicle-registration"
     />
     <KpiCard
       label="Live GPS-Tracked"
@@ -269,6 +269,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('fleet')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => county.county.value, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

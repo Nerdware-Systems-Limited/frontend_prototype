@@ -5,7 +5,6 @@
     subtitle="KPA · KMA · KenTrade · NCTTCA - Real-time AIS vessel traffic, port performance, KenTrade cargo single-window, and NCTTCA corridor transit KPIs"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/maritime/services" class="btn">Port Services<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/maritime/performance" class="btn">Performance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/maritime/port-ops" class="btn">Port Ops<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
@@ -278,13 +277,13 @@ async function load() {
   const avm = useAviationMaritime()
 
   const [opRes, poRes, beRes, vsRes, lmRes, ctRes, incRes] = await Promise.allSettled([
-    avm.maritimeOperations(days.value),
-    avm.ports(),
-    avm.berths({ port: portFilter.value || undefined, page_size: 30 }),
+    avm.maritimeOperations(days.value, county.query.value),
+    avm.ports(county.query.value),
+    avm.berths({ port: portFilter.value || undefined, county: county.county.value ?? undefined, page_size: 30 }),
     avm.vessels({ page_size: 30 }),
     avm.vesselMovementsLive(),
-    avm.containerByPort({ days: days.value }),
-    avm.maritimeIncidentStats(90),
+    avm.containerByPort({ days: days.value, ...county.query.value }),
+    avm.maritimeIncidentStats(90, county.county.value ?? undefined),
   ])
 
   if (opRes.status  === 'fulfilled') ops.value           = opRes.value
@@ -302,6 +301,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('maritime')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

@@ -14,6 +14,9 @@
 
 import { useAuthStore } from '~/stores/auth'
 import { apiBaseUrl } from '~/utils/apiBase'
+import { countyKeyFor, withModuleCounty } from '~/utils/scopeRoutes'
+import { expandPaged, wantedRows } from '~/utils/pageExpand'
+import { useCountyScope } from '~/composables/useCountyScope'
 
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -42,10 +45,19 @@ export default defineNuxtPlugin((nuxtApp) => {
       headers['Authorization'] = `Bearer ${auth.accessToken}`
     }
 
+    // The county in force for this module (see utils/scopeRoutes), added to its GET requests.
+    let scoped = options
+    const countyKey = countyKeyFor(path)
+    if (countyKey) {
+      let county: string | null = null
+      try { county = nuxtApp.runWithContext(() => useCountyScope(countyKey).county.value) as string | null } catch { /* no app context: leave unscoped */ }
+      scoped = withModuleCounty(path, options, county)
+    }
+
     try {
       return await $fetch<T>(path, {
         baseURL: BASE_URL,
-        ...options,
+        ...scoped,
         headers,
       })
     } catch (err: unknown) {
@@ -79,9 +91,20 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
   }
 
+  /**
+   * The client every caller uses. A GET that asks for more than one server page (the backend caps a page at 100)
+   * is expanded into several and returned as one response, instead of silently coming back with 100 rows.
+   */
+  async function api<T = unknown>(path: string, options: Parameters<typeof $fetch>[1] & { _retry?: boolean } = {}): Promise<T> {
+    const method = String(options.method ?? 'GET').toUpperCase()
+    const want = method === 'GET' ? wantedRows(path, options.query as Record<string, unknown> | undefined) : null
+    if (!want) return apiFetch<T>(path, options)
+    return expandPaged<T>(path, options as { query?: unknown }, want, (p, o) => apiFetch<T>(p, o))
+  }
+
   return {
     provide: {
-      api: apiFetch,
+      api,
     },
   }
 })

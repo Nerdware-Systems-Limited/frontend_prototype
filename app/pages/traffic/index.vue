@@ -5,7 +5,6 @@
     subtitle="KeNHA · KURA · KMD - Real-time flow, congestion events, speed compliance, KMD weather impact, and NCTTCA corridor alerts"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
       <NuxtLink to="/traffic/alerts" class="btn">Alerts<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
@@ -79,28 +78,19 @@
   <div class="two-col-map">
     <CollapsibleSection class="card map-card" title="Live Traffic Map" storage-key="map:traffic/index">
       <ClientOnly>
-        <UaptsMap
+        <LiveMap
           :markers="mapMarkers"
           :roads="roadsGeo"
+          :live="mapLive"
+          :legend="mapLegend"
           :center="[-1.286, 36.817]"
           :zoom="10"
-          height="500px"
-          show-legend
-          show-map-toolbar
+          height="520px"
+          noun="map points"
+          feed-title="Congestion &amp; stations"
         />
       </ClientOnly>
-      <div class="map-key">
-        <span class="mk"><span class="dot" style="background:#22c55e" /> Station operational</span>
-        <span class="mk"><span class="dot" style="background:#eab308" /> Station degraded</span>
-        <span class="mk"><span class="dot" style="background:#94a3b8" /> Station offline</span>
-      </div>
-      <div class="map-key">
-        <span class="mk"><span class="dot" style="background:#10b981" /> Free flow</span>
-        <span class="mk"><span class="dot" style="background:#eab308" /> Moderate</span>
-        <span class="mk"><span class="dot" style="background:#f97316" /> Heavy</span>
-        <span class="mk"><span class="dot" style="background:#ef4444" /> Severe</span>
-      </div>
-      <p class="map-key-note">Congestion events (large dots) are colored by live speed vs. free-flow speed; the shaded circle around one is its reported impact radius.</p>
+      <p class="map-key-note">Congestion events (large dots) are coloured by live speed vs. free-flow speed; the shaded circle around one is its reported impact radius. Critical events ping on the map. Refreshes in place every few seconds - no reload.</p>
     </CollapsibleSection>
 
     <div class="right-col">
@@ -280,16 +270,17 @@ import { useTraffic, useGis } from '~/composables/api'
 import type { TrafficSummary, CongestionEvent, TrafficAlert, WeatherObservation } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
 
-type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
+import type { MarkerSpec } from '~/components/UaptsMap.vue'
 
 const summary          = ref<TrafficSummary | null>(null)
 const congestionEvents = ref<CongestionEvent[]>([])
 const alerts           = ref<TrafficAlert[]>([])
 const weather          = ref<WeatherObservation[]>([])
 const timeRange        = useTimeRange('traffic', { default: '7d' })
+const county           = useCountyScope('traffic')
 const classWindow      = ref('7d')
 const classShare       = ref<{ vehicle_class: string; total: number; share_pct: number }[]>([])
-const mapMarkers       = ref<MarkerSpec[]>([])
+const mapMarkers       = shallowRef<MarkerSpec[]>([])
 const roadsGeo         = ref<GeoJSONFeatureCollection | null>(null)
 const loading          = ref(true)
 const error            = ref<string | null>(null)
@@ -299,16 +290,13 @@ async function load() {
   loading.value = true
   error.value = null
   const traffic = useTraffic()
-  const gis     = useGis()
 
-  const [sumRes, congRes, alertRes, wxRes, classRes, mapRes, roadsRes] = await Promise.allSettled([
-    traffic.summary(),
-    traffic.activeCongestion(),
-    traffic.alerts({ page_size: 20, active: true } as any),
-    traffic.weather({ page_size: 6 }),
-    traffic.classShare(timeRange.days.value),
-    traffic.mapData(),
-    gis.roads({ limit: 400, simplify: 0.01 }),
+  const [sumRes, congRes, alertRes, wxRes, classRes] = await Promise.allSettled([
+    traffic.summary(county.query.value),
+    traffic.activeCongestion(county.query.value),
+    traffic.alerts({ page_size: 20, active: true, ...county.query.value } as any),
+    traffic.weather({ page_size: 6, ...county.query.value }),
+    traffic.classShare({ ...timeRange.query.value, ...county.query.value }),
   ])
 
   if (sumRes.status   === 'fulfilled') {
@@ -325,8 +313,6 @@ async function load() {
     classShare.value = (classRes.value as any).results
     classWindow.value = timeRange.period.value.toLowerCase()
   }
-  if (mapRes.status   === 'fulfilled') mapMarkers.value       = mapRes.value.markers as MarkerSpec[]
-  if (roadsRes.status === 'fulfilled') roadsGeo.value         = roadsRes.value
 
   if ([sumRes, congRes].every(r => r.status === 'rejected'))
     error.value = 'Unable to reach the UAPTS Traffic API.'
@@ -334,6 +320,31 @@ async function load() {
   lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
   loading.value = false
 }
+
+// ── Live operations: live map feed ───────────────────────────────────────────
+// The map refreshes on its own short loop (stations + active congestion only)
+// so it feels live, while the heavier KPI/summary cards stay on the 60s cycle
+// below. Road geometry is static, so it is fetched once, never per tick.
+async function loadMap() {
+  const res = await useTraffic().mapData(county.query.value)
+  mapMarkers.value = res.markers as MarkerSpec[]
+}
+async function loadRoadsOnce() {
+  try { roadsGeo.value = await useGis().roads({ limit: 400, simplify: 0.01 }) } catch { /* basemap alone is fine */ }
+}
+const mapLive = useLivePoll(loadMap, { intervalMs: 15_000 })
+const mapLegend = [
+  { color: 'red' as const,    label: 'Severe / offline' },
+  { color: 'orange' as const, label: 'Heavy' },
+  { color: 'yellow' as const, label: 'Moderate / degraded' },
+  { color: 'green' as const,  label: 'Free flow / operational' },
+  { color: 'gray' as const,   label: 'Other' },
+]
+onMounted(loadRoadsOnce)
+
+// Period or county changed - here, on another Traffic page, or from the global filter in the top bar.
+// The map has its own live loop, so refresh it too instead of waiting for the next tick.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), () => { load(); mapLive.refresh() })
 
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null

@@ -5,7 +5,6 @@
     subtitle="KRC · NCTTCA - SGR &amp; MGR timetables, OTP, NCTTCA corridor punctuality benchmarks, and recent operation adherence"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="loadOtp" />
       <NuxtLink to="/railway/network-inventory" class="btn">Station / Route Performance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -36,63 +35,14 @@
     </div>
   </div>
 
-  <!-- OTP KPIs -->
+  <!-- OTP KPIs: the server's figures over the chosen period / county -->
   <div class="kpi-grid">
-    <KpiCard
-      label="On-Time Performance"
-      :value="otp ? `${otp.on_time_pct.toFixed(1)}%` : '-'"
-      :unavailable="!otp"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Rolling period"
-      :status="!otp ? undefined : otp.on_time_pct >= 85 ? 'healthy' : 'warning'"
-      to="#otp-panel"
-    />
-    <KpiCard
-      label="Total Operations"
-      :value="otp ? fmtNum(otp.total_operations) : '-'"
-      :unavailable="!otp"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      to="#schedule-adherence"
-    />
-    <KpiCard
-      label="Avg Delay"
-      :value="otp ? `${otp.avg_delay_min.toFixed(0)} min` : '-'"
-      :unavailable="!otp"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Arrival delay average"
-      :status="!otp ? undefined : otp.avg_delay_min < 10 ? 'healthy' : 'warning'"
-    />
-    <KpiCard
-      label="Delayed Operations"
-      :value="otp ? fmtNum(otp.delayed) : '-'"
-      :unavailable="!otp"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      :description="otp ? `${otp.cancellation_pct.toFixed(1)}% cancellation rate` : ''"
-      to="#schedule-adherence"
-    />
-    <KpiCard
-      label="Cancelled"
-      :value="otp ? fmtNum(otp.cancelled) : '-'"
-      :unavailable="!otp"
-      :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Service cancelled"
-      :status="!otp ? undefined : otp.cancelled === 0 ? 'healthy' : 'warning'"
-      to="#schedule-adherence"
-    />
-    <KpiCard
-      label="Active Schedules"
-      :value="fmtNum(schedules.filter(s => s.is_active).length)"
-      :unavailable="loading || schedulesError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(schedules.length)} total`"
-      to="#active-schedules-table"
-    />
+    <KpiCard label="On-Time Performance" :value="otp ? `${otp.on_time_pct.toFixed(1)}%` : '-'" :unavailable="!otp" :unavailable-note="otpLoading ? 'Loading…' : 'KRC OCC feed unavailable'" :period="rangeTag" description="Rolling period" :status="!otp ? undefined : otp.on_time_pct >= 85 ? 'healthy' : 'warning'" to="#otp-panel" />
+    <KpiCard label="Total Operations" :value="otp ? fmtNum(otp.total_operations) : '-'" :unavailable="!otp" :unavailable-note="otpLoading ? 'Loading…' : 'KRC OCC feed unavailable'" :period="rangeTag" description="Trains run" to="#schedule-adherence" />
+    <KpiCard label="Avg Delay" :value="otp ? `${otp.avg_delay_min.toFixed(0)} min` : '-'" :unavailable="!otp" :unavailable-note="otpLoading ? 'Loading…' : 'KRC OCC feed unavailable'" :period="rangeTag" description="Arrival delay average" :status="!otp ? undefined : otp.avg_delay_min < 10 ? 'healthy' : 'warning'" />
+    <KpiCard label="Delayed Operations" :value="otp ? fmtNum(otp.delayed) : '-'" :unavailable="!otp" :unavailable-note="otpLoading ? 'Loading…' : 'KRC OCC feed unavailable'" :period="rangeTag" :description="otp ? `${otp.cancellation_pct.toFixed(1)}% cancellation rate` : ''" to="#schedule-adherence" />
+    <KpiCard label="Cancelled" :value="otp ? fmtNum(otp.cancelled) : '-'" :unavailable="!otp" :unavailable-note="otpLoading ? 'Loading…' : 'KRC OCC feed unavailable'" :period="rangeTag" description="Service cancelled" :status="!otp ? undefined : otp.cancelled === 0 ? 'healthy' : 'warning'" to="#schedule-adherence" />
+    <KpiCard label="Active Schedules" :value="fmtNum(scheduleStats.groupCount('is_active', true))" :unavailable="scheduleStats.count.value === null" :unavailable-note="scheduleStats.loading.value ? 'Loading…' : 'KRC feed unavailable'" period="LIVE" :description="`of ${fmtNum(scheduleStats.count.value)} total`" to="#active-schedules-table" />
   </div>
 
   <!-- Schedule table -->
@@ -100,118 +50,44 @@
 
   <div id="active-schedules-table" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="networkFilter" class="select-sm">
-          <option value="">All networks</option>
-          <option value="sgr">SGR</option>
-          <option value="mgr">MGR</option>
-        </select>
-        <select v-model="classFilter" class="select-sm">
-          <option value="">All service classes</option>
-          <option value="express">Express</option>
-          <option value="standard">Standard</option>
-          <option value="local">Local</option>
-          <option value="freight">Freight</option>
-        </select>
-        <select v-model="dayTypeFilter" class="select-sm">
-          <option value="">All day types</option>
-          <option value="daily">Daily</option>
-          <option value="weekday">Weekday</option>
-          <option value="weekend">Weekend</option>
-          <option value="holiday">Holiday</option>
-        </select>
-        <label class="checkbox-label">
-          <input v-model="activeOnly" type="checkbox" />
-          Active only
-        </label>
-        <input v-model="trainSearch" class="select-sm" placeholder="Train number…" style="min-width:120px" />
-        <button class="btn" @click="networkFilter=''; classFilter=''; dayTypeFilter=''; trainSearch=''; activeOnly=true">Reset</button>
-        <ExportButton filename="uapts-train-schedules.csv" :rows="filteredSchedules" :columns="scheduleExportColumns" style="margin-left:auto" />
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th></th>
-            <th>Train #</th>
-            <th>Network</th>
-            <th>Class</th>
-            <th>Route</th>
-            <th>Dep</th>
-            <th>Arr</th>
-            <th>Duration</th>
-            <th>Days</th>
-            <th>Fare (Economy)</th>
-            <th>Fare (1st)</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody v-if="filteredSchedules.length">
-          <template v-for="s in schedulesPageRows" :key="s.id">
-            <tr class="expand-row" @click="expanded = expanded === s.id ? null : s.id">
-              <td class="expand-cell">{{ expanded === s.id ? '▾' : '▸' }}</td>
-              <td style="font-family:monospace;font-weight:700">{{ s.train_number }}</td>
-              <td>
-                <BadgePill :variant="s.network === 'sgr' ? 'info' : 'success'">
-                  {{ s.network.toUpperCase() }}
-                </BadgePill>
-              </td>
-              <td><BadgePill :variant="classBadge(s.service_class)">{{ s.service_class }}</BadgePill></td>
-              <td style="font-size:12px;font-weight:600">{{ s.origin_code }} → {{ s.destination_code }}</td>
-              <td style="font-family:monospace;font-weight:700;color:var(--fg-1)">{{ s.departure_time }}</td>
-              <td style="font-family:monospace;color:var(--fg-2)">{{ s.arrival_time }}</td>
-              <td style="font-size:12px">{{ formatDuration(s.duration_minutes) }}</td>
-              <td style="font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.days_of_week">{{ s.days_of_week }}</td>
-              <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_economy_kes)) }}</td>
-              <td style="font-size:12px">KES {{ fmtKES(parseFloat(s.fare_first_class_kes)) }}</td>
-              <td><BadgePill :variant="s.is_active ? 'success' : 'neutral'">{{ s.is_active ? 'Active' : 'Inactive' }}</BadgePill></td>
-            </tr>
-            <tr v-if="expanded === s.id" class="detail-row">
-              <td :colspan="11">
-                <div class="drilldown">
-                  <div class="dd-item"><span class="dd-label">Days of Week</span><span>{{ s.days_of_week }}</span></div>
-                  <div class="dd-item"><span class="dd-label">Day Type</span><span style="text-transform:capitalize">{{ s.day_type }}</span></div>
-                  <div class="dd-item"><span class="dd-label">Train Unit</span><span style="font-family:monospace">{{ s.train_unit_code ?? '-' }}</span></div>
-                  <div class="dd-item"><span class="dd-label">Freight Fare (per ton)</span><span>KES {{ fmtKES(parseFloat(s.fare_freight_per_ton_kes)) }}</span></div>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="11" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading schedules…' : 'No schedules match filters.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="schedulesPage" :total-pages="schedulesTotalPages" :total="schedulesTotal"
-        @prev="schedulesPrev" @next="schedulesNext"
-      />
+      <DataTable :table="scheduleTable" row-key="id" title="Train schedules" export-name="uapts-train-schedules" expandable filters-open
+                 placeholder="Search train number, station…" empty="No schedules match the current filters.">
+        <template #toolbar>
+          <label class="checkbox-label"><input v-model="activeOnly" type="checkbox" /> Active only</label>
+        </template>
+        <template #cell-train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.train_number }}</span></template>
+        <template #cell-network="{ row }"><BadgePill :variant="row.network === 'sgr' ? 'info' : 'success'">{{ String(row.network).toUpperCase() }}</BadgePill></template>
+        <template #cell-route="{ row }"><span style="font-weight:600">{{ row.origin_code }} → {{ row.destination_code }}</span></template>
+        <template #cell-duration_minutes="{ row }">{{ formatDuration(row.duration_minutes) }}</template>
+        <template #cell-fare_economy_kes="{ row }">KES {{ fmtKES(parseFloat(row.fare_economy_kes)) }}</template>
+        <template #cell-fare_first_class_kes="{ row }">KES {{ fmtKES(parseFloat(row.fare_first_class_kes)) }}</template>
+        <template #expanded="{ row }">
+          <div class="drilldown">
+            <div class="dd-item"><span class="dd-label">Days of Week</span><span>{{ row.days_of_week }}</span></div>
+            <div class="dd-item"><span class="dd-label">Day Type</span><span style="text-transform:capitalize">{{ row.day_type }}</span></div>
+            <div class="dd-item"><span class="dd-label">Train Unit</span><span style="font-family:monospace">{{ row.train_unit_code ?? '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Freight Fare (per ton)</span><span>KES {{ fmtKES(parseFloat(row.fare_freight_per_ton_kes)) }}</span></div>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 
-  <!-- Revenue, bookings and no-shows by route -->
-  <SectionTitle :pill="`KRC Ticketing · ${timeRange.period.value.toLowerCase()}`">Revenue &amp; Bookings by Route</SectionTitle>
+  <!-- Revenue and bookings by route: the server's ranked roll-up of the ticketing feed -->
+  <SectionTitle :pill="`KRC Ticketing · ${rangeTag.toLowerCase()}`">Revenue &amp; Bookings by Route</SectionTitle>
 
   <div class="card" style="margin-bottom:16px">
     <div class="card-body">
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>Route</th><th>Bookings</th><th>No-Shows</th><th>No-Show Rate</th><th>Revenue (KES)</th></tr></thead>
-          <tbody v-if="revenueByRoute.length">
-            <tr v-for="r in revenuePageRows" :key="`${r.origin}-${r.destination}`">
-              <td style="font-weight:600;font-size:12px">{{ r.origin }} → {{ r.destination }}</td>
-              <td>{{ fmtNum(r.bookings) }}</td>
-              <td>{{ fmtNum(r.noShows) }}</td>
-              <td :style="{ color: r.noShowRate > 10 ? 'var(--danger-fg)' : 'var(--success-fg)' }">{{ r.noShowRate.toFixed(1) }}%</td>
-              <td style="font-size:12px">KES {{ fmtKES(r.revenue) }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No ticketing data in the current view.' }}</td></tr></tbody>
-        </table>
+      <div v-if="revenueByRoute.length" class="route-list">
+        <div class="route-head"><span>Route</span><span>Bookings</span><span>Share</span><span>Revenue (KES)</span></div>
+        <div v-for="r in revenueByRoute" :key="`${r.origin}-${r.destination}`" class="route-row">
+          <span style="font-weight:600;font-size:12px">{{ r.origin }} → {{ r.destination }}</span>
+          <span>{{ fmtNum(r.bookings) }}</span>
+          <span>{{ totalBookings > 0 ? ((r.bookings / totalBookings) * 100).toFixed(1) : '0.0' }}%</span>
+          <span style="font-size:12px">KES {{ fmtKES(r.revenue) }}</span>
+        </div>
       </div>
-      <TablePagination
-        :page="revenuePage" :total-pages="revenueTotalPages" :total="revenueTotal"
-        @prev="revenuePrev" @next="revenueNext"
-      />
+      <EmptyState v-else :loading="routesLoading" message="No ticketing data in the current view." compact />
     </div>
   </div>
 
@@ -220,53 +96,17 @@
 
   <div id="schedule-adherence" class="card drill-target">
     <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Train</th>
-            <th>Route</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th>Sched. Dep</th>
-            <th>Act. Dep</th>
-            <th>Dep Delay</th>
-            <th>Arr Delay</th>
-            <th>Delay Reason</th>
-            <th>Passengers</th>
-          </tr>
-        </thead>
-        <tbody v-if="recentOps.length">
-          <tr v-for="op in recentOpsPageRows" :key="op.id">
-            <td style="font-family:monospace;font-weight:700">{{ op.schedule_train_number }}</td>
-            <td style="font-size:12px">{{ op.origin_code }} → {{ op.destination_code }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ op.service_date }}</td>
-            <td><BadgePill :variant="opBadge(op.status)">{{ op.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-size:11px">
-              {{ scheduleDepTime(op.schedule) }}
-            </td>
-            <td style="font-size:11px;white-space:nowrap">{{ op.actual_departure ? fmtTime(op.actual_departure) : '-' }}</td>
-            <td>
-              <span :style="{ color: op.delay_departure_min > 30 ? 'var(--danger-fg)' : op.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
-                {{ op.delay_departure_min > 0 ? `+${op.delay_departure_min} min` : '✓' }}
-              </span>
-            </td>
-            <td>
-              <span :style="{ color: op.delay_arrival_min > 30 ? 'var(--danger-fg)' : op.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600', fontSize:'12px' }">
-                {{ op.delay_arrival_min > 0 ? `+${op.delay_arrival_min} min` : '✓' }}
-              </span>
-            </td>
-            <td style="font-size:12px;text-transform:capitalize">{{ op.delay_reason.replace(/_/g,' ') }}</td>
-            <td style="font-size:12px">{{ op.passengers_actual != null ? fmtNum(op.passengers_actual) : '-' }}</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading operations…' : 'No recent operations.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="recentOpsPage" :total-pages="recentOpsTotalPages" :total="recentOpsTotal"
-        @prev="recentOpsPrev" @next="recentOpsNext"
-      />
+      <DataTable :table="opsTable" row-key="id" title="Train operations" export-name="uapts-train-operations" filters-open
+                 placeholder="Search train, station, delay reason…" empty="No operations in this period.">
+        <template #cell-schedule_train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.schedule_train_number }}</span></template>
+        <template #cell-route="{ row }">{{ row.origin_code }} → {{ row.destination_code }}</template>
+        <template #cell-delay_departure_min="{ row }">
+          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min} min` : '✓' }}</span>
+        </template>
+        <template #cell-delay_arrival_min="{ row }">
+          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min} min` : '✓' }}</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -275,132 +115,99 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useRailway } from '~/composables/api'
-import type { TrainSchedule, TrainOperation, OnTimeStats, RailTicket } from '~/composables/api'
+import type { OnTimeStats } from '~/composables/api'
+import { useApi } from '~/composables/api/_client'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { useTimeRange } from '~/composables/useTimeRange'
+import type { TableColumn } from '~/types/dataTable'
 
-const schedules  = ref<TrainSchedule[]>([])
-const recentOps  = ref<TrainOperation[]>([])
-const tickets    = ref<RailTicket[]>([])
-const otp        = ref<OnTimeStats | null>(null)
-const loading    = ref(true)
-const error      = ref<string | null>(null)
-const schedulesError = ref(false)
-const lastRefreshed  = ref('-')
-const timeRange = useTimeRange('railway', { default: '30d' })
-const otpDays = timeRange.days
-const networkFilter  = ref('')
-const classFilter    = ref('')
-const dayTypeFilter  = ref('')
-const activeOnly     = ref(true)
-const trainSearch    = ref('')
-const expanded       = ref<string | null>(null)
+// Every table, KPI and roll-up asks the server for the page's period (the global one unless picked here, a preset OR a calendar
+// range) and county, so they always agree - nothing is derived from a first page (see docs/data-tables.md).
+const RAIL = '/api/v1/railway'
+const api = useApi()
+const timeRange = useTimeRange('railway', { default: '30d', years: true, custom: true })
+const county = useCountyScope('railway')
+const rangeTag = computed(() => timeRange.period.value)
+const scope = () => ({ ...timeRange.query.value, ...county.query.value })
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const rail = useRailway()
+const opt = (values: string[]) => values.map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const CLASS_BADGE: Record<string, string> = { express: 'info', standard: 'neutral', local: 'fair', freight: 'warning' }
+const OP_BADGE: Record<string, string> = { in_transit: 'info', boarding: 'fair', arrived: 'success', delayed: 'danger', cancelled: 'danger', scheduled: 'neutral', departed: 'info', diverted: 'warning' }
 
-  const [schRes, opRes, otpRes, ticketsRes] = await Promise.allSettled([
-    rail.schedules({ page_size: 100 }),
-    rail.operations({ page_size: 30 }),
-    rail.onTimeStats(otpDays.value),
-    rail.tickets({ page_size: 300, days: otpDays.value }),
-  ])
-
-  if (schRes.status === 'fulfilled') schedules.value = (schRes.value as any).results ?? []
-  if (opRes.status  === 'fulfilled') recentOps.value = (opRes.value as any).results ?? []
-  if (otpRes.status === 'fulfilled') otp.value       = otpRes.value
-  if (ticketsRes.status === 'fulfilled') tickets.value = (ticketsRes.value as any).results ?? []
-
-  schedulesError.value = schRes.status === 'rejected'
-
-  if ([schRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Railway API.'
-
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-  loading.value = false
-}
-
-async function loadOtp() {
-  const [res] = await Promise.allSettled([useRailway().onTimeStats(otpDays.value)])
-  if (res.status === 'fulfilled') otp.value = res.value
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-// ── Computed ──────────────────────────────────────────────────────────────
-const filteredSchedules = computed(() =>
-  schedules.value.filter(s => {
-    if (activeOnly.value    && !s.is_active)                                       return false
-    if (networkFilter.value  && s.network       !== networkFilter.value)           return false
-    if (classFilter.value    && s.service_class !== classFilter.value)             return false
-    if (dayTypeFilter.value  && s.day_type      !== dayTypeFilter.value)           return false
-    if (trainSearch.value    && !s.train_number.toLowerCase().includes(trainSearch.value.toLowerCase())) return false
-    return true
-  }),
-)
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: schedulesPageRows, page: schedulesPage, totalPages: schedulesTotalPages,
-  total: schedulesTotal, next: schedulesNext, prev: schedulesPrev,
-} = usePagination(filteredSchedules, 15)
-
-const {
-  pageRows: recentOpsPageRows, page: recentOpsPage, totalPages: recentOpsTotalPages,
-  total: recentOpsTotal, next: recentOpsNext, prev: recentOpsPrev,
-} = usePagination(recentOps, 15)
-
-const scheduleExportColumns = [
-  { key: 'train_number', label: 'Train #' },
-  { key: 'network', label: 'Network' },
-  { key: 'service_class', label: 'Class' },
-  { key: 'origin_code', label: 'Origin' },
-  { key: 'destination_code', label: 'Destination' },
-  { key: 'departure_time', label: 'Departure' },
-  { key: 'arrival_time', label: 'Arrival' },
-  { key: 'duration_minutes', label: 'Duration (min)' },
-  { key: 'days_of_week', label: 'Days' },
-  { key: 'fare_economy_kes', label: 'Fare Economy (KES)' },
-  { key: 'fare_first_class_kes', label: 'Fare 1st Class (KES)' },
-  { key: 'is_active', label: 'Active' },
+// ── Schedules ────────────────────────────────────────────────────────────
+const activeOnly = ref(true)
+const scheduleColumns: TableColumn[] = [
+  { key: 'train_number', label: 'Train #', priority: 1, pin: 'left' },
+  { key: 'network', label: 'Network', options: opt(['sgr', 'mgr']), priority: 2 },
+  { key: 'service_class', label: 'Class', type: 'badge', badge: CLASS_BADGE, options: opt(['express', 'standard', 'local', 'freight']), priority: 2 },
+  { key: 'route', label: 'Route', sortable: 'origin_code', filter: false, exportAs: r => `${r.origin_code} - ${r.destination_code}`, priority: 1 },
+  { key: 'departure_time', label: 'Dep', type: 'mono', priority: 1 },
+  { key: 'arrival_time', label: 'Arr', type: 'mono', priority: 2 },
+  { key: 'duration_minutes', label: 'Duration', type: 'num', priority: 3 },
+  { key: 'days_of_week', label: 'Days', priority: 3 },
+  { key: 'day_type', label: 'Day type', options: opt(['daily', 'weekday', 'weekend', 'holiday']), priority: 3, hidden: true },
+  { key: 'fare_economy_kes', label: 'Fare (Economy)', type: 'num', priority: 3 },
+  { key: 'fare_first_class_kes', label: 'Fare (1st)', type: 'num', priority: 3 },
+  { key: 'is_active', label: 'Status', type: 'bool', priority: 1 },
 ]
-
-// Build a lookup of schedule_id → departure_time for the adherence table
-const scheduleMap = computed(() => {
-  const m = new Map<string, string>()
-  schedules.value.forEach(s => m.set(s.id, s.departure_time))
-  return m
+const scheduleTable = useEndpointTable({
+  key: 'rail-schedules', path: `${RAIL}/schedules/`, columns: scheduleColumns, countyKey: 'railway', pageSize: 15,
+  params: () => (activeOnly.value ? { 'f.is_active__exact': 'true' } : {}), defaultSort: [{ key: 'departure_time', dir: 'asc' }],
 })
-function scheduleDepTime(schedId: string) {
-  return scheduleMap.value.get(schedId) ?? '-'
+
+// ── Recent operations (the chosen period) ────────────────────────────────
+const opColumns: TableColumn[] = [
+  { key: 'schedule_train_number', label: 'Train', priority: 1, pin: 'left' },
+  { key: 'route', label: 'Route', sortable: 'origin_code', filter: false, exportAs: r => `${r.origin_code} - ${r.destination_code}`, priority: 2 },
+  { key: 'service_date', label: 'Date', type: 'date', priority: 1 },
+  { key: 'status', label: 'Status', type: 'badge', badge: OP_BADGE, options: opt(Object.keys(OP_BADGE)), priority: 1 },
+  { key: 'schedule_departure_time', label: 'Sched. Dep', type: 'mono', priority: 3 },
+  { key: 'actual_departure', label: 'Act. Dep', type: 'datetime', priority: 3 },
+  { key: 'delay_departure_min', label: 'Dep Delay', type: 'num', priority: 2 },
+  { key: 'delay_arrival_min', label: 'Arr Delay', type: 'num', priority: 1 },
+  { key: 'delay_reason', label: 'Delay Reason', priority: 2 },
+  { key: 'passengers_actual', label: 'Passengers', type: 'num', priority: 3 },
+]
+const opsTable = useEndpointTable({
+  key: 'rail-operations', path: `${RAIL}/operations/`, columns: opColumns, countyKey: 'railway', pageSize: 15,
+  params: () => timeRange.query.value, defaultSort: [{ key: 'service_date', dir: 'desc' }],
+})
+
+// ── KPIs ─────────────────────────────────────────────────────────────────
+const scheduleStats = useServerCount(`${RAIL}/schedules/`, county.query, { groupBy: ['is_active'] })
+const otp = ref<OnTimeStats | null>(null)
+const otpLoading = ref(true)
+const error = computed(() => !otp.value && !otpLoading.value && scheduleStats.failed.value ? 'Unable to reach the UAPTS Railway API.' : null)
+async function loadOtp() {
+  try { otp.value = await api<OnTimeStats>(`${RAIL}/operations/on-time-stats/`, { query: scope() }) } catch { otp.value = null } finally { otpLoading.value = false }
 }
 
+// ── Revenue by route: ranked server roll-up of the ridership feed ─────────
+const routeRows = ref<any[]>([])
+const routesLoading = ref(true)
+async function loadRoutes() {
+  try { routeRows.value = (await api<any>(`${RAIL}/tickets/by-route/`, { query: scope() }))?.results ?? [] } catch { routeRows.value = [] } finally { routesLoading.value = false }
+}
 const revenueByRoute = computed(() => {
-  const m = new Map<string, { origin: string; destination: string; bookings: number; noShows: number; revenue: number }>()
-  for (const tk of tickets.value) {
-    const originLabel = tk.origin_code ?? tk.origin
-    const destinationLabel = tk.destination_code ?? tk.destination
-    const key = `${originLabel}-${destinationLabel}`
-    const ex = m.get(key) ?? { origin: originLabel, destination: destinationLabel, bookings: 0, noShows: 0, revenue: 0 }
-    ex.bookings++
-    if (tk.is_no_show) ex.noShows++
-    ex.revenue += parseFloat(tk.fare_kes || '0')
+  const m = new Map<string, { origin: string; destination: string; bookings: number; revenue: number }>()
+  for (const r of routeRows.value) {
+    const key = `${r.origin__code}-${r.destination__code}`
+    const ex = m.get(key) ?? { origin: r.origin__name ?? r.origin__code, destination: r.destination__name ?? r.destination__code, bookings: 0, revenue: 0 }
+    ex.bookings += Number(r.bookings ?? 0); ex.revenue += Number(r.revenue ?? 0)
     m.set(key, ex)
   }
-  return [...m.values()]
-    .map(r => ({ ...r, noShowRate: r.bookings > 0 ? (r.noShows / r.bookings) * 100 : 0 }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 15)
+  return [...m.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 15)
 })
+const totalBookings = computed(() => revenueByRoute.value.reduce((s, r) => s + r.bookings, 0))
 
-const {
-  pageRows: revenuePageRows, page: revenuePage, totalPages: revenueTotalPages,
-  total: revenueTotal, next: revenueNext, prev: revenuePrev,
-} = usePagination(revenueByRoute, 15)
+watch(() => JSON.stringify(scope()), () => { void loadOtp(); void loadRoutes() })
+onMounted(() => { void loadOtp(); void loadRoutes() })
+function refreshAll() { void Promise.all([scheduleTable.refresh(), opsTable.refresh(), scheduleStats.refresh(), loadOtp(), loadRoutes()]) }
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(refreshAll, 120_000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -413,36 +220,16 @@ function fmtKES(n: number | null | undefined) {
   if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}k`
   return Math.round(n).toLocaleString()
 }
-function fmtTime(iso: string) {
-  try { return new Date(iso).toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' }) }
-  catch { return iso }
-}
 function formatDuration(min: number) {
   const h = Math.floor(min / 60), m = min % 60
   return h > 0 ? `${h}h ${m > 0 ? `${m}m` : ''}`.trim() : `${m}m`
-}
-function classBadge(c: string) {
-  const m: Record<string,string> = { express:'info', standard:'neutral', local:'fair', freight:'warning' }
-  return m[c] ?? 'neutral'
-}
-function opBadge(s: string) {
-  const m: Record<string,string> = { in_transit:'info', boarding:'fair', arrived:'success', delayed:'danger', cancelled:'danger', scheduled:'neutral', departed:'info', diverted:'warning' }
-  return m[s] ?? 'neutral'
 }
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px; }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; user-select:none; color:var(--fg-2); }
 .checkbox-label input[type="checkbox"] { width:14px; height:14px; accent-color:var(--primary-fill); cursor:pointer; }
-.table-scroll { overflow-x:auto; }
-.expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
-.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
-.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
-.dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 
 /* ── OTP visual panel ── */
 .otp-panel {
@@ -475,4 +262,8 @@ function opBadge(s: string) {
 .otp-delay  { background:var(--warning-bg); color:var(--warning-fg); border:1px solid var(--warning-fg); }
 .otp-cancel { background:var(--danger-bg); color:var(--danger-fg); border:1px solid var(--danger-fg); }
 .otp-info   { background:var(--info-bg); color:var(--info-fg); border:1px solid var(--info-fg); }
+.route-list { display:flex; flex-direction:column; max-height:420px; overflow-y:auto; }
+.route-head, .route-row { display:grid; grid-template-columns:2fr 1fr 1fr 1.2fr; gap:10px; padding:7px 4px; font-size:13px; align-items:center; }
+.route-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--fg-3); border-bottom:1px solid var(--border-subtle); position:sticky; top:0; background:var(--surface-1, var(--surface)); }
+.route-row { border-bottom:1px solid var(--border-subtle); }
 </style>

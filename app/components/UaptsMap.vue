@@ -36,6 +36,11 @@
  */
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { apiBaseUrl } from '~/utils/apiBase'
+import { useGis } from '~/composables/api/useGis'
+import {
+  BASEMAP_ORDER, BASEMAP_LABELS, MAP_COLORS, createBasemapLayer, basemapForTheme,
+  type BasemapKey,
+} from '~/utils/mapBasemap'
 
 // ── Public types ─────────────────────────────────────────────────────
 // Re-exported so composables (useTraffic/usePublicTransport) can
@@ -63,6 +68,14 @@ export interface MarkerSpec {
    * decorative halo, and never drawn without a real backend radius.
    */
   radiusKm?: number
+  /**
+   * Live "needs attention" marker: draws a looping radar ping under it.
+   * Markers that first appear after the initial render (a new incident
+   * arriving on a live refresh) ping a few times automatically, with no flag.
+   */
+  pulse?: boolean
+  /** ISO timestamp of the underlying record's last update - shown as a freshness footer in the popup. */
+  updatedAt?: string
 }
 
 export interface LineSpec {
@@ -174,14 +187,25 @@ interface Props {
   // Shared
   /** Map height in CSS units. Defaults to 600px. */
   height?: string
-  /** Basemap tile style. v-model-able via :basemap + @update:basemap. Defaults to the classic OSM raster layer, so existing callers are unaffected. */
-  basemap?: 'light' | 'dark' | 'satellite'
+  /** Basemap tile style. v-model-able via :basemap + @update:basemap. When omitted the map follows the app theme (light/dark) and the toolbar can still cycle it. */
+  basemap?: BasemapKey
   /**
    * Self-contained fullscreen / locate-me / reset-view / cycle-basemap
    * button cluster, top-right. Off by default so existing callers keep
    * their current appearance untouched.
    */
   showMapToolbar?: boolean
+  /**
+   * Load roads for whatever is in view. Zoomed out the `roads` prop is shown as
+   * the national overview; from zoom 8 the map fetches /api/v1/gis/roads/ for
+   * the visible bbox on every pan/zoom (up to 8000 features, most important
+   * classes first, more classes as you zoom in), so zooming into a section
+   * shows all its roads instead of the capped national sample. Defaults to on
+   * whenever a `roads` GeoJSON is passed without a PMTiles roads layer.
+   */
+  roadsInView?: boolean
+  /** Hide the toolbar's fullscreen button (a parent such as LiveMap provides its own, wrapping its HUD). */
+  hideFullscreen?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -205,13 +229,16 @@ const props = withDefaults(defineProps<Props>(), {
   arrows: () => [],
   initialBbox: undefined,
   showLegend: false,
-  basemap: 'light',
+  basemap: undefined,
   showMapToolbar: false,
+  hideFullscreen: false,
+  roadsInView: undefined,
 })
 
 const emit = defineEmits<{
   (e: 'feature-click', payload: { layer: string; feature: any }): void
-  (e: 'update:basemap', value: 'light' | 'dark' | 'satellite'): void
+  (e: 'update:basemap', value: BasemapKey): void
+  (e: 'markers-synced', payload: { added: string[]; removed: string[]; total: number }): void
   (e: 'bounds-change', payload: { bbox: [number, number, number, number]; zoom: number; center: [number, number] }): void
 }>()
 
@@ -275,7 +302,12 @@ const mapWrapperEl = ref<HTMLDivElement | null>(null)   // fullscreen target - t
 // Mirrors props.basemap locally so cycleBasemap() works whether or not
 // the parent binds @update:basemap - "controlled" via v-model AND usable
 // as a plain one-shot initial value. See setBasemap()/cycleBasemap().
-const currentBasemap = ref<'light' | 'dark' | 'satellite'>(props.basemap)
+const theme = useTheme()
+// `pinnedBasemap` is a basemap chosen explicitly (prop or toolbar). While it's
+// null the map simply follows the app theme, so toggling dark mode re-skins
+// every open map without each page wiring anything up.
+const pinnedBasemap = ref<BasemapKey | null>(props.basemap ?? null)
+const currentBasemap = ref<BasemapKey>(props.basemap ?? basemapForTheme(theme.resolved.value))
 const isFullscreen = ref(false)
 const legendExpanded = ref(false)   // legend defaults to a small chip so it never sits on top of map content
 const locateStatus = ref<'idle' | 'locating' | 'found' | 'error'>('idle')
@@ -283,29 +315,6 @@ let baseLayer: any = null            // active Lc.tileLayer instance, tracked se
 let resizeObserver: ResizeObserver | null = null
 let locateMarkerGroup: any = null    // "you are here" dot + accuracy circle
 let homeView: { bbox: [number, number, number, number] } | { center: [number, number]; zoom: number } | null = null
-
-// Free, no-API-key raster tile sources for the basemap switcher.
-const BASEMAP_CATALOG: Record<'light' | 'dark' | 'satellite', { url: string; options: Record<string, any> }> = {
-  light: {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    options: { attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19 },
-  },
-  dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    options: {
-      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd', maxZoom: 20, detectRetina: true,
-    },
-  },
-  satellite: {
-    // Esri's legacy free tile endpoint - fine for dev/demo traffic. Esri
-    // has been steering high-volume users toward a newer, API-key-gated
-    // basemap service (ibasemaps-api.arcgis.com); swap this out if usage
-    // ever grows enough for that to matter.
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    options: { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community', maxZoom: 19 },
-  },
-}
 
 // Catalogue of layers that the LAYER_CATALOG API knows how to fetch.
 const LAYER_CATALOG: Record<string, { label: string; color: string; endpoint: string }> = {
@@ -322,10 +331,7 @@ const LAYER_CATALOG: Record<string, { label: string; color: string; endpoint: st
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
-const markerColorMap: Record<MarkerColor, string> = {
-  green: '#10b981', yellow: '#eab308', red: '#ef4444',
-  orange: '#f97316', blue: '#3b82f6', purple: '#a855f7', gray: '#94a3b8',
-}
+const markerColorMap: Record<MarkerColor, string> = MAP_COLORS
 
 function markerRadius(size: MarkerSize | undefined): number {
   if (size === 'lg') return 12
@@ -495,9 +501,8 @@ function roadStyle(feature: any) {
   return { color: roadColorFor(hw), weight: roadWeightFor(hw), opacity, dashArray }
 }
 
-function renderRoads(Lc: any) {
-  if (!props.roads || !mapRef.value) return
-  const layer = Lc.geoJSON(props.roads, {
+function makeRoadsGeoJSON(Lc: any, data: GeoJSONFeatureCollection) {
+  return Lc.geoJSON(data, {
     style: (feature: any) => roadStyle(feature),
     onEachFeature: (feature: any, lyr: any) => {
       lyr.bindPopup(buildPopup('roads', feature))
@@ -510,8 +515,107 @@ function renderRoads(Lc: any) {
       lyr.on('click',     () => emit('feature-click', { layer: 'roads', feature }))
     },
   })
-  layer.addTo(mapRef.value)
-  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#ea580c', count: props.roads.features?.length ?? 0, visible: true, instance: layer })
+}
+
+// The 'roads' layer is a stable group whose contents are swapped: the static
+// `roads` prop (national overview) when zoomed out, or the viewport fetch
+// (see loadViewRoads) when zoomed in. Keeping one group keeps the legend
+// toggle and feature count working across both.
+let roadsGroup: any = null
+
+function renderRoads(Lc: any) {
+  roadsGroup = null
+  roadsViewLoaded = null
+  if (!props.roads || !mapRef.value) return
+  roadsGroup = Lc.layerGroup()
+  roadsGroup.addLayer(makeRoadsGeoJSON(Lc, props.roads))
+  roadsGroup.addTo(mapRef.value)
+  layerStates.value.push({ key: 'roads', label: 'Roads', color: '#ea580c', count: props.roads.features?.length ?? 0, visible: true, instance: roadsGroup })
+}
+
+// ── Viewport road loading ───────────────────────────────────────────────
+// More road classes as you zoom in. Limits are the backend's: bbox-scoped,
+// capped at 8000 features with the most important classes kept first, and
+// `truncated` set when the cap bit.
+const HW_MAJOR = 'motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary,secondary_link,tertiary'
+const HW_MINOR = `${HW_MAJOR},unclassified,residential`
+const HW_ALL = `${HW_MINOR},service,track,living_street`
+const ROAD_TIERS = [
+  { minZoom: 13, highway: HW_ALL },
+  { minZoom: 10, highway: HW_MINOR },
+  { minZoom: 8,  highway: HW_MAJOR },
+]
+const ROADS_VIEW_LIMIT = 8000
+const roadsStatus = ref<{ loading: boolean; truncated: boolean; count: number; detail: boolean }>({
+  loading: false, truncated: false, count: 0, detail: false,
+})
+const mapZoom = ref(props.zoom)
+const roadsViewEnabled = computed(() => props.roadsInView ?? (!!props.roads && !props.roadsTilesUrl))
+const gisApi = useGis()   // resolved here (setup context) so the async loader below can reuse it
+let roadsViewSeq = 0
+let roadsViewTimer: ReturnType<typeof setTimeout> | null = null
+let roadsViewLoaded: { bbox: [number, number, number, number]; tier: number; zoom: number; truncated: boolean } | null = null
+
+function bboxContains(outer: [number, number, number, number], b: any): boolean {
+  return b.getSouth() >= outer[0] && b.getWest() >= outer[1] && b.getNorth() <= outer[2] && b.getEast() <= outer[3]
+}
+
+function scheduleRoadsView(force = false) {
+  if (!roadsViewEnabled.value) return
+  if (roadsViewTimer) clearTimeout(roadsViewTimer)
+  roadsViewTimer = setTimeout(() => { void loadViewRoads(force) }, force ? 0 : 350)
+}
+
+async function loadViewRoads(force = false) {
+  const map = mapRef.value
+  if (!map || !roadsViewEnabled.value || !roadsGroup) return
+  const Lc = await getLeaflet()
+  if (!Lc) return
+  const z = map.getZoom()
+  const tier = ROAD_TIERS.find(t => z >= t.minZoom)
+
+  if (!tier) {
+    // Zoomed out: back to the national overview.
+    if (roadsViewLoaded && props.roads) {
+      roadsViewSeq++
+      roadsGroup.clearLayers()
+      roadsGroup.addLayer(makeRoadsGeoJSON(Lc, props.roads))
+      const st = layerStates.value.find(s => s.key === 'roads')
+      if (st) st.count = props.roads.features?.length ?? 0
+    }
+    roadsViewLoaded = null
+    roadsStatus.value = { loading: false, truncated: false, count: 0, detail: false }
+    return
+  }
+
+  const now = map.getBounds()
+  const l = roadsViewLoaded
+  // Already have this view covered. A truncated load only counts if we haven't
+  // zoomed in since - zooming in is how you get the roads the cap cut off.
+  if (!force && l && l.tier === tier.minZoom && bboxContains(l.bbox, now) && !(l.truncated && z > l.zoom)) return
+
+  const padded = now.pad(0.25)
+  const bbox: [number, number, number, number] = [padded.getSouth(), padded.getWest(), padded.getNorth(), padded.getEast()]
+  const seq = ++roadsViewSeq
+  roadsStatus.value = { ...roadsStatus.value, loading: true }
+  try {
+    const data = await gisApi.roads({
+      bbox, highway: tier.highway, limit: ROADS_VIEW_LIMIT,
+      simplify: Number((1.40625 / 2 ** z).toFixed(6)),   // ~1 screen pixel at this zoom, in degrees
+    })
+    if (seq !== roadsViewSeq || !roadsGroup) return        // a newer pan/zoom superseded this one
+    roadsGroup.clearLayers()
+    roadsGroup.addLayer(makeRoadsGeoJSON(Lc, data))
+    const truncated = !!(data as any).truncated
+    roadsViewLoaded = { bbox, tier: tier.minZoom, zoom: z, truncated }
+    const count = data.features?.length ?? 0
+    const st = layerStates.value.find(s => s.key === 'roads')
+    if (st) st.count = count
+    roadsStatus.value = { loading: false, truncated, count, detail: true }
+  } catch (err: any) {
+    console.warn('[UaptsMap] viewport roads failed:', err?.message)
+    if (seq === roadsViewSeq) roadsStatus.value = { ...roadsStatus.value, loading: false }
+  }
 }
 
 // Holds the live protomaps-leaflet layer instance so we can tear it down
@@ -715,34 +819,131 @@ function renderRoutes(Lc: any) {
   layerStates.value.push({ key: 'routes', label: 'PT Routes', color: '#a855f7', count: props.routes.features?.length ?? 0, visible: true, instance: layer })
 }
 
-function renderMarkers(Lc: any) {
-  if (!props.markers?.length || !mapRef.value) return
-  const group = Lc.layerGroup()
-  for (const m of props.markers) {
-    if (m.lat == null || m.lon == null) continue
-    const radius = markerRadius(m.size)
-    const fill = markerColorMap[m.color ?? 'blue']
-    // Real impact-zone radius (e.g. a congestion event's own
-    // impact_radius_km) drawn as a soft tinted zone under the marker -
-    // never shown without a genuine backend radius.
-    if (m.radiusKm != null && m.radiusKm > 0) {
-      Lc.circle([m.lat, m.lon], {
-        radius: m.radiusKm * 1000,
-        color: fill, weight: 1, opacity: 0.5,
-        fillColor: fill, fillOpacity: 0.12,
-        interactive: false,
-      }).addTo(group)
-    }
-    const marker = Lc.circleMarker([m.lat, m.lon], {
-      radius, color: '#fff', weight: 1.5, fillColor: fill, fillOpacity: 0.9,
-    })
-    marker.bindPopup(buildMarkerPopup(m, fill), { maxWidth: 300, minWidth: 210 })
-    marker.on('click', () => emit('feature-click', { layer: 'markers', feature: m }))
-    marker.addTo(group)
-  }
-  group.addTo(mapRef.value)
-  layerStates.value.push({ key: 'markers', label: 'Markers', color: '#22d3ee', count: props.markers.length, visible: true, instance: group })
+// ── Live markers ─────────────────────────────────────────────────────
+// Markers are reconciled by id rather than torn down and rebuilt: a live
+// refresh that changes three incidents out of 200 touches three markers, the
+// rest (and the PMTiles/road layers underneath) are left alone, so nothing
+// flickers and an open popup survives the refresh.
+interface MarkerEntry {
+  spec: MarkerSpec
+  sig: string
+  layers: any[]
+  dot: any
+  fresh: boolean
 }
+const markerIndex = new Map<string, MarkerEntry>()
+let markerGroup: any = null
+let markersSynced = false // false until the first sync, so initial markers don't all "ping" as new
+
+function markerSig(m: MarkerSpec): string {
+  return JSON.stringify([m.lat, m.lon, m.color, m.size, m.radiusKm, m.pulse, m.title, m.subtitle, m.badge, m.rows, m.updatedAt])
+}
+
+function pulseIcon(Lc: any, fill: string, size: number, fresh: boolean) {
+  const box = Math.round(size * 5)
+  return Lc.divIcon({
+    className: `um-pulse${fresh ? ' um-pulse--new' : ''}`,
+    html: `<i style="--pulse:${fill}"></i><i style="--pulse:${fill}"></i>`,
+    iconSize: [box, box],
+    iconAnchor: [box / 2, box / 2],
+  })
+}
+
+function upsertLayerState(state: { key: string; label: string; color: string; count: number; instance: any }) {
+  const cur = layerStates.value.find(s => s.key === state.key)
+  if (cur) { cur.count = state.count; cur.instance = state.instance; return }
+  layerStates.value.push({ ...state, visible: true })
+}
+
+function buildMarker(Lc: any, m: MarkerSpec, fresh: boolean): MarkerEntry {
+  const group = markerGroup
+  const layers: any[] = []
+  const radius = markerRadius(m.size)
+  const fill = markerColorMap[m.color ?? 'blue']
+
+  // Real impact-zone radius (e.g. a congestion event's own
+  // impact_radius_km) drawn as a soft tinted zone under the marker -
+  // never shown without a genuine backend radius.
+  if (m.radiusKm != null && m.radiusKm > 0) {
+    const zone = Lc.circle([m.lat, m.lon], {
+      radius: m.radiusKm * 1000,
+      color: fill, weight: 1, opacity: 0.5,
+      fillColor: fill, fillOpacity: 0.12,
+      interactive: false,
+    })
+    zone.addTo(group); layers.push(zone)
+  }
+  if (m.pulse || fresh) {
+    const halo = Lc.marker([m.lat, m.lon], {
+      icon: pulseIcon(Lc, fill, radius, !m.pulse && fresh),
+      interactive: false, keyboard: false, zIndexOffset: -100,
+    })
+    halo.addTo(group); layers.push(halo)
+  }
+  const dot = Lc.circleMarker([m.lat, m.lon], {
+    radius, color: '#fff', weight: 1.75, fillColor: fill, fillOpacity: 0.95,
+  })
+  dot.bindPopup(buildMarkerPopup(m, fill), { maxWidth: 300, minWidth: 210, autoPanPadding: [24, 24] })
+  if (m.title) dot.bindTooltip(escape(m.title), { direction: 'top', offset: [0, -radius], className: 'um-tip', opacity: 1 })
+  dot.on('click', () => emit('feature-click', { layer: 'markers', feature: m }))
+  dot.addTo(group); layers.push(dot)
+  return { spec: m, sig: markerSig(m), layers, dot, fresh }
+}
+
+function removeMarkerEntry(e: MarkerEntry) {
+  for (const l of e.layers) markerGroup?.removeLayer(l)
+}
+
+function syncMarkers(Lc: any) {
+  const map = mapRef.value
+  if (!map) return
+  const specs = (props.markers ?? []).filter(m => m.lat != null && m.lon != null)
+  if (!markerGroup) {
+    if (!specs.length) return
+    markerGroup = Lc.layerGroup().addTo(map)
+  }
+  const added: string[] = []
+  const removed: string[] = []
+  const seen = new Set<string>()
+
+  for (const m of specs) {
+    seen.add(m.id)
+    const cur = markerIndex.get(m.id)
+    const sig = markerSig(m)
+    if (cur && cur.sig === sig) { cur.spec = m; continue }
+    const reopen = !!cur && cur.dot.isPopupOpen?.()
+    if (cur) removeMarkerEntry(cur)
+    const entry = buildMarker(Lc, m, !cur && markersSynced)
+    markerIndex.set(m.id, entry)
+    if (!cur) added.push(m.id)
+    if (reopen) entry.dot.openPopup()
+  }
+  for (const [id, e] of markerIndex) {
+    if (seen.has(id)) continue
+    removeMarkerEntry(e)
+    markerIndex.delete(id)
+    removed.push(id)
+  }
+
+  upsertLayerState({ key: 'markers', label: 'Live markers', color: '#22d3ee', count: markerIndex.size, instance: markerGroup })
+  const wasSynced = markersSynced
+  markersSynced = true
+  if (wasSynced && (added.length || removed.length)) emit('markers-synced', { added, removed, total: markerIndex.size })
+}
+
+/** Fly to a marker by id and open its popup (used by LiveMap's feed). */
+function openMarker(id: string, zoom = 13) {
+  const e = markerIndex.get(id)
+  const map = mapRef.value
+  if (!e || !map) return false
+  const target = Math.max(map.getZoom(), zoom)
+  map.flyTo([e.spec.lat, e.spec.lon], target, { duration: 0.8 })
+  map.once('moveend', () => e.dot.openPopup())
+  return true
+}
+
+let linesGroup: any = null
+let arrowsGroup: any = null
 
 function renderLines(Lc: any) {
   if (!props.lines?.length || !mapRef.value) return
@@ -758,6 +959,7 @@ function renderLines(Lc: any) {
     polyline.addTo(group)
   }
   group.addTo(mapRef.value)
+  linesGroup = group
   layerStates.value.push({ key: 'lines', label: 'Lines', color: '#3b82f6', count: props.lines.length, visible: true, instance: group })
 }
 
@@ -784,25 +986,39 @@ function renderArrows(Lc: any) {
     curve.addTo(group)
   }
   group.addTo(mapRef.value)
+  arrowsGroup = group
   layerStates.value.push({ key: 'arrows', label: 'OD Arrows', color: '#a855f7', count: props.arrows.length, visible: true, instance: group })
 }
 
 // ── Popup builders ──────────────────────────────────────────────────
-// All popups use inline styles - Leaflet injects popup DOM outside the
-// component's scoped CSS scope, so class-based styles never apply.
+// Popups are built as HTML strings and injected by Leaflet outside this
+// component's scoped CSS, so they're styled by the global map.css (.um-pop*)
+// plus inline styles that reference its CSS variables - which is what makes
+// them follow light/dark theme like everything else.
 
-const POPUP_WRAP = 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-width:210px;max-width:280px;overflow:hidden;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.18)'
-const POPUP_HEAD_BASE = 'padding:9px 12px 8px;border-radius:7px 7px 0 0'
-const POPUP_ROW_EVEN  = 'background:#f8fafc'
-const POPUP_ROW_ODD   = 'background:#fff'
-const POPUP_CELL_L = 'font-size:11px;color:#64748b;padding:4px 6px 4px 12px;white-space:nowrap'
-const POPUP_CELL_R = 'font-size:11px;font-weight:600;color:#1e293b;padding:4px 12px 4px 6px;text-align:right'
+const POPUP_WRAP = 'min-width:210px;max-width:290px;font-family:Inter,system-ui,sans-serif'
+const POPUP_HEAD_BASE = 'padding:10px 28px 9px 12px;color:#fff'
+const POPUP_ROW_EVEN  = 'background:var(--map-row-alt)'
+const POPUP_ROW_ODD   = 'background:transparent'
+const POPUP_CELL_L = 'font-size:11px;color:var(--map-popup-muted);padding:4px 6px 4px 12px;white-space:nowrap'
+const POPUP_CELL_R = 'font-size:11px;font-weight:600;color:var(--map-popup-fg);padding:4px 12px 4px 6px;text-align:right'
+
+function ago(iso?: string): string {
+  if (!iso) return ''
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return ''
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000))
+  if (s < 45) return 'just now'
+  if (s < 3600) return `${Math.round(s / 60)}m ago`
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`
+  return `${Math.round(s / 86400)}d ago`
+}
 
 function buildMarkerPopup(m: MarkerSpec, fill: string): string {
   const head = `
-    <div style="${POPUP_HEAD_BASE};background:${fill}">
-      ${m.badge ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.75);margin-bottom:3px">${escape(m.badge)}</div>` : ''}
-      <div style="font-size:13px;font-weight:600;color:#fff;line-height:1.3">${escape(m.title ?? m.id)}</div>
+    <div class="um-pop-head" style="background:${fill}">
+      ${m.badge ? `<div class="um-pop-badge">${escape(m.badge)}</div>` : ''}
+      <div class="um-pop-title">${escape(m.title ?? m.id)}</div>
     </div>`
 
   let body = ''
@@ -813,12 +1029,14 @@ function buildMarkerPopup(m: MarkerSpec, fill: string): string {
         <td style="${POPUP_CELL_R}">${escape(r.value)}</td>
        </tr>`
     ).join('')
-    body = `<table style="border-collapse:collapse;width:100%">${trs}</table>`
+    body = `<table>${trs}</table>`
   } else if (m.subtitle) {
-    body = `<div style="font-size:12px;color:#475569;padding:8px 12px">${escape(m.subtitle)}</div>`
+    body = `<div style="font-size:12px;color:var(--map-popup-muted);padding:8px 12px">${escape(m.subtitle)}</div>`
   }
+  const when = ago(m.updatedAt)
+  const foot = when ? `<div class="um-pop-foot"><span class="um-live-dot"></span>Updated ${escape(when)}</div>` : ''
 
-  return `<div style="${POPUP_WRAP}">${head}${body}</div>`
+  return `<div class="um-pop">${head}${body}${foot}</div>`
 }
 
 function buildPopup(layerKey: string, feature: any): string {
@@ -866,15 +1084,15 @@ function buildPopup(layerKey: string, feature: any): string {
   const layerLabel = LAYER_LABELS[layerKey] ?? layerKey
   const headBg = LAYER_COLORS[layerKey] ?? '#1e293b'
   const head = `
-    <div style="${POPUP_HEAD_BASE};background:${headBg}">
-      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.65);margin-bottom:3px">${escape(layerLabel)}</div>
-      <div style="font-size:13px;font-weight:600;color:#fff;line-height:1.3">${escape(String(title))}</div>
+    <div class="um-pop-head" style="background:${headBg}">
+      <div class="um-pop-badge">${escape(layerLabel)}</div>
+      <div class="um-pop-title">${escape(String(title))}</div>
     </div>`
   const body = rows
-    ? `<table style="border-collapse:collapse;width:100%">${rows}</table>`
-    : `<div style="font-size:12px;color:#94a3b8;padding:8px 12px">No properties</div>`
+    ? `<table>${rows}</table>`
+    : `<div style="font-size:12px;color:var(--map-popup-muted);padding:8px 12px">No properties</div>`
 
-  return `<div style="${POPUP_WRAP}">${head}${body}</div>`
+  return `<div class="um-pop">${head}${body}</div>`
 }
 
 function formatValue(v: any): string {
@@ -967,13 +1185,13 @@ function buildRoadsTilePopup(picked: { feature: any; layerName: string }[]): str
         </tr>`
       }).join('')
     return `
-      <div style="${idx > 0 ? 'border-top:1px solid #e2e8f0' : ''}">
-        ${picked.length > 1 ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;background:#f1f5f9;padding:5px 12px">Feature ${idx + 1} of ${picked.length}</div>` : ''}
-        <div style="font-size:12px;font-weight:600;color:#1e293b;padding:7px 12px 2px">${escape(String(title))}${badge}</div>
-        <table style="border-collapse:collapse;width:100%">${rows}</table>
+      <div style="${idx > 0 ? 'border-top:1px solid var(--map-hairline)' : ''}">
+        ${picked.length > 1 ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--map-popup-muted);background:var(--map-row-alt);padding:5px 12px">Feature ${idx + 1} of ${picked.length}</div>` : ''}
+        <div style="font-size:12px;font-weight:600;color:var(--map-popup-fg);padding:7px 12px 2px">${escape(String(title))}${badge}</div>
+        <table>${rows}</table>
       </div>`
   }).join('')
-  return `<div style="${POPUP_WRAP}">${cards}</div>`
+  return `<div class="um-pop">${cards}</div>`
 }
 
 function handleRoadsTileClick(e: any) {
@@ -1029,13 +1247,13 @@ function buildRailsTilePopup(picked: { feature: any; layerName: string }[]): str
         </tr>`
       }).join('')
     return `
-      <div style="${idx > 0 ? 'border-top:1px solid #e2e8f0' : ''}">
-        ${picked.length > 1 ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;background:#f1f5f9;padding:5px 12px">Feature ${idx + 1} of ${picked.length}</div>` : ''}
-        <div style="font-size:12px;font-weight:600;color:#1e293b;padding:7px 12px 2px">${escape(String(title))}${badge}</div>
-        <table style="border-collapse:collapse;width:100%">${rows}</table>
+      <div style="${idx > 0 ? 'border-top:1px solid var(--map-hairline)' : ''}">
+        ${picked.length > 1 ? `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--map-popup-muted);background:var(--map-row-alt);padding:5px 12px">Feature ${idx + 1} of ${picked.length}</div>` : ''}
+        <div style="font-size:12px;font-weight:600;color:var(--map-popup-fg);padding:7px 12px 2px">${escape(String(title))}${badge}</div>
+        <table>${rows}</table>
       </div>`
   }).join('')
-  return `<div style="${POPUP_WRAP}">${cards}</div>`
+  return `<div class="um-pop">${cards}</div>`
 }
 
 function handleRailsTileClick(e: any) {
@@ -1066,22 +1284,19 @@ function toggleLayer(key: string) {
 }
 
 // ── Basemap switching ────────────────────────────────────────────────
-function createBaseLayer(Lc: any, key: 'light' | 'dark' | 'satellite'): any {
-  const spec = BASEMAP_CATALOG[key] ?? BASEMAP_CATALOG.light
-  return Lc.tileLayer(spec.url, spec.options)
-}
-
-function setBasemap(Lc: any, key: 'light' | 'dark' | 'satellite') {
+function setBasemap(Lc: any, key: BasemapKey) {
   if (!mapRef.value) return
   if (baseLayer) mapRef.value.removeLayer(baseLayer)
-  baseLayer = createBaseLayer(Lc, key)
+  baseLayer = createBasemapLayer(Lc, key)
   baseLayer.addTo(mapRef.value)
+  baseLayer.bringToBack() // basemap must never paint over data layers added earlier
   currentBasemap.value = key
 }
 
 async function cycleBasemap() {
-  const order: Array<'light' | 'dark' | 'satellite'> = ['light', 'dark', 'satellite']
+  const order = BASEMAP_ORDER
   const next = order[(order.indexOf(currentBasemap.value) + 1) % order.length]!
+  pinnedBasemap.value = next
   const Lc = await getLeaflet()
   if (Lc) setBasemap(Lc, next)
   emit('update:basemap', next) // lets a v-model-bound parent (e.g. for URL-state sync) stay in sync
@@ -1142,7 +1357,7 @@ function onLocationFound(e: any) {
   locateMarkerGroup = L.layerGroup([
     L.circle(e.latlng, { radius: e.accuracy, color: '#3b82f6', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.08 }),
     L.circleMarker(e.latlng, { radius: 7, color: '#fff', weight: 2, fillColor: '#3b82f6', fillOpacity: 1 })
-      .bindPopup('<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;font-size:12px;font-weight:600;padding:2px 4px">You are here</div>'),
+      .bindPopup('<div class="um-pop"><div style="font-size:12px;font-weight:600;padding:8px 12px;min-width:0">You are here</div></div>'),
   ]).addTo(mapRef.value)
 }
 
@@ -1177,7 +1392,7 @@ function getMap() {
   return mapRef.value
 }
 
-defineExpose({ flyTo, fitBounds, getMap })
+defineExpose({ flyTo, fitBounds, getMap, openMarker })
 
 // ── Lifecycle ───────────────────────────────────────────────────────
 onMounted(async () => {
@@ -1214,7 +1429,7 @@ onMounted(async () => {
     homeView = { center: props.center, zoom: props.zoom }
   }
 
-  map.on('moveend', emitBoundsChange)
+  map.on('moveend', () => { mapZoom.value = map.getZoom(); emitBoundsChange(); scheduleRoadsView() })
   map.on('locationfound', onLocationFound)
   map.on('locationerror', onLocationError)
   // Click-to-activate scroll zoom (see scrollWheelZoom:false above) - the
@@ -1244,8 +1459,9 @@ onMounted(async () => {
   await renderRailsTiles()
   renderRoutes(Lc)
   renderLines(Lc)
-  renderMarkers(Lc)
+  syncMarkers(Lc)
   renderArrows(Lc)
+  scheduleRoadsView(true)
 
   // The container's real size can still change after this point - a
   // staggered entrance animation elsewhere on the page finishing, the
@@ -1264,6 +1480,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
   resizeObserver?.disconnect()
+  if (roadsViewTimer) clearTimeout(roadsViewTimer)
   resizeObserver = null
   if (mapRef.value) {
     mapRef.value.remove()
@@ -1271,25 +1488,27 @@ onBeforeUnmount(() => {
   }
 })
 
-// Watchers: when data-props change after mount, re-render.
-// We rebuild from scratch because the shapes are independent and
-// doing a proper diff would be more code than the map will ever
-// realistically need at this volume.
+// Watchers. Static layers (boundary, roads, routes, tiles, catalogue) are
+// rebuilt from scratch when their props change - doing a proper diff would be
+// more code than they will ever realistically need. Live layers (markers,
+// lines, arrows) have their own watchers so a 15-second data refresh never
+// tears down the road network or PMTiles underneath.
+const LIVE_KEYS = new Set(['markers', 'lines', 'arrows'])
+
 watch(
   () => [
     props.boundary, props.roads, props.routes,
-    props.markers, props.lines, props.arrows,
     props.layers, props.roadsTilesUrl, props.roadsClassFilter, props.roadsConditionFilter,
     props.roadsAgencyFilter, props.roadsCountyFilter,
     props.railsTilesUrl,
   ],
   async () => {
     if (!mapRef.value) return
-    // Tear down existing layer instances.
+    // Tear down existing static layer instances; live layers stay put.
     for (const s of layerStates.value) {
-      if (s.instance) mapRef.value.removeLayer(s.instance)
+      if (!LIVE_KEYS.has(s.key) && s.instance) mapRef.value.removeLayer(s.instance)
     }
-    layerStates.value = []
+    layerStates.value = layerStates.value.filter(s => LIVE_KEYS.has(s.key))
     selectedCountyLayer.value = null
     roadsTileLayer = null
     railsTileLayer = null
@@ -1301,25 +1520,54 @@ watch(
     await renderRoadsTiles()
     await renderRailsTiles()
     renderRoutes(Lc)
-    renderLines(Lc)
-    renderMarkers(Lc)
-    renderArrows(Lc)
+    scheduleRoadsView(true)
+    // Static layers just re-added on top; keep live markers above them.
+    markerGroup?.eachLayer?.((l: any) => l.bringToFront?.())
   },
-  // No `deep: true`: the getter's own reactive dependencies (each prop
-  // access below) already trigger this on wholesale reassignment, which
-  // is the only kind of change these props ever undergo - the parent
-  // always swaps in a brand-new object/array, never mutates one in
-  // place. Deep-diffing multi-thousand-coordinate GeoJSON on every tick
-  // for a case that can't happen was pure overhead.
+  // No `deep: true`: the getter's own reactive dependencies already trigger
+  // this on wholesale reassignment, which is the only kind of change these
+  // props ever undergo - deep-diffing multi-thousand-coordinate GeoJSON on
+  // every tick for a case that can't happen was pure overhead.
 )
+
+watch(() => props.markers, async () => {
+  if (!mapRef.value) return
+  const Lc = await getLeaflet()
+  if (Lc) syncMarkers(Lc)
+})
+
+watch(() => [props.lines, props.arrows], async () => {
+  if (!mapRef.value) return
+  const Lc = await getLeaflet()
+  if (!Lc) return
+  for (const key of ['lines', 'arrows']) {
+    const st = layerStates.value.find(s => s.key === key)
+    if (st?.instance) mapRef.value.removeLayer(st.instance)
+    layerStates.value = layerStates.value.filter(s => s.key !== key)
+  }
+  linesGroup = null; arrowsGroup = null
+  renderLines(Lc)
+  renderArrows(Lc)
+})
 
 // Basemap can be driven externally (v-model from a parent doing e.g.
 // URL-state sync) as well as from the toolbar's own cycle button, so
-// keep the internal ref in sync when the prop changes out from under us.
+// keep the internal state in sync when the prop changes out from under us.
 watch(() => props.basemap, async (v) => {
-  if (!v || v === currentBasemap.value) return
+  pinnedBasemap.value = v ?? null
+  const key = v ?? basemapForTheme(theme.resolved.value)
+  if (key === currentBasemap.value) return
   const Lc = await getLeaflet()
-  if (Lc) setBasemap(Lc, v)
+  if (Lc) setBasemap(Lc, key)
+})
+
+// Follow the app theme while no basemap is pinned.
+watch(() => theme.resolved.value, async (t) => {
+  if (pinnedBasemap.value) return
+  const key = basemapForTheme(t)
+  if (key === currentBasemap.value) return
+  const Lc = await getLeaflet()
+  if (Lc) setBasemap(Lc, key)
 })
 
 const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'kenya' || true))
@@ -1334,6 +1582,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
     <div class="uapts-topright-stack">
       <div v-if="props.showMapToolbar" class="uapts-toolbar" role="toolbar" aria-label="Map controls">
         <button
+          v-if="!props.hideFullscreen"
           type="button" class="uapts-toolbar-btn"
           :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
           :title="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
@@ -1367,7 +1616,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
         </button>
         <button
           type="button" class="uapts-toolbar-btn uapts-toolbar-btn--basemap"
-          :aria-label="`Basemap: ${currentBasemap}. Tap to switch.`" :title="`Basemap: ${currentBasemap} (tap to switch)`"
+          :aria-label="`Basemap: ${BASEMAP_LABELS[currentBasemap]}. Tap to switch.`" :title="`Basemap: ${BASEMAP_LABELS[currentBasemap]} (tap to switch)`"
           @click="cycleBasemap"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1421,6 +1670,15 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
       </div>
     </div>
 
+    <!-- Viewport road loading status -->
+    <div v-if="roadsViewEnabled" class="uapts-roads-status" role="status" aria-live="polite">
+      <template v-if="roadsStatus.loading">Loading roads in view…</template>
+      <template v-else-if="roadsStatus.detail">
+        {{ roadsStatus.count.toLocaleString() }} roads in view<span v-if="roadsStatus.truncated"> · zoom in for more</span>
+      </template>
+      <template v-else-if="mapZoom < 8">Zoom in to load every road in view</template>
+    </div>
+
     <!-- Readout (catalog mode) -->
     <div v-if="props.showReadout" class="uapts-readout">
       <div class="uapts-readout-title">UAPTS GeoJSON Layers</div>
@@ -1447,10 +1705,10 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
      on top of the header while scrolling. */
   z-index: 0;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--r-md, 6px);
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--map-bg);
+  border: 1px solid var(--map-chrome-border);
 }
 .uapts-map { position: absolute; inset: 0; }
 
@@ -1474,13 +1732,13 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
 .uapts-legend {
   pointer-events: auto;
   z-index: 1000;
-  background: rgba(15, 23, 42, 0.94);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: var(--map-chrome-bg);
+  color: var(--map-chrome-fg);
+  border: 1px solid var(--map-chrome-border);
+  border-radius: var(--r-md, 6px);
   backdrop-filter: blur(8px);
   font-size: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--map-chrome-shadow);
 }
 .uapts-layer-control {
   padding: 10px 12px;
@@ -1516,15 +1774,15 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #cbd5e1;
+  color: var(--map-chrome-fg);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 .uapts-toolbar-btn svg { width: 16px; height: 16px; }
-.uapts-toolbar-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
-.uapts-toolbar-btn:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.uapts-toolbar-btn:hover { background: var(--map-chrome-hover); color: var(--map-chrome-fg); }
+.uapts-toolbar-btn:focus-visible { outline: 2px solid var(--map-accent); outline-offset: 1px; }
 .uapts-toolbar-btn.is-active {
-  color: #60a5fa;
+  color: var(--map-accent);
   animation: uapts-toolbar-pulse 1.1s ease-in-out infinite;
 }
 @keyframes uapts-toolbar-pulse {
@@ -1540,10 +1798,10 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--map-chrome-muted);
   margin-bottom: 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--map-hairline);
 }
 
 .uapts-legend-toggle {
@@ -1554,7 +1812,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   padding: 8px 10px;
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--map-chrome-muted);
   font: inherit;
   font-weight: 600;
   font-size: 11px;
@@ -1562,8 +1820,8 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   letter-spacing: 0.05em;
   cursor: pointer;
 }
-.uapts-legend-toggle:hover { color: #e2e8f0; }
-.uapts-legend-toggle:focus-visible { outline: 2px solid #60a5fa; outline-offset: -2px; }
+.uapts-legend-toggle:hover { color: var(--map-chrome-fg); }
+.uapts-legend-toggle:focus-visible { outline: 2px solid var(--map-accent); outline-offset: -2px; }
 .uapts-legend-chevron {
   width: 12px;
   height: 12px;
@@ -1573,7 +1831,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
 .uapts-legend.is-expanded .uapts-legend-chevron { transform: rotate(180deg); }
 .uapts-legend-body {
   padding: 8px 12px 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--map-hairline);
 }
 
 .uapts-layer-row,
@@ -1601,8 +1859,8 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   margin: 0 -6px;
   transition: background 0.1s, opacity 0.1s;
 }
-.uapts-legend-row:hover { background: rgba(255, 255, 255, 0.06); }
-.uapts-legend-row:focus-visible { outline: 2px solid #60a5fa; outline-offset: -2px; }
+.uapts-legend-row:hover { background: var(--map-chrome-hover); }
+.uapts-legend-row:focus-visible { outline: 2px solid var(--map-accent); outline-offset: -2px; }
 .uapts-legend-row.is-hidden { opacity: 0.45; }
 .uapts-legend-row.is-hidden .uapts-legend-dot { background: transparent !important; border: 1.5px solid currentColor; }
 
@@ -1614,14 +1872,14 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   padding: 6px 8px;
   background: transparent;
   border: 1px solid transparent;
-  color: #cbd5e1;
+  color: var(--map-chrome-fg);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
   border-radius: 4px;
   transition: all 0.1s;
 }
-.uapts-layer-toggle:hover { background: rgba(255, 255, 255, 0.05); }
+.uapts-layer-toggle:hover { background: var(--map-chrome-hover); }
 
 .uapts-layer-dot,
 .uapts-legend-dot {
@@ -1646,7 +1904,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
 .uapts-legend-count {
   font-variant-numeric: tabular-nums;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--map-chrome-muted);
 }
 
 .uapts-readout {
@@ -1654,14 +1912,14 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   bottom: 12px;
   right: 12px;
   z-index: 1000;
-  background: rgba(15, 23, 42, 0.94);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: var(--map-chrome-bg);
+  color: var(--map-chrome-fg);
+  border: 1px solid var(--map-chrome-border);
+  border-radius: var(--r-md, 6px);
   padding: 8px 10px;
   backdrop-filter: blur(8px);
   font-size: 11px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--map-chrome-shadow);
   max-width: 280px;
 }
 .uapts-readout-title {
@@ -1669,7 +1927,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--map-chrome-muted);
   margin-bottom: 4px;
 }
 .uapts-readout-grid {
@@ -1679,7 +1937,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
 }
 .uapts-readout-cell-key {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--map-chrome-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -1688,4 +1946,20 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   font-weight: 600;
   font-size: 12px;
 }
-</style>
+
+.uapts-roads-status {
+  position: absolute;
+  left: 12px;
+  bottom: 34px;
+  z-index: 1000;
+  padding: 3px 9px;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  color: var(--map-chrome-muted);
+  background: var(--map-chrome-bg);
+  border: 1px solid var(--map-chrome-border);
+  border-radius: var(--r-pill, 999px);
+  pointer-events: none;
+}
+.uapts-roads-status:empty { display: none; }
+</style>

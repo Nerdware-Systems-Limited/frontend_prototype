@@ -8,7 +8,7 @@
 //   weather, alerts.
 // Plus the one-shot analytics endpoint at /summary/.
 
-import { useApi, cleanQuery } from './_client'
+import { useApi, cleanQuery, scopeArgs } from './_client'
 import type { Paged } from '~/types/uapts'
 
 export type CongestionLevel = 'free_flow' | 'moderate' | 'heavy' | 'severe'
@@ -176,7 +176,15 @@ export interface TrafficSummary {
   generated_at: string
 }
 
-export interface TrafficQuery {
+/** The shared scope parameters (core.scope on the backend): a period and/or one county. */
+export interface TrafficScopeQuery {
+  county?: string
+  days?: number
+  date_from?: string
+  date_to?: string
+}
+
+export interface TrafficQuery extends TrafficScopeQuery {
   page?: number
   page_size?: number
   segment?: string
@@ -196,7 +204,7 @@ export function useTraffic() {
 
   return {
     // One-shot analytics
-    summary: () => api<TrafficSummary>('/api/v1/traffic/summary/'),
+    summary: (q?: TrafficScopeQuery) => api<TrafficSummary>('/api/v1/traffic/summary/', ...scopeArgs(q)),
 
     // CRUD + list views
     countingStations: (q?: TrafficQuery) =>
@@ -209,8 +217,8 @@ export function useTraffic() {
       api<Paged<SpeedObservation>>('/api/v1/traffic/speed-observations/', { query: cleanQuery(q as Record<string, unknown>) }),
     congestionEvents: (q?: TrafficQuery) =>
       api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/', { query: cleanQuery(q as Record<string, unknown>) }),
-    activeCongestion: () =>
-      api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/active/'),
+    activeCongestion: (q?: TrafficScopeQuery) =>
+      api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/active/', ...scopeArgs(q)),
     routeOptimizations: (q?: TrafficQuery) =>
       api<Paged<RouteOptimization>>('/api/v1/traffic/route-optimizations/', { query: cleanQuery(q as Record<string, unknown>) }),
     forecasts: (q?: TrafficQuery) =>
@@ -229,27 +237,32 @@ export function useTraffic() {
       api<TrafficAlert>(`/api/v1/traffic/alerts/${id}/resolve/`, { method: 'POST' }),
 
     // Class share analytics
-    classShare: (days = 7) =>
+    // `days` as before, or the full scope (a period and/or county).
+    classShare: (days: number | TrafficScopeQuery = 7) =>
       api<{ count: number; results: { vehicle_class: string; total: number; share_pct: number }[]; days: number }>(
-        `/api/v1/traffic/classifications/share/?days=${days}`,
+        typeof days === 'number' ? `/api/v1/traffic/classifications/share/?days=${days}` : '/api/v1/traffic/classifications/share/',
+        ...(typeof days === 'number' ? [] : scopeArgs(days)),
       ),
 
     // Map data: map domain entities into marker/line shapes the UAPTSMap
     // component understands. These are convenience selectors - the
     // component itself is decoupled from the API.
-    mapData: async () => {
-      const [stations, events] = await Promise.all([
-        api<Paged<CountingStation>>('/api/v1/traffic/counting-stations/', { query: { page_size: 200 } }),
-        api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/', { query: { status: 'active', page_size: 100 } }),
+    mapData: async (scope?: { county?: string }) => {
+      const county = scope?.county ? { county: scope.county } : {}
+      const [stations, eventsRes] = await Promise.all([
+        api<Paged<CountingStation>>('/api/v1/traffic/counting-stations/', { query: { page_size: 200, ...county } }),
+        api<Paged<CongestionEvent>>('/api/v1/traffic/congestion-events/', { query: { status: 'active', page_size: 100, ...county } }),
       ])
-      const markers: import('~/components/UaptsMap.vue').MarkerSpec[] = []
-      // Station id -> coords lookup, reused below for event markers since
-      // TrafficCountSerializer only returns `station` as a bare FK id
-      // (string), never a nested {latitude, longitude} object.
+      type Spec = import('~/components/UaptsMap.vue').MarkerSpec
+      const markers: Spec[] = []
       const stationCoords = new Map<string, { latitude: number; longitude: number }>()
+      // segment id -> a station on it, so most events resolve with no extra request.
+      const stationBySegment = new Map<string, { latitude: number; longitude: number }>()
       for (const s of (stations as any).results ?? []) {
         if (s.latitude == null || s.longitude == null) continue
-        stationCoords.set(s.id, { latitude: s.latitude, longitude: s.longitude })
+        const pt = { latitude: s.latitude, longitude: s.longitude }
+        stationCoords.set(s.id, pt)
+        if (s.segment_id) stationBySegment.set(s.segment_id, pt)
         const colour =
           s.equipment_status === 'operational' ? 'green'
           : s.equipment_status === 'degraded' ? 'yellow'
@@ -260,21 +273,37 @@ export function useTraffic() {
           lat: s.latitude,
           lon: s.longitude,
           title: `${s.station_code} - ${s.station_name}`,
-          subtitle: `${s.agency_code ?? ''} · ${s.station_type.toUpperCase()} · ${s.speed_limit_kmh ?? '-'} km/h · ${s.equipment_status}`,
+          badge: `${String(s.station_type).toUpperCase()} counting station`,
+          subtitle: `${s.agency_code ?? ''} · ${String(s.station_type).toUpperCase()} · ${s.speed_limit_kmh ?? '-'} km/h · ${s.equipment_status}`,
+          rows: [
+            { label: 'Status', value: String(s.equipment_status) },
+            { label: 'Agency', value: s.agency_code ?? '-' },
+            { label: 'Speed limit', value: s.speed_limit_kmh != null ? `${s.speed_limit_kmh} km/h` : '-' },
+            { label: 'Data quality', value: s.data_quality_score != null ? `${Number(s.data_quality_score).toFixed(0)}%` : '-' },
+          ],
+          updatedAt: s.updated_at,
           color: colour,
           size: 'sm',
         })
       }
-      for (const e of (events as any).results ?? []) {
-        if (e.segment_id == null) continue
-        // Pull a single traffic count for the segment if we have it - its
-        // `station` field is just the station id, so resolve coords via
-        // the station lookup built above rather than a nested object.
-        const tc = await api<Paged<TrafficCount>>(
-          `/api/v1/traffic/counts/?segment=${e.segment_id}&page_size=1`,
-        )
-        const tcRow = (tc as any).results?.[0]
-        const coords = tcRow?.station ? stationCoords.get(tcRow.station) : undefined
+
+      // Events whose segment has no station of its own fall back to a traffic
+      // count lookup (a count row carries the station id) - fetched in
+      // parallel, once per distinct segment, instead of one-by-one.
+      const events: any[] = ((eventsRes as any).results ?? []).filter((e: any) => e.segment_id != null)
+      const missing = [...new Set(events.filter(e => !stationBySegment.has(e.segment_id)).map(e => e.segment_id as string))]
+      const fallback = new Map<string, { latitude: number; longitude: number }>()
+      await Promise.all(missing.map(async (seg) => {
+        try {
+          const tc = await api<Paged<TrafficCount>>(`/api/v1/traffic/counts/?segment=${seg}&page_size=1`)
+          const st = (tc as any).results?.[0]?.station
+          const pt = st ? stationCoords.get(st) : undefined
+          if (pt) fallback.set(seg, pt)
+        } catch { /* one unresolvable segment must not blank the whole map */ }
+      }))
+
+      for (const e of events) {
+        const coords = stationBySegment.get(e.segment_id) ?? fallback.get(e.segment_id)
         if (!coords) continue
         // Color by the event's own live speed vs its free-flow speed - the
         // same relative-speed banding Google's traffic layer uses - rather
@@ -291,14 +320,24 @@ export function useTraffic() {
           id: `event-${e.id}`,
           lat: coords.latitude,
           lon: coords.longitude,
-          title: `[${e.severity.toUpperCase()}] Congestion`,
+          title: `[${String(e.severity).toUpperCase()}] Congestion${e.segment_road_code ? ' · ' + e.segment_road_code : ''}`,
+          badge: 'Congestion event',
           subtitle: `${e.avg_speed_kmh.toFixed(0)} km/h (free flow ${e.free_flow_speed_kmh.toFixed(0)} km/h) · Delay ${e.delay_minutes} min`,
+          rows: [
+            { label: 'Severity', value: String(e.severity) },
+            { label: 'Speed', value: `${e.avg_speed_kmh.toFixed(0)} / ${e.free_flow_speed_kmh.toFixed(0)} km/h` },
+            { label: 'Delay', value: `${e.delay_minutes} min` },
+            { label: 'Impact radius', value: `${e.impact_radius_km} km` },
+            { label: 'Started', value: new Date(e.started_at).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) },
+          ],
+          updatedAt: e.started_at,
           color: colour,
           size: 'lg',
           radiusKm: e.impact_radius_km,
+          pulse: colour === 'red',
         })
       }
       return { markers }
     },
   }
-}
+}

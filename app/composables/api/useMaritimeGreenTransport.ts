@@ -112,6 +112,8 @@ export interface MaritimeGreenSummary {
 }
 
 export interface MaritimeGreenQuery {
+  /** County from the global scope (top bar); the endpoint ignores it when it has no county column. */
+  county?: string
   page?: number
   page_size?: number
   port?: string
@@ -124,11 +126,11 @@ export function useMaritimeGreenTransport() {
   const M = '/api/v1/aviation-maritime/maritime/green-transport'
 
   return {
-    summary: (days = 30) => api<MaritimeGreenSummary>(`${M}/summary/`, { query: { days } }),
+    summary: (days = 30, county?: string) => api<MaritimeGreenSummary>(`${M}/summary/`, { query: cleanQuery({ days, county }) }),
     vesselEmissions: (q?: MaritimeGreenQuery) =>
       api<Paged<VesselEmissionRecord>>(`${M}/vessel-emissions/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    modeStats: (days = 30) =>
-      api<{ days: number; modes: GreenTransportModeStat[]; generated_at: string }>(`${M}/mode-stats/`, { query: { days } }),
+    modeStats: (days = 30, county?: string) =>
+      api<{ days: number; modes: GreenTransportModeStat[]; generated_at: string }>(`${M}/mode-stats/`, { query: cleanQuery({ days, county }) }),
     evFleet: (q?: MaritimeGreenQuery & { vehicle_type?: EVFleetVehicleType }) =>
       api<Paged<EVFleetRecord>>(`${M}/ev-fleet/`, { query: cleanQuery(q as Record<string, unknown>) }),
     reeferEnergy: (q?: MaritimeGreenQuery) =>

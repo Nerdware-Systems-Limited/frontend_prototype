@@ -19,32 +19,117 @@
   <div v-if="source?.protocol" class="ih-card ih-rise">
     <div class="ih-card-head">
       <h2>Connection details</h2>
-      <button
-        v-if="isPullProtocol" type="button" class="btn" :disabled="testingConnection"
-        @click="retestConnection"
-      >{{ testingConnection ? 'Testing…' : 'Test connection' }}</button>
+      <div class="head-actions">
+        <button
+          v-if="isPullProtocol && !editing" type="button" class="btn" :disabled="testingConnection"
+          @click="retestConnection"
+        >{{ testingConnection ? 'Testing…' : 'Test connection' }}</button>
+        <button v-if="isPullProtocol && !editing" type="button" class="btn btn-primary" @click="startEdit">Edit link &amp; key</button>
+      </div>
     </div>
     <div class="ih-card-body">
-      <dl class="conn-meta">
+      <div v-if="saveNote" class="save-note">✓ {{ saveNote }}</div>
+      <dl v-if="!editing" class="conn-meta">
         <dt>Protocol</dt><dd>{{ protocolLabel }}</dd>
         <dt>Auth method</dt><dd>{{ authMethodLabel }}</dd>
-        <dt>{{ isPullProtocol ? 'Endpoint' : 'Feed key' }}</dt><dd class="mono-sm">{{ source.endpoint_value || '-' }}</dd>
+        <dt>{{ isPullProtocol ? 'Link' : 'Feed key' }}</dt><dd class="mono-sm">{{ source.endpoint_value || '-' }}</dd>
         <template v-if="isPullProtocol">
+          <dt>API key</dt>
+          <dd>
+            <span v-if="source.has_credentials" class="test-ok">●●●●●●●● stored (encrypted)</span>
+            <span v-else class="hint">none</span>
+          </dd>
           <dt>Reconcile cron</dt><dd class="mono-sm">{{ source.reconcile_cron || '-' }}</dd>
+        </template>
+        <template v-if="source.monitoring">
+          <dt>Monitoring area</dt>
+          <dd>
+            <span class="mono-sm">{{ source.monitoring.bbox }}</span>
+            <span class="hint"> · west, south, east, north{{ source.options?.bbox ? '' : ' (platform default)' }}</span>
+          </dd>
+          <dt>Roads polled</dt>
+          <dd>
+            <strong>{{ source.monitoring.points }}</strong> points on {{ source.monitoring.road_classes.join('/') }} roads from the
+            {{ source.monitoring.road_source }}
+            <span class="hint"> · quota allows {{ source.monitoring.points_per_cycle_allowed }} per pull</span>
+            <span v-if="source.monitoring.degraded_points" class="test-bad"> · {{ source.monitoring.degraded_points }} not returning data</span>
+          </dd>
         </template>
         <dt>Last test</dt>
         <dd>
           <template v-if="testResult">
-            <span :class="testResult.ok ? 'test-ok' : 'test-bad'">{{ testResult.ok ? '✓ reachable' : '✕ ' + testResult.detail }}</span>
+            <span :class="testResult.ok ? 'test-ok' : 'test-bad'">{{ testResult.ok ? '✓ ' + testResult.detail : '✕ ' + testResult.detail }}</span>
             <span class="hint"> · just now</span>
           </template>
           <template v-else-if="source.last_test_at">
-            <span :class="source.last_test_ok ? 'test-ok' : 'test-bad'">{{ source.last_test_ok ? '✓ reachable' : '✕ unreachable' }}</span>
+            <span :class="source.last_test_ok ? 'test-ok' : 'test-bad'">{{ source.last_test_ok ? '✓ working' : '✕ failed' }}</span>
             <span class="hint"> · {{ fmtDate(source.last_test_at) }}</span>
           </template>
           <span v-else class="hint">never tested{{ isPullProtocol ? '' : ' (nothing to reach for a push feed)' }}</span>
         </dd>
       </dl>
+
+      <form v-else class="edit-form" @submit.prevent="saveEdit">
+        <label class="field">
+          <span class="field-label">Link</span>
+          <input v-model="form.endpoint_value" class="select-sm field-input" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field-label">
+            API key
+            <button type="button" class="reveal-btn" @click="keyShown = !keyShown">{{ keyShown ? 'hide' : 'reveal' }}</button>
+          </span>
+          <input
+            v-model="form.key" class="select-sm field-input" :type="keyShown ? 'text' : 'password'" autocomplete="off" spellcheck="false"
+            :disabled="form.clear_key"
+            :placeholder="source.has_credentials ? 'A key is stored - type a new one to replace it' : 'No key stored'"
+          />
+        </label>
+        <label v-if="source.has_credentials" class="check">
+          <input v-model="form.clear_key" type="checkbox" /> Remove the stored key
+        </label>
+        <label class="field">
+          <span class="field-label">Pull schedule (cron)</span>
+          <input v-model="form.reconcile_cron" class="select-sm field-input" autocomplete="off" />
+        </label>
+        <template v-if="source.supports_area">
+          <label class="field">
+            <span class="field-label">Monitoring area <span class="hint">west, south, east, north - empty = platform default</span></span>
+            <input v-model="form.bbox" class="select-sm field-input" placeholder="36.65,-1.45,37.05,-1.16" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span class="field-label">Max road points <span class="hint">empty = as many as the daily quota allows</span></span>
+            <input v-model="form.max_points" class="select-sm field-input" inputmode="numeric" autocomplete="off" />
+          </label>
+          <p class="hint">
+            Points are picked automatically from the UAPTS road network inside this area, major roads first, and refreshed after you save.
+          </p>
+        </template>
+        <p class="hint">Leave the key empty to keep the current one. A pasted sample call with <code>?key=…</code> is split for you.</p>
+        <div v-if="editError" class="error-banner">⚠ {{ editError }}</div>
+        <div class="edit-actions">
+          <button type="submit" class="btn btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save changes' }}</button>
+          <button type="button" class="btn" :disabled="saving" @click="editing = false">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Tables this feed writes to ────────────────────────────────── -->
+  <div v-if="source?.target_tables?.length" class="ih-card ih-rise ih-rise-2">
+    <div class="ih-card-head"><h2>Tables written</h2><span class="hint">where this feed's data lands</span></div>
+    <div class="ih-card-body ih-table-wrap">
+      <table class="ih-table stack-table">
+        <thead><tr><th>Data</th><th>Table</th><th class="num">Rows</th><th>What counts</th></tr></thead>
+        <tbody>
+          <tr v-for="t in source.target_tables" :key="t.model">
+            <td data-label="Data">{{ t.label }}</td>
+            <td class="mono-sm" data-label="Table">{{ t.table || t.model }}</td>
+            <td class="mono-sm num" data-label="Rows">{{ t.rows.toLocaleString('en-KE') }}</td>
+            <td class="hint" data-label="What counts">{{ t.note }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -139,7 +224,7 @@ definePageMeta({ layout: 'default' })
 import { ArrowLeft } from 'lucide-vue-next'
 
 import { useIntegrations } from '~/composables/api'
-import type { DataSource, DataSourceStats, RegisterAuthMethod, RegisterProtocol, TestConnectionResult } from '~/composables/api'
+import type { DataSource, DataSourceStats, RegisterAuthMethod, RegisterProtocol, TestConnectionResult, UpdateConnectionPayload } from '~/composables/api'
 
 const route = useRoute()
 const api = useIntegrations()
@@ -171,6 +256,57 @@ const authMethodLabel = computed(() => {
   const m = source.value?.auth_method
   return m ? (AUTH_LABELS[m] ?? m) : '-'
 })
+
+// ── Edit link / key / schedule (PATCH /integrations/<id>/connection/) ──
+const editing = ref(false)
+const saving = ref(false)
+const editError = ref<string | null>(null)
+const saveNote = ref<string | null>(null)
+const keyShown = ref(false)
+const form = reactive({ endpoint_value: '', key: '', clear_key: false, reconcile_cron: '', bbox: '', max_points: '' })
+function startEdit() {
+  if (!source.value) return
+  Object.assign(form, {
+    endpoint_value: source.value.endpoint_value, key: '', clear_key: false, reconcile_cron: source.value.reconcile_cron,
+    bbox: source.value.options?.bbox ?? '', max_points: source.value.options?.max_points != null ? String(source.value.options.max_points) : '',
+  })
+  editError.value = null
+  saveNote.value = null
+  keyShown.value = false
+  editing.value = true
+}
+async function saveEdit() {
+  if (!source.value) return
+  const cur = source.value
+  const payload: UpdateConnectionPayload = {}
+  if (form.endpoint_value.trim() !== cur.endpoint_value) payload.endpoint_value = form.endpoint_value.trim()
+  if (form.reconcile_cron.trim() !== cur.reconcile_cron) payload.reconcile_cron = form.reconcile_cron.trim()
+  if (cur.supports_area) {
+    const bbox = form.bbox.trim()
+    const mp = String(form.max_points).trim()
+    const was = cur.options ?? {}
+    if (bbox !== (was.bbox ?? '') || mp !== (was.max_points != null ? String(was.max_points) : '')) {
+      if (mp && !/^\d+$/.test(mp)) { editError.value = 'Max road points must be a whole number.'; return }
+      payload.options = { bbox, max_points: mp ? Number(mp) : '' }
+    }
+  }
+  if (form.clear_key) payload.clear_key = true
+  else if (form.key.trim()) payload.key = form.key.trim()
+  if (!Object.keys(payload).length) { editing.value = false; return }
+  saving.value = true
+  editError.value = null
+  try {
+    await api.updateConnection(sourceId, payload)
+    testResult.value = null
+    await load()                       // the detail response carries tables + has_credentials
+    editing.value = false
+    saveNote.value = 'Saved. Use "Test connection" to check it, or "Trigger sync" to pull now.'
+  } catch (e: any) {
+    editError.value = e?.data?.message || e?.data?.detail || e?.message || 'Could not save the changes.'
+  } finally {
+    saving.value = false
+  }
+}
 
 const testingConnection = ref(false)
 const testResult = ref<TestConnectionResult | null>(null)
@@ -235,7 +371,7 @@ async function load() {
 const actionBusy = ref(false)
 async function trigger() {
   actionBusy.value = true
-  try { await api.trigger(sourceId); await load() } catch { /* transient - leave prior state visible */ } finally { actionBusy.value = false }
+  try { await api.trigger(sourceId); await load(); setTimeout(load, 6000) } catch { /* transient - leave prior state visible */ } finally { actionBusy.value = false }
 }
 async function pause() {
   actionBusy.value = true
@@ -250,6 +386,11 @@ onMounted(load)
 </script>
 
 <style scoped>
+.head-actions { display: flex; gap: 8px; }
+.edit-form { display: grid; gap: 12px; max-width: 640px; }
+.edit-actions { display: flex; gap: 8px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-2); }
+.save-note { background: var(--success-bg); color: var(--success-fg); border-radius: var(--r-sm); padding: 8px 12px; font-size: 12.5px; margin-bottom: 12px; }
 .error-banner {
   background: var(--danger-bg); border: 1px solid var(--danger-fg); color: var(--danger-fg);
   border-radius: var(--r-sm); padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px;

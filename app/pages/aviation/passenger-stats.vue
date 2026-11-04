@@ -5,7 +5,6 @@
     subtitle="KAA · KCAA · KenTrade - Airport throughput, domestic vs international volumes, KenTrade air cargo clearances, and revenue trends"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <select v-model="airportFilter" class="select-sm" @change="load">
         <option value="">All airports</option>
         <option v-for="a in airports.filter(x => x.iata_code)" :key="a.iata_code!" :value="a.iata_code!">{{ a.iata_code }} - {{ a.name }}</option>
@@ -226,6 +225,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('aviation')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

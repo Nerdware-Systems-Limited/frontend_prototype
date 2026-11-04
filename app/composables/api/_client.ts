@@ -39,6 +39,16 @@ export function useApi() {
 }
 
 /**
+ * Trailing `$api` arguments for an endpoint that takes an OPTIONAL scope (county / period):
+ * `api(path, ...scopeArgs(q))`. With nothing to send it adds no argument at all, so a call
+ * without a scope is exactly the bare `api(path)` it always was.
+ */
+export function scopeArgs(q?: object): [] | [{ query: Record<string, string | number | boolean> }] {
+  const query = cleanQuery(q as Record<string, unknown> | undefined)
+  return Object.keys(query).length ? [{ query }] : []
+}
+
+/**
  * Convenience: build query-string params that drop null/undefined.
  * Keeps the URL clean (no `?agency_code=`).
  */

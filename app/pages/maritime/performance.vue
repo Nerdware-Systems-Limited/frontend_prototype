@@ -199,9 +199,9 @@ async function load() {
   const perf = useMaritimePerformance()
 
   const [sumRes, kpiRes, rankRes] = await Promise.allSettled([
-    perf.summary(),
-    perf.kpis({}),
-    perf.ranking(),
+    perf.summary(days.value, countyName.value),
+    perf.kpis(scope.value),
+    perf.ranking(days.value, countyName.value),
   ])
 
   if (sumRes.status  === 'fulfilled') summary.value = sumRes.value
@@ -216,6 +216,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, scope, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 // ── Table pagination (max 15 rows visible per table) ───────────────────

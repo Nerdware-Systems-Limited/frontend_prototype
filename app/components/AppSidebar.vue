@@ -79,6 +79,7 @@
           <NuxtLink v-if="canSee('/infrastructure/projects')" class="sidebar-link" to="/infrastructure/projects" :class="{ active: isActive('/infrastructure/projects') }">Road Infrastructure Status</NuxtLink>
           <NuxtLink v-if="canSee('/infrastructure/bridges')" class="sidebar-link" to="/infrastructure/bridges" :class="{ active: isActive('/infrastructure/bridges') }">Bridges & Assets</NuxtLink>
           <NuxtLink v-if="canSee('/infrastructure/funding')" class="sidebar-link" to="/infrastructure/funding" :class="{ active: isActive('/infrastructure/funding') }">Funding Allocations</NuxtLink>
+          <NuxtLink v-if="canSee('/infrastructure/maintenance')" class="sidebar-link" to="/infrastructure/maintenance" :class="{ active: isActive('/infrastructure/maintenance') }">Maintenance Orders</NuxtLink>
         </div>
       </details>
 

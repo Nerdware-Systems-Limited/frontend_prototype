@@ -5,7 +5,6 @@
     subtitle="KeNHA · KURA · KMD - Volume trends, speed compliance, vehicle class breakdown, O-D matrix, and AI forecasts"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <!-- <button class="btn" :disabled="loading" @click="load">↻ Refresh</button> -->
     </template>
   </PageHeader>
@@ -236,6 +235,7 @@ const odError    = ref(false)
 const forecastError = ref(false)
 const lastRefreshed = ref('-')
 const timeRange = useTimeRange('traffic', { default: '7d' })
+const county = useCountyScope('traffic')
 const days = timeRange.days
 const { sourceLabel } = useDataSources()
 
@@ -245,10 +245,10 @@ async function load() {
   const traffic = useTraffic()
 
   const [sumRes, fcRes, speedRes, classRes, odRes] = await Promise.allSettled([
-    traffic.summary(),
+    traffic.summary(county.query.value),
     traffic.forecasts({ page_size: 48 }),
-    traffic.speedObservations({ page_size: 30 }),
-    traffic.classShare(days.value),
+    traffic.speedObservations({ page_size: 30, ...county.query.value }),
+    traffic.classShare({ ...timeRange.query.value, ...county.query.value }),
     traffic.topOdPairs(days.value),
   ])
 
@@ -273,6 +273,8 @@ async function load() {
   loading.value = false
 }
 
+// Period or county changed - here, on another Traffic page, or from the global filter in the top bar.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

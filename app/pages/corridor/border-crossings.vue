@@ -5,7 +5,6 @@
     subtitle="One-stop border posts - queues, waiting and clearance times, truck volumes and the main cause of delay"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink v-if="canSee('/corridor/northern')" to="/corridor/northern" class="btn">Northern Corridor<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -141,7 +140,10 @@ import {
 const access = useAccessControl()
 const canSee = access.canAccessRoute
 
-const days = ref(30)
+// The window follows the global period (top bar); these endpoints take a rolling day count, so a year / custom
+// global range falls back to 30 days here.
+const timeRange = useTimeRange('corridor', { default: '30d' })
+const days = timeRange.days
 const posts = ref<BorderPostStatus[]>([])
 const trend = ref<BorderTrendPoint[]>([])
 const causes = ref<DelayCauseRow[]>([])
@@ -177,6 +179,7 @@ async function loadRows() {
   rowsLoading.value = false
 }
 onMounted(load)
+watch(days, load)
 
 function pick(id: string) { selected.value = selected.value === id ? '' : id; loadTrend() }
 

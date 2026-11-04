@@ -165,10 +165,10 @@ async function load() {
   const rail = useRailway()
 
   const [tpRes, bpRes, trRes, dwRes, rmRes] = await Promise.allSettled([
-    avm.containerThroughput({ page_size: 100 }),
-    avm.containerByPort(),
-    avm.containerTrend(60),
-    avm.yardDwell({ page_size: 100 }),
+    avm.containerThroughput({ ...scope.value, page_size: 100 }),
+    avm.containerByPort(scope.value),
+    avm.containerTrend(60, countyName.value),
+    avm.yardDwell({ ...scope.value, page_size: 100 }),
     rail.freight({ page_size: 100, port_linked: true }),
   ])
 
@@ -190,6 +190,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { countyName, scope, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 // ── Port name lookup (by-port aggregate has names; raw records only have unlocode) ─

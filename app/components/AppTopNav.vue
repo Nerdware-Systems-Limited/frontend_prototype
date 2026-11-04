@@ -47,6 +47,7 @@
       >
         {{ liveConnected ? 'Live' : 'Offline' }}
       </div>
+      <GlobalScopeControl />
       <div class="nav-time" id="navClock">{{ clock }}</div>
 
       <button
@@ -241,6 +242,7 @@ const searchItems: SearchItem[] = [
   { label: 'Road Infrastructure Status', group: 'Road Infrastructure', to: '/infrastructure/projects', icon: Construction },
   { label: 'Bridges & Assets', group: 'Road Infrastructure', to: '/infrastructure/bridges', icon: Construction },
   { label: 'Funding Allocations', group: 'Road Infrastructure', to: '/infrastructure/funding', icon: Construction },
+  { label: 'Maintenance Orders', group: 'Road Infrastructure', to: '/infrastructure/maintenance', icon: Construction },
 
   { label: 'Overview', group: 'Aviation', to: '/aviation/overview', icon: Plane },
 
@@ -271,6 +273,12 @@ const searchItems: SearchItem[] = [
   { label: 'Rail Infrastructure', group: 'Railway', to: '/railway/infrastructure', icon: TrainFront },
   { label: 'Rail Network Inventory', group: 'Railway', to: '/railway/network-inventory', icon: TrainFront },
   { label: 'Rail Safety', group: 'Railway', to: '/railway/safety', icon: TrainFront },
+
+  { label: 'Overview', group: 'Corridor & Trade', to: '/corridor', icon: MapPinned },
+  { label: 'Northern Corridor', group: 'Corridor & Trade', to: '/corridor/northern', icon: MapPinned },
+  { label: 'Border Crossings', group: 'Corridor & Trade', to: '/corridor/border-crossings', icon: MapPinned },
+  { label: 'Transit Declarations', group: 'Corridor & Trade', to: '/corridor/transit', icon: MapPinned },
+  { label: 'LAPSSET Corridor', group: 'Corridor & Trade', to: '/corridor/lapsset', icon: MapPinned },
 
   { label: 'AI Predictive Workbench', group: 'Analytics & Reporting', to: '/analytics', icon: BarChart3 },
   { label: 'Query Builder', group: 'Analytics & Reporting', to: '/query-builder', icon: BarChart3 },

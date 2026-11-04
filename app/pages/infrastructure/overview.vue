@@ -93,17 +93,22 @@ const s = ref<InfrastructureSummary | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+// County filter, shared across the Infrastructure pages and following the global filter until this module picks its own.
+const county = useCountyScope('infrastructure')
+
 async function load() {
   loading.value = true
   error.value = null
   try {
-    s.value = await useInfrastructure().summary()
+    s.value = await useInfrastructure().summary(county.query.value)
   } catch {
     error.value = 'Unable to reach the UAPTS Infrastructure API.'
   } finally {
     loading.value = false
   }
 }
+// County changed - here, on another Infrastructure page, or from the global filter in the top bar.
+watch(() => county.county.value, load)
 onMounted(load)
 
 const maxLength = computed(() => Math.max(1, ...(s.value?.network.condition_distribution ?? []).map(c => c.length ?? 0)))

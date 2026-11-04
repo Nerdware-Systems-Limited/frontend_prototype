@@ -37,7 +37,7 @@
 
   <!-- Capacity utilisation -->
   <SectionTitle pill="Computed · Live Registry × Passenger Stats">Terminal Capacity Utilisation</SectionTitle>
-  <div class="card">
+  <div id="terminal-capacity" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -77,7 +77,7 @@
 
   <!-- Airport registry -->
   <SectionTitle pill="Live Registry">Airport Registry</SectionTitle>
-  <div class="card">
+  <div id="airport-registry" class="card drill-target">
     <div class="card-body">
       <div class="filter-row">
         <input v-model="search" class="select-sm" placeholder="Search name / IATA / city / county…" style="min-width:180px" />
@@ -122,7 +122,7 @@
 
   <!-- Runway condition -->
   <SectionTitle pill="KCAA AMS · Pending Integration">Runway Condition</SectionTitle>
-  <div class="card">
+  <div id="runway-condition" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -154,7 +154,7 @@
 
   <!-- Navaids -->
   <SectionTitle pill="KCAA AMS · Pending Integration">Navigational Aids</SectionTitle>
-  <div class="card">
+  <div id="navaids" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -180,7 +180,7 @@
 
   <!-- Terminal / ATC / fuel-farm facilities -->
   <SectionTitle pill="KAA AMS · Pending Integration">Terminal, ATC &amp; Ground Facilities</SectionTitle>
-  <div class="card">
+  <div id="terminal-facilities" class="card drill-target">
     <div class="card-body">
       <div class="table-scroll">
         <table>
@@ -208,7 +208,7 @@
 
   <!-- Capital works -->
   <SectionTitle pill="KAA / National Treasury · Pending Integration">Capital Works Pipeline</SectionTitle>
-  <div class="card">
+  <div id="capital-works" class="card drill-target">
     <div class="card-body">
       <table>
         <thead><tr><th>Project</th><th>Airport</th><th>Contractor</th><th>Scope</th><th>Physical</th><th>Financial</th><th>Capacity Impact</th></tr></thead>
@@ -296,6 +296,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('aviation')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => county.county.value, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

@@ -15,11 +15,11 @@
   <!-- KPIs (live) -->
   <div class="kpi-grid">
     <KpiCard
-      label="Incidents (90d)"
+      :label="`Incidents (${days}d)`"
       :value="stats ? fmtNum(stats.total_incidents) : '-'"
       :unavailable="!stats"
       :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
-      period="90D"
+      :period="period"
       description="All severities"
       to="#incident-log"
     />
@@ -28,7 +28,7 @@
       :value="stats ? fmtNum(stats.fatal_incidents) : '-'"
       :unavailable="!stats"
       :unavailable-note="loading ? 'Loading…' : 'KMA Investigation Dept feed unavailable'"
-      period="90D"
+      :period="period"
       description="Loss of life recorded"
       :status="!stats ? undefined : stats.fatal_incidents === 0 ? 'healthy' : 'critical'"
       to="#incident-log"
@@ -38,7 +38,7 @@
       :value="stats ? fmtNum(stats.casualties) : '-'"
       :unavailable="!stats"
       :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
-      period="90D"
+      :period="period"
       description="Total across incidents"
       to="#incident-log"
     />
@@ -47,8 +47,8 @@
       :value="stats ? fmtNum(stats.pollution_tons) : '-'"
       :unavailable="!stats"
       :unavailable-note="loading ? 'Loading…' : 'NEMA / KMA feed unavailable'"
-      period="90D"
-      description="Oil/fuel spilled, 90d"
+      :period="period"
+      :description="`Oil/fuel spilled, ${days}d`"
     />
   </div>
 
@@ -187,8 +187,8 @@ async function load() {
   const avm = useAviationMaritime()
 
   const [statsRes, incRes, portsRes] = await Promise.allSettled([
-    avm.maritimeIncidentStats(90),
-    avm.maritimeIncidents({ days: 90, page_size: 100 } as any),
+    avm.maritimeIncidentStats(days.value, countyName.value),
+    avm.maritimeIncidents({ ...scope.value, page_size: 100 }),
     avm.ports(),
   ])
 
@@ -202,6 +202,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, scope, key, period } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 const portByUnlocode = computed(() => new Map(ports.value.map(p => [p.unlocode, p])))

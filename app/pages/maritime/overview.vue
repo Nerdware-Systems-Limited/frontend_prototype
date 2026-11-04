@@ -5,7 +5,6 @@
     subtitle="KPA · KMA - headline port, vessel, inspection and safety figures at a glance"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/maritime" class="btn">Vessel Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -96,14 +95,18 @@ async function load() {
   error.value = null
   const avm = useAviationMaritime()
   const [opRes, incRes] = await Promise.allSettled([
-    avm.maritimeOperations(timeRange.days.value),
-    avm.maritimeIncidentStats(90),
+    avm.maritimeOperations(timeRange.days.value, county.query.value),
+    avm.maritimeIncidentStats(90, county.county.value ?? undefined),
   ])
   if (opRes.status === 'fulfilled') ops.value = opRes.value
   if (incRes.status === 'fulfilled') incidentStats.value = incRes.value
   if (opRes.status === 'rejected' && incRes.status === 'rejected') error.value = 'Unable to reach the UAPTS Maritime API.'
   loading.value = false
 }
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('maritime')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 
 const totalTeu = computed(() => (ops.value?.ports ?? []).reduce((s, p) => s + (p.teu_throughput_30d ?? 0), 0))

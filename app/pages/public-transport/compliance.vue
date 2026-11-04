@@ -10,179 +10,80 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="licenceFailed" class="error-banner">⚠ Unable to reach the UAPTS Public Transport API.</div>
 
-  <!-- KPI strip -->
+  <!-- KPI strip: counted and averaged by the server over ALL licences / operators, not over the first page of them -->
   <div class="kpi-grid">
     <KpiCard
-      label="Active Licences"
-      :value="fmtNum(kpis.active)"
-      :unavailable="loading || licensesError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      description="Currently valid PSV licences"
-      to="#licence-registry"
+      label="Active Licences" :value="fmtNum(statusStats.groupCount('status', 'active'))"
+      :unavailable="statusStats.count.value === null" :unavailable-note="statusStats.loading.value ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE" description="Currently valid PSV licences" to="#licence-registry"
     />
     <KpiCard
-      label="Expiring ≤30d"
-      :value="fmtNum(kpis.exp30)"
-      :unavailable="loading || expiringError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="30D"
-      description="Urgent renewal required"
-      to="#expiry-alerts"
+      label="Expiring ≤30d" :value="fmtNum(exp30.count.value)"
+      :unavailable="exp30.count.value === null" :unavailable-note="exp30.loading.value ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="30D" description="Urgent renewal required" to="#expiry-alerts"
     />
     <KpiCard
-      label="Expiring 31–90d"
-      :value="fmtNum(kpis.exp90)"
-      :unavailable="loading || expiringError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="90D"
-      description="Plan renewals ahead"
-      to="#expiry-alerts"
+      label="Expiring 31–90d" :value="fmtNum(exp90.count.value)"
+      :unavailable="exp90.count.value === null" :unavailable-note="exp90.loading.value ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="90D" description="Plan renewals ahead" to="#expiry-alerts"
     />
     <KpiCard
-      label="Expired / Suspended"
-      :value="fmtNum(kpis.expired + kpis.suspended)"
-      :unavailable="loading || licensesError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      description="Immediate enforcement action"
+      label="Expired / Suspended" :value="fmtNum(expiredOrSuspended)"
+      :unavailable="statusStats.count.value === null" :unavailable-note="statusStats.loading.value ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
+      period="LIVE" description="Immediate enforcement action" to="#licence-registry"
     />
     <KpiCard
-      label="Avg GPS Compliance"
-      :value="avgGpsCompliance ? `${avgGpsCompliance.toFixed(1)}%` : '-'"
-      :unavailable="loading || licensesError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
-      period="LIVE"
-      description="Across all active licences"
-      :status="!avgGpsCompliance ? undefined : avgGpsCompliance >= 90 ? 'healthy' : 'warning'"
+      label="Avg GPS Compliance" :value="avgGps ? `${avgGps.toFixed(1)}%` : '-'"
+      :unavailable="gpsStats.count.value === null" :unavailable-note="gpsStats.loading.value ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
+      period="LIVE" description="Across all active licences"
+      :status="!avgGps ? undefined : avgGps >= 90 ? 'healthy' : 'warning'"
     />
     <KpiCard
-      label="Active Operators"
-      :value="fmtNum(activeSaccos)"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA feed unavailable'"
-      period="LIVE"
-      :description="`${fmtNum(saccos.length)} total registered`"
-      to="#operator-status"
+      label="Active Operators" :value="fmtNum(operatorStats.groupCount('registration_status', 'active'))"
+      :unavailable="operatorStats.count.value === null" :unavailable-note="operatorStats.loading.value ? 'Loading…' : 'NTSA feed unavailable'"
+      period="LIVE" :description="`${fmtNum(operatorStats.count.value)} total registered`" to="#operator-status"
     />
   </div>
 
   <!-- Expiry alerts: PSV licences that are expired or expiring, most urgent first -->
   <CertificateExpiryPanel id="expiry-alerts" class="drill-target" title="Licence expiry alerts" :sources="['psv']" storage-key="psv-compliance" style="margin-bottom:16px" />
 
-  <!-- Licence table with filters -->
+  <!-- PSV licences: the whole register, searched / filtered / sorted / paged on the server -->
   <SectionTitle>PSV Licence Registry</SectionTitle>
 
   <div id="licence-registry" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="statusFilter" class="select-sm">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="expired">Expired</option>
-          <option value="suspended">Suspended</option>
-          <option value="revoked">Revoked</option>
-        </select>
-        <input v-model="saccoSearch" class="select-sm" placeholder="Search operator…" style="min-width:160px" />
-        <button class="btn" @click="load">Apply</button>
-        <button class="btn" @click="statusFilter = ''; saccoSearch = ''">Clear</button>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Licence No.</th>
-            <th>Operator</th>
-            <th>Route</th>
-            <th>Issued</th>
-            <th>Expires</th>
-            <th>Days Left</th>
-            <th>GPS Compliance</th>
-            <th>Vehicles</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody v-if="filteredLicenses.length">
-          <tr v-for="l in licensesPageRows" :key="l.id">
-            <td style="font-family:monospace;font-size:12px">{{ l.license_number }}</td>
-            <td style="font-weight:600">{{ l.sacco_name ?? '-' }}</td>
-            <td style="font-size:12px">{{ l.route_name ?? '-' }}</td>
-            <td style="font-size:12px">{{ fmtDate(l.issue_date) }}</td>
-            <td style="font-size:12px">{{ fmtDate(l.expiry_date) }}</td>
-            <td>
-              <span :style="{ color: daysColor(daysUntil(l.expiry_date)), fontWeight: '600' }">
-                {{ daysUntil(l.expiry_date) }}d
-              </span>
-            </td>
-            <td>
-              <div class="gps-bar-wrap">
-                <div class="gps-bar" :style="{ transform: `scaleX(${l.gps_compliance_pct / 100})`, background: gpsBg(l.gps_compliance_pct) }" />
-              </div>
-              <span style="font-size:11px">{{ l.gps_compliance_pct.toFixed(0) }}%</span>
-            </td>
-            <td>{{ fmtNum(l.vehicle_count) }}</td>
-            <td><BadgePill :variant="statusBadge(l.status)">{{ l.status }}</BadgePill></td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">
-              {{ loading ? 'Loading licences…' : 'No licences match the current filters.' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="licensesPage" :total-pages="licensesTotalPages" :total="licensesTotal"
-        @prev="licensesPrev" @next="licensesNext"
-      />
+      <DataTable :table="licenceTable" row-key="id" title="PSV licence registry" export-name="uapts-psv-licences" filters-open
+                 placeholder="Search licence number, operator, route…" empty="No PSV licences have been registered.">
+        <template #cell-sacco_name="{ row }"><span class="strong">{{ row.sacco_name ?? '-' }}</span></template>
+        <template #cell-days_left="{ row }">
+          <span class="days" :style="{ color: daysColor(daysUntil(row.expiry_date)) }">{{ daysUntil(row.expiry_date) }}d</span>
+        </template>
+        <template #cell-gps_compliance_pct="{ row }">
+          <div class="gps-bar-wrap"><div class="gps-bar" :style="{ transform: `scaleX(${row.gps_compliance_pct / 100})`, background: gpsBg(row.gps_compliance_pct) }" /></div>
+          <span style="font-size:11px">{{ row.gps_compliance_pct.toFixed(0) }}%</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 
-  <!-- SACCO compliance status table -->
+  <!-- Operator registration status -->
   <div id="operator-status" class="card drill-target">
     <div class="card-header">
       Operator Registration Status
       <NuxtLink to="/public-transport/operators" class="link-sm">Full operator registry →</NuxtLink>
     </div>
     <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Operator Name</th>
-            <th>Status</th>
-            <th>Fleet Size</th>
-            <th>Routes</th>
-            <th>Service Quality</th>
-          </tr>
-        </thead>
-        <tbody v-if="saccos.length">
-          <tr v-for="s in saccosPageRows" :key="s.id">
-            <td style="font-weight:600">{{ s.sacco_name }}</td>
-            <td><BadgePill :variant="saccoStatus(s.registration_status)">{{ s.registration_status }}</BadgePill></td>
-            <td>{{ fmtNum(s.fleet_size) }}</td>
-            <td>{{ fmtNum(s.route_count) }}</td>
-            <td>
-              <div class="gps-bar-wrap">
-                <div class="gps-bar" :style="{ transform: `scaleX(${s.service_quality_score / 100})`, background: gpsBg(s.service_quality_score) }" />
-              </div>
-              <span style="font-size:11px">{{ s.service_quality_score.toFixed(0) }}/100</span>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">
-              {{ loading ? 'Loading…' : 'No operator data' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="saccosPage" :total-pages="saccosTotalPages" :total="saccosTotal"
-        @prev="saccosPrev" @next="saccosNext"
-      />
+      <DataTable :table="operatorTable" row-key="id" title="Operator registration status" export-name="uapts-operator-status"
+                 placeholder="Search operator…" empty="No operator data">
+        <template #cell-sacco_name="{ row }"><span class="strong">{{ row.sacco_name }}</span></template>
+        <template #cell-service_quality_score="{ row }">
+          <div class="gps-bar-wrap"><div class="gps-bar" :style="{ transform: `scaleX(${row.service_quality_score / 100})`, background: gpsBg(row.service_quality_score) }" /></div>
+          <span style="font-size:11px">{{ row.service_quality_score.toFixed(0) }}/100</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 
@@ -210,7 +111,7 @@
           </div>
         </div>
       </div>
-      <EmptyState v-else :loading="loading" message="No compliance summary available." compact />
+      <EmptyState v-else :loading="loadingSummary" message="No compliance summary available." compact />
     </div>
   </div>
 </template>
@@ -220,98 +121,96 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport } from '~/composables/api'
-import type { PSVLicense, Sacco } from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { eatDate } from '~/utils/timeRange'
+import type { TableColumn } from '~/types/dataTable'
 
-const licenses          = ref<PSVLicense[]>([])
-const expiringLicenses  = ref<PSVLicense[]>([])
-const saccos            = ref<Sacco[]>([])
-const complianceSummary = ref<Record<string, { compliant: number; flagged: number; violation: number; total: number }>>({})
-const loading      = ref(true)
-const error        = ref<string | null>(null)
-const licensesError = ref(false)
-const expiringError = ref(false)
-const saccosError   = ref(false)
-const lastRefreshed = ref('-')
-const statusFilter = ref('')
-const saccoSearch  = ref('')
+// Both tables are windows onto the WHOLE register: search, filters, sorting and paging run on the server, and every KPI is
+// a server count / average (see docs/data-tables.md) - nothing is computed from a first page of licences.
+const PT = '/api/v1/public-transport'
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const pt = usePublicTransport()
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('public-transport')
+const scope = () => county.query.value
 
-  const [licRes, expRes, saccosRes, compRes] = await Promise.allSettled([
-    pt.psvLicenses({ page_size: 100 }),
-    pt.expiringLicenses(90),
-    pt.saccos({ page_size: 50 }),
-    pt.complianceSummary(),
-  ])
+const LICENCE_STATUSES = ['active', 'expired', 'suspended', 'revoked'].map(value => ({ value, label: value[0]!.toUpperCase() + value.slice(1) }))
+const SACCO_STATUSES = ['active', 'suspended', 'revoked'].map(value => ({ value, label: value[0]!.toUpperCase() + value.slice(1) }))
+const LICENCE_BADGE: Record<string, string> = { active: 'success', expired: 'danger', suspended: 'warning', revoked: 'neutral' }
+const SACCO_BADGE: Record<string, string> = { active: 'success', suspended: 'warning', revoked: 'danger' }
 
-  if (licRes.status     === 'fulfilled') licenses.value          = (licRes.value as any).results ?? []
-  if (expRes.status     === 'fulfilled') expiringLicenses.value  = Array.isArray(expRes.value) ? expRes.value : ((expRes.value as any).results ?? [])
-  if (saccosRes.status  === 'fulfilled') saccos.value            = (saccosRes.value as any).results ?? []
-  if (compRes.status    === 'fulfilled') complianceSummary.value = (compRes.value as any) ?? {}
-
-  licensesError.value = licRes.status    === 'rejected'
-  expiringError.value = expRes.status    === 'rejected'
-  saccosError.value   = saccosRes.status === 'rejected'
-
-  if ([licRes, expRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Public Transport API.'
-
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-  loading.value = false
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-// ── Computed ─────────────────────────────────────────────────────────────
-const filteredLicenses = computed(() =>
-  licenses.value.filter(l => {
-    if (statusFilter.value && l.status !== statusFilter.value) return false
-    if (saccoSearch.value  && !(l.sacco_name ?? '').toLowerCase().includes(saccoSearch.value.toLowerCase())) return false
-    return true
-  }),
-)
-
-const kpis = computed(() => ({
-  active:    licenses.value.filter(l => l.status === 'active').length,
-  exp30:     expiringLicenses.value.filter(l => daysUntil(l.expiry_date) <= 30).length,
-  exp90:     expiringLicenses.value.filter(l => daysUntil(l.expiry_date) > 30).length,
-  expired:   licenses.value.filter(l => l.status === 'expired').length,
-  suspended: licenses.value.filter(l => l.status === 'suspended').length,
-}))
-
-const avgGpsCompliance = computed(() => {
-  const active = licenses.value.filter(l => l.status === 'active')
-  if (!active.length) return null
-  return active.reduce((s, l) => s + l.gps_compliance_pct, 0) / active.length
+// ── PSV licence registry ─────────────────────────────────────────────────
+const licenceColumns: TableColumn[] = [
+  { key: 'license_number', label: 'Licence No.', type: 'mono', priority: 1, pin: 'left' },
+  { key: 'sacco_name', label: 'Operator', priority: 1, minWidth: 160 },
+  { key: 'route_name', label: 'Route', priority: 2 },
+  { key: 'issue_date', label: 'Issued', type: 'date', priority: 3 },
+  { key: 'expiry_date', label: 'Expires', type: 'date', priority: 1 },
+  // Derived from the expiry date: sorts by it on the server, and exports as a number of days.
+  { key: 'days_left', label: 'Days Left', sortable: 'expiry_date', filter: false, exportAs: r => String(daysUntil(r.expiry_date)), priority: 2 },
+  { key: 'gps_compliance_pct', label: 'GPS Compliance', type: 'num', digits: 0, priority: 2 },
+  { key: 'vehicle_count', label: 'Vehicles', type: 'num', priority: 3 },
+  { key: 'status', label: 'Status', type: 'badge', badge: LICENCE_BADGE, options: LICENCE_STATUSES, priority: 1 },
+]
+const licenceTable = useEndpointTable({
+  key: 'pt-psv-licences', path: `${PT}/psv-licenses/`, columns: licenceColumns, countyKey: 'public-transport', pageSize: 25,
+  defaultSort: [{ key: 'expiry_date', dir: 'asc' }],
 })
 
-const activeSaccos = computed(() => saccos.value.filter(s => s.registration_status === 'active').length)
+// ── Operator registration status ─────────────────────────────────────────
+const operatorColumns: TableColumn[] = [
+  { key: 'sacco_name', label: 'Operator Name', priority: 1, pin: 'left', minWidth: 170 },
+  { key: 'registration_status', label: 'Status', type: 'badge', badge: SACCO_BADGE, options: SACCO_STATUSES, priority: 1 },
+  { key: 'fleet_size', label: 'Fleet Size', type: 'num', priority: 2 },
+  { key: 'route_count', label: 'Routes', type: 'num', priority: 2 },
+  { key: 'service_quality_score', label: 'Service Quality', type: 'num', digits: 0, priority: 1 },
+]
+const operatorTable = useEndpointTable({
+  key: 'pt-operator-status', path: `${PT}/saccos/`, columns: operatorColumns, countyKey: 'public-transport', pageSize: 25,
+  defaultSort: [{ key: 'sacco_name', dir: 'asc' }],
+})
 
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: licensesPageRows, page: licensesPage, totalPages: licensesTotalPages,
-  total: licensesTotal, next: licensesNext, prev: licensesPrev,
-} = usePagination(filteredLicenses, 15)
+// ── KPIs: counted by the server ──────────────────────────────────────────
+// Dates are EAT calendar days, like the rest of the platform.
+const today = () => eatDate(new Date())
+const plusDays = (n: number) => eatDate(new Date(Date.now() + n * 86_400_000))
+const statusStats = useServerCount(`${PT}/psv-licenses/`, scope, { groupBy: ['status'] })
+const gpsStats = useServerCount(`${PT}/psv-licenses/`, () => ({ ...scope(), 'f.status__exact': 'active' }), { aggregate: ['avg:gps_compliance_pct'] })
+// Expiring: from today up to N days ahead - the same window the backend's /expiring/ action uses.
+const exp30 = useServerCount(`${PT}/psv-licenses/`, () => ({ ...scope(), 'f.expiry_date__gte': today(), 'f.expiry_date__lte': plusDays(30) }))
+const exp90 = useServerCount(`${PT}/psv-licenses/`, () => ({ ...scope(), 'f.expiry_date__gt': plusDays(30), 'f.expiry_date__lte': plusDays(90) }))
+const operatorStats = useServerCount(`${PT}/saccos/`, scope, { groupBy: ['registration_status'] })
 
-const {
-  pageRows: saccosPageRows, page: saccosPage, totalPages: saccosTotalPages,
-  total: saccosTotal, next: saccosNext, prev: saccosPrev,
-} = usePagination(saccos, 15)
+const avgGps = computed(() => gpsStats.avg('gps_compliance_pct'))
+const expiredOrSuspended = computed(() => {
+  const e = statusStats.groupCount('status', 'expired'), s = statusStats.groupCount('status', 'suspended')
+  return e === null || s === null ? null : e + s
+})
+const licenceFailed = computed(() => statusStats.failed.value && !statusStats.loading.value)
 
-// ── Helpers ──────────────────────────────────────────────────────────────
+// ── Compliance by check type: an aggregate the backend computes (a handful of check types) ──
+const complianceSummary = ref<Record<string, { compliant: number; flagged: number; violation: number; total: number }>>({})
+const loadingSummary = ref(true)
+async function loadSummary() {
+  try { complianceSummary.value = ((await usePublicTransport().complianceSummary()) as any) ?? {} } catch { /* the card shows its empty state */ } finally { loadingSummary.value = false }
+}
+watch(() => county.county.value, loadSummary)
+onMounted(loadSummary)
+
+// Keep it live (the page used to reload every two minutes).
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  timer = setInterval(() => {
+    void Promise.all([licenceTable.refresh(), operatorTable.refresh(), statusStats.refresh(), gpsStats.refresh(), exp30.refresh(), exp90.refresh(), operatorStats.refresh(), loadSummary()])
+  }, 120_000)
+})
+onUnmounted(() => { if (timer) clearInterval(timer) })
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
-}
-function fmtDate(s: string) {
-  try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
-  catch { return s }
 }
 function daysUntil(dateStr: string): number {
   try { return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000) }
@@ -323,20 +222,12 @@ function daysColor(d: number) {
 function gpsBg(pct: number) {
   return pct >= 90 ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--destructive)'
 }
-function statusBadge(s: string) {
-  const m: Record<string,string> = { active:'success', expired:'danger', suspended:'warning', revoked:'neutral' }
-  return m[s] ?? 'neutral'
-}
-function saccoStatus(s: string) {
-  const m: Record<string,string> = { active:'success', suspended:'warning', revoked:'danger' }
-  return m[s] ?? 'neutral'
-}
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin-bottom:16px; }
 .filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.gps-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; display:flex; }
+.gps-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; display:flex; min-width:70px; }
 .gps-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
 .compliance-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
 .chk-card { border:1px solid var(--border-subtle); border-radius:6px; padding:10px 12px; }
@@ -350,5 +241,7 @@ function saccoStatus(s: string) {
 .chk-ok-bar { background:var(--success); }
 .chk-flag-bar { background:var(--warning); }
 .chk-viol-bar { background:var(--destructive); }
+.strong { font-weight:600; }
+.days { font-weight:600; }
 .link-sm { font-size:12px; color:var(--link); text-decoration:none; }
 </style>

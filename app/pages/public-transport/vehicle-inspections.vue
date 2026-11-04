@@ -12,21 +12,21 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPI strip (computed from the loaded registry - real fields only) -->
+  <!-- KPI strip: counted by the server over ALL inspections, not over a first page of them -->
   <div class="kpi-grid">
-    <KpiCard label="Inspections (loaded)" :value="fmtNum(inspections.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Most recent records" to="#inspection-registry" />
-    <KpiCard label="Passed" :value="fmtNum(countByResult('pass'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Roadworthy" />
-    <KpiCard label="Failed" :value="fmtNum(countByResult('fail'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Not roadworthy" />
-    <KpiCard label="Conditional Pass" :value="fmtNum(countByResult('conditional_pass'))" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Passed with conditions" />
-    <KpiCard label="Pass Rate" :value="passRate != null ? `${passRate.toFixed(1)}%` : '-'" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Pass / (pass + fail)" :status="passRate == null ? undefined : passRate >= 80 ? 'healthy' : 'warning'" />
-    <KpiCard label="Re-inspections" :value="fmtNum(reinspectionCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Follow-up records" />
-    <KpiCard label="Overdue" :value="fmtNum(overdueCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Next inspection due date passed" to="#overdue-queue" />
-    <KpiCard label="Due ≤30d" :value="fmtNum(dueSoonCount)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="30D" description="Next inspection approaching" />
-    <KpiCard label="Active Centres" :value="fmtNum(byCentre.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Distinct inspection centres" to="#inspections-by-centre" />
-    <KpiCard label="Active Inspectors" :value="fmtNum(byInspector.length)" :unavailable="loading || !!error" :unavailable-note="loading ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable'" period="LIVE" description="Distinct inspectors on file" />
+    <KpiCard label="Inspections" :value="fmtNum(resultStats.count.value)" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="All records" to="#inspection-registry" />
+    <KpiCard label="Passed" :value="fmtNum(resultStats.groupCount('result', 'pass'))" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Roadworthy" />
+    <KpiCard label="Failed" :value="fmtNum(resultStats.groupCount('result', 'fail'))" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Not roadworthy" />
+    <KpiCard label="Conditional Pass" :value="fmtNum(resultStats.groupCount('result', 'conditional_pass'))" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Passed with conditions" />
+    <KpiCard label="Pass Rate" :value="passRate != null ? `${passRate.toFixed(1)}%` : '-'" :unavailable="unavailable" :unavailable-note="note" period="LIVE" description="Pass / (pass + fail)" :status="passRate == null ? undefined : passRate >= 80 ? 'healthy' : 'warning'" />
+    <KpiCard label="Re-inspections" :value="fmtNum(reinspectionStats.count.value)" :unavailable="reinspectionStats.count.value === null" :unavailable-note="note" period="LIVE" description="Follow-up records" />
+    <KpiCard label="Overdue" :value="fmtNum(overdueStats.count.value)" :unavailable="overdueStats.count.value === null" :unavailable-note="note" period="LIVE" description="Next inspection due date passed" to="#overdue-queue" />
+    <KpiCard label="Due ≤30d" :value="fmtNum(dueSoonStats.count.value)" :unavailable="dueSoonStats.count.value === null" :unavailable-note="note" period="30D" description="Next inspection approaching" />
+    <KpiCard label="Active Centres" :value="fmtNum(centreStats.distinct('inspection_centre'))" :unavailable="centreStats.count.value === null" :unavailable-note="note" period="LIVE" description="Distinct inspection centres" to="#inspections-by-centre" />
+    <KpiCard label="Active Inspectors" :value="fmtNum(centreStats.distinct('inspector_name'))" :unavailable="centreStats.count.value === null" :unavailable-note="note" period="LIVE" description="Distinct inspectors on file" />
   </div>
 
-  <!-- Analytics -->
+  <!-- Analytics: grouped by the server -->
   <SectionTitle pill="Computed · Rolling">Inspections by Centre</SectionTitle>
   <div id="inspections-by-centre" class="card drill-target">
     <div class="card-body">
@@ -37,23 +37,23 @@
           <span class="bar-val">{{ c.count }} · {{ c.passRate.toFixed(0) }}% pass</span>
         </div>
       </div>
-      <div v-else style="font-size:13px;color:var(--fg-3)">{{ loading ? 'Loading…' : 'No inspection records.' }}</div>
+      <div v-else style="font-size:13px;color:var(--fg-3)">{{ centreStats.loading.value ? 'Loading…' : 'No inspection records.' }}</div>
     </div>
   </div>
 
-  <!-- Overdue queue -->
+  <!-- Overdue queue: the longest-overdue first -->
   <SectionTitle pill="Computed · Rolling">Overdue Inspections</SectionTitle>
   <div id="overdue-queue" class="card drill-target">
     <div class="card-body">
       <div v-if="overdue.length">
         <AlertItem
-          v-for="i in overdue.slice(0, 20)" :key="i.id"
+          v-for="i in overdue" :key="i.id"
           :severity="i.result === 'fail' ? 'critical' : 'warning'"
           :title="`${i.plate_number} - inspection overdue`"
           :meta="`Due ${fmtDate(i.next_inspection_due)} · Last result ${i.result} · ${i.inspection_centre}`"
         />
       </div>
-      <EmptyState v-else :loading="loading" message="No overdue inspections in the loaded registry." icon="search" compact />
+      <EmptyState v-else :loading="overdueLoading" message="No overdue inspections." icon="search" compact />
     </div>
   </div>
 
@@ -61,84 +61,21 @@
   <SectionTitle pill="NTSA Fleet Inspections · Rolling">Inspection Registry</SectionTitle>
   <div id="inspection-registry" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search plate / centre / inspector…" style="min-width:200px" @keyup.enter="load" />
-        <select v-model="resultFilter" class="select-sm">
-          <option value="">All results</option>
-          <option value="pass">Pass</option>
-          <option value="fail">Fail</option>
-          <option value="conditional_pass">Conditional pass</option>
-        </select>
-        <label class="checkbox-label">
-          <input v-model="reinspectionOnly" type="checkbox" />
-          Re-inspections only
-        </label>
-        <button class="btn" @click="load">Apply</button>
-        <button class="btn" @click="clearFilters">Clear</button>
-      </div>
-
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Vehicle</th>
-              <th>Centre</th>
-              <th>Inspector</th>
-              <th>Inspected</th>
-              <th>Result</th>
-              <th>Sticker No.</th>
-              <th>Next Due</th>
-              <th>Re-inspection</th>
-              <th>Report</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredInspections.length">
-            <template v-for="i in inspectionsPageRows" :key="i.id">
-              <tr class="insp-row" @click="toggleExpand(i)">
-                <td class="expand-cell">{{ expandedId === i.id ? '▾' : '▸' }}</td>
-                <td style="font-weight:700;font-family:monospace">{{ i.plate_number }}</td>
-                <td style="font-size:12px">{{ i.inspection_centre }}</td>
-                <td style="font-size:12px">{{ i.inspector_name || '-' }}</td>
-                <td style="font-size:11px">{{ fmtDate(i.inspected_at) }}</td>
-                <td><BadgePill :variant="resultBadge(i.result)">{{ i.result.replace(/_/g,' ') }}</BadgePill></td>
-                <td style="font-family:monospace;font-size:11px">{{ i.sticker_no || '-' }}</td>
-                <td style="font-size:11px">
-                  <span :style="{ color: isOverdue(i.next_inspection_due) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(i.next_inspection_due) }}</span>
-                </td>
-                <td style="text-align:center">{{ i.is_reinspection ? '✓' : '-' }}</td>
-                <td>
-                  <a v-if="i.report_url" :href="i.report_url" target="_blank" rel="noopener" class="link-sm" @click.stop>View →</a>
-                  <span v-else style="color:var(--fg-3);font-size:11px">-</span>
-                </td>
-              </tr>
-              <tr v-if="expandedId === i.id" class="insp-detail-row">
-                <td :colspan="10">
-                  <div class="dd-title">Re-inspection Chain</div>
-                  <div v-if="reinspectionCache[i.id]?.length" class="dd-list">
-                    <div v-for="r in reinspectionCache[i.id]" :key="r.id" class="dd-item">
-                      <BadgePill :variant="resultBadge(r.result)">{{ r.result.replace(/_/g,' ') }}</BadgePill>
-                      <span>{{ fmtDate(r.inspected_at) }} · {{ r.inspection_centre }} · {{ r.inspector_name || '-' }}</span>
-                    </div>
-                  </div>
-                  <div v-else class="dd-empty">{{ reinspectionLoaded[i.id] ? 'No follow-up re-inspections on file.' : 'Loading…' }}</div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tbody v-else>
-            <tr>
-              <td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">
-                {{ loading ? 'Loading inspections…' : 'No inspection records match the current filters.' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <TablePagination
-          :page="inspectionsPage" :total-pages="inspectionsTotalPages" :total="inspectionsTotal"
-          @prev="inspectionsPrev" @next="inspectionsNext"
-        />
-      </div>
+      <DataTable :table="inspectionTable" row-key="id" title="Inspection registry" export-name="uapts-vehicle-inspections" expandable filters-open
+                 placeholder="Search plate, centre, inspector, sticker…" empty="No inspection records match the current filters.">
+        <template #toolbar>
+          <label class="checkbox-label"><input v-model="reinspectionOnly" type="checkbox" /> Re-inspections only</label>
+        </template>
+        <template #cell-plate_number="{ row }"><span style="font-weight:700;font-family:monospace">{{ row.plate_number }}</span></template>
+        <template #cell-next_inspection_due="{ row }">
+          <span :style="{ color: isOverdue(row.next_inspection_due) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(row.next_inspection_due) }}</span>
+        </template>
+        <template #cell-report_url="{ row }">
+          <a v-if="row.report_url" :href="row.report_url" target="_blank" rel="noopener" class="link-sm" @click.stop>View →</a>
+          <span v-else style="color:var(--fg-3);font-size:11px">-</span>
+        </template>
+        <template #expanded="{ row }"><ReinspectionChain :inspection="row.id" /></template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -147,117 +84,85 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useVehicleInspections } from '~/composables/api'
-import type { VehicleInspection } from '~/composables/api'
+import { useApi } from '~/composables/api/_client'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { eatDate } from '~/utils/timeRange'
+import type { TableColumn } from '~/types/dataTable'
 
-const inspections = ref<VehicleInspection[]>([])
-const loading      = ref(true)
-const error        = ref<string | null>(null)
+// The registry is a window onto ALL inspections (search, filters, sorting, paging on the server); every KPI and the per-centre
+// breakdown are server counts / groups (see docs/data-tables.md). A row's re-inspection chain loads when it is opened.
+const V = '/api/v1/fleet/vehicle-inspections/'
+const api = useApi()
 
-const search           = ref('')
-const resultFilter     = ref('')
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('public-transport')
+const scope = () => county.query.value
+
+const RESULTS = [{ value: 'pass', label: 'Pass' }, { value: 'fail', label: 'Fail' }, { value: 'conditional_pass', label: 'Conditional pass' }]
+const RESULT_BADGE: Record<string, string> = { pass: 'success', fail: 'danger', conditional_pass: 'warning' }
+
 const reinspectionOnly = ref(false)
-const expandedId       = ref<string | null>(null)
+const inspectionColumns: TableColumn[] = [
+  { key: 'plate_number', label: 'Vehicle', priority: 1, pin: 'left' },
+  { key: 'inspection_centre', label: 'Centre', priority: 2 },
+  { key: 'inspector_name', label: 'Inspector', priority: 2 },
+  { key: 'inspected_at', label: 'Inspected', type: 'date', priority: 1 },
+  { key: 'result', label: 'Result', type: 'badge', badge: RESULT_BADGE, options: RESULTS, priority: 1 },
+  { key: 'sticker_no', label: 'Sticker No.', type: 'mono', priority: 3 },
+  { key: 'next_inspection_due', label: 'Next Due', type: 'date', priority: 1 },
+  { key: 'is_reinspection', label: 'Re-inspection', type: 'bool', sortable: 'reinspection_of', filter: false, priority: 3 },
+  { key: 'report_url', label: 'Report', sortable: false, filter: false, noExport: true, priority: 3 },
+]
+const inspectionTable = useEndpointTable({
+  key: 'pt-vehicle-inspections', path: V, columns: inspectionColumns, countyKey: 'public-transport', pageSize: 15,
+  params: () => (reinspectionOnly.value ? { 'f.reinspection_of__isnull': 'false' } : {}),
+  defaultSort: [{ key: 'inspected_at', dir: 'desc' }],
+})
 
-const reinspectionCache  = reactive<Record<string, VehicleInspection[]>>({})
-const reinspectionLoaded = reactive<Record<string, boolean>>({})
+// ── KPIs: counted by the server ──────────────────────────────────────────
+// Dates are EAT calendar days, like the rest of the platform.
+const today = () => eatDate(new Date())
+const plusDays = (n: number) => eatDate(new Date(Date.now() + n * 86_400_000))
+const resultStats = useServerCount(V, scope, { groupBy: ['result'] })
+const reinspectionStats = useServerCount(V, () => ({ ...scope(), 'f.reinspection_of__isnull': 'false' }))
+const overdueStats = useServerCount(V, () => ({ ...scope(), 'f.next_inspection_due__lt': today() }))
+const dueSoonStats = useServerCount(V, () => ({ ...scope(), 'f.next_inspection_due__gte': today(), 'f.next_inspection_due__lte': plusDays(30) }))
+// Per-centre totals (and distinct centres / inspectors), plus the passes per centre for the pass rate.
+const centreStats = useServerCount(V, scope, { aggregate: ['distinct:inspection_centre', 'distinct:inspector_name'], groupBy: ['inspection_centre'] })
+const centrePass = useServerCount(V, () => ({ ...scope(), 'f.result__exact': 'pass' }), { groupBy: ['inspection_centre'] })
+const allStats = [resultStats, reinspectionStats, overdueStats, dueSoonStats, centreStats, centrePass]
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const vi = useVehicleInspections()
-
-  // Note: the backend endpoint has no full-text search param (search=
-  // is a silent no-op there - see useVehicleInspections.ts), so the
-  // search box below filters the loaded page client-side instead.
-  const res = await vi.list({ page_size: 100 }).catch(() => null)
-  if (res) {
-    inspections.value = (res as any).results ?? []
-  } else {
-    error.value = 'Unable to reach the UAPTS Fleet Vehicle Inspections API.'
-  }
-
-  loading.value = false
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-function clearFilters() {
-  search.value = ''; resultFilter.value = ''; reinspectionOnly.value = false
-  load()
-}
-
-async function toggleExpand(i: VehicleInspection) {
-  if (expandedId.value === i.id) { expandedId.value = null; return }
-  expandedId.value = i.id
-  if (reinspectionLoaded[i.id]) return
-  const vi = useVehicleInspections()
-  const res = await vi.reinspections(i.id).catch(() => null)
-  reinspectionCache[i.id] = res ? (Array.isArray(res) ? res : (res as any).results ?? []) : []
-  reinspectionLoaded[i.id] = true
-}
-
-// ── Filters ──────────────────────────────────────────────────────────────
-const filteredInspections = computed(() => inspections.value.filter(i => {
-  if (resultFilter.value && i.result !== resultFilter.value) return false
-  if (reinspectionOnly.value && !i.is_reinspection) return false
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    const hay = `${i.plate_number} ${i.inspection_centre} ${i.inspector_name ?? ''}`.toLowerCase()
-    if (!hay.includes(q)) return false
-  }
-  return true
-}))
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: inspectionsPageRows, page: inspectionsPage, totalPages: inspectionsTotalPages,
-  total: inspectionsTotal, next: inspectionsNext, prev: inspectionsPrev,
-} = usePagination(filteredInspections, 15)
-
-// ── KPIs / analytics (all computed client-side from real loaded records) ─
-function countByResult(r: string) { return inspections.value.filter(i => i.result === r).length }
-const reinspectionCount = computed(() => inspections.value.filter(i => i.is_reinspection).length)
+const unavailable = computed(() => resultStats.count.value === null)
+const note = computed(() => resultStats.loading.value ? 'Loading…' : 'NTSA Fleet Inspections feed unavailable')
+const error = computed(() => resultStats.failed.value && !resultStats.loading.value ? 'Unable to reach the UAPTS Fleet Vehicle Inspections API.' : null)
 const passRate = computed(() => {
-  const pass = countByResult('pass'), fail = countByResult('fail')
-  return pass + fail > 0 ? (pass / (pass + fail)) * 100 : null
+  const pass = resultStats.groupCount('result', 'pass'), fail = resultStats.groupCount('result', 'fail')
+  return pass === null || fail === null || pass + fail === 0 ? null : (pass / (pass + fail)) * 100
 })
-
-function isOverdue(due: string | null | undefined) {
-  return !!due && new Date(due).getTime() < Date.now()
-}
-function isDueSoon(due: string | null | undefined) {
-  if (!due) return false
-  const days = Math.ceil((new Date(due).getTime() - Date.now()) / 86_400_000)
-  return days >= 0 && days <= 30
-}
-const overdue = computed(() => inspections.value.filter(i => isOverdue(i.next_inspection_due)))
-const overdueCount = computed(() => overdue.value.length)
-const dueSoonCount = computed(() => inspections.value.filter(i => isDueSoon(i.next_inspection_due)).length)
-
-const byCentre = computed(() => {
-  const m = new Map<string, { centre: string; count: number; pass: number }>()
-  for (const i of inspections.value) {
-    const ex = m.get(i.inspection_centre) ?? { centre: i.inspection_centre, count: 0, pass: 0 }
-    ex.count++
-    if (i.result === 'pass') ex.pass++
-    m.set(i.inspection_centre, ex)
-  }
-  return [...m.values()].map(c => ({ ...c, passRate: c.count ? (c.pass / c.count) * 100 : 0 })).sort((a, b) => b.count - a.count)
-})
+const byCentre = computed(() =>
+  (centreStats.groups.value?.inspection_centre ?? [])
+    .map((g: any) => ({ centre: String(g.value), count: g.count as number, passRate: g.count ? ((centrePass.groupCount('inspection_centre', g.value) ?? 0) / g.count) * 100 : 0 }))
+    .sort((a, b) => b.count - a.count),
+)
 const maxCentre = computed(() => Math.max(1, ...byCentre.value.map(c => c.count)))
 
-const byInspector = computed(() => {
-  const m = new Map<string, number>()
-  for (const i of inspections.value) {
-    if (!i.inspector_name) continue
-    m.set(i.inspector_name, (m.get(i.inspector_name) ?? 0) + 1)
-  }
-  return [...m.entries()].map(([inspector, count]) => ({ inspector, count })).sort((a, b) => b.count - a.count)
-})
+// ── Overdue queue: the longest-overdue few, from the server ───────────────
+const overdue = ref<any[]>([])
+const overdueLoading = ref(true)
+async function loadOverdue() {
+  try {
+    const r = await api<any>(V, { query: { ...scope(), 'f.next_inspection_due__lt': today(), ordering: 'next_inspection_due', page_size: 20 } })
+    overdue.value = r?.results ?? []
+  } catch { overdue.value = [] } finally { overdueLoading.value = false }
+}
+onMounted(loadOverdue)
+
+function refreshAll() { void Promise.all([inspectionTable.refresh(), ...allStats.map(s => s.refresh()), loadOverdue()]) }
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(refreshAll, 120_000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -269,17 +174,13 @@ function fmtDate(s: string | null | undefined) {
   try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'2-digit' }) }
   catch { return s }
 }
-function resultBadge(r: string) {
-  const m: Record<string,string> = { pass:'success', fail:'danger', conditional_pass:'warning' }
-  return m[r] ?? 'neutral'
-}
+function isOverdue(due: string | null | undefined) { return !!due && due < today() }
+function resultBadge(r: string) { return RESULT_BADGE[r] ?? 'neutral' }
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
 .checkbox-label { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
-.table-scroll { overflow-x:auto; }
 .bar-list { display:flex; flex-direction:column; gap:8px; }
 .bar-row { display:grid; grid-template-columns:140px 1fr 90px; align-items:center; gap:8px; }
 .bar-label { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -291,12 +192,5 @@ function resultBadge(r: string) {
 .bar-row-wide .bar-label { font-size:13px; font-weight:600; overflow:visible; white-space:normal; }
 .bar-row-wide .bar-wrap { height:16px; }
 .bar-row-wide .bar-val { font-size:12.5px; font-weight:600; }
-.insp-row { cursor:pointer; }
-.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
-.insp-detail-row td { background:var(--surface-1); padding:12px 18px; border-bottom:1px solid var(--border-subtle); }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
-.dd-list { display:flex; flex-direction:column; gap:6px; }
-.dd-item { display:flex; align-items:center; gap:8px; font-size:12px; }
-.dd-empty { font-size:12px; color:var(--fg-3); }
 .link-sm { font-size:11px; color:var(--link); text-decoration:none; }
 </style>

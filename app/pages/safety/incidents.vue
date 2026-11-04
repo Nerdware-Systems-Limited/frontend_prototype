@@ -4,9 +4,6 @@
     title="Incident Command"
     subtitle="NTSA · NPS · KMD - Real-time active incidents, NPS emergency dispatch coordination, KMD weather context, and investigation workflows"
   >
-    <template #actions>
-      <TimeRangeSelector :range="range" @change="onRangeChange" />
-    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -190,13 +187,16 @@
   <div class="two-col">
     <CollapsibleSection class="card map-card" title="Active Incident Map" storage-key="map:safety/incidents">
       <ClientOnly>
-        <UaptsMap
+        <LiveMap
           :markers="incidentMarkers"
           :roads="roadsGeo"
+          :live="mapLive"
+          :legend="mapLegend"
           :center="[-1.286, 36.817]"
           :zoom="7"
-          height="480px"
-          show-legend
+          height="520px"
+          noun="incidents"
+          feed-title="Incidents"
         />
       </ClientOnly>
     </CollapsibleSection>
@@ -343,7 +343,7 @@ import type { Incident, IncidentReport } from '~/composables/api/useSafety'
 
 const { hasMinRole } = usePermissions()
 
-type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green' | 'yellow' | 'red' | 'orange' | 'blue' | 'purple' | 'gray'; size?: 'sm' | 'md' | 'lg' }
+import type { MarkerSpec } from '~/components/UaptsMap.vue'
 
 const summary    = ref<SafetySummary | null>(null)
 const incidents  = ref<Incident[]>([])
@@ -361,6 +361,8 @@ const lastRefreshed = ref('-')
 // incidents). It sizes the KPI cards and the "All Incidents" table; active incidents and
 // dispatches are always live.
 const range = useTimeRange('safety', { default: '30d', years: true, custom: true })
+// County filter, shared across the Safety pages and following the global filter until this module picks its own.
+const county = useCountyScope('safety')
 
 const severityFilter = ref('')
 const statusFilter   = ref('')
@@ -408,6 +410,7 @@ function tableFilters() {
     ...(severityFilter.value ? { severity: severityFilter.value } : {}),
     ...(statusFilter.value   ? { status:   statusFilter.value }   : {}),
     ...(verifiedFilter.value ? { verified: verifiedFilter.value } : {}),
+    ...county.query.value,
   }
 }
 
@@ -429,7 +432,9 @@ async function fetchIncidents() {
 }
 
 function applyFilters() { pagesLoaded.value = 1; load() }
-function onRangeChange() { applyFilters() }
+// Any change to the period or county - picked here, on another Safety page, or from the global filter in
+// the top bar - re-queries. One watcher instead of per-control handlers so none of those paths is missed.
+watch(() => JSON.stringify([range.query.value, county.query.value]), () => applyFilters())
 async function loadMore() { pagesLoaded.value++; await load() }
 
 // Same 10 / 20-a-month thresholds as the Safety Overview, scaled to the chosen period.
@@ -449,7 +454,7 @@ async function load() {
   const gis    = useGis()
 
   const [sumRes, incRes, activeRes, dispRes, roadsRes, boundaryRes] = await Promise.allSettled([
-    safety.summary(range.query.value),
+    safety.summary({ ...range.query.value, ...county.query.value }),
     fetchIncidents(),
     safety.activeIncidents({ page_size: 100, ...tableFilters() }),
     safety.dispatches({ page_size: 30 }),
@@ -486,6 +491,22 @@ function adoptQueryFilters() {
 }
 adoptQueryFilters()
 watch(() => route.query, () => { adoptQueryFilters(); applyFilters() })
+
+// ── Live operations: live incident feed ───────────────────────────────────────
+// Open incidents are re-fetched on a short loop of their own and merged into
+// `activeList`, so a newly reported incident pings onto the map within seconds
+// without reloading the KPIs, tables or period incidents (those stay on 60s).
+async function loadLive() {
+  const res: any = await useSafety().activeIncidents({ page_size: 100, ...tableFilters() })
+  activeList.value = res.results ?? []
+}
+const mapLive = useLivePoll(loadLive, { intervalMs: 15_000 })
+const mapLegend = [
+  { color: 'red' as const,    label: 'Fatal' },
+  { color: 'orange' as const, label: 'Serious' },
+  { color: 'blue' as const,   label: 'Minor' },
+  { color: 'gray' as const,   label: 'Resolved' },
+]
 
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
@@ -571,19 +592,36 @@ const incidentExportColumns = [
 
 const incidentMarkers = computed((): MarkerSpec[] =>
   // The period's incidents plus anything still open (which may be older than the period).
-  [...incidents.value, ...activeList.value.filter(a => !incidents.value.some(i => i.id === a.id))]
+  // Open ones use the freshest copy (activeList is the live-polled one).
+  [...activeList.value, ...incidents.value.filter(i => !activeList.value.some(a => a.id === i.id))]
     .filter(i => i.latitude && i.longitude)
-    .map(i => ({
-      id: `inc-${i.id}`,
-      lat: i.latitude!,
-      lon: i.longitude!,
-      title: i.title,
-      subtitle: `${i.severity} · ${i.status}`,
-      color: i.severity === 'fatal' ? 'red'
-           : i.severity === 'serious' ? 'orange'
-           : 'blue',
-      size: i.severity === 'fatal' ? 'lg' : i.severity === 'serious' ? 'md' : 'sm',
-    })),
+    .map((i): MarkerSpec => {
+      const open = !['resolved', 'closed', 'cancelled'].includes(i.status)
+      const fatal = i.severity === 'fatal'
+      return {
+        id: `inc-${i.id}`,
+        lat: i.latitude!,
+        lon: i.longitude!,
+        title: i.title,
+        badge: `${i.incident_type.replace(/_/g, ' ')} · ${i.reference_code}`,
+        subtitle: `${i.severity} · ${i.status.replace(/_/g, ' ')}`,
+        rows: [
+          { label: 'Severity', value: i.severity },
+          { label: 'Status', value: i.status.replace(/_/g, ' ') },
+          ...(i.county ? [{ label: 'County', value: i.county }] : []),
+          { label: 'Casualties', value: String(i.casualties ?? 0) },
+          { label: 'Vehicles', value: String(i.vehicles_involved ?? 0) },
+          { label: 'Responders', value: String(i.dispatch_count ?? 0) },
+          { label: 'Verified', value: i.is_verified ? 'Yes' : 'No' },
+          { label: 'Reported', value: fmtTime(i.reported_at) },
+        ],
+        updatedAt: i.updated_at,
+        // Closed-out incidents stay on the map for context but go quiet.
+        color: !open ? 'gray' : fatal ? 'red' : i.severity === 'serious' ? 'orange' : 'blue',
+        size: !open ? 'sm' : fatal ? 'lg' : i.severity === 'serious' ? 'md' : 'sm',
+        pulse: open && fatal,
+      }
+    }),
 )
 
 // ── Formatters ─────────────────────────────────────────────────────────

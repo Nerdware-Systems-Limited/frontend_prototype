@@ -5,7 +5,6 @@
     subtitle="KAA · KCAA - headline fleet, flight, punctuality and passenger figures at a glance"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/aviation" class="btn">Flight Movements<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -89,6 +88,10 @@ async function load() {
     loading.value = false
   }
 }
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('aviation')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 
 const maxStatus = computed(() => Math.max(1, ...(summary.value?.by_status ?? []).map(s => s.c)))

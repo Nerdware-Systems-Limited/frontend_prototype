@@ -5,7 +5,6 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - SGR & MGR ridership, freight manifests, KPA port-rail reconciliation, KenTrade cargo, and NCTTCA corridor KPIs"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/railway/network-inventory" class="btn">Network Inventory<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/railway/safety" class="btn">Rail Safety<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/railway/live" class="btn">Live Operations<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
@@ -61,26 +60,26 @@
       :value="summary ? `${summary.on_time_30d.on_time_pct.toFixed(1)}%` : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KRC OCC feed unavailable'"
-      period="30D"
+      :period="rangeTag"
       :description="summary ? `Avg delay ${summary.on_time_30d.avg_delay_min.toFixed(0)} min (30d)` : ''"
       :status="!summary ? undefined : summary.on_time_30d.on_time_pct >= 85 ? 'healthy' : 'warning'"
       to="#otp-summary"
     />
     <KpiCard
-      label="Passenger Bookings (30d)"
+      label="Passenger Bookings"
       :value="summary ? fmtNum(summary.kpis.passenger_bookings_30d) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      period="30D"
+      :period="rangeTag"
       :description="summary ? `KES ${fmtKES(summary.ridership_30d.revenue_kes)}` : ''"
       to="#ridership-summary"
     />
     <KpiCard
-      label="Freight Shipments (30d)"
+      label="Freight Shipments"
       :value="summary ? fmtNum(summary.kpis.freight_30d_shipments) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      period="30D"
+      :period="rangeTag"
       :description="summary ? `${fmtNum(summary.freight_30d.total_tons)} tons` : ''"
       to="/railway/freight"
     />
@@ -89,8 +88,8 @@
       :value="summary ? `${summary.ridership_30d.no_show_rate_pct.toFixed(1)}%` : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      period="30D"
-      description="Passengers (30d)"
+      :period="rangeTag"
+      description="Of booked passengers"
       :status="!summary ? undefined : summary.ridership_30d.no_show_rate_pct < 5 ? 'healthy' : 'warning'"
     />
     <KpiCard
@@ -98,8 +97,8 @@
       :value="summary ? fmtNum(summary.kpis.open_incidents) : '-'"
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'KRC Safety feed unavailable'"
-      period="90D"
-      :description="summary ? `${fmtNum(summary.incidents_90d.casualties)} casualties (90d)` : ''"
+      period="LIVE"
+      :description="summary ? `${fmtNum(summary.incidents_90d.casualties)} casualties · ${safetyTag}` : ''"
       :status="!summary ? undefined : summary.kpis.open_incidents === 0 ? 'healthy' : 'warning'"
       to="/railway/safety"
     />
@@ -152,7 +151,7 @@
 
       <!-- Ridership summary -->
       <div id="ridership-summary" class="card stack-card drill-target">
-        <div class="card-header">Ridership & Revenue (30d)</div>
+        <div class="card-header">Ridership & Revenue ({{ rangeTag.toLowerCase() }})</div>
         <div class="card-body" v-if="summary">
           <div class="rid-stat-row">
             <div><span class="stat-label">Bookings</span><span class="rid-val">{{ fmtNum(summary.ridership_30d.bookings) }}</span></div>
@@ -166,7 +165,7 @@
       <!-- Freight summary -->
       <div class="card stack-card">
         <div class="card-header">
-          Freight Summary (30d)
+          Freight Summary ({{ rangeTag.toLowerCase() }})
           <NuxtLink to="/railway/freight" class="link-sm">Details →</NuxtLink>
         </div>
         <div class="card-body" v-if="summary">
@@ -190,7 +189,7 @@
       <!-- Safety -->
       <div class="card stack-card">
         <div class="card-header">
-          Safety Summary (90d)
+          Safety Summary ({{ safetyTag }})
           <NuxtLink to="/railway/safety" class="link-sm">Details →</NuxtLink>
         </div>
         <div class="card-body" v-if="summary">
@@ -217,84 +216,42 @@
 
   <div id="live-operations" class="card drill-target">
     <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Train</th>
-            <th>Route</th>
-            <th>Status</th>
-            <th>Current Station</th>
-            <th>Delay (Arr)</th>
-            <th>Delay Reason</th>
-            <th>Occupancy</th>
-          </tr>
-        </thead>
-        <tbody v-if="liveOps.length">
-          <tr v-for="op in liveOpsPageRows" :key="op.id">
-            <td style="font-family:monospace;font-weight:700">{{ op.train_number }}</td>
-            <td style="font-size:12px">{{ op.origin_code }} → {{ op.destination_code }}</td>
-            <td><BadgePill :variant="opBadge(op.status)">{{ op.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-size:12px;font-family:monospace">{{ op.current_station_code ?? '-' }}</td>
-            <td :style="{ color: op.delay_arrival_min > 30 ? 'var(--danger-fg)' : op.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
-              {{ op.delay_arrival_min > 0 ? `+${op.delay_arrival_min} min` : 'On time' }}
-            </td>
-            <td style="font-size:12px;text-transform:capitalize">{{ (op as any).delay_reason?.replace(/_/g,' ') ?? '-' }}</td>
-            <td>
-              <div v-if="(op as any).occupancy_pct != null" class="occ-wrap">
-                <div class="occ-bar" :style="{ width: `${(op as any).occupancy_pct}%`, background: (op as any).occupancy_pct >= 90 ? 'var(--destructive)' : (op as any).occupancy_pct >= 70 ? 'var(--warning)' : 'var(--success)' }" />
-              </div>
-              <span style="font-size:11px">{{ (op as any).occupancy_pct != null ? `${(op as any).occupancy_pct.toFixed(0)}%` : '-' }}</span>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading live operations…' : 'No live train operations.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="liveOpsPage" :total-pages="liveOpsTotalPages" :total="liveOpsTotal"
-        @prev="liveOpsPrev" @next="liveOpsNext"
-      />
+      <DataTable :table="liveTable" row-key="id" title="Live train operations" export-name="uapts-live-train-operations"
+                 placeholder="Search train, station…" empty="No live train operations.">
+        <template #cell-schedule_train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.schedule_train_number }}</span></template>
+        <template #cell-route="{ row }">{{ row.origin_code }} → {{ row.destination_code }}</template>
+        <template #cell-delay_arrival_min="{ row }">
+          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">
+            {{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min} min` : 'On time' }}
+          </span>
+        </template>
+        <template #cell-occupancy_pct="{ row }">
+          <template v-if="row.occupancy_pct != null">
+            <div class="occ-wrap"><div class="occ-bar" :style="{ width: `${row.occupancy_pct}%`, background: row.occupancy_pct >= 90 ? 'var(--destructive)' : row.occupancy_pct >= 70 ? 'var(--warning)' : 'var(--success)' }" /></div>
+            <span style="font-size:11px">{{ Number(row.occupancy_pct).toFixed(0) }}%</span>
+          </template>
+          <span v-else>-</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 
-  <!-- Top routes -->
-  <SectionTitle pill="KRC Ticketing · 30d">Top Routes by Ridership</SectionTitle>
+  <!-- Top routes: a ranked top-N from the ticketing roll-up, so a scrolling list rather than a pageable table -->
+  <SectionTitle :pill="`KRC Ticketing · ${rangeTag}`">Top Routes by Ridership</SectionTitle>
 
   <div class="card">
     <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Origin</th>
-            <th>Destination</th>
-            <th>Bookings</th>
-            <th>Revenue (KES)</th>
-            <th>Share</th>
-          </tr>
-        </thead>
-        <tbody v-if="topRoutes.length">
-          <tr v-for="r in topRoutesPageRows" :key="`${r.origin__code}-${r.destination__code}`">
-            <td style="font-weight:600">{{ r.origin__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.origin__code }})</span></td>
-            <td>{{ r.destination__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.destination__code }})</span></td>
-            <td style="font-weight:700">{{ fmtNum(r.bookings) }}</td>
-            <td>{{ fmtKES(r.revenue) }}</td>
-            <td>
-              <div class="share-bar-wrap">
-                <div class="share-bar"
-                  :style="{ width: `${maxBookings > 0 ? (r.bookings / maxBookings) * 100 : 0}%`, background: 'var(--primary-fill)' }" />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No route data.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="topRoutesPage" :total-pages="topRoutesTotalPages" :total="topRoutesTotal"
-        @prev="topRoutesPrev" @next="topRoutesNext"
-      />
+      <div v-if="topRoutes.length" class="route-list">
+        <div class="route-head"><span>Origin</span><span>Destination</span><span>Bookings</span><span>Revenue (KES)</span><span>Share</span></div>
+        <div v-for="r in topRoutes" :key="`${r.origin__code}-${r.destination__code}`" class="route-row">
+          <span style="font-weight:600">{{ r.origin__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.origin__code }})</span></span>
+          <span>{{ r.destination__name }} <span style="font-size:11px;color:var(--fg-3)">({{ r.destination__code }})</span></span>
+          <span style="font-weight:700">{{ fmtNum(r.bookings) }}</span>
+          <span>{{ fmtKES(r.revenue) }}</span>
+          <span class="share-bar-wrap"><span class="share-bar" :style="{ width: `${maxBookings > 0 ? (r.bookings / maxBookings) * 100 : 0}%`, background: 'var(--primary-fill)' }" /></span>
+        </div>
+      </div>
+      <div v-else class="empty-cell">{{ loading ? 'Loading…' : 'No route data.' }}</div>
     </div>
   </div>
 </template>
@@ -304,13 +261,21 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
 import { useRailway, useGis } from '~/composables/api'
-import type { RailwaySummary, LiveOperation, OnTimeStats } from '~/composables/api'
+import type { RailwaySummary, OnTimeStats } from '~/composables/api'
+import { useApi } from '~/composables/api/_client'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { useTimeRange } from '~/composables/useTimeRange'
+import type { TableColumn } from '~/types/dataTable'
 
 const summary  = ref<RailwaySummary | null>(null)
 // RailwaySummary.on_time_30d is a trimmed-down OnTimeStats (no `delayed` /
 // `cancellation_pct` on this backend) - fetch the full stats separately so
 // the "Delayed" stat below doesn't show a misleading dash.
-const timeRange = useTimeRange('railway', { default: '30d' })
+const timeRange = useTimeRange('railway', { default: '30d', years: true, custom: true })
+const rangeTag = computed(() => timeRange.period.value)
+// The open-incidents card follows the period too; with none picked the backend looks back 90 days.
+const safetyTag = computed(() => rangeTag.value)
 // The range-driven on-time figures when they have loaded; otherwise the summary's own fixed 30 days,
 // labelled as such, so the card never shows one window under another window's name.
 const otp = computed(() => {
@@ -320,7 +285,6 @@ const otp = computed(() => {
   return s ? { on_time_pct: s.on_time_pct, total_operations: s.total_operations, cancelled: s.cancelled, avg_delay_min: s.avg_delay_min, delayed: null as number | null, window: '30d' } : null
 })
 const otpStats = ref<OnTimeStats | null>(null)
-const liveOps  = ref<LiveOperation[]>([])
 const mapData  = ref<{ lines: any[]; markers: any[] }>({ lines: [], markers: [] })
 const loading  = ref(true)
 const error    = ref<string | null>(null)
@@ -331,22 +295,16 @@ async function load() {
   error.value = null
   const rail = useRailway()
 
-  const [sumRes, liveRes, mapRes, otpRes] = await Promise.allSettled([
-    rail.summary(),
-    rail.liveOperations(),
+  const [sumRes, mapRes, otpRes] = await Promise.allSettled([
+    rail.summary(timeRange.query.value as any),
     rail.mapData(),
-    rail.onTimeStats(timeRange.days.value),
+    useApi()<OnTimeStats>('/api/v1/railway/operations/on-time-stats/', { query: timeRange.query.value as Record<string, any> }),
   ])
 
   if (sumRes.status  === 'fulfilled') {
     summary.value = sumRes.value
-    liveOps.value = sumRes.value.live_operations ?? []
   }
   if (otpRes.status === 'fulfilled') otpStats.value = otpRes.value
-  if (liveRes.status === 'fulfilled') {
-    const raw = Array.isArray(liveRes.value) ? liveRes.value : (liveRes.value as any).results ?? []
-    if (raw.length) liveOps.value = raw
-  }
   if (mapRes.status  === 'fulfilled') mapData.value = mapRes.value
 
   if ([sumRes].every(r => r.status === 'rejected'))
@@ -356,6 +314,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('railway')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
@@ -365,16 +327,24 @@ onUnmounted(() => { if (t) clearInterval(t) })
 const topRoutes  = computed(() => summary.value?.top_routes ?? [])
 const maxBookings = computed(() => Math.max(1, ...topRoutes.value.map(r => r.bookings)))
 
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: liveOpsPageRows, page: liveOpsPage, totalPages: liveOpsTotalPages,
-  total: liveOpsTotal, next: liveOpsNext, prev: liveOpsPrev,
-} = usePagination(liveOps, 15)
-
-const {
-  pageRows: topRoutesPageRows, page: topRoutesPage, totalPages: topRoutesTotalPages,
-  total: topRoutesTotal, next: topRoutesNext, prev: topRoutesPrev,
-} = usePagination(topRoutes, 15)
+// ── Live train operations: every operation under way, searched / filtered / sorted / paged on the server ──
+const IN_SERVICE = 'boarding,departed,in_transit,delayed'
+const OP_STATUSES = ['scheduled', 'boarding', 'departed', 'in_transit', 'delayed', 'arrived', 'cancelled', 'diverted'].map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const OP_BADGE: Record<string, string> = { in_transit: 'info', boarding: 'fair', arrived: 'success', delayed: 'danger', cancelled: 'danger', scheduled: 'neutral', departed: 'info', diverted: 'warning' }
+const liveColumns: TableColumn[] = [
+  { key: 'schedule_train_number', label: 'Train', priority: 1, pin: 'left' },
+  { key: 'route', label: 'Route', sortable: 'origin_code', filter: false, exportAs: r => `${r.origin_code} - ${r.destination_code}`, priority: 2 },
+  { key: 'status', label: 'Status', type: 'badge', badge: OP_BADGE, options: OP_STATUSES, priority: 1 },
+  { key: 'current_station_code', label: 'Current Station', type: 'mono', priority: 2 },
+  { key: 'delay_arrival_min', label: 'Delay (Arr)', type: 'num', priority: 1 },
+  { key: 'delay_reason', label: 'Delay Reason', priority: 3 },
+  { key: 'occupancy_pct', label: 'Occupancy', type: 'num', digits: 0, priority: 2 },
+]
+const liveTable = useEndpointTable({
+  key: 'rail-live-operations', path: '/api/v1/railway/operations/', columns: liveColumns, countyKey: 'railway', pageSize: 15,
+  params: { 'f.status__in': IN_SERVICE }, defaultSort: [{ key: 'delay_arrival_min', dir: 'desc' }],
+})
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), () => { void liveTable.refresh() })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -447,4 +417,9 @@ function opBadge(s: string) {
 .share-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; }
 .share-bar { height:100%; border-radius:4px; }
 .link-sm { font-size:12px; color:var(--link); text-decoration:none; }
+.route-list { display:flex; flex-direction:column; max-height:420px; overflow-y:auto; }
+.route-head, .route-row { display:grid; grid-template-columns:1.4fr 1.4fr .7fr .8fr 1fr; gap:10px; align-items:center; padding:7px 4px; font-size:13px; }
+.route-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--fg-3); border-bottom:1px solid var(--border-subtle); position:sticky; top:0; background:var(--surface-1, var(--surface)); }
+.route-row { border-bottom:1px solid var(--border-subtle); }
+.share-bar { display:block; }
 </style>

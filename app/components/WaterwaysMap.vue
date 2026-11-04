@@ -8,6 +8,7 @@
  * never pulls the ~45k streams and drains.
  */
 import { useGisLayers } from '~/composables/api/useGisLayers'
+import { createBasemapLayer, basemapForTheme } from '~/utils/mapBasemap'
 
 interface Aid { id: string; name: string; aid_type: string; operational_status: string; latitude: number | null; longitude: number | null }
 const props = withDefaults(defineProps<{
@@ -89,11 +90,23 @@ function drawPicked() {
   if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 11, padding: [24, 24] })
 }
 
+// Same basemap + theme behaviour as every other UAPTS map (see utils/mapBasemap).
+const theme = useTheme()
+let baseLayer: any = null
+function applyBasemap() {
+  if (!map || !L) return
+  if (baseLayer) map.removeLayer(baseLayer)
+  baseLayer = createBasemapLayer(L, basemapForTheme(theme.resolved.value))
+  baseLayer.addTo(map)
+  baseLayer.bringToBack()
+}
+watch(() => theme.resolved.value, applyBasemap)
+
 onMounted(async () => {
   const mod: any = await import('leaflet')
   L = mod.default ?? mod
   map = L.map(el.value!, { center: [0.2, 37.9], zoom: 6, preferCanvas: true })
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors (ODbL)', maxZoom: 18 }).addTo(map)
+  applyBasemap()
   hydro = L.layerGroup().addTo(map)
   picked = L.layerGroup().addTo(map)
   aids = L.layerGroup().addTo(map)
@@ -108,7 +121,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer); map?.remove(); map = nul
 
 <template>
   <div class="ww-map">
-    <div ref="el" :style="{ height }" />
+    <div ref="el" class="uapts-map um-frame" :style="{ height }" />
     <div v-if="loading" class="ww-badge">Loading water features…</div>
     <div v-if="note" class="ww-note">{{ note }}</div>
     <div class="ww-key">

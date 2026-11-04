@@ -11,8 +11,13 @@
  * still chosen on the next Aviation page, and it survives navigating away and
  * back within the session. A reload starts from the module's default again.
  * Different modules keep independent selections.
+ *
+ * Global scope: a module the user has NOT touched follows the system-wide range set
+ * from the top nav (useGlobalScope). The first time they pick a range here it becomes
+ * this module's own (`isOverridden`), and `reset()` hands it back to the global one.
  */
 import { computed } from 'vue'
+import { useGlobalScope } from '~/composables/useGlobalScope'
 import {
   clampYear, currentYear, eatDate, isRangeMode, periodBadge, rangeBounds, rangeQuery,
   type RangeMode, type RangePreset, type RangeSelection,
@@ -27,39 +32,55 @@ export interface UseTimeRangeOptions {
 }
 
 export function useTimeRange(key: string, opts: UseTimeRangeOptions = {}) {
-  const state = useState<RangeSelection>(`timerange:${key}`, () => ({ mode: opts.default ?? '7d', year: currentYear() }))
+  type ModuleState = RangeSelection & { overridden?: boolean }
+  const state = useState<ModuleState>(`timerange:${key}`, () => ({ mode: opts.default ?? '7d', year: currentYear() }))
+  const global = useGlobalScope()
+  // Which selection is in force: this module's own once chosen, else the global one if set.
+  const source = computed<RangeSelection>(() =>
+    !state.value.overridden && global.range.value ? global.range.value : state.value)
 
   // The selection is shared across a module's pages. A page whose data cannot answer a
   // past year falls back to a preset instead of sending a year-long window to an endpoint that
   // only understands "the last N days".
   const unsupported = (m: RangeSelection['mode']) => (m === 'year' && !opts.years) || (m === 'custom' && !opts.custom)
   const effective = computed<RangeSelection>(() =>
-    unsupported(state.value.mode) ? { mode: opts.default ?? '30d', year: state.value.year } : state.value)
+    unsupported(source.value.mode) ? { mode: opts.default ?? '30d', year: source.value.year } : source.value)
   const mode = computed(() => effective.value.mode)
   const year = computed(() => effective.value.year)
   const bounds = computed(() => rangeBounds(effective.value))
 
+  // The first edit on a module starts from what it was showing (possibly the global range) and
+  // pins it as this module's own.
+  function adopt() {
+    if (state.value.overridden) return
+    state.value = { ...(global.range.value ?? state.value), overridden: true }
+  }
+
   function setMode(next: RangeMode) {
     if (!isRangeMode(next) || unsupported(next)) return
+    adopt()
     // Entering custom from a preset starts from what the user was already looking at.
     if (next === 'custom' && !state.value.from) {
       const b = rangeBounds(effective.value)
       // A preset's `from` is N days back (N + 1 calendar days inclusive); trim it to N so the
       // custom pickers show the same number of days the preset did.
       const from = effective.value.mode === 'year' ? b.from : eatDate(new Date(Date.parse(`${b.to}T00:00:00Z`) - (b.days - 1) * 86_400_000))
-      state.value = { ...state.value, mode: 'custom', from, to: b.to }
+      state.value = { ...state.value, mode: 'custom', from, to: b.to, overridden: true }
       return
     }
     state.value = { ...state.value, mode: next }
   }
   function setCustom(from: string, to: string) {
     if (!opts.custom) return
-    state.value = { ...state.value, mode: 'custom', from, to }
+    adopt()
+    state.value = { ...state.value, mode: 'custom', from, to, overridden: true }
   }
   function setYear(y: number) {
-    state.value = { mode: 'year', year: clampYear(y) }
+    state.value = { mode: 'year', year: clampYear(y), overridden: true }
   }
-  function stepYear(delta: number) { setYear(state.value.year + delta) }
+  function stepYear(delta: number) { setYear(effective.value.year + delta) }
+  /** Drop this module's own choice and follow the global range (or the module default) again. */
+  function reset() { state.value = { mode: opts.default ?? '7d', year: currentYear() } }
 
   return {
     key,
@@ -81,7 +102,13 @@ export function useTimeRange(key: string, opts: UseTimeRangeOptions = {}) {
     isCustom: computed(() => effective.value.mode === 'custom'),
     /** Period parameters for endpoints on the shared period contract (see `rangeQuery`). */
     query: computed(() => rangeQuery(effective.value)),
-    setMode, setYear, stepYear, setCustom,
+    /** The range in force, in the shared RangeSelection shape (what the global scope stores). */
+    selection: computed<RangeSelection>(() => ({ ...effective.value })),
+    /** True when this module follows the global range rather than its own choice. */
+    isGlobal: computed(() => !state.value.overridden && !!global.range.value),
+    /** True when this module's own choice is in force. */
+    isOverridden: computed(() => !!state.value.overridden),
+    setMode, setYear, stepYear, setCustom, reset,
   }
 }
 

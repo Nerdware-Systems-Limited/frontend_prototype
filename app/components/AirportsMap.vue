@@ -5,6 +5,7 @@
  * aviation API; the context layers come from the GIS layer API when the account may read them.
  */
 import { useGisLayers } from '~/composables/api/useGisLayers'
+import { createBasemapLayer, basemapForTheme } from '~/utils/mapBasemap'
 import type { Airport, RunwayFeature } from '~/composables/api'
 
 const props = withDefaults(defineProps<{
@@ -97,11 +98,23 @@ async function drawContext() {
   context.value = (t.status === 'fulfilled' && t.value.truncated) || (a.status === 'fulfilled' && a.value.truncated) ? 'Zoom in to see every feature in this view.' : ''
 }
 
+// Same basemap + theme behaviour as every other UAPTS map (see utils/mapBasemap).
+const theme = useTheme()
+let baseLayer: any = null
+function applyBasemap() {
+  if (!map || !L) return
+  if (baseLayer) map.removeLayer(baseLayer)
+  baseLayer = createBasemapLayer(L, basemapForTheme(theme.resolved.value))
+  baseLayer.addTo(map)
+  baseLayer.bringToBack()
+}
+watch(() => theme.resolved.value, applyBasemap)
+
 onMounted(async () => {
   const mod: any = await import('leaflet')
   L = mod.default ?? mod
   map = L.map(el.value!, { center: [0.2, 37.9], zoom: 6, preferCanvas: true })
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors (ODbL)', maxZoom: 19 }).addTo(map)
+  applyBasemap()
   ctxLayer = L.layerGroup().addTo(map)
   rwLayer = L.layerGroup().addTo(map)
   apLayer = L.layerGroup().addTo(map)
@@ -121,7 +134,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer); map?.remove(); map = nul
 
 <template>
   <div class="ap-map">
-    <div ref="el" :style="{ height }" />
+    <div ref="el" class="uapts-map um-frame" :style="{ height }" />
     <div class="ap-bar">
       <label v-if="counts.strips" class="ap-toggle"><input v-model="strips" type="checkbox"> Show {{ counts.strips }} airstrips &amp; heliports without an IATA code</label>
       <span v-if="context" class="ap-note">{{ context }}</span>

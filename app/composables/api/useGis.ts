@@ -92,20 +92,19 @@ export function useGis() {
   const api = useApi()
 
   /**
-   * Static URL to the pre-tiled road network (PMTiles archive), served by
-   * a dedicated `pmtiles serve` process (go-pmtiles) - NOT through Django.
+   * Static URL to the pre-tiled road network (PMTiles archive).
    *
-   * Django (running here under Daphne/ASGI) doesn't honor HTTP Range
-   * requests for /media/, which PMTiles absolutely requires (it seeks into
-   * the file rather than downloading it whole). Confirmed via:
-   *   curl -I -H "Range: bytes=0-1023" http://0.0.0.0:8000/media/roads.pmtiles
-   * → came back 200 with the full Content-Length and no Accept-Ranges
-   * header at all, instead of the expected 206 Partial Content.
-   *
-   * `pmtiles serve <dir> --port 8081` (from https://github.com/protomaps/go-pmtiles)
-   * handles ranges correctly out of the box and needs no Django involvement.
-   * Swap `tilesBase` below for wherever that process is actually running,
-   * or for a CDN/S3 URL in production.
+   * PMTiles are read with HTTP byte-range requests, so whatever serves
+   * `tilesBase` MUST answer `Range:` with 206 Partial Content. Production
+   * nginx does. In dev the Django backend does too, via core/range_serve.py
+   * (django.views.static.serve ignores Range and answers 200 with the whole
+   * file, which protomaps-leaflet rejects with "Server returned no
+   * content-length header or content-length exceeding request"). Note that
+   * `pmtiles serve` is NOT a substitute: it serves Z/X/Y tiles, not the raw
+   * archive. Check any host with:
+   *   curl -s -o /dev/null -D - -H "Range: bytes=0-1023" <tilesBase>/roads.pmtiles
+   * (expect `206` and a `Content-Range` header). Cross-origin tile hosts also
+   * need CORS to allow the `Range` header (CORS_ALLOW_HEADERS in settings.py).
    */
   const roadsPmtilesUrl = (path: string = '/roads.pmtiles') => {
     const tilesBase = (useRuntimeConfig().public.tilesBase as string) || 'http://localhost:8081'
@@ -182,6 +181,12 @@ export function useGis() {
   }
 
   /**
+   * GET /api/v1/gis/counties/ - canonical county names for the shared county filter
+   * (names only; empty when the kenya-counties reference layer isn't loaded).
+   */
+  const counties = () => api<{ count: number; results: string[] }>('/api/v1/gis/counties/')
+
+  /**
    * GET /api/v1/gis/routes/?bbox=&service_type=&limit=&simplify=
    * Public transport routes as GeoJSON. Reads live from tbl_pt_routes.
    */
@@ -238,5 +243,5 @@ export function useGis() {
     })
   }
 
-  return { kenyaBoundary, roads, roadsPmtilesUrl, railsPmtilesUrl, routes, mapOverview, clearGisCache }
+  return { kenyaBoundary, roads, roadsPmtilesUrl, railsPmtilesUrl, routes, mapOverview, counties, clearGisCache }
 }

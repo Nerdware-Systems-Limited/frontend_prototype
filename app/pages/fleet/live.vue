@@ -156,6 +156,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('fleet')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => county.county.value, load)
 onMounted(load)
 // 30-second refresh for live positions
 let t: ReturnType<typeof setInterval> | null = null

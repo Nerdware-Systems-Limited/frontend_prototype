@@ -332,6 +332,9 @@ function agencyLink(path: string) {
   return selectedAgency.value ? { path, query: { agency: selectedAgency.value } } : path
 }
 
+// County filter, shared across the Infrastructure pages and following the global filter until this module picks its own.
+const county = useCountyScope('infrastructure')
+
 async function load() {
   loading.value = true
   error.value = null
@@ -339,12 +342,12 @@ async function load() {
   const gis   = useGis()
 
   const [allRes, critRes, roadsRes, sigRes, closureRes, sumRes] = await Promise.allSettled([
-    infra.bridges({ page_size: 200 }),
-    infra.criticalBridges(),
+    infra.bridges({ page_size: 200, ...county.query.value }),
+    infra.criticalBridges(county.query.value),
     gis.roads({ limit: 300, simplify: 0.03 }),
-    infra.signalFaults(),
+    infra.signalFaults(county.query.value),
     infra.ruralRoadStatus({ page_size: 50 }),
-    infra.summary(),
+    infra.summary(county.query.value),
   ])
 
   if (allRes.status  === 'fulfilled') bridges.value  = (allRes.value as any).results ?? []
@@ -366,6 +369,8 @@ async function load() {
   loading.value = false
 }
 
+// County changed - here, on another Infrastructure page, or from the global filter in the top bar.
+watch(() => county.county.value, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

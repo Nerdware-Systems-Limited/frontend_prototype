@@ -94,10 +94,10 @@ export function useMaritimePerformance() {
   const M = '/api/v1/aviation-maritime/maritime/performance'
 
   return {
-    summary: (days = 30) => api<MaritimePerformanceSummary>(`${M}/summary/`, { query: { days } }),
-    kpis: (q?: { port?: string; days?: number }) =>
+    summary: (days = 30, county?: string) => api<MaritimePerformanceSummary>(`${M}/summary/`, { query: cleanQuery({ days, county }) }),
+    kpis: (q?: { port?: string; days?: number; county?: string }) =>
       api<{ days: number; ports: PortPerformanceKpi[]; generated_at: string }>(`${M}/kpis/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    ranking: (days = 30) =>
-      api<MaritimeRanking>(`${M}/ranking/`, { query: { days } }),
+    ranking: (days = 30, county?: string) =>
+      api<MaritimeRanking>(`${M}/ranking/`, { query: cleanQuery({ days, county }) }),
   }
 }

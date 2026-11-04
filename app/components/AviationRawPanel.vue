@@ -1,32 +1,8 @@
 <template>
-  <CollapsibleSection :id="id" class="card drill-target" :default-open="defaultOpen" :title="cfg.title" :source="cfg.source" :count="rows.length">
+  <CollapsibleSection :id="id" class="card drill-target" :default-open="defaultOpen" :title="cfg.title" :source="cfg.source" :count="table.total.value">
     <div class="card-body">
       <p v-if="cfg.hint" class="hint">{{ cfg.hint }}</p>
-      <div v-if="error" class="error-banner">⚠ {{ error }}</div>
-      <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search…" style="min-width:200px" />
-        <button class="btn" @click="search = ''">Clear</button>
-        <ExportButton :filename="`uapts-aviation-${dataset}.csv`" :rows="filtered" :columns="cfg.columns.map(c => ({ key: c.key, label: c.label }))" style="margin-left:auto" />
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr><th v-for="c in cfg.columns" :key="c.key" :style="c.type === 'num' ? 'text-align:right' : ''">{{ c.label }}</th></tr>
-          </thead>
-          <tbody v-if="filtered.length">
-            <tr v-for="r in pageRows" :key="String(r.id)">
-              <td v-for="c in cfg.columns" :key="c.key" :style="cellStyle(c)">
-                <BadgePill v-if="c.type === 'badge' && r[c.key]" :variant="badgeVariant(c, r[c.key])">{{ label(r[c.key]) }}</BadgePill>
-                <template v-else>{{ cell(c, r) }}</template>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr><td :colspan="cfg.columns.length" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : cfg.empty }}</td></tr>
-          </tbody>
-        </table>
-        <TablePagination :page="page" :total-pages="totalPages" :total="total" @prev="prev" @next="next" />
-      </div>
+      <DataTable :table="table" row-key="id" :title="cfg.title" :empty="cfg.empty" :export-name="`uapts-aviation-${dataset}`" />
     </div>
   </CollapsibleSection>
 </template>
@@ -34,15 +10,18 @@
 <script setup lang="ts">
 /**
  * One panel for the aviation upload tables the dashboards do not roll up themselves: KAA air cargo statistics and
- * ground handlers, KCAA AOC register and ATM performance, KCAA occurrence reports, KMD aviation weather. Fetches its own
- * rows (newest first, up to 200) and filters / pages them in the browser. A field the viewer's access tier hides
- * (occurrence narratives, cargo forwarders) arrives as null and shows as "-".
+ * ground handlers, KCAA AOC register and ATM performance, KCAA occurrence reports, KMD aviation weather. A field the
+ * viewer's access tier hides (occurrence narratives, cargo forwarders) arrives as null and shows as "-".
+ *
+ * Every table is a window onto the WHOLE server-side dataset: search, column filters, sorting and paging all run on
+ * the server (see composables/useServerTable), so nothing is capped at the first few hundred rows and the browser
+ * only ever holds one page. Export can take every matching row.
  */
-import { useAviationMaritime } from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import type { TableColumn } from '~/types/dataTable'
 
 type Dataset = 'air-cargo' | 'ground-handlers' | 'aoc' | 'atm' | 'occurrences' | 'weather'
 type Col = { key: string; label: string; type?: 'text' | 'mono' | 'num' | 'date' | 'datetime' | 'badge' | 'bool' | 'join'; badge?: Record<string, string>; join?: string[]; digits?: number }
-type Row = Record<string, any>
 
 const props = withDefaults(defineProps<{ dataset: Dataset; id?: string; defaultOpen?: boolean; airport?: string }>(), { defaultOpen: false, id: undefined, airport: undefined })
 
@@ -115,59 +94,33 @@ const CONFIG: Record<Dataset, { title: string; source: string; hint?: string; em
   },
 }
 
+
 const cfg = computed(() => CONFIG[props.dataset])
-const rows = ref<Row[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
-const search = ref('')
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const avm = useAviationMaritime()
-  const q = { page_size: 100, airport: props.airport }
-  try {
-    const res: any = await {
-      'air-cargo': () => avm.airCargoStats(q), 'ground-handlers': () => avm.groundHandlers(q), aoc: () => avm.airOperatorCertificates({ page_size: 100 }),
-      atm: () => avm.atmPerformance({ page_size: 100 }), occurrences: () => avm.safetyReports({ airport: props.airport }), weather: () => avm.metObservations({ scope: 'aviation' }),
-    }[props.dataset]()
-    rows.value = res.results ?? []
-  } catch {
-    rows.value = []
-    error.value = `Unable to load ${cfg.value.title.toLowerCase()}.`
-  } finally { loading.value = false }
-}
-onMounted(load)
-watch(() => [props.dataset, props.airport], load)
+const PATHS: Record<Dataset, string> = { 'air-cargo': 'air-cargo-stats', 'ground-handlers': 'ground-handlers', 'aoc': 'air-operator-certificates', 'atm': 'atm-performance', 'occurrences': 'safety-reports', 'weather': 'met-observations' }
+// Columns the server computes (they are not database columns): shown, but they cannot be sorted or filtered on.
+const COMPUTED: Record<Dataset, string[]> = { 'air-cargo': ['total_tonnes'], 'ground-handlers': ['performance_vs_standard_pct'], 'aoc': ['days_to_expiry'], 'atm': ['separation_incidents', 'atco_coverage_pct'], 'occurrences': ['aircraft_registration'], 'weather': [] }
+// Datasets whose endpoint takes the page-level `airport` selector.
+const SCOPED = new Set<Dataset>(['air-cargo', 'ground-handlers', 'occurrences'])
+// Fixed extra parameters per dataset.
+const EXTRA: Partial<Record<Dataset, Record<string, string>>> = { 'weather': { scope: 'aviation' } }
 
-const filtered = computed(() => {
-  const s = search.value.trim().toLowerCase()
-  return s ? rows.value.filter(r => Object.values(r).some(v => v != null && String(v).toLowerCase().includes(s))) : rows.value
+const columns: TableColumn[] = CONFIG[props.dataset].columns.map((c: Col, i: number) => ({
+  ...c,
+  ...(COMPUTED[props.dataset].includes(c.key) ? { sortable: false as const, filter: false as const } : {}),
+  priority: i < 5 ? (2 as const) : (3 as const),
+}))
+
+const table = useEndpointTable({
+  key: `aviation-${props.dataset}`,
+  path: `/api/v1/aviation-maritime/aviation/${PATHS[props.dataset]}/`,
+  columns,
+  pageSize: 25,
+  countyKey: 'aviation',
+  params: () => ({ ...EXTRA[props.dataset], ...(SCOPED.has(props.dataset) ? { airport: props.airport } : {}) }),
 })
-const { pageRows, page, totalPages, total, next, prev } = usePagination(filtered, 15)
-
-const label = (v: unknown) => String(v ?? '').replace(/_/g, ' ')
-const cellStyle = (c: Col) => (c.type === 'mono' ? 'font-family:monospace;font-size:12px' : c.type === 'num' ? 'text-align:right' : 'font-size:12px')
-const badgeVariant = (c: Col, v: string) => c.badge?.[v] ?? 'info'
-function fmtDate(v: string, time: boolean) {
-  const d = new Date(v)
-  return Number.isNaN(d.getTime()) ? v
-    : d.toLocaleString('en-KE', time ? { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: 'short', year: 'numeric' })
-}
-function cell(c: Col, r: Row): string {
-  const v = r[c.key]
-  if (c.type === 'join') return v == null ? '-' : (c.join ?? []).map(k => label(r[k])).filter(Boolean).join(' ')
-  if (v == null || v === '') return '-'
-  if (c.type === 'date') return fmtDate(v, false)
-  if (c.type === 'datetime') return fmtDate(v, true)
-  if (c.type === 'num') return Number(v).toLocaleString(undefined, { maximumFractionDigits: c.digits ?? 2 })
-  if (c.type === 'bool') return v ? 'Yes' : 'No'
-  return label(v)
-}
 </script>
 
 <style scoped>
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.table-scroll { overflow-x:auto; }
-.hint { font-size:12px; color:var(--fg-3); margin:0 0 8px; }
+.hint { font-size: 12px; color: var(--fg-3); margin: 0 0 8px; }
 </style>

@@ -37,7 +37,6 @@
           <option value="landed">Landed</option>
           <option value="scheduled">Scheduled</option>
         </select>
-        <TimeRangeSelector :range="timeRange" @change="load" />
         <button class="btn" @click="search=''; airlineFilter=''; statusFilter=''; load()">Clear</button>
         <ExportButton filename="uapts-flight-log.csv" :rows="filteredFlights" :columns="exportColumns" style="margin-left:auto" />
       </div>
@@ -139,6 +138,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('aviation')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.county.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

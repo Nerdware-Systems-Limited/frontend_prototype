@@ -9,7 +9,7 @@
 //   /traffic-signals/, /rural-road-status/, /asset-snapshots/, /summary/.
 // ─────────────────────────────────────────────────────────────────────
 
-import { useApi, cleanQuery, type SummaryFilterParams } from './_client'
+import { useApi, cleanQuery, scopeArgs, type SummaryFilterParams } from './_client'
 import type { Paged } from '~/types/uapts'
 
 // ── Enums ───────────────────────────────────────────────────────────
@@ -406,9 +406,10 @@ export function useInfrastructure() {
       api<{ count: number; results: RoadSegmentMapPoint[] }>(`${I}/road-segments/condition-map/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    segmentConditionDistribution: () =>
+    segmentConditionDistribution: (q?: { county?: string }) =>
       api<{ count: number; results: Array<{ condition_class: string; total: number; total_length_km: number }> }>(
         `${I}/road-segments/condition-distribution/`,
+        ...scopeArgs(q),
       ),
     segmentIRIHistogram: () => api<unknown>(`${I}/road-segments/iri-histogram/`),
 
@@ -417,7 +418,7 @@ export function useInfrastructure() {
       api<Paged<MaintenanceOrder>>(`${I}/maintenance-orders/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    maintenanceByType: () => api<unknown>(`${I}/maintenance-orders/by-type/`),
+    maintenanceByType: (q?: { county?: string }) => api<unknown>(`${I}/maintenance-orders/by-type/`, ...scopeArgs(q)),
     progressMaintenance: (id: string, body: { progress_pct: number }) =>
       api<MaintenanceOrder>(`${I}/maintenance-orders/${id}/progress/`, {
         method: 'POST',
@@ -439,28 +440,28 @@ export function useInfrastructure() {
     // ── Bridges ────────────────────────────────────────────────────
     bridges: (q?: InfrastructureQuery) =>
       api<Paged<Bridge>>(`${I}/bridges/`, { query: cleanQuery(q as Record<string, unknown>) }),
-    criticalBridges: () => api<Paged<Bridge>>(`${I}/bridges/critical/`),
+    criticalBridges: (q?: { county?: string }) => api<Paged<Bridge>>(`${I}/bridges/critical/`, ...scopeArgs(q)),
 
     // ── Streetlights ───────────────────────────────────────────────
     streetlights: (q?: InfrastructureQuery) =>
       api<Paged<Streetlight>>(`${I}/streetlights/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    streetlightStatusSummary: () =>
+    streetlightStatusSummary: (q?: { county?: string }) =>
       api<{
         count: number
         by_status: Record<string, number>
         operational_pct: number
-      }>(`${I}/streetlights/status-summary/`),
+      }>(`${I}/streetlights/status-summary/`, ...scopeArgs(q)),
 
     // ── Construction projects ──────────────────────────────────────
     projects: (q?: InfrastructureQuery) =>
       api<Paged<ConstructionProject>>(`${I}/construction-projects/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    projectPortfolio: () => api<unknown>(`${I}/construction-projects/portfolio/`),
-    delayedProjects: () => api<Paged<ConstructionProject>>(`${I}/construction-projects/delayed/`),
-    projectsByCounty: () => api<unknown>(`${I}/construction-projects/by-county/`),
+    projectPortfolio: (q?: { county?: string }) => api<unknown>(`${I}/construction-projects/portfolio/`, ...scopeArgs(q)),
+    delayedProjects: (q?: { county?: string }) => api<Paged<ConstructionProject>>(`${I}/construction-projects/delayed/`, ...scopeArgs(q)),
+    projectsByCounty: (q?: { county?: string }) => api<unknown>(`${I}/construction-projects/by-county/`, ...scopeArgs(q)),
 
     // ── ML deterioration forecasts ─────────────────────────────────
     forecasts: (q?: InfrastructureQuery) =>
@@ -490,7 +491,7 @@ export function useInfrastructure() {
       api<Paged<TrafficSignal>>(`${I}/traffic-signals/`, {
         query: cleanQuery(q as Record<string, unknown>),
       }),
-    signalFaults: () => api<Paged<TrafficSignal>>(`${I}/traffic-signals/faults/`),
+    signalFaults: (q?: { county?: string }) => api<Paged<TrafficSignal>>(`${I}/traffic-signals/faults/`, ...scopeArgs(q)),
 
     // ── Rural roads ────────────────────────────────────────────────
     ruralRoadStatus: (q?: InfrastructureQuery) =>

@@ -12,92 +12,18 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPIs -->
+  <!-- KPIs: counted, summed and averaged by the server over ALL operators / routes / licences, not over a first page -->
   <div class="kpi-grid">
-    <KpiCard
-      label="Registered Operators"
-      :value="fmtNum(saccos.length)"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      :description="`${fmtNum(kpis.active)} active`"
-      to="#operator-registry"
-    />
-    <KpiCard
-      label="Suspended"
-      :value="fmtNum(kpis.suspended)"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      description="Registration suspended"
-    />
-    <KpiCard
-      label="Revoked"
-      :value="fmtNum(kpis.revoked)"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      description="Registration revoked"
-    />
-    <KpiCard
-      label="Total Fleet Size"
-      :value="fmtNum(kpis.fleetSize)"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
-      period="LIVE"
-      description="Across all operators"
-    />
-    <KpiCard
-      label="Active Routes"
-      :value="fmtNum(kpis.activeRoutes)"
-      :unavailable="loading || routesError"
-      :unavailable-note="loading ? 'Loading…' : 'NaMATA GTFS-RT feed unavailable'"
-      period="LIVE"
-      :description="`${fmtNum(routes.length)} total routes served`"
-    />
-    <KpiCard
-      label="Avg Service Quality"
-      :value="kpis.avgQuality != null ? kpis.avgQuality.toFixed(0) + '/100' : '-'"
-      :unavailable="loading || saccosError"
-      :unavailable-note="loading ? 'Loading…' : 'NaMATA feed unavailable'"
-      period="LIVE"
-      description="Composite score, all operators"
-      :status="kpis.avgQuality == null ? undefined : kpis.avgQuality >= 70 ? 'healthy' : 'warning'"
-    />
-    <KpiCard
-      label="Open Complaints"
-      :value="fmtNum(kpis.openComplaints)"
-      :unavailable="loading || feedbackError"
-      :unavailable-note="loading ? 'Loading…' : 'NaMATA Feedback feed unavailable'"
-      period="LIVE"
-      description="Unresolved passenger feedback"
-    />
-    <KpiCard
-      label="Route Compliance"
-      :value="kpis.routeCompliance != null ? kpis.routeCompliance.toFixed(1) + '%' : '-'"
-      :unavailable="loading || complianceError"
-      :unavailable-note="loading ? 'Loading…' : 'NaMATA / NTSA feed unavailable'"
-      period="LIVE"
-      description="Compliant checks / total checks"
-      :status="kpis.routeCompliance == null ? undefined : kpis.routeCompliance >= 85 ? 'healthy' : 'warning'"
-    />
-    <KpiCard
-      label="Avg GPS Compliance"
-      :value="kpis.avgGps != null ? kpis.avgGps.toFixed(1) + '%' : '-'"
-      :unavailable="loading || licensesError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA iTIMS feed unavailable'"
-      period="LIVE"
-      description="Across active PSV licences"
-      :status="kpis.avgGps == null ? undefined : kpis.avgGps >= 90 ? 'healthy' : 'warning'"
-    />
-    <KpiCard
-      label="PSV Licence Compliance"
-      :value="kpis.licenceCompliance != null ? kpis.licenceCompliance.toFixed(1) + '%' : '-'"
-      :unavailable="loading || licensesError"
-      :unavailable-note="loading ? 'Loading…' : 'NTSA PSV Registry feed unavailable'"
-      period="LIVE"
-      description="Active licences / total issued"
-    />
+    <KpiCard label="Registered Operators" :value="fmtNum(operatorStats.count.value)" :unavailable="operatorStats.count.value === null" :unavailable-note="note(operatorStats)" period="LIVE" :description="`${fmtNum(operatorStats.groupCount('registration_status', 'active'))} active`" to="#operator-registry" />
+    <KpiCard label="Suspended" :value="fmtNum(operatorStats.groupCount('registration_status', 'suspended'))" :unavailable="operatorStats.count.value === null" :unavailable-note="note(operatorStats)" period="LIVE" description="Registration suspended" />
+    <KpiCard label="Revoked" :value="fmtNum(operatorStats.groupCount('registration_status', 'revoked'))" :unavailable="operatorStats.count.value === null" :unavailable-note="note(operatorStats)" period="LIVE" description="Registration revoked" />
+    <KpiCard label="Total Fleet Size" :value="fmtNum(operatorStats.sum('fleet_size'))" :unavailable="operatorStats.count.value === null" :unavailable-note="note(operatorStats)" period="LIVE" description="Across all operators" />
+    <KpiCard label="Active Routes" :value="fmtNum(activeRoutes.count.value)" :unavailable="activeRoutes.count.value === null" :unavailable-note="note(activeRoutes)" period="LIVE" :description="`${fmtNum(routeStats.count.value)} total routes served`" />
+    <KpiCard label="Avg Service Quality" :value="avgQuality != null ? avgQuality.toFixed(0) + '/100' : '-'" :unavailable="operatorStats.count.value === null" :unavailable-note="note(operatorStats)" period="LIVE" description="Composite score, all operators" :status="avgQuality == null ? undefined : avgQuality >= 70 ? 'healthy' : 'warning'" />
+    <KpiCard label="Open Complaints" :value="fmtNum(openComplaints.count.value)" :unavailable="openComplaints.count.value === null" :unavailable-note="note(openComplaints)" period="LIVE" description="Unresolved passenger feedback" />
+    <KpiCard label="Route Compliance" :value="routeCompliance != null ? routeCompliance.toFixed(1) + '%' : '-'" :unavailable="complianceStats.count.value === null" :unavailable-note="note(complianceStats)" period="LIVE" description="Compliant checks / total checks" :status="routeCompliance == null ? undefined : routeCompliance >= 85 ? 'healthy' : 'warning'" />
+    <KpiCard label="Avg GPS Compliance" :value="avgGps != null ? avgGps.toFixed(1) + '%' : '-'" :unavailable="gpsStats.count.value === null" :unavailable-note="note(gpsStats)" period="LIVE" description="Across active PSV licences" :status="avgGps == null ? undefined : avgGps >= 90 ? 'healthy' : 'warning'" />
+    <KpiCard label="PSV Licence Compliance" :value="licenceCompliance != null ? licenceCompliance.toFixed(1) + '%' : '-'" :unavailable="licenceStats.count.value === null" :unavailable-note="note(licenceStats)" period="LIVE" description="Active licences / total issued" />
   </div>
 
   <!-- Registry -->
@@ -105,179 +31,15 @@
 
   <div id="operator-registry" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="search" class="select-sm" placeholder="Search operator name…" style="min-width:180px" />
-        <select v-model="statusFilter" class="select-sm">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-          <option value="revoked">Revoked</option>
-        </select>
-        <select v-model="serviceTypeFilter" class="select-sm">
-          <option value="">All service types</option>
-          <option value="matatu">Matatu</option>
-          <option value="brt">BRT</option>
-          <option value="ferry">Ferry</option>
-          <option value="rail">Rail</option>
-        </select>
-        <select v-model="fleetBandFilter" class="select-sm">
-          <option value="">All fleet sizes</option>
-          <option value="small">Small (&lt; 20 vehicles)</option>
-          <option value="medium">Medium (20-49)</option>
-          <option value="large">Large (50+)</option>
-        </select>
-        <select v-model="complaintFilter" class="select-sm">
-          <option value="">All complaint levels</option>
-          <option value="open">Has open complaints</option>
-          <option value="none">No open complaints</option>
-        </select>
-        <select v-model="sortKey" class="select-sm">
-          <option value="sacco_name">Name</option>
-          <option value="fleet_size">Fleet size</option>
-          <option value="service_quality_score">Service quality</option>
-          <option value="route_compliance">Route compliance</option>
-          <option value="complaint_count">Complaints</option>
-          <option value="revenue">Revenue</option>
-        </select>
-        <button class="btn" @click="clearFilters">Clear</button>
-        <ExportButton
-          filename="uapts-operators.csv"
-          :rows="exportRows"
-          :columns="exportColumns"
-          style="margin-left:auto"
-        />
-      </div>
-
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Operator</th>
-              <th>Status</th>
-              <th>Contact</th>
-              <th>Routes</th>
-              <th>Fleet</th>
-              <th>Service Quality</th>
-              <th>Route Compliance</th>
-              <th>Complaints</th>
-              <th>Revenue (period)</th>
-              <th>Fleet Util %</th>
-              <th>Payment Channels</th>
-              <th>Last Refresh</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredOperators.length">
-            <template v-for="op in operatorsPageRows" :key="op.id">
-              <tr class="op-row" @click="toggleExpand(op.id)">
-                <td class="expand-cell">{{ expandedId === op.id ? '▾' : '▸' }}</td>
-                <td style="font-weight:600">{{ op.sacco_name }}</td>
-                <td><BadgePill :variant="statusBadge(op.registration_status)">{{ op.registration_status }}</BadgePill></td>
-                <td style="font-size:12px">{{ op.contact_phone ?? '-' }}</td>
-                <td>{{ fmtNum(op.route_count) }}</td>
-                <td>{{ fmtNum(op.fleet_size) }}</td>
-                <td>
-                  <div class="util-bar-wrap">
-                    <div class="util-bar" :style="{ transform: `scaleX(${op.service_quality_score / 100})`, background: scoreBg(op.service_quality_score) }" />
-                  </div>
-                  <span style="font-size:11px">{{ op.service_quality_score.toFixed(0) }}/100</span>
-                </td>
-                <td>
-                  <span v-if="op.route_compliance != null" :style="{ color: scoreBg(op.route_compliance) }">
-                    {{ op.route_compliance.toFixed(0) }}%
-                  </span>
-                  <span v-else style="color:var(--fg-3)">-</span>
-                </td>
-                <td>
-                  <span :style="{ color: op.complaint_count > 5 ? 'var(--danger-fg)' : op.complaint_count > 0 ? 'var(--warning-fg)' : 'var(--success-fg)' }">
-                    {{ fmtNum(op.complaint_count) }}
-                  </span>
-                </td>
-                <td style="font-size:12px">{{ op.revenue != null ? fmtKES(op.revenue) : '-' }}</td>
-                <td style="font-size:12px">{{ op.fleet_utilization_pct != null ? op.fleet_utilization_pct.toFixed(0) + '%' : '-' }}</td>
-                <td style="font-size:11px;text-transform:capitalize">{{ op.payment_channels.join(', ') || '-' }}</td>
-                <td style="font-size:11px">{{ op.last_refresh ? fmtDate(op.last_refresh) : '-' }}</td>
-              </tr>
-              <tr v-if="expandedId === op.id" class="op-detail-row">
-                <td :colspan="13">
-                  <div class="drilldown">
-                    <div class="dd-col">
-                      <div class="dd-title">Routes Served ({{ op.routesForSacco.length }})</div>
-                      <div v-if="op.routesForSacco.length" class="dd-list">
-                        <div v-for="r in op.routesForSacco" :key="r.id" class="dd-item">
-                          <span style="font-weight:600">{{ r.route_name }}</span>
-                          <BadgePill variant="info">{{ r.service_type }}</BadgePill>
-                          <span style="color:var(--fg-3)">{{ r.stop_count }} stops · KES {{ r.fare_kes }}</span>
-                        </div>
-                      </div>
-                      <div v-else class="dd-empty">No routes on file.</div>
-                    </div>
-
-                    <div class="dd-col">
-                      <div class="dd-title">PSV Licences ({{ op.licensesForSacco.length }})</div>
-                      <div v-if="op.licensesForSacco.length" class="dd-list">
-                        <div v-for="l in op.licensesForSacco" :key="l.id" class="dd-item">
-                          <span style="font-family:monospace">{{ l.license_number }}</span>
-                          <BadgePill :variant="statusBadge(l.status)">{{ l.status }}</BadgePill>
-                          <span style="color:var(--fg-3)">exp {{ fmtDate(l.expiry_date) }} · GPS {{ l.gps_compliance_pct.toFixed(0) }}%</span>
-                        </div>
-                      </div>
-                      <div v-else class="dd-empty">No PSV licences on file.</div>
-                    </div>
-
-                    <div class="dd-col">
-                      <div class="dd-title">Service Quality Components</div>
-                      <div v-if="op.qualityForSacco.length" class="dd-list">
-                        <div v-for="q in op.qualityForSacco" :key="q.id" class="dd-item dd-item-block">
-                          <span style="color:var(--fg-3)">{{ fmtDate(q.period_start) }} – {{ fmtDate(q.period_end) }}</span>
-                          <span>On-time {{ q.on_time_pct.toFixed(0) }}% · Complaint rate {{ q.complaint_rate.toFixed(2) }} · Vehicle age {{ q.vehicle_age_score.toFixed(0) }} · Occupancy {{ q.occupancy_score.toFixed(0) }}</span>
-                        </div>
-                      </div>
-                      <div v-else class="dd-empty">No service-quality records.</div>
-                    </div>
-
-                    <div class="dd-col">
-                      <div class="dd-title">Complaints / Feedback ({{ op.feedbackForSacco.length }})</div>
-                      <div v-if="op.feedbackForSacco.length" class="dd-list">
-                        <div v-for="f in op.feedbackForSacco.slice(0, 8)" :key="f.id" class="dd-item dd-item-block">
-                          <span>
-                            <BadgePill :variant="fbStatusBadge(f.status)">{{ f.status }}</BadgePill>
-                            {{ f.category.replace(/_/g,' ') }} · {{ f.rating }}★
-                          </span>
-                          <span style="color:var(--fg-3)">{{ f.text || '(no comment)' }}</span>
-                        </div>
-                      </div>
-                      <div v-else class="dd-empty">No feedback on file.</div>
-                    </div>
-
-                    <div class="dd-col">
-                      <div class="dd-title">Enforcement / Compliance Flags</div>
-                      <div v-if="op.complianceForSacco.length" class="dd-list">
-                        <div v-for="c in op.complianceForSacco.slice(0, 8)" :key="c.id" class="dd-item">
-                          <BadgePill :variant="complianceBadge(c.status)">{{ c.status }}</BadgePill>
-                          <span>{{ c.check_type }} · {{ c.route_name ?? c.route }}</span>
-                        </div>
-                      </div>
-                      <div v-else class="dd-empty">No compliance checks recorded.</div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tbody v-else>
-            <tr>
-              <td colspan="13" style="text-align:center;color:var(--fg-3);padding:16px">
-                {{ loading ? 'Loading operators…' : 'No operators match the current filters.' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <TablePagination
-          :page="operatorsPage" :total-pages="operatorsTotalPages" :total="operatorsTotal"
-          @prev="operatorsPrev" @next="operatorsNext"
-        />
-      </div>
+      <DataTable :table="operatorTable" row-key="id" title="Operator registry" export-name="uapts-operators" expandable filters-open
+                 placeholder="Search operator name, contact…" empty="No operators match the current filters.">
+        <template #cell-sacco_name="{ row }"><span style="font-weight:600">{{ row.sacco_name }}</span></template>
+        <template #cell-service_quality_score="{ row }">
+          <div class="util-bar-wrap"><div class="util-bar" :style="{ transform: `scaleX(${row.service_quality_score / 100})`, background: scoreBg(row.service_quality_score) }" /></div>
+          <span style="font-size:11px">{{ Number(row.service_quality_score).toFixed(0) }}/100</span>
+        </template>
+        <template #expanded="{ row }"><OperatorDetailPanel :sacco="row.id" /></template>
+      </DataTable>
     </div>
   </div>
 
@@ -286,43 +48,12 @@
 
   <div class="card">
     <div class="card-body">
-      <table>
-        <thead>
-          <tr>
-            <th>Route</th>
-            <th>Target Time</th>
-            <th>Predicted Pax</th>
-            <th>Range</th>
-            <th>Model</th>
-            <th>Horizon (h)</th>
-          </tr>
-        </thead>
-        <tbody v-if="forecasts.length">
-          <tr v-for="f in forecastsPageRows" :key="f.id">
-            <td style="font-weight:600;font-size:12px">{{ f.route_name ?? f.route }}</td>
-            <td style="font-size:12px;white-space:nowrap">{{ fmtTime(f.target_at) }}</td>
-            <td style="font-weight:700">{{ fmtNum(f.predicted_passengers) }}</td>
-            <td style="font-size:12px;color:var(--fg-2)">
-              {{ fmtNum(f.lower_passengers) }} – {{ fmtNum(f.upper_passengers) }}
-            </td>
-            <td style="font-size:11px">
-              <BadgePill variant="info">{{ f.model_name }}</BadgePill>
-            </td>
-            <td>{{ f.horizon_hours }}h</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr>
-            <td colspan="6" style="text-align:center;color:var(--fg-3);padding:16px">
-              {{ loading ? 'Loading forecasts…' : 'No demand forecast data available.' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="forecastsPage" :total-pages="forecastsTotalPages" :total="forecastsTotal"
-        @prev="forecastsPrev" @next="forecastsNext"
-      />
+      <DataTable :table="forecastTable" row-key="id" title="Demand forecasts" export-name="uapts-demand-forecasts"
+                 placeholder="Search route, model…" empty="No demand forecast data available.">
+        <template #cell-route_name="{ row }"><span style="font-weight:600">{{ row.route_name ?? row.route }}</span></template>
+        <template #cell-predicted_passengers="{ row }"><span style="font-weight:700">{{ fmtNum(row.predicted_passengers) }}</span></template>
+        <template #cell-range="{ row }">{{ fmtNum(row.lower_passengers) }} – {{ fmtNum(row.upper_passengers) }}</template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -331,257 +62,88 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { usePublicTransport } from '~/composables/api'
-import type {
-  Sacco, Route, OperatorMetric, ServiceQualityScore,
-  PassengerFeedback, DemandForecast, PSVLicense, PaymentTransaction,
-} from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import type { TableColumn } from '~/types/dataTable'
 
-type ComplianceRecord = { id: string; route: string; route_name?: string; check_type: string; status: string; notes: string; checked_at: string }
+// The registry and the forecasts are windows onto the WHOLE dataset (search, filters, sorting, paging on the server) and every
+// KPI is a server count / sum / average - nothing is computed from a first page (see docs/data-tables.md). The per-operator
+// drill-down loads only the opened operator's records.
+const PT = '/api/v1/public-transport'
 
-const saccos       = ref<Sacco[]>([])
-const routes       = ref<Route[]>([])
-const metrics      = ref<OperatorMetric[]>([])
-const quality      = ref<ServiceQualityScore[]>([])
-const feedback     = ref<PassengerFeedback[]>([])
-const licenses     = ref<PSVLicense[]>([])
-const payments     = ref<PaymentTransaction[]>([])
-const compliance   = ref<ComplianceRecord[]>([])
-const forecasts    = ref<DemandForecast[]>([])
-const loading      = ref(true)
-const error        = ref<string | null>(null)
-const saccosError     = ref(false)
-const routesError     = ref(false)
-const feedbackError   = ref(false)
-const complianceError = ref(false)
-const licensesError   = ref(false)
-const lastRefreshed = ref('-')
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('public-transport')
+const scope = () => county.query.value
 
-const search            = ref('')
-const statusFilter      = ref('')
-const serviceTypeFilter = ref('')
-const fleetBandFilter   = ref('')
-const complaintFilter   = ref('')
-const sortKey           = ref('sacco_name')
-const expandedId        = ref<string | null>(null)
+const REG_STATUSES = ['active', 'suspended', 'revoked'].map(value => ({ value, label: value[0]!.toUpperCase() + value.slice(1) }))
+const REG_BADGE: Record<string, string> = { active: 'success', suspended: 'warning', revoked: 'danger' }
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const pt = usePublicTransport()
-
-  const [saccosRes, routesRes, metricsRes, qualityRes, feedbackRes, licensesRes, paymentsRes, complianceRes, forecastsRes] = await Promise.allSettled([
-    pt.saccos({ page_size: 100 }),
-    pt.routes({ page_size: 200 }),
-    pt.operatorMetrics({ page_size: 200 }),
-    pt.serviceQuality({ page_size: 200 }),
-    pt.feedback({ page_size: 200 }),
-    pt.psvLicenses({ page_size: 200 }),
-    pt.payments({ page_size: 200 }),
-    pt.compliance({ page_size: 200 }),
-    pt.demandForecasts({ page_size: 24 }),
-  ])
-
-  if (saccosRes.status     === 'fulfilled') saccos.value     = (saccosRes.value as any).results ?? []
-  if (routesRes.status     === 'fulfilled') routes.value     = (routesRes.value as any).results ?? []
-  if (metricsRes.status    === 'fulfilled') metrics.value    = (metricsRes.value as any).results ?? []
-  if (qualityRes.status    === 'fulfilled') quality.value    = (qualityRes.value as any).results ?? []
-  if (feedbackRes.status   === 'fulfilled') feedback.value   = (feedbackRes.value as any).results ?? []
-  if (licensesRes.status   === 'fulfilled') licenses.value   = (licensesRes.value as any).results ?? []
-  if (paymentsRes.status   === 'fulfilled') payments.value   = (paymentsRes.value as any).results ?? []
-  if (complianceRes.status === 'fulfilled') compliance.value = (complianceRes.value as any).results ?? []
-  if (forecastsRes.status  === 'fulfilled') forecasts.value  = (forecastsRes.value as any).results ?? []
-
-  saccosError.value     = saccosRes.status     === 'rejected'
-  routesError.value     = routesRes.status     === 'rejected'
-  feedbackError.value   = feedbackRes.status   === 'rejected'
-  complianceError.value = complianceRes.status === 'rejected'
-  licensesError.value   = licensesRes.status   === 'rejected'
-
-  if ([saccosRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Public Transport API.'
-
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-  loading.value = false
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-function toggleExpand(id: string) {
-  expandedId.value = expandedId.value === id ? null : id
-}
-function clearFilters() {
-  search.value = ''; statusFilter.value = ''; serviceTypeFilter.value = ''
-  fleetBandFilter.value = ''; complaintFilter.value = ''; sortKey.value = 'sacco_name'
-}
-
-// ── Per-operator aggregation ────────────────────────────────────────────
-const operators = computed(() => saccos.value.map(s => {
-  const routesForSacco     = routes.value.filter(r => r.sacco === s.id)
-  const routeIds           = new Set(routesForSacco.map(r => r.id))
-  const licensesForSacco   = licenses.value.filter(l => l.sacco === s.id)
-  const feedbackForSacco   = feedback.value.filter(f => f.sacco === s.id)
-  const qualityForSacco    = quality.value.filter(q => q.sacco === s.id)
-  const metricsForSacco    = metrics.value
-    .filter(m => m.sacco === s.id)
-    .sort((a, b) => (a.period_end < b.period_end ? 1 : -1))
-  const latestMetric       = metricsForSacco[0] ?? null
-  const complianceForSacco = compliance.value.filter(c => routeIds.has(c.route))
-  const paymentsForSacco   = payments.value.filter(p => p.route && routeIds.has(p.route))
-
-  const compliantCount = complianceForSacco.filter(c => c.status === 'compliant').length
-  const routeCompliance = complianceForSacco.length ? (compliantCount / complianceForSacco.length) * 100 : null
-
-  const revenue = latestMetric?.revenue_kes != null ? Number(latestMetric.revenue_kes)
-    : (paymentsForSacco.length ? paymentsForSacco.reduce((sum, p) => sum + Number(p.amount_kes || 0), 0) : null)
-
-  const paymentChannels = [...new Set(paymentsForSacco.map(p => p.provider))]
-
-  return {
-    id: s.id,
-    sacco_name: s.sacco_name,
-    registration_status: s.registration_status,
-    contact_phone: s.contact_phone,
-    route_count: s.route_count,
-    fleet_size: s.fleet_size,
-    service_quality_score: s.service_quality_score,
-    route_compliance: routeCompliance,
-    complaint_count: feedbackForSacco.filter(f => f.status === 'open').length,
-    revenue,
-    fleet_utilization_pct: latestMetric?.fleet_utilization_pct ?? null,
-    payment_channels: paymentChannels,
-    last_refresh: latestMetric?.period_end ?? s.updated_at ?? null,
-    routesForSacco, licensesForSacco, feedbackForSacco, qualityForSacco, complianceForSacco,
-  }
-}))
-
-const filteredOperators = computed(() => {
-  let list = operators.value.filter(op => {
-    if (search.value && !op.sacco_name.toLowerCase().includes(search.value.toLowerCase())) return false
-    if (statusFilter.value && op.registration_status !== statusFilter.value) return false
-    if (serviceTypeFilter.value && !op.routesForSacco.some(r => r.service_type === serviceTypeFilter.value)) return false
-    if (fleetBandFilter.value === 'small'  && !(op.fleet_size < 20)) return false
-    if (fleetBandFilter.value === 'medium' && !(op.fleet_size >= 20 && op.fleet_size < 50)) return false
-    if (fleetBandFilter.value === 'large'  && !(op.fleet_size >= 50)) return false
-    if (complaintFilter.value === 'open' && !(op.complaint_count > 0)) return false
-    if (complaintFilter.value === 'none' && !(op.complaint_count === 0)) return false
-    return true
-  })
-  const key = sortKey.value
-  return [...list].sort((a: any, b: any) => {
-    if (key === 'sacco_name') return a.sacco_name.localeCompare(b.sacco_name)
-    const av = Number(a[key] ?? 0), bv = Number(b[key] ?? 0)
-    return bv - av
-  })
-})
-
-// ── Export (current filtered view) ──────────────────────────────────────
-const exportColumns = [
-  { key: 'sacco_name', label: 'Operator' },
-  { key: 'registration_status', label: 'Status' },
-  { key: 'contact_phone', label: 'Contact' },
-  { key: 'route_count', label: 'Routes' },
-  { key: 'fleet_size', label: 'Fleet' },
-  { key: 'service_quality_score', label: 'Service Quality' },
-  { key: 'route_compliance', label: 'Route Compliance %' },
-  { key: 'complaint_count', label: 'Complaints' },
-  { key: 'revenue', label: 'Revenue (KES)' },
-  { key: 'fleet_utilization_pct', label: 'Fleet Util %' },
-  { key: 'payment_channels', label: 'Payment Channels' },
-  { key: 'last_refresh', label: 'Last Refresh' },
+// ── Operator registry ────────────────────────────────────────────────────
+const operatorColumns: TableColumn[] = [
+  { key: 'sacco_name', label: 'Operator', priority: 1, pin: 'left', minWidth: 170 },
+  { key: 'registration_status', label: 'Status', type: 'badge', badge: REG_BADGE, options: REG_STATUSES, priority: 1 },
+  { key: 'contact_phone', label: 'Contact', priority: 3 },
+  { key: 'agency_code', label: 'Agency', priority: 3 },
+  { key: 'route_count', label: 'Routes', type: 'num', priority: 2 },
+  { key: 'fleet_size', label: 'Fleet', type: 'num', priority: 1 },
+  { key: 'service_quality_score', label: 'Service Quality', type: 'num', digits: 0, priority: 1 },
+  { key: 'updated_at', label: 'Last Refresh', type: 'date', priority: 3 },
 ]
-const exportRows = computed(() => filteredOperators.value.map(op => ({
-  ...op,
-  payment_channels: op.payment_channels.join(', '),
-})))
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: operatorsPageRows, page: operatorsPage, totalPages: operatorsTotalPages,
-  total: operatorsTotal, next: operatorsNext, prev: operatorsPrev,
-} = usePagination(filteredOperators, 15)
-
-const {
-  pageRows: forecastsPageRows, page: forecastsPage, totalPages: forecastsTotalPages,
-  total: forecastsTotal, next: forecastsNext, prev: forecastsPrev,
-} = usePagination(forecasts, 15)
-
-// ── KPIs ─────────────────────────────────────────────────────────────────
-const kpis = computed(() => {
-  const active    = saccos.value.filter(s => s.registration_status === 'active').length
-  const suspended = saccos.value.filter(s => s.registration_status === 'suspended').length
-  const revoked   = saccos.value.filter(s => s.registration_status === 'revoked').length
-  const fleetSize = saccos.value.reduce((sum, s) => sum + (s.fleet_size ?? 0), 0)
-  const activeRoutes = routes.value.filter(r => r.is_active).length
-  const avgQuality = saccos.value.length
-    ? saccos.value.reduce((sum, s) => sum + s.service_quality_score, 0) / saccos.value.length
-    : null
-  const openComplaints = feedback.value.filter(f => f.status === 'open').length
-  const compliant = compliance.value.filter(c => c.status === 'compliant').length
-  const routeCompliance = compliance.value.length ? (compliant / compliance.value.length) * 100 : null
-  const activeLicenses = licenses.value.filter(l => l.status === 'active')
-  const avgGps = activeLicenses.length
-    ? activeLicenses.reduce((sum, l) => sum + l.gps_compliance_pct, 0) / activeLicenses.length
-    : null
-  const licenceCompliance = licenses.value.length
-    ? (activeLicenses.length / licenses.value.length) * 100
-    : null
-
-  return { active, suspended, revoked, fleetSize, activeRoutes, avgQuality, openComplaints, routeCompliance, avgGps, licenceCompliance }
+const operatorTable = useEndpointTable({
+  key: 'pt-operators', path: `${PT}/saccos/`, columns: operatorColumns, countyKey: 'public-transport', pageSize: 15,
+  defaultSort: [{ key: 'sacco_name', dir: 'asc' }],
 })
+
+// ── Demand forecasts (the endpoint serves only future targets, soonest first) ──
+const forecastColumns: TableColumn[] = [
+  { key: 'route_name', label: 'Route', priority: 1, pin: 'left', minWidth: 150 },
+  { key: 'target_at', label: 'Target Time', type: 'datetime', priority: 1 },
+  { key: 'predicted_passengers', label: 'Predicted Pax', type: 'num', priority: 1 },
+  { key: 'range', label: 'Range', sortable: false, filter: false, exportAs: r => `${r.lower_passengers}-${r.upper_passengers}`, priority: 2 },
+  { key: 'model_name', label: 'Model', priority: 3 },
+  { key: 'horizon_hours', label: 'Horizon (h)', type: 'num', priority: 3 },
+]
+const forecastTable = useEndpointTable({
+  key: 'pt-demand-forecasts', path: `${PT}/demand-forecasts/`, columns: forecastColumns, countyKey: 'public-transport', pageSize: 15,
+  defaultSort: [{ key: 'target_at', dir: 'asc' }],
+})
+
+// ── KPIs: counted by the server ──────────────────────────────────────────
+const operatorStats = useServerCount(`${PT}/saccos/`, scope, { aggregate: ['sum:fleet_size', 'avg:service_quality_score'], groupBy: ['registration_status'] })
+const routeStats = useServerCount(`${PT}/routes/`, scope)
+const activeRoutes = useServerCount(`${PT}/routes/`, () => ({ ...scope(), 'f.is_active__exact': 'true' }))
+const openComplaints = useServerCount(`${PT}/feedback/`, () => ({ ...scope(), 'f.status__exact': 'open' }))
+const complianceStats = useServerCount(`${PT}/compliance/`, scope, { groupBy: ['status'] })
+const gpsStats = useServerCount(`${PT}/psv-licenses/`, () => ({ ...scope(), 'f.status__exact': 'active' }), { aggregate: ['avg:gps_compliance_pct'] })
+const licenceStats = useServerCount(`${PT}/psv-licenses/`, scope, { groupBy: ['status'] })
+const allStats = [operatorStats, routeStats, activeRoutes, openComplaints, complianceStats, gpsStats, licenceStats]
+
+const avgQuality = computed(() => operatorStats.avg('service_quality_score'))
+const avgGps = computed(() => gpsStats.avg('gps_compliance_pct'))
+const pct = (num: number | null, den: number | null) => (num === null || !den ? null : (num / den) * 100)
+const routeCompliance = computed(() => pct(complianceStats.groupCount('status', 'compliant'), complianceStats.count.value))
+const licenceCompliance = computed(() => pct(licenceStats.groupCount('status', 'active'), licenceStats.count.value))
+const note = (s: { loading: { value: boolean } }) => s.loading.value ? 'Loading…' : 'NTSA / NaMATA feed unavailable'
+const error = computed(() => operatorStats.failed.value && !operatorStats.loading.value ? 'Unable to reach the UAPTS Public Transport API.' : null)
+
+// Keep it live (the page used to reload every two minutes).
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(() => { void Promise.all([operatorTable.refresh(), forecastTable.refresh(), ...allStats.map(s => s.refresh())]) }, 120_000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
   if (v == null) return '-'
   return v.toLocaleString(undefined, { maximumFractionDigits: d })
 }
-function fmtKES(n: number | null | undefined) {
-  if (n == null) return '-'
-  if (n >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000)     return `KES ${(n / 1_000).toFixed(1)}k`
-  return `KES ${Math.round(n).toLocaleString()}`
-}
-function fmtDate(s: string) {
-  try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'2-digit' }) }
-  catch { return s }
-}
-function fmtTime(iso: string) {
-  try { return new Date(iso).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
-  catch { return iso }
-}
 function scoreBg(pct: number) {
   return pct >= 85 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--destructive)'
-}
-function statusBadge(s: string) {
-  const m: Record<string,string> = { active:'success', expired:'danger', suspended:'warning', revoked:'danger' }
-  return m[s] ?? 'neutral'
-}
-function fbStatusBadge(s: string) {
-  const m: Record<string,string> = { open:'warning', investigating:'info', resolved:'success', closed:'neutral' }
-  return m[s] ?? 'neutral'
-}
-function complianceBadge(s: string) {
-  const m: Record<string,string> = { compliant:'success', flagged:'warning', violation:'danger' }
-  return m[s] ?? 'neutral'
 }
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; margin-bottom:16px; }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.table-scroll { overflow-x:auto; }
-.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; }
+.util-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-bottom:2px; min-width:70px; }
 .util-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .4s; }
-.op-row { cursor:pointer; }
-.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
-.op-detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
-.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
-.dd-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--fg-2); margin-bottom:8px; }
-.dd-list { display:flex; flex-direction:column; gap:6px; }
-.dd-item { display:flex; align-items:center; gap:8px; font-size:12px; flex-wrap:wrap; }
-.dd-item-block { flex-direction:column; align-items:flex-start; gap:2px; }
-.dd-empty { font-size:12px; color:var(--fg-3); }
 </style>

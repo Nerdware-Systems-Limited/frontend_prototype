@@ -4,9 +4,6 @@
     title="Blackspot Analysis"
     subtitle="NTSA · KeNHA · KMD - KDE accident cluster analysis, KeNHA road geometry context, KMD weather correlation, and predictive hotspot overlays"
   >
-    <template #actions>
-      <TimeRangeSelector :range="range" @change="load" />
-    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -266,6 +263,7 @@ async function load() {
 }
 
 onMounted(load)
+watch(() => JSON.stringify(range.query.value), load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })

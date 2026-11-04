@@ -5,7 +5,6 @@
     subtitle="Cargo moving through Kenya under a transit declaration - customs status, destination, time in transit and security alerts"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink v-if="canSee('/corridor/border-crossings')" to="/corridor/border-crossings" class="btn">Border Crossings<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
@@ -171,7 +170,10 @@ const access = useAccessControl()
 const canSee = access.canAccessRoute
 const hours = fmtHours
 
-const days = ref(30)
+// The window follows the global period (top bar); these endpoints take a rolling day count, so a year / custom
+// global range falls back to 30 days here.
+const timeRange = useTimeRange('corridor', { default: '30d' })
+const days = timeRange.days
 const summary = ref<TransitSummary | null>(null)
 const rows = ref<TransitShipment[]>([])
 const detail = ref<TransitShipment | null>(null)
@@ -203,6 +205,7 @@ function resetPage() { page.value = 1; loadRows() }
 function toggleStatus(s: CustomsStatus) { statusFilter.value = statusFilter.value === s ? '' : s; resetPage() }
 function filterDestination(d: string) { q.destination_country = q.destination_country === d ? '' : d; resetPage() }
 onMounted(load)
+watch(days, load)
 
 const count = (s: CustomsStatus) => summary.value?.status_counts.find(x => x.status === s)?.count ?? 0
 const total = computed(() => summary.value?.status_counts.reduce((a, s) => a + s.count, 0) ?? null)

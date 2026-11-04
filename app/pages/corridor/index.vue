@@ -5,7 +5,6 @@
     subtitle="NCTTCA · KenTrade · LAPSSET - transit, border crossings and corridor development across the Northern and LAPSSET corridors"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink v-if="canSee('/corridor/northern')" to="/corridor/northern" class="btn">Northern Corridor<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink v-if="canSee('/corridor/lapsset')" to="/corridor/lapsset" class="btn">LAPSSET<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
@@ -158,7 +157,10 @@ import {
 const access = useAccessControl()
 const canSee = access.canAccessRoute
 
-const days = ref(30)
+// The window follows the global period (top bar); these endpoints take a rolling day count, so a year / custom
+// global range falls back to 30 days here.
+const timeRange = useTimeRange('corridor', { default: '30d' })
+const days = timeRange.days
 const summary = ref<CorridorSummary | null>(null)
 const series = ref<KpiSeries[]>([])
 const alignments = ref<CorridorAlignment[]>([])
@@ -177,6 +179,7 @@ async function load() {
   loading.value = false
 }
 onMounted(load)
+watch(days, load)
 
 const k = computed(() => summary.value?.kpis ?? null)
 const lines = computed(() => alignmentLines(alignments.value))

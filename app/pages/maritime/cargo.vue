@@ -17,9 +17,9 @@
   <!-- KPIs -->
   <div class="kpi-grid">
     <KpiCard
-      label="Cargo Tonnes (30d)" :value="cargoTonnesTotal != null ? `${fmtNum(cargoTonnesTotal)}t` : '-'"
+      :label="`Cargo Tonnes (${days}d)`" :value="cargoTonnesTotal != null ? `${fmtNum(cargoTonnesTotal)}t` : '-'"
       :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
-      period="30D" :description="cargoTeuTotal != null ? `${fmtNum(cargoTeuTotal)} TEU` : 'All cargo types'"
+      :period="period" :description="cargoTeuTotal != null ? `${fmtNum(cargoTeuTotal)} TEU` : 'All cargo types'"
       to="#cargo-type-breakdown"
     />
     <KpiCard
@@ -35,12 +35,12 @@
     <KpiCard
       label="FCL Share" :value="pct(fclSharePct)"
       :unavailable="loading || btError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
-      period="30D" description="Of containerised cargo tonnage" to="#cargo-type-breakdown"
+      :period="period" description="Of containerised cargo tonnage" to="#cargo-type-breakdown"
     />
     <KpiCard
-      label="Reefer Shipments (30d)" :value="fmtNum(reeferShipments)"
+      :label="`Reefer Shipments (${days}d)`" :value="fmtNum(reeferShipments)"
       :unavailable="loading || btError" :unavailable-note="loading ? 'Loading…' : 'KPA feed unavailable'"
-      period="30D" description="Cold-chain cargo" to="#cargo-type-breakdown"
+      :period="period" description="Cold-chain cargo" to="#cargo-type-breakdown"
     />
     <KpiCard
       label="Avg Gate Processing" :value="gateProcessingMin != null ? `${gateProcessingMin.toFixed(0)} min` : '-'"
@@ -52,7 +52,7 @@
   </div>
 
   <!-- Cargo type breakdown -->
-  <SectionTitle pill="KPA · Live">Cargo Type Breakdown (30d)</SectionTitle>
+  <SectionTitle pill="KPA · Live">Cargo Type Breakdown ({{ days }}d)</SectionTitle>
   <div id="cargo-type-breakdown" class="card drill-target">
     <div class="card-body">
       <div v-if="cargoByType.length" class="cong-list">
@@ -202,11 +202,11 @@ async function load() {
   const mc = useMaritimeCargo()
 
   const [sumRes, btRes, plRes, skRes, otRes] = await Promise.allSettled([
-    mc.summary(),
-    mc.byType({ days: 30 }),
-    mc.pipeline({ page_size: 50 }),
-    mc.handlingStageKpis(),
-    mc.onwardTransport(30),
+    mc.summary(days.value, countyName.value),
+    mc.byType(scope.value),
+    mc.pipeline({ county: countyName.value, page_size: 50 }),
+    mc.handlingStageKpis(days.value, countyName.value),
+    mc.onwardTransport(days.value, countyName.value),
   ])
 
   if (sumRes.status === 'fulfilled') summary.value = sumRes.value
@@ -225,6 +225,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, scope, key, period } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 const maxTonnage = computed(() => Math.max(1, ...cargoByType.value.map(c => c.tonnes)))

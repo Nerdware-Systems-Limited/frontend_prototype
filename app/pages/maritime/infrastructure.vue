@@ -104,7 +104,7 @@
           @prev="capacityPrev" @next="capacityNext"
         />
       </div>
-      <div class="source-note">Annualised actual is estimated by scaling the {{ throughputDays }}-day container throughput to a full year - directional only, not a reported annual figure. Berth availability is from <code>infrastructure/summary/</code>.</div>
+      <div class="source-note">Annualised actual is estimated by scaling the {{ days }}-day container throughput to a full year - directional only, not a reported annual figure. Berth availability is from <code>infrastructure/summary/</code>.</div>
     </div>
   </div>
 
@@ -381,7 +381,6 @@ const inspections   = ref<any[]>([])
 const infra         = ref<MaritimeInfraSummary | null>(null)
 const loading       = ref(true)
 const error         = ref<string | null>(null)
-const throughputDays = ref(30)
 const portsError        = ref(false)
 const berthsError       = ref(false)
 const channelsError     = ref(false)
@@ -400,16 +399,16 @@ async function load() {
   const mi  = useMaritimeInfrastructure()
 
   const [poRes, beRes, ctRes, chRes, ndRes, ddRes, icRes, cwRes, insRes, sumRes] = await Promise.allSettled([
-    avm.ports(),
-    avm.berths({ page_size: 200 }),
-    avm.containerByPort({ days: throughputDays.value }),
-    mi.channels({ page_size: 100 }),
-    mi.navaids({ page_size: 200 }),
-    mi.dryDocks({ page_size: 50 }),
+    avm.ports({ county: countyName.value }),
+    avm.berths({ county: countyName.value, page_size: 200 }),
+    avm.containerByPort(scope.value),
+    mi.channels({ county: countyName.value, page_size: 100 }),
+    mi.navaids({ county: countyName.value, page_size: 200 }),
+    mi.dryDocks({ county: countyName.value, page_size: 50 }),
     mi.icds({ page_size: 50 }),
-    mi.capitalWorks({ page_size: 100 }),
-    avm.maritimeInspections({ days: 30 }),
-    mi.summary(),
+    mi.capitalWorks({ county: countyName.value, page_size: 100 }),
+    avm.maritimeInspections(scope.value),
+    mi.summary(days.value, countyName.value),
   ])
 
   if (poRes.status  === 'fulfilled') ports.value       = (poRes.value as any).results ?? []
@@ -437,6 +436,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, scope, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
@@ -481,7 +483,7 @@ const berthAvailabilityByPort = computed<Record<string, number | null>>(() => {
 const capacityUtilisation = computed(() => containers.value.map(c => {
   const port = ports.value.find(p => p.unlocode === c.port__unlocode)
   const designThroughput = port?.design_throughput_teu ?? null
-  const annualisedActual = c.teus != null ? Math.round((c.teus / throughputDays.value) * 365) : null
+  const annualisedActual = c.teus != null ? Math.round((c.teus / days.value) * 365) : null
   const utilizationPct = designThroughput && annualisedActual != null && designThroughput > 0
     ? (annualisedActual / designThroughput) * 100
     : null

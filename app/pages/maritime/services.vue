@@ -17,9 +17,9 @@
   <!-- KPIs -->
   <div class="kpi-grid">
     <KpiCard
-      label="Cargo Ops (30d)" :value="fmtNum(cargoOpsTotal)"
+      :label="`Cargo Ops (${days}d)`" :value="fmtNum(cargoOpsTotal)"
       :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA Ops feed unavailable'"
-      period="30D" description="Offload / load / stevedoring" to="#cargo-ops-table"
+      :period="`${days}D`" description="Offload / load / stevedoring" to="#cargo-ops-table"
     />
     <KpiCard
       label="Avg Tonnes / Gang Hour" :value="avgTonnesPerGangHour != null ? avgTonnesPerGangHour.toFixed(1) : '-'"
@@ -27,9 +27,9 @@
       period="LIVE" description="Stevedoring productivity (from sampled ops)" to="#cargo-ops-table"
     />
     <KpiCard
-      label="Pilotage Calls (30d)" :value="fmtNum(pilotageCallsTotal)"
+      :label="`Pilotage Calls (${days}d)`" :value="fmtNum(pilotageCallsTotal)"
       :unavailable="!summary" :unavailable-note="loading ? 'Loading…' : 'KPA Pilotage feed unavailable'"
-      period="30D" description="Boarding to berthing" to="#pilotage-table"
+      :period="`${days}D`" description="Boarding to berthing" to="#pilotage-table"
     />
     <KpiCard
       label="Avg Pilotage Duration" :value="avgPilotageDurationMin != null ? `${avgPilotageDurationMin.toFixed(0)} min` : '-'"
@@ -196,9 +196,9 @@ async function load() {
   const svc = useMaritimeServices()
 
   const [sumRes, coRes, plRes, licRes] = await Promise.allSettled([
-    svc.summary(),
-    svc.cargoHandling({ page_size: 50 }),
-    svc.pilotage({ page_size: 30 }),
+    svc.summary(days.value, countyName.value),
+    svc.cargoHandling({ county: countyName.value, page_size: 50 }),
+    svc.pilotage({ county: countyName.value, page_size: 30 }),
     svc.licences({ page_size: 100 }),
   ])
 
@@ -216,6 +216,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 const filteredCargoOps = computed(() => cargoOps.value.filter(c => !opFilter.value || c.operation_type === opFilter.value))

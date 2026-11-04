@@ -219,6 +219,8 @@ export type SafetyPeriod = {
   days?: number
   date_from?: string
   date_to?: string
+  /** One of the 47 counties (shared scope filter, see core.scope on the backend). */
+  county?: string
 }
 
 export interface SafetySummary {

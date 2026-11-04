@@ -5,7 +5,6 @@
     subtitle="Mombasa Port to the Great Lakes region - Transport Observatory indicators against benchmark, route condition and the port-to-border transit chain"
   >
     <template #actions>
-      <DayRangeToggle v-model="days" :options="[7, 30, 90]" @update:model-value="load" />
       <NuxtLink v-if="canSee('/corridor/border-crossings')" to="/corridor/border-crossings" class="btn">Border Crossings<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink v-if="canSee('/corridor')" to="/corridor" class="btn">Overview<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
@@ -84,7 +83,10 @@ import { useCorridor, benchmarkTone, fmtKpi, monthLabel, type KpiSeries, type Bo
 const access = useAccessControl()
 const canSee = access.canAccessRoute
 
-const days = ref(30)
+// The window follows the global period (top bar); these endpoints take a rolling day count, so a year / custom
+// global range falls back to 30 days here.
+const timeRange = useTimeRange('corridor', { default: '30d' })
+const days = timeRange.days
 const series = ref<KpiSeries[]>([])
 const posts = ref<BorderPostStatus[]>([])
 const active = ref<KpiSeries | null>(null)
@@ -107,6 +109,7 @@ async function load() {
   loading.value = false
 }
 onMounted(load)
+watch(days, load)
 
 const activeKey = computed(() => active.value ? `${active.value.corridor}|${active.value.indicator_code}|${active.value.segment}` : '')
 const select = (s: KpiSeries) => { active.value = s }

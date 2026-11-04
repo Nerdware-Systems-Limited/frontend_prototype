@@ -221,6 +221,9 @@ function agencyLink(path: string) {
   return selectedAgency.value ? { path, query: { agency: selectedAgency.value } } : path
 }
 
+// County filter, shared across the Infrastructure pages and following the global filter until this module picks its own.
+const county = useCountyScope('infrastructure')
+
 async function load() {
   loading.value = true
   error.value = null
@@ -229,10 +232,10 @@ async function load() {
 
   const [budRes, segRes, projRes, riskRes, sumRes, agencyRes] = await Promise.allSettled([
     infra.budgets({ page_size: 50 }),
-    infra.segments({ page_size: 200 }),
-    infra.projects({ page_size: 100 }),
+    infra.segments({ page_size: 200, ...county.query.value }),
+    infra.projects({ page_size: 100, ...county.query.value }),
     infra.atRiskForecasts(),
-    infra.summary(),
+    infra.summary(county.query.value),
     agenciesApi.list({ page_size: 50 }),
   ])
 
@@ -254,6 +257,8 @@ async function load() {
   loading.value = false
 }
 
+// County changed - here, on another Infrastructure page, or from the global filter in the top bar.
+watch(() => county.county.value, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

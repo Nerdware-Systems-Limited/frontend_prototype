@@ -225,7 +225,7 @@
         </thead>
         <tbody v-if="yardDwell.length">
           <tr v-for="d in dwellPageRows" :key="d.id ?? `${d.port}${d.direction}`">
-            <td style="font-size:12px;font-weight:600">{{ d.port_name ?? d.port }}</td>
+            <td style="font-size:12px;font-weight:600">{{ d.port_unlocode }}</td>
             <td><BadgePill :variant="dirBadge(d.direction)">{{ d.direction }}</BadgePill></td>
             <td>{{ fmtNum(d.container_count) }}</td>
             <td :style="{ color: d.avg_dwell_days > 7 ? 'var(--danger-fg)' : d.avg_dwell_days > 4 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
@@ -273,10 +273,10 @@ async function load() {
   const avm = useAviationMaritime()
 
   const [opRes, beRes, trendRes, dwellRes] = await Promise.allSettled([
-    avm.maritimeOperations(30),
-    avm.berths({ port: portFilter.value || undefined, page_size: 50 }),
-    avm.containerTrend(60),
-    avm.yardDwell({ port: portFilter.value || undefined, page_size: 60 }),
+    avm.maritimeOperations(days.value, { county: countyName.value }),
+    avm.berths({ port: portFilter.value || undefined, county: countyName.value, page_size: 50 }),
+    avm.containerTrend(60, countyName.value),
+    avm.yardDwell({ port: portFilter.value || undefined, county: countyName.value, page_size: 60 }),
   ])
 
   if (opRes.status    === 'fulfilled') opsData.value        = opRes.value
@@ -293,6 +293,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

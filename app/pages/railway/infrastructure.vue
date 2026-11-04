@@ -12,122 +12,26 @@
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPIs -->
+  <!-- KPIs: counted and summed by the server over the whole registers -->
   <div class="kpi-grid">
-    <KpiCard
-      label="Operational Track"
-      :value="`${fmtNum(operationalTrackKm, 0)} km`"
-      :unavailable="loading || linesError"
-      :unavailable-note="loading ? 'Loading…' : 'Rail Line Registry feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(totalTrackKm, 0)} km total network`"
-    />
-    <KpiCard
-      label="Sections Needing Repair"
-      :value="fmtNum(poorCriticalSections.length)"
-      :unavailable="loading || trackError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC Track Registry feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(trackSections.length)} track sections`"
-      :status="loading || trackError ? undefined : poorCriticalSections.length > 0 ? 'warning' : 'healthy'"
-      to="#track-sections"
-    />
-    <KpiCard
-      label="Signal Availability"
-      :value="signalAvailabilityPct != null ? `${signalAvailabilityPct.toFixed(1)}%` : '-'"
-      :unavailable="loading || sigError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC Signalling feed unavailable'"
-      period="LIVE"
-      :description="`${fmtNum(signals.length)} signals registered`"
-      :status="loading || sigError || signalAvailabilityPct == null ? undefined : signalAvailabilityPct >= 95 ? 'healthy' : 'warning'"
-      to="#signalling"
-    />
-    <KpiCard
-      label="Crossings Needing Action"
-      :value="fmtNum(highRiskCrossings.length)"
-      :unavailable="loading || crossingsError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC Level Crossings feed unavailable'"
-      period="LIVE"
-      description="High / critical risk rating"
-      :status="loading || crossingsError ? undefined : highRiskCrossings.length > 0 ? 'warning' : 'healthy'"
-      to="#level-crossings"
-    />
-    <KpiCard
-      label="Culverts Poor / Critical"
-      :value="fmtNum(poorCriticalCulverts.length)"
-      :unavailable="loading || culvError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC Track Registry feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(culverts.length)} culverts`"
-      :status="loading || culvError ? undefined : poorCriticalCulverts.length > 0 ? 'warning' : 'healthy'"
-      to="#culverts"
-    />
-    <KpiCard
-      label="Open Capital Works"
-      :value="fmtNum(openCapitalWorks.length)"
-      :unavailable="loading || capError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC / National Treasury feed unavailable'"
-      period="LIVE"
-      :description="`of ${fmtNum(capitalWorks.length)} projects`"
-      to="#capital-works"
-    />
-    <KpiCard
-      label="Capital Works Budget"
-      :value="capitalWorksBudget ? `KES ${fmtKES(capitalWorksBudget)}` : '-'"
-      :unavailable="loading || capError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC / National Treasury feed unavailable'"
-      period="LIVE"
-      description="Sum of active project budgets"
-      to="#capital-works"
-    />
+    <KpiCard label="Operational Track" :value="opKm != null ? `${fmtNum(opKm, 0)} km` : '-'" :unavailable="lineStats.count.value === null" :unavailable-note="note" period="LIVE" :description="`of ${fmtNum(lineStats.sum('length_km'), 0)} km total network`" />
+    <KpiCard label="Sections Needing Repair" :value="fmtNum(poorSections.count.value)" :unavailable="poorSections.count.value === null" :unavailable-note="note" period="LIVE" :description="`of ${fmtNum(trackStats.count.value)} track sections`" :status="poorSections.count.value === null ? undefined : poorSections.count.value > 0 ? 'warning' : 'healthy'" to="#track-sections" />
+    <KpiCard label="Signal Availability" :value="signalAvailabilityPct != null ? `${signalAvailabilityPct.toFixed(1)}%` : '-'" :unavailable="signalStats.count.value === null" :unavailable-note="note" period="LIVE" :description="`${fmtNum(signalStats.count.value)} signals registered`" :status="signalAvailabilityPct == null ? undefined : signalAvailabilityPct >= 95 ? 'healthy' : 'warning'" to="#signalling" />
+    <KpiCard label="Crossings Needing Action" :value="fmtNum(riskCrossings.count.value)" :unavailable="riskCrossings.count.value === null" :unavailable-note="note" period="LIVE" description="High / critical risk rating" :status="riskCrossings.count.value === null ? undefined : riskCrossings.count.value > 0 ? 'warning' : 'healthy'" to="#level-crossings" />
+    <KpiCard label="Culverts Poor / Critical" :value="fmtNum(poorCulverts.count.value)" :unavailable="poorCulverts.count.value === null" :unavailable-note="note" period="LIVE" :description="`of ${fmtNum(culvertStats.count.value)} culverts`" :status="poorCulverts.count.value === null ? undefined : poorCulverts.count.value > 0 ? 'warning' : 'healthy'" to="#culverts" />
+    <KpiCard label="Open Capital Works" :value="fmtNum(openWorks.count.value)" :unavailable="openWorks.count.value === null" :unavailable-note="note" period="LIVE" :description="`of ${fmtNum(workStats.count.value)} projects`" to="#capital-works" />
+    <KpiCard label="Capital Works Budget" :value="openBudget ? `KES ${fmtKES(openBudget)}` : '-'" :unavailable="openWorks.count.value === null" :unavailable-note="note" period="LIVE" description="Sum of active project budgets" to="#capital-works" />
   </div>
 
   <!-- Track sections -->
   <SectionTitle pill="KRC Track Registry · Live">Track Sections</SectionTitle>
   <div id="track-sections" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="trackSearch" class="select-sm" placeholder="Search section / line…" style="min-width:180px" />
-        <select v-model="conditionFilter" class="select-sm">
-          <option value="">All conditions</option>
-          <option value="excellent">Excellent</option>
-          <option value="good">Good</option>
-          <option value="fair">Fair</option>
-          <option value="poor">Poor</option>
-          <option value="critical">Critical</option>
-        </select>
-        <button class="btn" @click="trackSearch=''; conditionFilter=''">Clear</button>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Line</th><th>Section</th><th>Chainage (km)</th><th>Rail Type</th><th>Sleeper</th>
-              <th>Condition</th><th>Posted Speed</th><th>Last Inspected</th><th>Next Inspection Due</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredTrackSections.length">
-            <tr v-for="t in trackPageRows" :key="t.id">
-              <td style="font-weight:600;font-size:12px">{{ t.line_name ?? t.line }}</td>
-              <td style="font-family:monospace;font-size:12px">{{ t.section_ref }}</td>
-              <td style="font-size:12px">{{ t.chainage_start_km }} - {{ t.chainage_end_km }}</td>
-              <td style="font-size:12px">{{ t.rail_type }}</td>
-              <td style="font-size:12px">{{ t.sleeper_type }}</td>
-              <td><BadgePill :variant="condBadge(t.track_condition)">{{ t.track_condition }}</BadgePill></td>
-              <td style="font-size:12px">{{ t.posted_speed_kmh != null ? `${t.posted_speed_kmh} km/h` : '-' }}</td>
-              <td style="font-size:11px">{{ fmtDate(t.last_inspected_at) }}</td>
-              <td style="font-size:11px">{{ fmtDate(t.next_inspection_due) }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading track sections…' : 'No track sections match the current filters.' }}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <TablePagination
-        :page="trackPage" :total-pages="trackTotalPages" :total="trackTotal"
-        @prev="trackPrev" @next="trackNext"
-      />
+      <DataTable :table="trackTable" row-key="id" title="Track sections" export-name="uapts-rail-track-sections" filters-open
+                 placeholder="Search section, line…" empty="No track sections match the current filters.">
+        <template #cell-chainage_start_km="{ row }">{{ row.chainage_start_km }} - {{ row.chainage_end_km }}</template>
+        <template #cell-posted_speed_kmh="{ row }">{{ row.posted_speed_kmh != null ? `${row.posted_speed_kmh} km/h` : '-' }}</template>
+      </DataTable>
     </div>
   </div>
 
@@ -135,48 +39,11 @@
   <SectionTitle pill="KRC Level Crossings · Live">Level Crossings</SectionTitle>
   <div id="level-crossings" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="crossingSearch" class="select-sm" placeholder="Search road / line…" style="min-width:180px" />
-        <select v-model="riskFilter" class="select-sm">
-          <option value="">All risk ratings</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-        <button class="btn" @click="crossingSearch=''; riskFilter=''">Clear</button>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Crossing</th><th>Road</th><th>Line</th><th>Protection</th><th>Risk</th>
-              <th>Near-Misses</th><th>Daily Road Traffic</th><th>Daily Trains</th><th>Last Incident</th><th>Active</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredCrossings.length">
-            <tr v-for="c in crossingsPageRows" :key="c.id">
-              <td style="font-family:monospace;font-weight:700;font-size:12px">{{ c.crossing_ref }}</td>
-              <td style="font-weight:600;font-size:12px">{{ c.road_name }}</td>
-              <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
-              <td style="font-size:12px">{{ c.protection_type.replace(/_/g,' ') }}</td>
-              <td><BadgePill :variant="riskBadge(c.risk_rating)">{{ c.risk_rating }}</BadgePill></td>
-              <td>{{ fmtNum(c.near_miss_count) }}</td>
-              <td>{{ c.daily_road_traffic != null ? fmtNum(c.daily_road_traffic) : '-' }}</td>
-              <td>{{ c.daily_train_movements != null ? fmtNum(c.daily_train_movements) : '-' }}</td>
-              <td style="font-size:11px">{{ c.last_incident_at ? fmtDate(c.last_incident_at) : '-' }}</td>
-              <td><BadgePill :variant="c.is_active ? 'success' : 'neutral'">{{ c.is_active ? 'Active' : 'Inactive' }}</BadgePill></td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading crossings…' : 'No level crossings match the current filters.' }}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <TablePagination
-        :page="crossingsPage" :total-pages="crossingsTotalPages" :total="crossingsTotal"
-        @prev="crossingsPrev" @next="crossingsNext"
-      />
+      <DataTable :table="crossingTable" row-key="id" title="Level crossings" export-name="uapts-rail-level-crossings" filters-open
+                 placeholder="Search crossing, road, line…" empty="No level crossings match the current filters.">
+        <template #cell-crossing_ref="{ row }"><span style="font-family:monospace;font-weight:700;font-size:12px">{{ row.crossing_ref }}</span></template>
+        <template #cell-protection_type="{ row }">{{ String(row.protection_type).replace(/_/g,' ') }}</template>
+      </DataTable>
     </div>
   </div>
 
@@ -185,46 +52,20 @@
     <div id="signalling" class="card drill-target">
       <div class="card-header">Signalling</div>
       <div class="card-body">
-        <table>
-          <thead><tr><th>Signal</th><th>Line</th><th>Type</th><th>Status</th><th>Automatic</th></tr></thead>
-          <tbody v-if="signals.length">
-            <tr v-for="s in signalsPageRows" :key="s.id">
-              <td style="font-family:monospace;font-weight:600;font-size:12px">{{ s.signal_ref }}</td>
-              <td style="font-size:12px">{{ s.line_name ?? s.line }}</td>
-              <td style="font-size:12px">{{ s.signal_type.replace(/_/g,' ') }}</td>
-              <td><BadgePill :variant="signalBadge(s.status)">{{ s.status.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="text-align:center">{{ s.is_automatic ? '✓' : '-' }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No signals registered.' }}</td></tr></tbody>
-        </table>
-        <TablePagination
-          :page="signalsPage" :total-pages="signalsTotalPages" :total="signalsTotal"
-          @prev="signalsPrev" @next="signalsNext"
-        />
+        <DataTable :table="signalTable" row-key="id" title="Signals" export-name="uapts-rail-signals"
+                   placeholder="Search signal, line…" empty="No signals registered.">
+          <template #cell-signal_ref="{ row }"><span style="font-family:monospace;font-weight:600;font-size:12px">{{ row.signal_ref }}</span></template>
+        </DataTable>
       </div>
     </div>
 
     <div id="culverts" class="card drill-target">
       <div class="card-header">Culverts</div>
       <div class="card-body">
-        <table>
-          <thead><tr><th>Culvert</th><th>Line</th><th>Type</th><th>Span (m)</th><th>Condition</th></tr></thead>
-          <tbody v-if="culverts.length">
-            <tr v-for="c in culvertsPageRows" :key="c.id">
-              <td style="font-family:monospace;font-weight:600;font-size:12px">{{ c.culvert_ref }}</td>
-              <td style="font-size:12px">{{ c.line_name ?? c.line }}</td>
-              <td style="font-size:12px">{{ c.culvert_type }}</td>
-              <td>{{ c.span_m ?? '-' }}</td>
-              <td><BadgePill :variant="condBadge(c.condition)">{{ c.condition }}</BadgePill></td>
-            </tr>
-          </tbody>
-          <tbody v-else><tr><td colspan="5" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No culverts registered.' }}</td></tr></tbody>
-        </table>
-        <TablePagination
-          :page="culvertsPage" :total-pages="culvertsTotalPages" :total="culvertsTotal"
-          @prev="culvertsPrev" @next="culvertsNext"
-        />
+        <DataTable :table="culvertTable" row-key="id" title="Culverts" export-name="uapts-rail-culverts"
+                   placeholder="Search culvert, line…" empty="No culverts registered.">
+          <template #cell-culvert_ref="{ row }"><span style="font-family:monospace;font-weight:600;font-size:12px">{{ row.culvert_ref }}</span></template>
+        </DataTable>
       </div>
     </div>
   </div>
@@ -233,32 +74,13 @@
   <SectionTitle pill="KRC / National Treasury · Live">Capital Works Pipeline</SectionTitle>
   <div id="capital-works" class="card drill-target">
     <div class="card-body">
-      <table>
-        <thead>
-          <tr><th>Project</th><th>Type</th><th>Line</th><th>Status</th><th>Budget (KES)</th><th>Spent (KES)</th><th>Progress</th><th>Funding Source</th><th>Contractor</th><th>Expected Completion</th></tr>
-        </thead>
-        <tbody v-if="capitalWorks.length">
-          <tr v-for="c in capitalWorksPageRows" :key="c.id">
-            <td style="font-weight:600;font-size:12px">{{ c.project_name }}</td>
-            <td style="font-size:12px">{{ c.project_type.replace(/_/g,' ') }}</td>
-            <td style="font-size:12px">{{ c.line_name ?? c.line ?? '-' }}</td>
-            <td><BadgePill :variant="capitalWorkBadge(c.status)">{{ c.status.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-size:12px">{{ fmtKES(parseFloat(c.budget_kes)) }}</td>
-            <td style="font-size:12px">{{ fmtKES(parseFloat(c.spent_kes)) }}</td>
-            <td style="font-size:12px">{{ c.progress_pct.toFixed(0) }}%</td>
-            <td style="font-size:12px">{{ c.funding_source || '-' }}</td>
-            <td style="font-size:12px">{{ c.contractor || '-' }}</td>
-            <td style="font-size:11px">{{ c.expected_completion ? fmtDate(c.expected_completion) : '-' }}</td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading capital works…' : 'No capital works projects on file.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="capitalWorksPage" :total-pages="capitalWorksTotalPages" :total="capitalWorksTotal"
-        @prev="capitalWorksPrev" @next="capitalWorksNext"
-      />
+      <DataTable :table="workTable" row-key="id" title="Capital works" export-name="uapts-rail-capital-works"
+                 placeholder="Search project, contractor, line…" empty="No capital works projects on file.">
+        <template #cell-project_name="{ row }"><span style="font-weight:600">{{ row.project_name }}</span></template>
+        <template #cell-budget_kes="{ row }">{{ fmtKES(parseFloat(row.budget_kes)) }}</template>
+        <template #cell-spent_kes="{ row }">{{ fmtKES(parseFloat(row.spent_kes)) }}</template>
+        <template #cell-progress_pct="{ row }">{{ Number(row.progress_pct).toFixed(0) }}%</template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -267,130 +89,104 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useRailway, useRailInfrastructure } from '~/composables/api'
-import type { RailLine, TrackSection, LevelCrossing, RailCapitalWork, RailCulvert, RailSignal } from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import type { TableColumn } from '~/types/dataTable'
 
-const lines         = ref<RailLine[]>([])
-const trackSections = ref<TrackSection[]>([])
-const crossings     = ref<LevelCrossing[]>([])
-const capitalWorks  = ref<RailCapitalWork[]>([])
-const culverts      = ref<RailCulvert[]>([])
-const signals       = ref<RailSignal[]>([])
-const loading       = ref(true)
-const error         = ref<string | null>(null)
-const linesError      = ref(false)
-const trackError      = ref(false)
-const crossingsError  = ref(false)
-const capError        = ref(false)
-const culvError       = ref(false)
-const sigError        = ref(false)
+// These are registers (a track section has no event date), so the page filters them by county only. Every table is a window onto
+// the whole register and every KPI a server count / sum, so nothing is derived from a first page (see docs/data-tables.md).
+const RAIL = '/api/v1/railway'
+const county = useCountyScope('railway')
+const scope = () => county.query.value
 
-const trackSearch     = ref('')
-const conditionFilter  = ref('')
-const crossingSearch   = ref('')
-const riskFilter       = ref('')
+const opt = (values: string[]) => values.map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const COND = opt(['excellent', 'good', 'fair', 'poor', 'critical'])
+const COND_BADGE: Record<string, string> = { excellent: 'success', good: 'success', fair: 'fair', poor: 'warning', critical: 'danger' }
+const RISK_BADGE: Record<string, string> = { critical: 'danger', high: 'warning', medium: 'fair', low: 'success' }
+const SIGNAL_BADGE: Record<string, string> = { operational: 'success', faulty: 'danger', maintenance: 'warning', decommissioned: 'neutral' }
+const WORK_BADGE: Record<string, string> = { planned: 'neutral', in_progress: 'info', completed: 'success', suspended: 'warning' }
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const rail = useRailway()
-  const ri   = useRailInfrastructure()
+const table = (key: string, path: string, columns: TableColumn[], sort: { key: string; dir: 'asc' | 'desc' }) =>
+  useEndpointTable({ key, path: `${RAIL}/${path}/`, columns, countyKey: 'railway', pageSize: 15, defaultSort: [sort] })
 
-  const [linesRes, trackRes, crossRes, capRes, culvRes, sigRes] = await Promise.allSettled([
-    rail.lines({ page_size: 200 }),
-    ri.trackSections({ page_size: 200 }),
-    ri.levelCrossings({ page_size: 200 }),
-    ri.capitalWorks({ page_size: 100 }),
-    ri.culverts({ page_size: 200 }),
-    ri.signals({ page_size: 200 }),
-  ])
+const trackTable = table('rail-track-sections', 'track-sections', [
+  { key: 'line_name', label: 'Line', priority: 1, pin: 'left' },
+  { key: 'section_ref', label: 'Section', type: 'mono', priority: 1 },
+  { key: 'chainage_start_km', label: 'Chainage (km)', type: 'num', priority: 2, filter: false },
+  { key: 'rail_type', label: 'Rail Type', priority: 3 },
+  { key: 'sleeper_type', label: 'Sleeper', priority: 3 },
+  { key: 'track_condition', label: 'Condition', type: 'badge', badge: COND_BADGE, options: COND, priority: 1 },
+  { key: 'posted_speed_kmh', label: 'Posted Speed', type: 'num', priority: 2 },
+  { key: 'last_inspected_at', label: 'Last Inspected', type: 'date', priority: 3 },
+  { key: 'next_inspection_due', label: 'Next Inspection Due', type: 'date', priority: 2 },
+], { key: 'track_condition', dir: 'desc' })
 
-  if (linesRes.status === 'fulfilled') lines.value        = (linesRes.value as any).results ?? []
-  if (trackRes.status === 'fulfilled') trackSections.value = (trackRes.value as any).results ?? []
-  if (crossRes.status === 'fulfilled') crossings.value     = (crossRes.value as any).results ?? []
-  if (capRes.status   === 'fulfilled') capitalWorks.value  = (capRes.value as any).results ?? []
-  if (culvRes.status  === 'fulfilled') culverts.value      = (culvRes.value as any).results ?? []
-  if (sigRes.status   === 'fulfilled') signals.value       = (sigRes.value as any).results ?? []
+const crossingTable = table('rail-infra-crossings', 'level-crossings', [
+  { key: 'crossing_ref', label: 'Crossing', priority: 1, pin: 'left' },
+  { key: 'road_name', label: 'Road', priority: 1 },
+  { key: 'line_name', label: 'Line', priority: 2 },
+  { key: 'protection_type', label: 'Protection', priority: 2 },
+  { key: 'risk_rating', label: 'Risk', type: 'badge', badge: RISK_BADGE, options: opt(['critical', 'high', 'medium', 'low']), priority: 1 },
+  { key: 'near_miss_count', label: 'Near-Misses', type: 'num', priority: 2 },
+  { key: 'daily_road_traffic', label: 'Daily Road Traffic', type: 'num', priority: 3 },
+  { key: 'daily_train_movements', label: 'Daily Trains', type: 'num', priority: 3 },
+  { key: 'last_incident_at', label: 'Last Incident', type: 'date', priority: 3 },
+  { key: 'is_active', label: 'Active', type: 'bool', priority: 3 },
+], { key: 'near_miss_count', dir: 'desc' })
 
-  linesError.value     = linesRes.status === 'rejected'
-  trackError.value     = trackRes.status === 'rejected'
-  crossingsError.value = crossRes.status === 'rejected'
-  capError.value       = capRes.status   === 'rejected'
-  culvError.value      = culvRes.status  === 'rejected'
-  sigError.value       = sigRes.status   === 'rejected'
+const signalTable = table('rail-signals', 'signals', [
+  { key: 'signal_ref', label: 'Signal', priority: 1, pin: 'left' },
+  { key: 'line_name', label: 'Line', priority: 2 },
+  { key: 'signal_type', label: 'Type', priority: 2 },
+  { key: 'status', label: 'Status', type: 'badge', badge: SIGNAL_BADGE, options: opt(Object.keys(SIGNAL_BADGE)), priority: 1 },
+  { key: 'is_automatic', label: 'Automatic', type: 'bool', priority: 3 },
+], { key: 'signal_ref', dir: 'asc' })
 
-  if ([linesRes, trackRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Railway API.'
+const culvertTable = table('rail-culverts', 'culverts', [
+  { key: 'culvert_ref', label: 'Culvert', priority: 1, pin: 'left' },
+  { key: 'line_name', label: 'Line', priority: 2 },
+  { key: 'culvert_type', label: 'Type', priority: 2 },
+  { key: 'span_m', label: 'Span (m)', type: 'num', priority: 3 },
+  { key: 'condition', label: 'Condition', type: 'badge', badge: COND_BADGE, options: COND, priority: 1 },
+], { key: 'condition', dir: 'desc' })
 
-  loading.value = false
-}
+const workTable = table('rail-capital-works', 'capital-works', [
+  { key: 'project_name', label: 'Project', priority: 1, pin: 'left', minWidth: 170 },
+  { key: 'project_type', label: 'Type', priority: 2 },
+  { key: 'line_name', label: 'Line', priority: 3 },
+  { key: 'status', label: 'Status', type: 'badge', badge: WORK_BADGE, options: opt(Object.keys(WORK_BADGE)), priority: 1 },
+  { key: 'budget_kes', label: 'Budget (KES)', type: 'num', priority: 2 },
+  { key: 'spent_kes', label: 'Spent (KES)', type: 'num', priority: 2 },
+  { key: 'progress_pct', label: 'Progress', sortable: false, filter: false, priority: 2 },
+  { key: 'funding_source', label: 'Funding Source', priority: 3 },
+  { key: 'contractor', label: 'Contractor', priority: 3 },
+  { key: 'expected_completion', label: 'Expected Completion', type: 'date', priority: 2 },
+], { key: 'expected_completion', dir: 'asc' })
 
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
+// ── KPIs: counted by the server ──────────────────────────────────────────
+const lineStats = useServerCount(`${RAIL}/lines/`, scope, { aggregate: ['sum:length_km'] })
+const opLines = useServerCount(`${RAIL}/lines/`, () => ({ ...scope(), 'f.status__exact': 'operational' }), { aggregate: ['sum:length_km'] })
+const trackStats = useServerCount(`${RAIL}/track-sections/`, scope)
+const poorSections = useServerCount(`${RAIL}/track-sections/`, () => ({ ...scope(), 'f.track_condition__in': 'poor,critical' }))
+const signalStats = useServerCount(`${RAIL}/signals/`, scope, { groupBy: ['status'] })
+const riskCrossings = useServerCount(`${RAIL}/level-crossings/`, () => ({ ...scope(), 'f.risk_rating__in': 'high,critical' }))
+const culvertStats = useServerCount(`${RAIL}/culverts/`, scope)
+const poorCulverts = useServerCount(`${RAIL}/culverts/`, () => ({ ...scope(), 'f.condition__in': 'poor,critical' }))
+const workStats = useServerCount(`${RAIL}/capital-works/`, scope)
+const openWorks = useServerCount(`${RAIL}/capital-works/`, () => ({ ...scope(), 'f.status__in': 'planned,in_progress' }), { aggregate: ['sum:budget_kes'] })
+const allStats = [lineStats, opLines, trackStats, poorSections, signalStats, riskCrossings, culvertStats, poorCulverts, workStats, openWorks]
 
-// ── Computed ──────────────────────────────────────────────────────────────
-const totalTrackKm = computed(() => lines.value.reduce((s, l) => s + (l.length_km ?? 0), 0))
-const operationalTrackKm = computed(() => lines.value.filter(l => l.status === 'operational').reduce((s, l) => s + (l.length_km ?? 0), 0))
+const opKm = computed(() => (opLines.count.value === null ? null : opLines.sum('length_km') ?? 0))
+const signalAvailabilityPct = computed(() => signalStats.groupPct('status', 'operational'))
+const openBudget = computed(() => openWorks.sum('budget_kes'))
+const note = computed(() => lineStats.loading.value ? 'Loading…' : 'KRC Track Registry feed unavailable')
+const error = computed(() => lineStats.failed.value && trackStats.failed.value && !lineStats.loading.value ? 'Unable to reach the UAPTS Railway API.' : null)
 
-const poorCriticalSections = computed(() => trackSections.value.filter(t => t.track_condition === 'poor' || t.track_condition === 'critical'))
-const filteredTrackSections = computed(() => trackSections.value.filter(t => {
-  if (conditionFilter.value && t.track_condition !== conditionFilter.value) return false
-  if (trackSearch.value) {
-    const q = trackSearch.value.toLowerCase()
-    if (!t.section_ref.toLowerCase().includes(q) && !(t.line_name ?? '').toLowerCase().includes(q)) return false
-  }
-  return true
-}))
-
-const highRiskCrossings = computed(() => crossings.value.filter(c => c.risk_rating === 'high' || c.risk_rating === 'critical'))
-const filteredCrossings = computed(() => crossings.value.filter(c => {
-  if (riskFilter.value && c.risk_rating !== riskFilter.value) return false
-  if (crossingSearch.value) {
-    const q = crossingSearch.value.toLowerCase()
-    if (!c.road_name.toLowerCase().includes(q) && !(c.line_name ?? '').toLowerCase().includes(q)) return false
-  }
-  return true
-}))
-
-const poorCriticalCulverts = computed(() => culverts.value.filter(c => c.condition === 'poor' || c.condition === 'critical'))
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: trackPageRows, page: trackPage, totalPages: trackTotalPages,
-  total: trackTotal, next: trackNext, prev: trackPrev,
-} = usePagination(filteredTrackSections, 15)
-
-const {
-  pageRows: crossingsPageRows, page: crossingsPage, totalPages: crossingsTotalPages,
-  total: crossingsTotal, next: crossingsNext, prev: crossingsPrev,
-} = usePagination(filteredCrossings, 15)
-
-const {
-  pageRows: signalsPageRows, page: signalsPage, totalPages: signalsTotalPages,
-  total: signalsTotal, next: signalsNext, prev: signalsPrev,
-} = usePagination(signals, 15)
-
-const {
-  pageRows: culvertsPageRows, page: culvertsPage, totalPages: culvertsTotalPages,
-  total: culvertsTotal, next: culvertsNext, prev: culvertsPrev,
-} = usePagination(culverts, 15)
-
-const {
-  pageRows: capitalWorksPageRows, page: capitalWorksPage, totalPages: capitalWorksTotalPages,
-  total: capitalWorksTotal, next: capitalWorksNext, prev: capitalWorksPrev,
-} = usePagination(capitalWorks, 15)
-
-const signalAvailabilityPct = computed(() => {
-  if (!signals.value.length) return null
-  return (signals.value.filter(s => s.status === 'operational').length / signals.value.length) * 100
-})
-
-const openCapitalWorks = computed(() => capitalWorks.value.filter(c => c.status === 'planned' || c.status === 'in_progress'))
-const capitalWorksBudget = computed(() =>
-  openCapitalWorks.value.reduce((s, c) => s + (parseFloat(c.budget_kes) || 0), 0) || null,
-)
+function refreshAll() { void Promise.all([trackTable, crossingTable, signalTable, culvertTable, workTable].map(t => t.refresh()).concat(allStats.map(s => s.refresh()))) }
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(refreshAll, 120_000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -404,33 +200,10 @@ function fmtKES(n: number | null | undefined) {
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
   return Math.round(n).toLocaleString()
 }
-function fmtDate(s: string | null | undefined) {
-  if (!s) return '-'
-  try { return new Date(s).toLocaleDateString('en-KE', { day:'2-digit', month:'short', year:'numeric' }) }
-  catch { return s }
-}
-function condBadge(s: string) {
-  const m: Record<string,string> = { excellent:'success', good:'success', fair:'fair', poor:'warning', critical:'danger' }
-  return m[s] ?? 'neutral'
-}
-function riskBadge(s: string) {
-  const m: Record<string,string> = { critical:'danger', high:'warning', medium:'fair', low:'success' }
-  return m[s] ?? 'neutral'
-}
-function signalBadge(s: string) {
-  const m: Record<string,string> = { operational:'success', faulty:'danger', maintenance:'warning', decommissioned:'neutral' }
-  return m[s] ?? 'neutral'
-}
-function capitalWorkBadge(s: string) {
-  const m: Record<string,string> = { planned:'neutral', in_progress:'info', completed:'success', suspended:'warning' }
-  return m[s] ?? 'neutral'
-}
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col { grid-template-columns:1fr; } }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.table-scroll { overflow-x:auto; }
 </style>

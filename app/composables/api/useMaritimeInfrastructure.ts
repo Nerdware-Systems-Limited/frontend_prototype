@@ -129,6 +129,8 @@ export interface MaritimeInfraSummary {
 }
 
 export interface MaritimeInfraQuery {
+  /** County from the global scope (top bar); the endpoint ignores it when it has no county column. */
+  county?: string
   page?: number
   page_size?: number
   port?: string
@@ -140,7 +142,7 @@ export function useMaritimeInfrastructure() {
   const M = '/api/v1/aviation-maritime/maritime/infrastructure'
 
   return {
-    summary: (days = 30) => api<MaritimeInfraSummary>(`${M}/summary/`, { query: { days } }),
+    summary: (days = 30, county?: string) => api<MaritimeInfraSummary>(`${M}/summary/`, { query: cleanQuery({ days, county }) }),
     channels: (q?: MaritimeInfraQuery) =>
       api<Paged<Channel>>(`${M}/channels/`, { query: cleanQuery(q as Record<string, unknown>) }),
     navaids: (q?: MaritimeInfraQuery & { aid_type?: MaritimeNavaidType; status?: MaritimeNavaidStatus }) =>

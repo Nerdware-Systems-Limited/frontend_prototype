@@ -175,11 +175,11 @@ async function load() {
   const gt = useMaritimeGreenTransport()
 
   const [sumRes, msRes, emRes, evRes, rfRes] = await Promise.allSettled([
-    gt.summary(),
-    gt.modeStats(),
-    gt.vesselEmissions({ page_size: 50 }),
-    gt.evFleet({ page_size: 50 }),
-    gt.reeferEnergy({ page_size: 50 }),
+    gt.summary(days.value, countyName.value),
+    gt.modeStats(days.value, countyName.value),
+    gt.vesselEmissions({ county: countyName.value, page_size: 50 }),
+    gt.evFleet({ county: countyName.value, page_size: 50 }),
+    gt.reeferEnergy({ county: countyName.value, page_size: 50 }),
   ])
 
   if (sumRes.status === 'fulfilled') summary.value = sumRes.value
@@ -194,6 +194,9 @@ async function load() {
   loading.value = false
 }
 
+// Period and county follow the global filter in the top bar; reload when either changes.
+const { days, countyName, key } = useMaritimeScope()
+watch(key, load)
 onMounted(load)
 
 const modeStats = computed(() => modeStatsSummary.value?.modes ?? [])

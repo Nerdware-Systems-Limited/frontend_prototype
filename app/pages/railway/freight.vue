@@ -5,68 +5,20 @@
     subtitle="KRC · KPA · KenTrade · NCTTCA - Freight manifests, corridor analysis, KenTrade single-window clearances, NCTTCA transit tracking, and KPA port-rail reconciliation"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/railway/infrastructure" class="btn">Freight Terminals<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
 
-  <!-- KPIs -->
+  <!-- KPIs: counted and summed by the server over ALL manifests in the chosen period / county -->
   <div class="kpi-grid">
-    <KpiCard
-      label="Total Shipments"
-      :value="fmtNum(manifests.length)"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Manifests in view"
-      to="#manifest-log"
-    />
-    <KpiCard
-      label="Total Tonnage"
-      :value="totalTons ? `${fmtNum(totalTons)} t` : '-'"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Freight tonne-km"
-      to="#cargo-type-mix"
-    />
-    <KpiCard
-      label="Total Revenue"
-      :value="totalRevenue ? `KES ${fmtKES(totalRevenue)}` : '-'"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Freight revenue"
-      to="#manifest-log"
-    />
-    <KpiCard
-      label="Avg Wagons/Shipment"
-      :value="avgWagons ? avgWagons.toFixed(1) : '-'"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Average wagon count"
-    />
-    <KpiCard
-      label="Port-Rail Manifests"
-      :value="fmtNum(portRailManifests.length)"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC / KPA feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="Rail-nominated containers (KPA)"
-      to="#port-rail-reconciliation"
-    />
-    <KpiCard
-      label="Transit Manifests"
-      :value="fmtNum(portManifests.filter(m => m.port_origin).length)"
-      :unavailable="loading || mfError"
-      :unavailable-note="loading ? 'Loading…' : 'KRC feed unavailable'"
-      :period="`${timeRange.period.value}`"
-      description="From port of origin"
-      to="#intermodal-transfer"
-    />
+    <KpiCard label="Total Shipments" :value="fmtNum(stats.count.value)" :unavailable="unavailable" :unavailable-note="note" :period="rangeTag" description="Manifests in view" to="#manifest-log" />
+    <KpiCard label="Total Tonnage" :value="totalTons != null ? `${fmtNum(totalTons)} t` : '-'" :unavailable="unavailable" :unavailable-note="note" :period="rangeTag" description="Freight carried" to="#cargo-type-mix" />
+    <KpiCard label="Total Revenue" :value="totalRevenue != null ? `KES ${fmtKES(totalRevenue)}` : '-'" :unavailable="unavailable" :unavailable-note="note" :period="rangeTag" description="Freight revenue" to="#manifest-log" />
+    <KpiCard label="Avg Wagons/Shipment" :value="avgWagons != null ? avgWagons.toFixed(1) : '-'" :unavailable="unavailable" :unavailable-note="note" :period="rangeTag" description="Average wagon count" />
+    <KpiCard label="Port-Rail Manifests" :value="fmtNum(portStats.count.value)" :unavailable="portStats.count.value === null" :unavailable-note="note" :period="rangeTag" description="Rail-nominated containers (KPA)" to="#port-rail-reconciliation" />
+    <KpiCard label="Transit Manifests" :value="fmtNum(transitStats.count.value)" :unavailable="transitStats.count.value === null" :unavailable-note="note" :period="rangeTag" description="From port of origin" to="#intermodal-transfer" />
   </div>
 
   <!-- Cargo type mix + corridor breakdown -->
@@ -86,7 +38,7 @@
             </div>
           </div>
         </div>
-        <EmptyState v-else :loading="loading" message="No cargo data." compact />
+        <EmptyState v-else :loading="stats.loading.value" message="No cargo data." compact />
       </div>
     </div>
 
@@ -94,7 +46,7 @@
       <div class="card-header">Top Freight Corridors ({{ timeRange.period.value.toLowerCase() }})</div>
       <div class="card-body">
         <div v-if="corridors.length" class="corridor-list">
-          <div v-for="c in corridors.slice(0, 8)" :key="`${c.origin_station__code}-${c.destination_station__code}`" class="corridor-item">
+          <div v-for="c in corridors.slice(0, 8)" :key="`${c.origin_station__code}-${c.destination_station__code}-${c.cargo_type}`" class="corridor-item">
             <div class="ci-header">
               <span class="ci-route">{{ c.origin_station__code ?? c.origin }} → {{ c.destination_station__code ?? c.destination }}</span>
               <BadgePill variant="neutral">{{ (c.cargo_type ?? 'mixed').replace(/_/g,' ') }}</BadgePill>
@@ -108,7 +60,7 @@
             </div>
           </div>
         </div>
-        <EmptyState v-else :loading="loading" message="No corridor data." compact />
+        <EmptyState v-else :loading="corridorsLoading" message="No corridor data." compact />
       </div>
     </div>
   </div>
@@ -122,46 +74,17 @@
         Rail-nominated containers are manifests with a KPA customs clearance reference or declared port origin.
         This view replaces the manual KRC-KPA reconciliation process.
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Manifest Ref</th>
-            <th>Customs Ref (KPA)</th>
-            <th>Port of Origin</th>
-            <th>Cargo Type</th>
-            <th>Tonnage</th>
-            <th>Wagons</th>
-            <th>Route</th>
-            <th>Operator</th>
-            <th>Dispatched</th>
-            <th>Arrived</th>
-          </tr>
-        </thead>
-        <tbody v-if="portRailManifests.length">
-          <tr v-for="m in portRailPageRows" :key="m.id">
-            <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
-            <td style="font-family:monospace;font-size:12px;color:var(--link)">{{ m.customs_clearance_ref ?? '-' }}</td>
-            <td style="font-family:monospace;font-size:12px">{{ m.port_origin ?? '-' }}</td>
-            <td><BadgePill :variant="cargoBadge(m.cargo_type)">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
-            <td>{{ m.wagon_count }}</td>
-            <td style="font-size:12px">{{ m.origin_station_code }} → {{ m.destination_station_code }}</td>
-            <td style="font-size:12px">{{ m.operator_agency_code ?? m.operator ?? '-' }}</td>
-            <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
-            <td style="font-size:11px;white-space:nowrap">
-              <span v-if="m.arrived_at">{{ fmtTime(m.arrived_at) }}</span>
-              <span v-else style="color:var(--warning-fg)">Pending</span>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading reconciliation data…' : 'No port-rail manifests found.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="portRailPage" :total-pages="portRailTotalPages" :total="portRailTotal"
-        @prev="portRailPrev" @next="portRailNext"
-      />
+      <DataTable :table="portRailTable" row-key="id" title="Port-rail manifests" export-name="uapts-port-rail-manifests"
+                 placeholder="Search manifest, customs ref, port…" empty="No port-rail manifests found.">
+        <template #cell-manifest_ref="{ row }"><span style="font-family:monospace;font-weight:700;font-size:12px">{{ row.manifest_ref }}</span></template>
+        <template #cell-customs_clearance_ref="{ row }"><span style="font-family:monospace;font-size:12px;color:var(--link)">{{ row.customs_clearance_ref || '-' }}</span></template>
+        <template #cell-tonnage="{ row }"><span style="font-weight:600">{{ fmtNum(row.tonnage) }}t</span></template>
+        <template #cell-route="{ row }">{{ row.origin_station_code }} → {{ row.destination_station_code }}</template>
+        <template #cell-arrived_at="{ row }">
+          <span v-if="row.arrived_at">{{ fmtTime(row.arrived_at) }}</span>
+          <span v-else style="color:var(--warning-fg)">Pending</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 
@@ -170,27 +93,18 @@
   <div id="intermodal-transfer" class="card drill-target" style="margin-bottom:16px">
     <div class="card-body">
       <div class="recon-note">
-        Rail-port intermodal performance, derived from manifests with a declared port of origin. Rail-road intermodal transfer is not yet modelled - no road-leg linkage exists in the freight data today.
+        Rail-port intermodal performance, grouped by the server over manifests with a declared port of origin. Rail-road intermodal transfer is not yet modelled - no road-leg linkage exists in the freight data today.
       </div>
-      <div v-if="intermodalByPort.length" class="table-scroll">
-        <table>
-          <thead><tr><th>Port of Origin</th><th>Manifests</th><th>Tonnage</th><th>Avg Transit Time</th><th>Pending Arrival</th></tr></thead>
-          <tbody>
-            <tr v-for="p in intermodalPageRows" :key="p.port">
-              <td style="font-weight:600">{{ p.port }}</td>
-              <td>{{ fmtNum(p.count) }}</td>
-              <td>{{ fmtNum(p.tons) }}t</td>
-              <td style="font-size:12px">{{ p.avgTransitHours != null ? `${p.avgTransitHours.toFixed(1)}h` : '-' }}</td>
-              <td :style="{ color: p.pending > 0 ? 'var(--warning-fg)' : 'inherit' }">{{ p.pending }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="intermodalByPort.length" class="port-list">
+        <div class="port-head"><span>Port of Origin</span><span>Manifests</span><span>Tonnage</span><span>Pending Arrival</span></div>
+        <div v-for="p in intermodalByPort" :key="p.port" class="port-row">
+          <span style="font-weight:600">{{ p.port }}</span>
+          <span>{{ fmtNum(p.count) }}</span>
+          <span>{{ fmtNum(p.tons) }}t</span>
+          <span :style="{ color: p.pending > 0 ? 'var(--warning-fg)' : 'inherit' }">{{ p.pending }}</span>
+        </div>
       </div>
-      <EmptyState v-else :loading="loading" message="No manifests with a declared port of origin in the current view." icon="search" compact />
-      <TablePagination
-        :page="intermodalPage" :total-pages="intermodalTotalPages" :total="intermodalTotal"
-        @prev="intermodalPrev" @next="intermodalNext"
-      />
+      <EmptyState v-else :loading="transitStats.loading.value" message="No manifests with a declared port of origin in the current view." icon="search" compact />
     </div>
   </div>
 
@@ -199,69 +113,21 @@
 
   <div id="manifest-log" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <select v-model="cargoFilter" class="select-sm">
-          <option value="">All cargo types</option>
-          <option value="container">Container</option>
-          <option value="bulk_fuel">Bulk Fuel</option>
-          <option value="bulk_cement">Bulk Cement</option>
-          <option value="grain">Grain</option>
-          <option value="general">General</option>
-          <option value="vehicle">Vehicle</option>
-          <option value="steel">Steel</option>
-        </select>
-        <input v-model="manifestSearch" class="select-sm" placeholder="Search manifest / route…" style="min-width:180px" />
-        <button class="btn" @click="cargoFilter=''; manifestSearch=''">Clear</button>
-        <ExportButton filename="uapts-freight-manifests.csv" :rows="filteredManifests" :columns="manifestExportColumns" style="margin-left:auto" />
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th></th>
-            <th>Manifest Ref</th>
-            <th>Cargo Type</th>
-            <th>Tonnage</th>
-            <th>Wagons</th>
-            <th>Route</th>
-            <th>Train</th>
-            <th>Revenue (KES)</th>
-            <th>Dispatched</th>
-            <th>Arrived</th>
-          </tr>
-        </thead>
-        <tbody v-if="filteredManifests.length">
-          <template v-for="m in manifestsPageRows" :key="m.id">
-            <tr class="expand-row" @click="expanded = expanded === m.id ? null : m.id">
-              <td class="expand-cell">{{ expanded === m.id ? '▾' : '▸' }}</td>
-              <td style="font-family:monospace;font-weight:700;font-size:12px">{{ m.manifest_ref }}</td>
-              <td><BadgePill :variant="cargoBadge(m.cargo_type)">{{ m.cargo_type.replace(/_/g,' ') }}</BadgePill></td>
-              <td style="font-weight:600">{{ fmtNum(m.tonnage) }}t</td>
-              <td>{{ m.wagon_count }}</td>
-              <td style="font-size:12px">{{ m.origin_station_code }} → {{ m.destination_station_code }}</td>
-              <td style="font-family:monospace;font-size:12px">{{ m.schedule_train_number ?? '-' }}</td>
-              <td style="font-size:12px">{{ fmtKES(parseFloat(m.revenue_kes)) }}</td>
-              <td style="font-size:11px;white-space:nowrap">{{ fmtTime(m.dispatched_at) }}</td>
-              <td style="font-size:11px;white-space:nowrap;color:var(--success-fg)">{{ m.arrived_at ? fmtTime(m.arrived_at) : '-' }}</td>
-            </tr>
-            <tr v-if="expanded === m.id" class="detail-row">
-              <td :colspan="10">
-                <div class="drilldown">
-                  <div class="dd-item"><span class="dd-label">Operator</span><span>{{ m.operator_agency_code ?? m.operator ?? '-' }}</span></div>
-                  <div class="dd-item"><span class="dd-label">Port of Origin</span><span style="font-family:monospace">{{ m.port_origin ?? '-' }}</span></div>
-                  <div class="dd-item"><span class="dd-label">Customs Ref (KPA)</span><span style="font-family:monospace">{{ m.customs_clearance_ref ?? '-' }}</span></div>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-        <tbody v-else>
-          <tr><td colspan="10" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading manifests…' : 'No manifests match filters.' }}</td></tr>
-        </tbody>
-      </table>
-      <TablePagination
-        :page="manifestsPage" :total-pages="manifestsTotalPages" :total="manifestsTotal"
-        @prev="manifestsPrev" @next="manifestsNext"
-      />
+      <DataTable :table="manifestTable" row-key="id" title="Freight manifest log" export-name="uapts-freight-manifests" expandable filters-open
+                 placeholder="Search manifest, station, train…" empty="No manifests match the current filters.">
+        <template #cell-manifest_ref="{ row }"><span style="font-family:monospace;font-weight:700;font-size:12px">{{ row.manifest_ref }}</span></template>
+        <template #cell-tonnage="{ row }"><span style="font-weight:600">{{ fmtNum(row.tonnage) }}t</span></template>
+        <template #cell-route="{ row }">{{ row.origin_station_code }} → {{ row.destination_station_code }}</template>
+        <template #cell-revenue_kes="{ row }">{{ fmtKES(parseFloat(row.revenue_kes)) }}</template>
+        <template #cell-arrived_at="{ row }"><span style="color:var(--success-fg)">{{ row.arrived_at ? fmtTime(row.arrived_at) : '-' }}</span></template>
+        <template #expanded="{ row }">
+          <div class="drilldown">
+            <div class="dd-item"><span class="dd-label">Operator</span><span>{{ row.operator_agency_code ?? row.operator ?? '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Port of Origin</span><span style="font-family:monospace">{{ row.port_origin || '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Customs Ref (KPA)</span><span style="font-family:monospace">{{ row.customs_clearance_ref || '-' }}</span></div>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -270,132 +136,99 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useRailway } from '~/composables/api'
-import type { FreightManifest } from '~/composables/api'
+import { useApi } from '~/composables/api/_client'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { useTimeRange } from '~/composables/useTimeRange'
+import type { TableColumn } from '~/types/dataTable'
 
-const manifests = ref<FreightManifest[]>([])
-const portManifests = ref<FreightManifest[]>([])
-const corridors = ref<any[]>([])
-const loading   = ref(true)
-const error     = ref<string | null>(null)
-const mfError   = ref(false)
-const lastRefreshed = ref('-')
-const timeRange = useTimeRange('railway', { default: '30d' })
-const days = timeRange.days
-const cargoFilter   = ref('')
-const manifestSearch = ref('')
-const expanded = ref<string | null>(null)
+// Every table and KPI asks the server for the page's period (the global one unless picked here) and county, so they always
+// agree - nothing is derived from a first page of manifests (see docs/data-tables.md).
+const RAIL = '/api/v1/railway'
+const F = `${RAIL}/freight/`
+const api = useApi()
+const timeRange = useTimeRange('railway', { default: '30d', years: true, custom: true })
+const county = useCountyScope('railway')
+const rangeTag = computed(() => timeRange.period.value)
+const scope = () => ({ ...timeRange.query.value, ...county.query.value })
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const rail = useRailway()
+const CARGO = ['container', 'bulk_fuel', 'bulk_cement', 'grain', 'general', 'vehicle', 'steel'].map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const CARGO_BADGE: Record<string, string> = { container: 'info', bulk_fuel: 'warning', bulk_cement: 'neutral', grain: 'success', vehicle: 'fair', steel: 'neutral' }
 
-  const [mfRes, portRes, corrRes] = await Promise.allSettled([
-    rail.freight({ page_size: 100, days: days.value }),
-    // Port-origin manifests are fetched on their own: the list is newest-first
-    // and capped at 100, so they would otherwise fall off the first page.
-    rail.freight({ page_size: 100, days: days.value, port_linked: true }),
-    rail.freightByCorridor(days.value),
-  ])
-
-  if (mfRes.status   === 'fulfilled') manifests.value = (mfRes.value as any).results ?? []
-  if (portRes.status === 'fulfilled') portManifests.value = (portRes.value as any).results ?? []
-  if (corrRes.status === 'fulfilled') corridors.value = (corrRes.value as any).results ?? []
-
-  mfError.value = mfRes.status === 'rejected'
-
-  if ([mfRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Railway API.'
-
-  lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
-  loading.value = false
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-// ── Computed ──────────────────────────────────────────────────────────────
-const portRailManifests = computed(() => portManifests.value)
-
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: portRailPageRows, page: portRailPage, totalPages: portRailTotalPages,
-  total: portRailTotal, next: portRailNext, prev: portRailPrev,
-} = usePagination(portRailManifests, 15)
-
-const filteredManifests = computed(() =>
-  manifests.value.filter(m => {
-    if (cargoFilter.value    && m.cargo_type !== cargoFilter.value)                                               return false
-    if (manifestSearch.value) {
-      const q = manifestSearch.value.toLowerCase()
-      if (!m.manifest_ref.toLowerCase().includes(q) &&
-          !m.origin_station_code.toLowerCase().includes(q) &&
-          !m.destination_station_code.toLowerCase().includes(q)) return false
-    }
-    return true
-  }),
-)
-
-const {
-  pageRows: manifestsPageRows, page: manifestsPage, totalPages: manifestsTotalPages,
-  total: manifestsTotal, next: manifestsNext, prev: manifestsPrev,
-} = usePagination(filteredManifests, 15)
-
-const byCargoType = computed(() => {
-  const map = new Map<string, { type: string; tons: number; count: number }>()
-  manifests.value.forEach(m => {
-    const ex = map.get(m.cargo_type)
-    if (ex) { ex.tons += m.tonnage; ex.count++ }
-    else map.set(m.cargo_type, { type: m.cargo_type, tons: m.tonnage, count: 1 })
-  })
-  return Array.from(map.values()).sort((a, b) => b.tons - a.tons)
-})
-
-const intermodalByPort = computed(() => {
-  const m = new Map<string, { port: string; count: number; tons: number; transitHours: number[]; pending: number }>()
-  for (const mf of portManifests.value) {
-    if (!mf.port_origin) continue
-    const ex = m.get(mf.port_origin) ?? { port: mf.port_origin, count: 0, tons: 0, transitHours: [], pending: 0 }
-    ex.count++
-    ex.tons += mf.tonnage
-    if (mf.arrived_at) {
-      ex.transitHours.push((new Date(mf.arrived_at).getTime() - new Date(mf.dispatched_at).getTime()) / 3_600_000)
-    } else {
-      ex.pending++
-    }
-    m.set(mf.port_origin, ex)
-  }
-  return [...m.values()]
-    .map(p => ({ port: p.port, count: p.count, tons: p.tons, pending: p.pending, avgTransitHours: p.transitHours.length ? p.transitHours.reduce((a, b) => a + b, 0) / p.transitHours.length : null }))
-    .sort((a, b) => b.count - a.count)
-})
-
-const {
-  pageRows: intermodalPageRows, page: intermodalPage, totalPages: intermodalTotalPages,
-  total: intermodalTotal, next: intermodalNext, prev: intermodalPrev,
-} = usePagination(intermodalByPort, 15)
-
-const manifestExportColumns = [
-  { key: 'manifest_ref', label: 'Manifest Ref' },
-  { key: 'cargo_type', label: 'Cargo Type' },
-  { key: 'tonnage', label: 'Tonnage' },
-  { key: 'wagon_count', label: 'Wagons' },
-  { key: 'origin_station_code', label: 'Origin' },
-  { key: 'destination_station_code', label: 'Destination' },
-  { key: 'schedule_train_number', label: 'Train' },
-  { key: 'revenue_kes', label: 'Revenue (KES)' },
-  { key: 'dispatched_at', label: 'Dispatched' },
-  { key: 'arrived_at', label: 'Arrived' },
+// ── Tables ───────────────────────────────────────────────────────────────
+const portRailColumns: TableColumn[] = [
+  { key: 'manifest_ref', label: 'Manifest Ref', priority: 1, pin: 'left' },
+  { key: 'customs_clearance_ref', label: 'Customs Ref (KPA)', priority: 2 },
+  { key: 'port_origin', label: 'Port of Origin', type: 'mono', priority: 2 },
+  { key: 'cargo_type', label: 'Cargo Type', type: 'badge', badge: CARGO_BADGE, options: CARGO, priority: 1 },
+  { key: 'tonnage', label: 'Tonnage', type: 'num', priority: 1 },
+  { key: 'wagon_count', label: 'Wagons', type: 'num', priority: 3 },
+  { key: 'route', label: 'Route', sortable: 'origin_station_code', filter: false, exportAs: r => `${r.origin_station_code} - ${r.destination_station_code}`, priority: 2 },
+  { key: 'operator_agency_code', label: 'Operator', priority: 3 },
+  { key: 'dispatched_at', label: 'Dispatched', type: 'datetime', priority: 1 },
+  { key: 'arrived_at', label: 'Arrived', type: 'datetime', priority: 2 },
 ]
+const portRailTable = useEndpointTable({
+  key: 'rail-port-rail', path: F, columns: portRailColumns, countyKey: 'railway', pageSize: 15,
+  params: () => ({ ...timeRange.query.value, port_linked: 'true' }), defaultSort: [{ key: 'dispatched_at', dir: 'desc' }],
+})
 
-const totalTons    = computed(() => manifests.value.reduce((s, m) => s + m.tonnage, 0))
-const totalRevenue = computed(() => manifests.value.reduce((s, m) => s + parseFloat(m.revenue_kes), 0))
-const avgWagons    = computed(() => manifests.value.length > 0 ? manifests.value.reduce((s, m) => s + m.wagon_count, 0) / manifests.value.length : null)
-const maxCargoTons    = computed(() => Math.max(1, ...byCargoType.value.map(c => c.tons)))
+const manifestColumns: TableColumn[] = [
+  { key: 'manifest_ref', label: 'Manifest Ref', priority: 1, pin: 'left' },
+  { key: 'cargo_type', label: 'Cargo Type', type: 'badge', badge: CARGO_BADGE, options: CARGO, priority: 1 },
+  { key: 'tonnage', label: 'Tonnage', type: 'num', priority: 1 },
+  { key: 'wagon_count', label: 'Wagons', type: 'num', priority: 3 },
+  { key: 'route', label: 'Route', sortable: 'origin_station_code', filter: false, exportAs: r => `${r.origin_station_code} - ${r.destination_station_code}`, priority: 2 },
+  { key: 'schedule_train_number', label: 'Train', type: 'mono', priority: 2 },
+  { key: 'revenue_kes', label: 'Revenue (KES)', type: 'num', priority: 2 },
+  { key: 'dispatched_at', label: 'Dispatched', type: 'datetime', priority: 1 },
+  { key: 'arrived_at', label: 'Arrived', type: 'datetime', priority: 2 },
+]
+const manifestTable = useEndpointTable({
+  key: 'rail-freight-manifests', path: F, columns: manifestColumns, countyKey: 'railway', pageSize: 15,
+  params: () => timeRange.query.value, defaultSort: [{ key: 'dispatched_at', dir: 'desc' }],
+})
+
+// ── KPIs and breakdowns: computed by the server ──────────────────────────
+const stats = useServerCount(F, scope, { aggregate: ['sum:tonnage', 'sum:revenue_kes', 'avg:wagon_count'], groupBy: ['cargo_type'], groupAggregate: ['sum:tonnage'] })
+const portStats = useServerCount(F, () => ({ ...scope(), port_linked: 'true' }))
+const transitStats = useServerCount(F, () => ({ ...scope(), port_origin_set: 'true' }), { groupBy: ['port_origin'], groupAggregate: ['sum:tonnage'] })
+const pendingStats = useServerCount(F, () => ({ ...scope(), port_origin_set: 'true', 'f.arrived_at__isnull': 'true' }), { groupBy: ['port_origin'] })
+const allStats = [stats, portStats, transitStats, pendingStats]
+
+const unavailable = computed(() => stats.count.value === null)
+const note = computed(() => stats.loading.value ? 'Loading…' : 'KRC feed unavailable')
+const error = computed(() => stats.failed.value && !stats.loading.value ? 'Unable to reach the UAPTS Railway API.' : null)
+const totalTons = computed(() => stats.sum('tonnage'))
+const totalRevenue = computed(() => stats.sum('revenue_kes'))
+const avgWagons = computed(() => stats.avg('wagon_count'))
+
+const byCargoType = computed(() =>
+  (stats.groups.value.cargo_type ?? [])
+    .map(g => ({ type: String(g.value), tons: stats.groupValue('cargo_type', g.value, 'sum:tonnage') ?? 0, count: g.count }))
+    .sort((a, b) => b.tons - a.tons))
+const intermodalByPort = computed(() =>
+  (transitStats.groups.value.port_origin ?? []).map(g => ({
+    port: String(g.value), count: g.count, tons: transitStats.groupValue('port_origin', g.value, 'sum:tonnage') ?? 0,
+    pending: pendingStats.groupCount('port_origin', g.value) ?? 0,
+  })))
+const maxCargoTons = computed(() => Math.max(1, ...byCargoType.value.map(c => c.tons)))
+
+// ── Corridors: a ranked top-N the server rolls up ────────────────────────
+const corridors = ref<any[]>([])
+const corridorsLoading = ref(true)
+async function loadCorridors() {
+  try { corridors.value = (await api<any>(`${F}by-corridor/`, { query: scope() }))?.results ?? [] } catch { corridors.value = [] } finally { corridorsLoading.value = false }
+}
 const maxCorridorTons = computed(() => Math.max(1, ...corridors.value.map(c => c.tons ?? c.total_tons ?? 0)))
+watch(() => JSON.stringify(scope()), loadCorridors)
+onMounted(loadCorridors)
+
+function refreshAll() { void Promise.all([portRailTable.refresh(), manifestTable.refresh(), ...allStats.map(s => s.refresh()), loadCorridors()]) }
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(refreshAll, 120_000) })
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -416,10 +249,6 @@ function fmtTime(iso: string) {
 function cargoColor(t: string) {
   const m: Record<string,string> = { container:'#3b82f6', bulk_fuel:'#f59e0b', bulk_cement:'#94a3b8', grain:'#22c55e', vehicle:'#a855f7', steel:'#64748b', general:'#10b981' }
   return m[t] ?? '#6b7280'
-}
-function cargoBadge(t: string) {
-  const m: Record<string,string> = { container:'info', bulk_fuel:'warning', bulk_cement:'neutral', grain:'success', vehicle:'fair', steel:'neutral' }
-  return m[t] ?? 'neutral'
 }
 </script>
 
@@ -453,14 +282,13 @@ function cargoBadge(t: string) {
 
 /* ── Reconciliation note ── */
 .recon-note { font-size:12px; color:var(--info-fg); background:var(--info-bg); border:1px solid var(--info-fg); border-radius:7px; padding:9px 13px; margin-bottom:12px; line-height:1.5; }
-.table-scroll { overflow-x:auto; }
 
 /* ── Filters & table ── */
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
-.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
 .dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.port-list { display:flex; flex-direction:column; max-height:420px; overflow-y:auto; }
+.port-head, .port-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:10px; padding:7px 4px; font-size:13px; align-items:center; }
+.port-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--fg-3); border-bottom:1px solid var(--border-subtle); position:sticky; top:0; background:var(--surface-1, var(--surface)); }
+.port-row { border-bottom:1px solid var(--border-subtle); }
 </style>

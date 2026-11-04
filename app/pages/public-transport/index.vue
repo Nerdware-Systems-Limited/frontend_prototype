@@ -5,7 +5,6 @@
     subtitle="NaMATA · NTSA · NCTTCA - BRT operations, PSV oversight, schedule adherence, fare analytics, NCTTCA corridor ridership, and operator ranking"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/public-transport/operators" class="btn">Public Operators<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/public-transport/compliance" class="btn">Compliance<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
@@ -158,39 +157,15 @@
         <NuxtLink to="/public-transport/operators" class="link-sm">View all →</NuxtLink>
       </div>
       <div class="card-body">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Operator</th>
-              <th>On-Time</th>
-              <th>Revenue</th>
-              <th>Util %</th>
-            </tr>
-          </thead>
-          <tbody v-if="leaderboard.length">
-            <tr v-for="op in leaderboardPageRows" :key="op.id">
-              <td style="font-weight:700;color:var(--fg-3)">#{{ op.rank_position }}</td>
-              <td style="font-weight:600">{{ op.sacco_name ?? op.sacco }}</td>
-              <td>
-                <span :style="{ color: op.on_time_pct >= 80 ? 'var(--success-fg)' : 'var(--warning-fg)' }">
-                  {{ op.on_time_pct.toFixed(1) }}%
-                </span>
-              </td>
-              <td style="font-size:12px">{{ fmtKES(Number(op.revenue_kes)) }}</td>
-              <td style="font-size:12px">{{ op.fleet_utilization_pct.toFixed(0) }}%</td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr>
-              <td colspan="5" style="text-align:center;color:var(--fg-3);padding:14px">{{ loading ? 'Loading…' : 'No data' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <TablePagination
-          :page="leaderboardPage" :total-pages="leaderboardTotalPages" :total="leaderboardTotal"
-          @prev="leaderboardPrev" @next="leaderboardNext"
-        />
+        <DataTable :table="leaderboardTable" row-key="id" title="Operator leaderboard" export-name="uapts-operator-leaderboard"
+                   placeholder="Search operator…" empty="No operator metrics for the latest period.">
+          <template #cell-rank_position="{ row }"><span style="font-weight:700;color:var(--fg-3)">#{{ row.rank_position }}</span></template>
+          <template #cell-sacco_name="{ row }"><span style="font-weight:600">{{ row.sacco_name ?? row.sacco }}</span></template>
+          <template #cell-on_time_pct="{ row }">
+            <span :style="{ color: row.on_time_pct >= 80 ? 'var(--success-fg)' : 'var(--warning-fg)' }">{{ Number(row.on_time_pct).toFixed(1) }}%</span>
+          </template>
+          <template #cell-revenue_kes="{ row }">{{ fmtKES(Number(row.revenue_kes)) }}</template>
+        </DataTable>
       </div>
     </div>
   </div>
@@ -237,14 +212,18 @@ definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
 import { usePublicTransport, useGis } from '~/composables/api'
-import type { PTSummary, OperatorMetric } from '~/composables/api'
+import type { PTSummary } from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useCountyScope } from '~/composables/useCountyScope'
+import { useTimeRange } from '~/composables/useTimeRange'
+import { eatDate } from '~/utils/timeRange'
+import type { TableColumn } from '~/types/dataTable'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
 
 type LineSpec   = { id: string; points: [number, number][]; color?: string; weight?: number; opacity?: number; label?: string }
 type MarkerSpec = { id: string; lat: number; lon: number; title?: string; subtitle?: string; color?: 'green'|'yellow'|'red'|'orange'|'blue'|'purple'|'gray'; size?: 'sm'|'md'|'lg' }
 
 const summary          = ref<PTSummary | null>(null)
-const leaderboard      = ref<OperatorMetric[]>([])
 const fareTrend        = ref<{ collected_hour: string; total_kes: number; transactions: number }[]>([])
 const fareChannels     = ref<{ payment_channel: string; total_kes: number; transactions: number; share_pct: number }[]>([])
 const onTime           = ref<any[]>([])
@@ -266,9 +245,8 @@ async function load() {
   const pt  = usePublicTransport()
   const gis = useGis()
 
-  const [sumRes, lbRes, revRes, chanRes, otRes, fbcRes, licRes, mapRes, roadsRes] = await Promise.allSettled([
+  const [sumRes, revRes, chanRes, otRes, fbcRes, licRes, mapRes, roadsRes] = await Promise.allSettled([
     pt.summary(),
-    pt.leaderboard(),
     pt.revenueTrend(days.value),
     pt.revenueByChannel(days.value),
     pt.onTimeStats(days.value),
@@ -283,7 +261,6 @@ async function load() {
     expiringLicenses.value = sumRes.value.expiring_licences ?? []
     feedbackByCategory.value = sumRes.value.feedback_by_category ?? []
   }
-  if (lbRes.status   === 'fulfilled') leaderboard.value       = (lbRes.value as any).results ?? []
   if (revRes.status  === 'fulfilled') fareTrend.value         = (revRes.value as any).results ?? []
   if (chanRes.status === 'fulfilled') fareChannels.value      = (chanRes.value as any).results ?? []
   if (otRes.status   === 'fulfilled') onTime.value            = ((otRes.value as any).results ?? []).slice(0, 8)
@@ -292,13 +269,17 @@ async function load() {
   if (mapRes.status  === 'fulfilled') { mapLines.value = mapRes.value.lines; mapMarkers.value = mapRes.value.markers }
   if (roadsRes.status === 'fulfilled') roadsGeo.value = roadsRes.value
 
-  if ([sumRes, lbRes].every(r => r.status === 'rejected'))
+  if (sumRes.status === 'rejected')
     error.value = 'Unable to reach the UAPTS Public Transport API.'
 
   lastRefreshed.value = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('public-transport')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
@@ -331,11 +312,21 @@ const demandForecastPoints = computed(() =>
   demandForecast.value.map(d => ({ label: fmtHour(d.target_at), value: d.total_predicted ?? 0 })),
 )
 
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: leaderboardPageRows, page: leaderboardPage, totalPages: leaderboardTotalPages,
-  total: leaderboardTotal, next: leaderboardNext, prev: leaderboardPrev,
-} = usePagination(leaderboard, 15)
+// ── Operator leaderboard: the latest reporting period, ranked, on the universal table ──
+const leaderboardColumns: TableColumn[] = [
+  { key: 'rank_position', label: '#', type: 'num', priority: 1, pin: 'left' },
+  { key: 'sacco_name', label: 'Operator', priority: 1, minWidth: 160 },
+  { key: 'on_time_pct', label: 'On-Time', type: 'num', digits: 1, priority: 1 },
+  { key: 'revenue_kes', label: 'Revenue', type: 'num', priority: 2 },
+  { key: 'fleet_utilization_pct', label: 'Util %', type: 'num', digits: 0, priority: 2 },
+  { key: 'total_trips', label: 'Trips', type: 'num', priority: 3 },
+  { key: 'complaint_count', label: 'Complaints', type: 'num', priority: 3 },
+]
+const leaderboardTable = useEndpointTable({
+  key: 'pt-operator-leaderboard', path: '/api/v1/public-transport/operator-metrics/', columns: leaderboardColumns, countyKey: 'public-transport',
+  pageSize: 15, params: { latest: '1' }, defaultSort: [{ key: 'rank_position', dir: 'asc' }],
+})
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), () => { void leaderboardTable.refresh() })
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {

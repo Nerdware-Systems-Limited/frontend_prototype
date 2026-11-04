@@ -4,10 +4,6 @@
     title="Maintenance Orders"
     subtitle="KeNHA · KURA · KeRRA · KRB - Road maintenance work orders, contractor progress, KRB budget allocation, and utilization tracking"
   >
-    <!-- <template #actions>
-      
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
-    </template> -->
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -333,18 +329,21 @@ const riskSearch         = ref('')
 const signalSearch       = ref('')
 const signalStatusFilter = ref('')
 
+// County filter, shared across the Infrastructure pages and following the global filter until this module picks its own.
+const county = useCountyScope('infrastructure')
+
 async function load() {
   loading.value = true
   error.value = null
   const infra = useInfrastructure()
 
   const [ordRes, budRes, typeRes, sumRes, riskRes, sigRes] = await Promise.allSettled([
-    infra.maintenanceOrders({ page_size: 100 }),
+    infra.maintenanceOrders({ page_size: 100, ...county.query.value }),
     infra.budgets({ page_size: 10 }),
-    infra.maintenanceByType(),
-    infra.summary(),
+    infra.maintenanceByType(county.query.value),
+    infra.summary(county.query.value),
     infra.atRiskForecasts(),
-    infra.signalFaults(),
+    infra.signalFaults(county.query.value),
   ])
 
   if (ordRes.status  === 'fulfilled') orders.value  = (ordRes.value as any).results ?? []
@@ -364,6 +363,8 @@ async function load() {
   loading.value = false
 }
 
+// County changed - here, on another Infrastructure page, or from the global filter in the top bar.
+watch(() => county.county.value, load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })

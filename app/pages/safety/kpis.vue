@@ -4,9 +4,6 @@
     title="Safety KPIs"
     subtitle="NTSA · KeNHA · KURA · KeRRA - National crash rates, injury severity, county breakdowns by road authority, and traffic violation trends"
   >
-    <template #actions>
-      <TimeRangeSelector :range="range" @change="load" />
-    </template>
   </PageHeader>
 
   <div v-if="error" class="error-banner">⚠ {{ error }}</div>
@@ -239,6 +236,7 @@ async function load() {
 }
 
 onMounted(load)
+watch(() => JSON.stringify(range.query.value), load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
 onUnmounted(() => { if (t) clearInterval(t) })

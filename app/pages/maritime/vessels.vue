@@ -11,28 +11,26 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
-
-  <!-- KPIs -->
+  <!-- KPIs: counted by the server, so they are right however many vessels there are -->
   <div class="kpi-grid">
     <KpiCard
-      label="Registered Vessels" :value="fmtNum(vessels.length)"
-      :unavailable="loading || vesselsError" :unavailable-note="loading ? 'Loading…' : 'KMA feed unavailable'"
+      label="Registered Vessels" :value="fmtNum(vesselCount.count.value)"
+      :unavailable="vesselCount.count.value === null" :unavailable-note="vesselCount.loading.value ? 'Loading…' : 'KMA feed unavailable'"
       period="LIVE" description="KMA vessel registry" to="#vessel-registry"
     />
     <KpiCard
-      label="Valid Safety Certs" :value="fmtNum(vessels.filter(v => v.safety_cert_status === 'valid').length)"
-      :unavailable="loading || vesselsError" :unavailable-note="loading ? 'Loading…' : 'KMA PSC feed unavailable'"
-      period="LIVE" :description="`of ${fmtNum(vessels.length)} registered`" to="#vessel-registry"
+      label="Valid Safety Certs" :value="fmtNum(validCertCount.count.value)"
+      :unavailable="validCertCount.count.value === null" :unavailable-note="validCertCount.loading.value ? 'Loading…' : 'KMA PSC feed unavailable'"
+      period="LIVE" :description="`of ${fmtNum(vesselCount.count.value)} registered`" to="#vessel-registry"
     />
     <KpiCard
-      label="Movements Loaded" :value="fmtNum(movements.length)"
-      :unavailable="loading || movementsError" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      label="Movements Recorded" :value="fmtNum(movementCount.count.value)"
+      :unavailable="movementCount.count.value === null" :unavailable-note="movementCount.loading.value ? 'Loading…' : 'KMA AIS feed unavailable'"
       period="LIVE" description="Port-call log" to="#vessel-movements"
     />
     <KpiCard
-      label="Vessels In Port" :value="fmtNum(movements.filter(m => m.status === 'in_port').length)"
-      :unavailable="loading || movementsError" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
+      label="Vessels In Port" :value="fmtNum(inPortCount.count.value)"
+      :unavailable="inPortCount.count.value === null" :unavailable-note="inPortCount.loading.value ? 'Loading…' : 'KMA AIS feed unavailable'"
       period="LIVE" description="Currently berthed / anchored" to="#vessel-movements"
     />
   </div>
@@ -41,75 +39,23 @@
   <SectionTitle pill="KMA · NAV 2018 · Continuous">Vessel Registry</SectionTitle>
   <div id="vessel-registry" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="vesselSearch" class="select-sm" placeholder="Search vessel name / IMO…" style="min-width:200px" />
-        <select v-model="vesselTypeFilter" class="select-sm">
-          <option value="">All vessel types</option>
-          <option value="container">Container</option>
-          <option value="bulk_carrier">Bulk Carrier</option>
-          <option value="passenger">Passenger</option>
-          <option value="tug">Tug</option>
-          <option value="supply">Supply</option>
-          <option value="dredger">Dredger</option>
-          <option value="tanker">Tanker</option>
-          <option value="general_cargo">General Cargo</option>
-          <option value="vehicle">Vehicle Carrier</option>
-        </select>
-        <select v-model="certFilter" class="select-sm">
-          <option value="">All cert statuses</option>
-          <option value="valid">Valid</option>
-          <option value="pending">Pending</option>
-          <option value="expired">Expired</option>
-        </select>
-        <button class="btn" @click="vesselSearch=''; vesselTypeFilter=''; certFilter=''">Clear</button>
-        <ExportButton filename="uapts-vessel-registry.csv" :rows="filteredVessels" :columns="vesselExportColumns" style="margin-left:auto" />
-      </div>
-
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Vessel</th>
-              <th>IMO / MMSI</th>
-              <th>Type</th>
-              <th>Flag</th>
-              <th>GRT / DWT</th>
-              <th>Safety Cert</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredVessels.length">
-            <template v-for="v in vesselsPageRows" :key="v.id">
-              <tr class="expand-row" @click="expandedVessel = expandedVessel === v.id ? null : v.id">
-                <td class="expand-cell">{{ expandedVessel === v.id ? '▾' : '▸' }}</td>
-                <td style="font-weight:600">{{ v.vessel_name }}</td>
-                <td style="font-family:monospace;font-size:12px">{{ v.imo_number }} / {{ v.mmsi }}</td>
-                <td><BadgePill variant="info">{{ v.vessel_type.replace(/_/g,' ') }}</BadgePill></td>
-                <td style="font-size:12px">{{ v.flag_state }}</td>
-                <td style="font-size:12px">{{ fmtNum(v.gross_tonnage) }} / {{ fmtNum(v.deadweight_tonnage) }}</td>
-                <td><BadgePill :variant="certBadge(v.safety_cert_status)">{{ v.safety_cert_status }}</BadgePill></td>
-              </tr>
-              <tr v-if="expandedVessel === v.id" class="detail-row">
-                <td :colspan="7">
-                  <div class="drilldown">
-                    <div class="dd-item"><span class="dd-label">Owner</span><span>{{ v.owner || '-' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Operator</span><span>{{ v.operator || '-' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Year Built</span><span>{{ v.year_built ?? '-' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Length Overall</span><span>{{ v.length_overall_m }}m</span></div>
-                    <div class="dd-item"><span class="dd-label">Beam</span><span>{{ v.beam_m }}m</span></div>
-                    <div class="dd-item"><span class="dd-label">Max Draft</span><span>{{ v.max_draft_m }}m</span></div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading vessels…' : 'No vessels match the current filters.' }}</td></tr></tbody>
-        </table>
-        <TablePagination
-          :page="vesselsPage" :total-pages="vesselsTotalPages" :total="vesselsTotal"
-          @prev="vesselsPrev" @next="vesselsNext"
-        />
-      </div>
+      <DataTable :table="vesselTable" row-key="id" title="Vessel registry" export-name="uapts-vessel-registry" expandable filters-open
+                 placeholder="Search vessel name / IMO / owner…" empty="No vessels registered yet.">
+        <template #cell-vessel_name="{ row }"><span class="strong">{{ row.vessel_name }}</span></template>
+        <template #cell-imo_number="{ row }"><span class="mono">{{ row.imo_number }} / {{ row.mmsi || '-' }}</span></template>
+        <template #cell-vessel_type="{ row }"><BadgePill variant="info">{{ String(row.vessel_type ?? '').replace(/_/g, ' ') }}</BadgePill></template>
+        <template #cell-gross_tonnage="{ row }">{{ fmtNum(row.gross_tonnage) }} / {{ fmtNum(row.deadweight_tonnage) }}</template>
+        <template #expanded="{ row }">
+          <div class="drilldown">
+            <div class="dd-item"><span class="dd-label">Owner</span><span>{{ row.owner || '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Operator</span><span>{{ row.operator || '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Year Built</span><span>{{ row.year_built ?? '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Length Overall</span><span>{{ row.length_overall_m }}m</span></div>
+            <div class="dd-item"><span class="dd-label">Beam</span><span>{{ row.beam_m }}m</span></div>
+            <div class="dd-item"><span class="dd-label">Max Draft</span><span>{{ row.max_draft_m }}m</span></div>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 
@@ -117,77 +63,25 @@
   <SectionTitle pill="KMA AIS · Live">Vessel Movements</SectionTitle>
   <div id="vessel-movements" class="card drill-target">
     <div class="card-body">
-      <div class="filter-row">
-        <input v-model="movementSearch" class="select-sm" placeholder="Search vessel name…" style="min-width:200px" />
-        <select v-model="portFilter" class="select-sm">
-          <option value="">All ports</option>
-          <option v-for="p in portOptions" :key="p" :value="p">{{ p }}</option>
-        </select>
-        <select v-model="statusFilter" class="select-sm">
-          <option value="">All statuses</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="in_transit">In Transit</option>
-          <option value="in_port">In Port</option>
-          <option value="departed">Departed</option>
-          <option value="delayed">Delayed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <button class="btn" @click="movementSearch=''; portFilter=''; statusFilter=''">Clear</button>
-        <ExportButton filename="uapts-vessel-movements.csv" :rows="filteredMovements" :columns="movementExportColumns" style="margin-left:auto" />
-      </div>
-
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Vessel</th>
-              <th>Port</th>
-              <th>Berth</th>
-              <th>Movement</th>
-              <th>Status</th>
-              <th>ETA / ETD</th>
-              <th>Cargo</th>
-              <th>TEU</th>
-            </tr>
-          </thead>
-          <tbody v-if="filteredMovements.length">
-            <template v-for="m in movementsPageRows" :key="m.id">
-              <tr class="expand-row" @click="expandedMovement = expandedMovement === m.id ? null : m.id">
-                <td class="expand-cell">{{ expandedMovement === m.id ? '▾' : '▸' }}</td>
-                <td style="font-weight:600">{{ m.vessel_name }}</td>
-                <td style="font-family:monospace;font-size:12px">{{ m.port_unlocode }}</td>
-                <td style="font-family:monospace;font-size:12px">{{ m.berth_code || '-' }}</td>
-                <td><BadgePill variant="neutral">{{ m.movement_type.replace(/_/g,' ') }}</BadgePill></td>
-                <td><BadgePill :variant="mvmtBadge(m.status)">{{ m.status.replace(/_/g,' ') }}</BadgePill></td>
-                <td style="font-size:11px;white-space:nowrap">
-                  <div v-if="m.eta">ETA: {{ fmtDate(m.eta) }}</div>
-                  <div v-if="m.etd">ETD: {{ fmtDate(m.etd) }}</div>
-                </td>
-                <td style="font-size:12px">{{ m.cargo_type }}</td>
-                <td style="font-size:12px">{{ m.teu_count > 0 ? fmtNum(m.teu_count) : '-' }}</td>
-              </tr>
-              <tr v-if="expandedMovement === m.id" class="detail-row">
-                <td :colspan="9">
-                  <div class="drilldown">
-                    <div class="dd-item"><span class="dd-label">IMO</span><span style="font-family:monospace">{{ m.vessel_imo }}</span></div>
-                    <div class="dd-item"><span class="dd-label">ATA</span><span>{{ m.ata ? fmtDate(m.ata) : '-' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">ATD</span><span>{{ m.atd ? fmtDate(m.atd) : '-' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Cargo Tonnage</span><span>{{ fmtNum(m.cargo_tonnage) }}t</span></div>
-                    <div class="dd-item"><span class="dd-label">International</span><span>{{ m.is_international ? 'Yes' : 'No' }}</span></div>
-                    <div class="dd-item"><span class="dd-label">Agency</span><span>{{ m.agency || '-' }}</span></div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tbody v-else><tr><td colspan="9" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading movements…' : 'No vessel movements match the current filters.' }}</td></tr></tbody>
-        </table>
-        <TablePagination
-          :page="movementsPage" :total-pages="movementsTotalPages" :total="movementsTotal"
-          @prev="movementsPrev" @next="movementsNext"
-        />
-      </div>
+      <DataTable :table="movementTable" row-key="id" title="Vessel movements" export-name="uapts-vessel-movements" expandable filters-open
+                 placeholder="Search vessel, port, cargo…" empty="No vessel movements recorded yet.">
+        <template #cell-vessel_name="{ row }"><span class="strong">{{ row.vessel_name }}</span></template>
+        <template #cell-eta="{ row }">
+          <div v-if="row.eta">ETA: {{ fmtDate(row.eta) }}</div>
+          <div v-if="row.etd">ETD: {{ fmtDate(row.etd) }}</div>
+          <span v-if="!row.eta && !row.etd">-</span>
+        </template>
+        <template #expanded="{ row }">
+          <div class="drilldown">
+            <div class="dd-item"><span class="dd-label">IMO</span><span class="mono">{{ row.vessel_imo }}</span></div>
+            <div class="dd-item"><span class="dd-label">ATA</span><span>{{ row.ata ? fmtDate(row.ata) : '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">ATD</span><span>{{ row.atd ? fmtDate(row.atd) : '-' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Cargo Tonnage</span><span>{{ fmtNum(row.cargo_tonnage) }}t</span></div>
+            <div class="dd-item"><span class="dd-label">International</span><span>{{ row.is_international ? 'Yes' : 'No' }}</span></div>
+            <div class="dd-item"><span class="dd-label">Agency</span><span>{{ row.agency || '-' }}</span></div>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 
@@ -199,106 +93,70 @@
 definePageMeta({ layout: 'default' })
 
 import { ArrowRight } from 'lucide-vue-next'
-import { useAviationMaritime } from '~/composables/api'
-import type { Vessel, VesselMovement } from '~/composables/api'
+import { useEndpointTable } from '~/composables/useEndpointTable'
+import { useServerCount } from '~/composables/useServerCount'
+import { useCountyScope } from '~/composables/useCountyScope'
+import type { TableColumn } from '~/types/dataTable'
 
-const vessels   = ref<Vessel[]>([])
-const movements = ref<VesselMovement[]>([])
-const loading   = ref(true)
-const error     = ref<string | null>(null)
-const vesselsError   = ref(false)
-const movementsError = ref(false)
+// Both tables are windows onto the WHOLE dataset: search, filters, sorting and paging run on the server
+// (see docs/data-tables.md), so nothing is capped at the first few hundred rows.
+const MA = '/api/v1/aviation-maritime/maritime'
 
-const vesselSearch     = ref('')
-const vesselTypeFilter = ref('')
-const certFilter       = ref('')
-const expandedVessel   = ref<string | null>(null)
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+// Passed to every request explicitly, so a change refetches and the page cache is keyed by it.
+const county = useCountyScope('maritime')
+const scope = () => county.query.value
 
-const movementSearch = ref('')
-const portFilter     = ref('')
-const statusFilter   = ref('')
-const expandedMovement = ref<string | null>(null)
+const CERT_BADGE: Record<string, string> = { valid: 'success', pending: 'warning', expired: 'danger' }
+const MVMT_BADGE: Record<string, string> = { in_port: 'success', in_transit: 'info', scheduled: 'neutral', departed: 'fair', delayed: 'warning', cancelled: 'danger' }
+// The model's own choices (Vessel.vessel_type, VesselMovement.movement_type / status). The old page's type menu was
+// missing cruise, fishing and other, so those vessels could never be filtered to.
+const VESSEL_TYPES = [
+  { value: 'container', label: 'Container' }, { value: 'bulk_carrier', label: 'Bulk Carrier' }, { value: 'tanker', label: 'Tanker' },
+  { value: 'general_cargo', label: 'General Cargo' }, { value: 'vehicle', label: 'Vehicle Carrier' }, { value: 'cruise', label: 'Cruise' },
+  { value: 'fishing', label: 'Fishing' }, { value: 'passenger', label: 'Passenger' }, { value: 'tug', label: 'Tug' },
+  { value: 'supply', label: 'Supply' }, { value: 'dredger', label: 'Dredger' }, { value: 'other', label: 'Other' },
+]
+const MOVEMENT_TYPES = ['arrival', 'berthing', 'departure', 'anchor', 'pilot_board', 'tug'].map(value => ({ value, label: value.replace(/_/g, ' ') }))
+const MOVEMENT_STATUSES = Object.keys(MVMT_BADGE).map(value => ({ value, label: value.replace(/_/g, ' ') }))
 
-async function load() {
-  loading.value = true
-  error.value = null
-  const avm = useAviationMaritime()
-
-  const [vsRes, mvRes] = await Promise.allSettled([
-    avm.vessels({ page_size: 200 } as any),
-    avm.vesselMovements({ page_size: 200 } as any),
-  ])
-
-  if (vsRes.status === 'fulfilled') vessels.value   = (vsRes.value as any).results ?? []
-  if (mvRes.status === 'fulfilled') movements.value = (mvRes.value as any).results ?? []
-
-  vesselsError.value   = vsRes.status === 'rejected'
-  movementsError.value = mvRes.status === 'rejected'
-
-  if ([vsRes, mvRes].every(r => r.status === 'rejected'))
-    error.value = 'Unable to reach the UAPTS Maritime API.'
-
-  loading.value = false
-}
-
-onMounted(load)
-let t: ReturnType<typeof setInterval> | null = null
-onMounted(() => { t = setInterval(load, 120_000) })
-onUnmounted(() => { if (t) clearInterval(t) })
-
-// ── Filters ──────────────────────────────────────────────────────────────
-const filteredVessels = computed(() => vessels.value.filter(v => {
-  if (vesselSearch.value) {
-    const q = vesselSearch.value.toLowerCase()
-    if (!v.vessel_name.toLowerCase().includes(q) && !v.imo_number.toLowerCase().includes(q)) return false
-  }
-  if (vesselTypeFilter.value && v.vessel_type !== vesselTypeFilter.value) return false
-  if (certFilter.value && v.safety_cert_status !== certFilter.value) return false
-  return true
-}))
-const vesselExportColumns = [
-  { key: 'vessel_name', label: 'Vessel' },
-  { key: 'imo_number', label: 'IMO' },
-  { key: 'mmsi', label: 'MMSI' },
-  { key: 'vessel_type', label: 'Type' },
-  { key: 'flag_state', label: 'Flag' },
-  { key: 'gross_tonnage', label: 'GRT' },
-  { key: 'deadweight_tonnage', label: 'DWT' },
-  { key: 'owner', label: 'Owner' },
-  { key: 'operator', label: 'Operator' },
-  { key: 'safety_cert_status', label: 'Safety Cert' },
+const vesselColumns: TableColumn[] = [
+  { key: 'vessel_name', label: 'Vessel', priority: 1, pin: 'left', minWidth: 160 },
+  { key: 'imo_number', label: 'IMO / MMSI', type: 'mono', priority: 2 },
+  { key: 'vessel_type', label: 'Type', priority: 2, options: VESSEL_TYPES },
+  { key: 'flag_state', label: 'Flag', priority: 2 },
+  { key: 'gross_tonnage', label: 'GRT / DWT', type: 'num', priority: 3, sortable: 'gross_tonnage', filterKey: 'gross_tonnage' },
+  { key: 'safety_cert_status', label: 'Safety Cert', type: 'badge', badge: CERT_BADGE, priority: 1 },
+]
+const movementColumns: TableColumn[] = [
+  { key: 'vessel_name', label: 'Vessel', priority: 1, pin: 'left', minWidth: 160 },
+  { key: 'port_unlocode', label: 'Port', type: 'mono', priority: 1 },
+  { key: 'berth_code', label: 'Berth', type: 'mono', priority: 3 },
+  { key: 'movement_type', label: 'Movement', type: 'badge', badge: Object.fromEntries(MOVEMENT_TYPES.map(o => [o.value, 'neutral'])), options: MOVEMENT_TYPES, priority: 2 },
+  { key: 'status', label: 'Status', type: 'badge', badge: MVMT_BADGE, options: MOVEMENT_STATUSES, priority: 1 },
+  { key: 'eta', label: 'ETA / ETD', type: 'datetime', priority: 2, sortable: 'eta', filterKey: 'eta' },
+  { key: 'cargo_type', label: 'Cargo', priority: 3 },
+  { key: 'teu_count', label: 'TEU', type: 'num', priority: 3 },
 ]
 
-const portOptions = computed(() => [...new Set(movements.value.map(m => m.port_unlocode))].sort())
-const filteredMovements = computed(() => movements.value.filter(m => {
-  if (movementSearch.value && !m.vessel_name.toLowerCase().includes(movementSearch.value.toLowerCase())) return false
-  if (portFilter.value && m.port_unlocode !== portFilter.value) return false
-  if (statusFilter.value && m.status !== statusFilter.value) return false
-  return true
-}))
+const vesselTable = useEndpointTable({ key: 'maritime-vessels', path: `${MA}/vessels/`, columns: vesselColumns, countyKey: 'maritime', pageSize: 25 })
+const movementTable = useEndpointTable({ key: 'maritime-vessel-movements', path: `${MA}/vessel-movements/`, columns: movementColumns, countyKey: 'maritime', pageSize: 25 })
 
-// ── Table pagination (max 15 rows visible per table) ───────────────────
-const {
-  pageRows: vesselsPageRows, page: vesselsPage, totalPages: vesselsTotalPages,
-  total: vesselsTotal, next: vesselsNext, prev: vesselsPrev,
-} = usePagination(filteredVessels, 15)
+// ── KPIs: counted by the server ──────────────────────────────────────────
+const vesselCount = useServerCount(`${MA}/vessels/`, scope)
+const validCertCount = useServerCount(`${MA}/vessels/`, () => ({ ...scope(), 'f.safety_cert_status__exact': 'valid' }))
+const movementCount = useServerCount(`${MA}/vessel-movements/`, scope)
+const inPortCount = useServerCount(`${MA}/vessel-movements/`, () => ({ ...scope(), 'f.status__exact': 'in_port' }))
 
-const {
-  pageRows: movementsPageRows, page: movementsPage, totalPages: movementsTotalPages,
-  total: movementsTotal, next: movementsNext, prev: movementsPrev,
-} = usePagination(filteredMovements, 15)
-const movementExportColumns = [
-  { key: 'vessel_name', label: 'Vessel' },
-  { key: 'vessel_imo', label: 'IMO' },
-  { key: 'port_unlocode', label: 'Port' },
-  { key: 'berth_code', label: 'Berth' },
-  { key: 'movement_type', label: 'Movement' },
-  { key: 'status', label: 'Status' },
-  { key: 'eta', label: 'ETA' },
-  { key: 'etd', label: 'ETD' },
-  { key: 'cargo_type', label: 'Cargo' },
-  { key: 'teu_count', label: 'TEU' },
-]
+// Keep the live numbers live (the page used to re-fetch every two minutes).
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  timer = setInterval(() => {
+    void vesselTable.refresh(); void movementTable.refresh()
+    for (const c of [vesselCount, validCertCount, movementCount, inPortCount]) void c.refresh()
+  }, 120_000)
+})
+onUnmounted(() => { if (timer) clearInterval(timer) })
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtNum(v: number | null | undefined, d = 0) {
@@ -307,27 +165,16 @@ function fmtNum(v: number | null | undefined, d = 0) {
 }
 function fmtDate(s: string | null) {
   if (!s) return '-'
-  try { return new Date(s).toLocaleString('en-KE', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) }
+  try { return new Date(s).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
   catch { return s }
-}
-function certBadge(s: string) {
-  const m: Record<string,string> = { valid:'success', pending:'warning', expired:'danger' }
-  return m[s] ?? 'neutral'
-}
-function mvmtBadge(s: string) {
-  const m: Record<string,string> = { in_port:'success', in_transit:'info', scheduled:'neutral', departed:'fair', delayed:'warning', cancelled:'danger' }
-  return m[s] ?? 'neutral'
 }
 </script>
 
 <style scoped>
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
-.filter-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-.table-scroll { overflow-x:auto; }
-.expand-row { cursor:pointer; }
-.expand-cell { width:18px; color:var(--fg-3); font-size:11px; }
-.detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
-.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.strong { font-weight:600; }
+.mono { font-family:var(--font-mono, monospace); font-size:12px; }
+.drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; padding:14px 18px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
 .dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

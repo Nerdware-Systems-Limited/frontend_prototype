@@ -5,7 +5,6 @@
     subtitle="KAA · KCAA · KMD - Real-time ADS-B flight tracking, OTP, passenger volumes, cargo, KMD weather advisories, and KCAA safety oversight"
   >
     <template #actions>
-      <TimeRangeSelector :range="timeRange" @change="load" />
       <NuxtLink to="/aviation/licensing" class="btn">Aircraft Licencing<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
       <NuxtLink to="/aviation/passenger-stats" class="btn">Passenger Stats<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
@@ -340,6 +339,10 @@ async function load() {
   loading.value = false
 }
 
+// County filter for this module, following the global filter in the top bar until a county is picked here.
+const county = useCountyScope('aviation')
+// Reload when the county (or the period) changes - picked here, on another page, or from the global filter.
+watch(() => JSON.stringify([timeRange.query.value, county.query.value]), load)
 onMounted(load)
 let t: ReturnType<typeof setInterval> | null = null
 onMounted(() => { t = setInterval(load, 120_000) })
