@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <SectionTitle :pill="ops ? 'KPA / KMA · ' + rangeTag : ''">Key metrics</SectionTitle>
   <div class="kpi-grid">
@@ -19,9 +19,9 @@
       period="LIVE" description="KPA/KMA managed" to="/maritime/port-ops"
     />
     <KpiCard
-      label="Vessels in Port" :value="ops ? fmtNum(ops.kpis.live_vessels) : '-'"
+      label="Vessels Tracked" :value="ops ? fmtNum(ops.kpis.live_vessels) : '-'"
       :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
-      period="LIVE" description="Currently in Kenyan waters" to="/maritime"
+      period="LIVE" description="AIS positions · Kenyan waters" to="/maritime"
     />
     <KpiCard
       label="Container Throughput" :value="ops ? fmtNum(totalTeu) : '-'"

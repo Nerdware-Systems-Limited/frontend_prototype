@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="kpi-grid">
     <KpiCard label="Declarations" :value="fmt(total)" :unavailable="!summary" :period="`${days}D`" description="Released in window" />
@@ -93,7 +93,7 @@
       <table v-if="rows.length">
         <thead><tr><th>Declaration</th><th>Corridor</th><th>Destination</th><th>Container</th><th>Truck</th><th class="r">Cargo (t)</th><th class="r">Bond (KES)</th><th class="r">Transit</th><th>Status</th><th>Alerts</th></tr></thead>
         <tbody>
-          <tr v-for="r in rows" :key="r.id" class="clickable" tabindex="0" @click="open(r)" @keydown.enter="open(r)">
+          <tr v-for="r in rows" :key="r.id" class="clickable" tabindex="0" @click="open(r)" @keydown.enter.self.prevent="open(r)" @keydown.space.self.prevent="open(r)">
             <td class="mono"><b>{{ r.transit_declaration_ref }}</b></td>
             <td>{{ r.corridor_code }}</td>
             <td>{{ r.destination_country }}</td>
@@ -259,7 +259,7 @@ tr.clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 .f.grow { flex: 1; min-width: 180px; }
 .f.chk { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-2); padding-bottom: 7px; }
 .d-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-.d-h { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-3); margin: 18px 0 8px; }
+.d-h { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-3); margin: 18px 0 8px; }
 .tl { list-style: none; margin: 0 0 14px; padding: 0; }
 .tl li { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; font-size: 12.5px; border-bottom: 1px solid var(--border-subtle); }
 .tl-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--border-interactive); background: var(--surface-2); }
@@ -267,6 +267,6 @@ tr.clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 .tl li.todo { color: var(--fg-3); }
 .tl-t { font-size: 11.5px; }
 .d-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
-.d-grid dt { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 2px; }
+.d-grid dt { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 2px; }
 .d-grid dd { margin: 0; font-size: 13px; color: var(--fg-1); }
 </style>

@@ -233,7 +233,7 @@ function patchBox(k: 'x' | 'y' | 'w' | 'h', n: number) {
 .insp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .insp-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--fg-1); }
 .insp-name strong { font-weight: 600; }
-.insp-id { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+.insp-id { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
 .insp-json-btn {
   display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; height: 26px; padding: 0 8px; font-size: 11px; font-weight: 600;
   color: var(--fg-2); background: none; border: 1px solid var(--border-subtle); border-radius: var(--r-sm); cursor: pointer;
@@ -271,7 +271,7 @@ function patchBox(k: 'x' | 'y' | 'w' | 'h', n: number) {
 .insp-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-2); cursor: pointer; }
 .insp-check input { width: auto; accent-color: var(--primary); }
 .insp-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.insp-grid4 label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 700; color: var(--fg-3); }
+.insp-grid4 label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; color: var(--fg-3); }
 .insp-note { font-size: 11.5px; color: var(--fg-3); line-height: 1.5; margin: 0; }
 .insp-note strong { color: var(--fg-2); font-weight: 600; }
 .insp-note code { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-2); }
@@ -279,7 +279,7 @@ function patchBox(k: 'x' | 'y' | 'w' | 'h', n: number) {
 .insp-rows li { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-1); padding: 5px 7px; background: var(--surface-1); border-radius: var(--r-xs); }
 .insp-rows li svg { flex-shrink: 0; color: var(--fg-3); }
 .insp-rows li.off { color: var(--fg-3); }
-.insp-tag { margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--fg-3); white-space: nowrap; }
+.insp-tag { margin-left: auto; font-size: 11px; font-family: var(--font-mono); color: var(--fg-3); white-space: nowrap; }
 .insp-btns { display: flex; align-items: center; gap: 10px; }
 .insp-btns .btn { gap: 5px; }
 .insp-link { background: none; border: 0; padding: 0; color: var(--primary); font-size: 11.5px; font-weight: 600; cursor: pointer; }

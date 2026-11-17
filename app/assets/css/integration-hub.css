@@ -95,7 +95,7 @@
   width: 100%; height: 100%; border-radius: var(--r-xs) var(--r-xs) 0 0; background: var(--primary);
   transform-origin: bottom; transition: transform var(--dur-slow) var(--ease-out);
 }
-.ih-sparkbar-label { font-size: 10px; color: var(--fg-3); margin-top: 5px; text-transform: uppercase; letter-spacing: .03em; }
+.ih-sparkbar-label { font-size: 11px; color: var(--fg-3); margin-top: 5px; text-transform: uppercase; letter-spacing: .03em; }
 
 /* ── Horizontal ranked bars (agency contributions) ──────────────────── */
 .ih-hbars { display: flex; flex-direction: column; gap: 8px; }

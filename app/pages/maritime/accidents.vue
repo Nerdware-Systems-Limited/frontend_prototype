@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs (live) -->
   <div class="kpi-grid">
@@ -85,7 +85,7 @@
           </thead>
           <tbody v-if="filteredIncidents.length">
             <template v-for="inc in incidentsPageRows" :key="inc.id">
-              <tr class="expand-row" @click="expanded = expanded === inc.id ? null : inc.id">
+              <tr class="expand-row" tabindex="0" :aria-expanded="expanded === inc.id" @click="expanded = expanded === inc.id ? null : inc.id" @keydown.enter.self.prevent="expanded = expanded === inc.id ? null : inc.id" @keydown.space.self.prevent="expanded = expanded === inc.id ? null : inc.id">
                 <td class="expand-cell">{{ expanded === inc.id ? '▾' : '▸' }}</td>
                 <td style="font-family:monospace;font-size:12px">{{ inc.incident_ref || '-' }}</td>
                 <td style="font-size:12px">{{ portLabel(inc.port_unlocode) }}</td>
@@ -304,5 +304,5 @@ function fmtNum(v: number | null | undefined, d = 0) {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

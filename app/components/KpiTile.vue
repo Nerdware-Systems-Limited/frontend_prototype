@@ -31,7 +31,8 @@ withDefaults(defineProps<{
   background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--r-md);
   padding: 14px 16px; box-shadow: var(--elev-1);
 }
-.kpi-tile-label { font-size: 11px; color: var(--fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+/* Same label voice as theme.css's .kpi-label, so tiles and cards read as one set. */
+.kpi-tile-label { font-size: 11px; color: var(--fg-3); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .kpi-tile-value {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: 24px; font-weight: 700; color: var(--fg-1); margin-top: 6px; line-height: 1.15;

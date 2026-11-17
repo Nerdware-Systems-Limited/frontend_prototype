@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Agency tabs: a viewer who can only see one agency (the server scopes by_agency) has nothing to switch between -->
   <div v-if="agencyOptions.length > 1" class="agency-tabs">
@@ -258,7 +258,7 @@
               <td><BadgePill :variant="condBadge(s.condition_class ?? '')">{{ s.condition_class ?? '-' }}</BadgePill></td>
               <td style="font-size:11px">{{ fmtDate(s.last_evaluated_at) }}</td>
               <td style="text-align:center">
-                <span :style="{ color: onMapIds.has(s.id) ? 'var(--success-fg)' : 'var(--fg-3)' }">{{ onMapIds.has(s.id) ? '✓' : '-' }}</span>
+                <span :style="{ color: onMapIds.has(s.id) ? 'var(--success-fg)' : 'var(--fg-3)' }">{{ onMapIds.has(s.id) ? 'Yes' : '-' }}</span>
               </td>
             </tr>
           </tbody>
@@ -842,7 +842,7 @@ function sigBadge(s: string) {
 .sample-caveat { margin:-8px 0 16px; font-size:11.5px; color:var(--fg-3); }
 .dist-caveat { font-size:11px; color:var(--fg-3); padding:0 14px 6px; margin-top:-4px; }
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s; }
 .agency-tab:hover { border-color:var(--primary); color:var(--primary); }
 .agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }

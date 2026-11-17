@@ -15,7 +15,7 @@
 
   <template v-else>
     <div v-if="error" class="error-banner dm-error" role="alert" aria-live="polite">
-      <span>⚠ {{ error }}</span>
+      <span class="banner-icon-warn">{{ error }}</span>
       <button type="button" class="error-retry-btn" @click="error = null; load()">Retry</button>
     </div>
 
@@ -132,7 +132,7 @@
     <!-- ── Coverage: resolve every agency × department × role ── -->
     <section v-else aria-label="Who sees what">
       <div v-if="directoryError" class="error-banner dm-error" role="alert">
-        <span>⚠ {{ directoryError }}</span>
+        <span class="banner-icon-warn">{{ directoryError }}</span>
         <button type="button" class="error-retry-btn" @click="loadDirectory()">Retry</button>
       </div>
       <div v-else-if="directory?.source === 'accounts'" class="notice" role="note">
@@ -192,7 +192,7 @@
   <!-- ── Create ── -->
   <SideDrawer :open="createOpen" title="New dashboard" subtitle="Start from a template or a blank canvas." @close="createOpen = false">
     <form id="dm-create" class="dm-create" @submit.prevent="create">
-      <div v-if="createError" class="error-banner" role="alert">⚠ {{ createError }}</div>
+      <div v-if="createError" class="error-banner banner-icon-warn" role="alert">{{ createError }}</div>
       <label class="dm-field">
         <span class="filter-label">Name</span>
         <input v-model="newName" type="text" required placeholder="e.g. KeNHA Maintenance Board">

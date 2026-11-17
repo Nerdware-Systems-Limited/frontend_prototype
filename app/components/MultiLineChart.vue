@@ -175,8 +175,8 @@ const tooltipStyle = computed(() => {
 .mlc-grid { stroke:var(--border-subtle); stroke-width:1; }
 .mlc-crosshair { stroke:var(--border-interactive); stroke-width:1; }
 .mlc-marker-ring { stroke:var(--surface-2); }
-.mlc-ytick { font-size:9px; fill:var(--fg-3); font-variant-numeric:tabular-nums; }
-.mlc-xtick { font-size:9px; fill:var(--fg-3); }
+.mlc-ytick { font-size:10.5px; fill:var(--fg-3); font-variant-numeric:tabular-nums; }
+.mlc-xtick { font-size:10.5px; fill:var(--fg-3); }
 .mlc-tooltip {
   position:absolute; transform:translateX(-50%);
   background:var(--surface-2); color:var(--fg-1); border:1px solid var(--border-subtle);
@@ -184,7 +184,7 @@ const tooltipStyle = computed(() => {
   font-size:11px; line-height:1.5; white-space:nowrap; pointer-events:none;
   box-shadow:var(--elev-2); z-index:5;
 }
-.mlc-tooltip-label { color:var(--fg-2); font-size:10px; margin-bottom:3px; font-weight:600; }
+.mlc-tooltip-label { color:var(--fg-2); font-size:11px; margin-bottom:3px; font-weight:600; }
 .mlc-tooltip-row { display:flex; align-items:center; gap:6px; }
 .mlc-tooltip-key { width:8px; height:2px; border-radius:1px; display:inline-block; }
 .mlc-tooltip-name { color:var(--fg-2); flex:1; }

@@ -12,7 +12,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Filters -->
   <div class="filter-row">
@@ -36,7 +36,7 @@
     storage-key="map:fleet/trip-playbacks"
   >
     <template #actions>
-      <button class="btn" @click="selectedTrip = null; tripPath = []">✕ Close</button>
+      <button class="btn" @click="selectedTrip = null; tripPath = []"><X :size="14" aria-hidden="true" />Close</button>
     </template>
     <ClientOnly>
       <UaptsMap
@@ -105,7 +105,7 @@
                 :disabled="loadingPath === trip.id"
                 @click="replayTrip(trip)"
               >
-                {{ loadingPath === trip.id ? '…' : '▶ Replay' }}
+                <Play v-if="loadingPath !== trip.id" :size="13" aria-hidden="true" />{{ loadingPath === trip.id ? 'Loading…' : 'Replay' }}
               </button>
             </td>
           </tr>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import { X, Play } from 'lucide-vue-next'
 definePageMeta({ layout: 'default' })
 import { useFleet } from '~/composables/api'
 import type { TripPlayback } from '~/composables/api'

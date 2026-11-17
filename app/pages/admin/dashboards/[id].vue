@@ -3,14 +3,14 @@
   <EmptyState v-else-if="loading" loading />
   <template v-else-if="error">
     <div class="error-banner dm-error" role="alert">
-      <span>⚠ {{ error }}</span>
+      <span class="banner-icon-warn">{{ error }}</span>
       <button v-if="notFound === false" type="button" class="error-retry-btn" @click="load">Retry</button>
     </div>
     <NuxtLink to="/admin/dashboards" class="btn btn-sm dm-back"><ArrowLeft :size="14" aria-hidden="true" /> All dashboards</NuxtLink>
   </template>
   <template v-else-if="record">
     <div v-if="actionError" class="error-banner dm-error" role="alert" aria-live="polite">
-      <span>⚠ {{ actionError }}</span>
+      <span class="banner-icon-warn">{{ actionError }}</span>
       <button type="button" class="error-retry-btn" @click="actionError = null">Dismiss</button>
     </div>
     <ClientOnly>

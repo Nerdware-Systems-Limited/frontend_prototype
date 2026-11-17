@@ -29,7 +29,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI ribbon - sums over the current filter set (DataUploadInboxView's
        aggregates), not all time and not just the loaded page. -->

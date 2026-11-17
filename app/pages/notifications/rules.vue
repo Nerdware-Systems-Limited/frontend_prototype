@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI row - matches the standard .kpi-grid/KpiCard pattern used across every other module -->
   <div class="kpi-grid">
@@ -56,7 +56,7 @@
               <span class="rule-meta-chip"><strong>Channel:</strong> {{ (r.channels ?? []).join(', ') || '-' }}</span>
               <span class="rule-meta-chip"><strong>Recipients:</strong> {{ (r.target_roles ?? []).join(', ') || 'All' }}</span>
               <span class="rule-meta-chip"><strong>Cooldown:</strong> {{ r.cooldown_seconds ? `${r.cooldown_seconds}s` : '-' }}</span>
-              <span v-if="r.escalation_policy_id" class="rule-meta-chip rule-meta-chip--esc">⚡ {{ policyName(r.escalation_policy_id) }}</span>
+              <span v-if="r.escalation_policy_id" class="rule-meta-chip rule-meta-chip--esc banner-icon-live">{{ policyName(r.escalation_policy_id) }}</span>
             </div>
             <div class="rule-card-actions">
               <button class="toggle-btn" :class="{ active: r.active }" :disabled="togglingId === r.id || !canConfigureRules" @click="toggleRule(r)">{{ r.active ? 'On' : 'Off' }}</button>
@@ -181,151 +181,139 @@
   </div>
 
   <!-- Create / Edit rule modal -->
-  <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
-    <div class="modal">
-      <div class="modal-header">
-        {{ editId ? 'Edit Rule' : 'Create Alert Rule' }}
-        <button class="modal-close" @click="closeModal">×</button>
+  <AppModal :model-value="showModal" :title="editId ? 'Edit Rule' : 'Create Alert Rule'" max-width="500px" @update:model-value="(open) => { if (!open) closeModal() }">
+    <div class="modal-stack">
+      <div class="form-group">
+        <label for="rule-f1">Rule Name *</label>
+        <input id="rule-f1" v-model="form.name" class="select-full" placeholder="e.g. High-severity safety alert" />
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Rule Name *</label>
-          <input v-model="form.name" class="select-full" placeholder="e.g. High-severity safety alert" />
-        </div>
-        <div class="form-group">
-          <label>Event Type *</label>
-          <select v-model="form.event_type" class="select-full">
-            <option value="">Select event type…</option>
-            <option value="traffic.violation.created">Traffic Violation Created</option>
-            <option value="traffic.congestion.high">Traffic Congestion High</option>
-            <option value="safety.incident.created">Safety Incident Created</option>
-            <option value="weather.observation.created">Weather Observation Created</option>
-            <option value="revenue.anomaly.detected">Revenue Anomaly Detected</option>
-            <option value="integration.sync.failed">Integration Sync Failed</option>
-            <option value="vessel.created">Vessel Created</option>
-            <option value="vessel.position_updated">Vessel Position Updated</option>
-            <option value="vessel.seen">Vessel Seen</option>
-            <option value="vessel.movement.recorded">Vessel Movement Recorded</option>
-            <option value="flight.status_updated">Flight Status Updated</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Minimum Severity</label>
-          <select v-model="form.severity" class="select-full">
-            <option value="">Any</option>
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Delivery Channels</label>
-          <div class="channel-checks">
-            <label v-for="ch in CHANNELS" :key="ch" class="checkbox-label">
-              <input type="checkbox" :value="ch" v-model="form.channels" />
-              {{ ch }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Target Roles</label>
-          <div class="channel-checks">
-            <label v-for="r in ROLES" :key="r" class="checkbox-label">
-              <input type="checkbox" :value="r" v-model="form.target_roles" />
-              {{ r }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Cooldown (seconds)</label>
-          <input type="number" v-model.number="form.cooldown_seconds" class="select-full" placeholder="300" min="0" />
-        </div>
-        <div class="form-group">
-          <label>Escalation Policy (optional)</label>
-          <select v-model="form.escalation_policy_id" class="select-full">
-            <option value="">None</option>
-            <option v-for="p in policies" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Message Template</label>
-          <textarea v-model="form.message_template" class="select-full" rows="3" placeholder="Use {field} placeholders matching the event's context payload, e.g. {plate_number}, {violation_type}, {station}, {weight_kg}…" />
-        </div>
-        <div v-if="saveError" style="font-size:12px;color:var(--danger-fg)">⚠ {{ saveError }}</div>
+      <div class="form-group">
+        <label for="rule-f2">Event Type *</label>
+        <select id="rule-f2" v-model="form.event_type" class="select-full">
+          <option value="">Select event type…</option>
+          <option value="traffic.violation.created">Traffic Violation Created</option>
+          <option value="traffic.congestion.high">Traffic Congestion High</option>
+          <option value="safety.incident.created">Safety Incident Created</option>
+          <option value="weather.observation.created">Weather Observation Created</option>
+          <option value="revenue.anomaly.detected">Revenue Anomaly Detected</option>
+          <option value="integration.sync.failed">Integration Sync Failed</option>
+          <option value="vessel.created">Vessel Created</option>
+          <option value="vessel.position_updated">Vessel Position Updated</option>
+          <option value="vessel.seen">Vessel Seen</option>
+          <option value="vessel.movement.recorded">Vessel Movement Recorded</option>
+          <option value="flight.status_updated">Flight Status Updated</option>
+        </select>
       </div>
-      <div class="modal-footer">
-        <button class="btn" @click="closeModal">Cancel</button>
-        <button class="btn btn-primary" :disabled="!form.name || !form.event_type || saving" @click="saveRule">
-          {{ saving ? 'Saving…' : editId ? 'Update' : 'Create' }}
-        </button>
+      <div class="form-group">
+        <label for="rule-f3">Minimum Severity</label>
+        <select id="rule-f3" v-model="form.severity" class="select-full">
+          <option value="">Any</option>
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
       </div>
+      <div class="form-group">
+        <span id="rule-f4" class="group-label">Delivery Channels</span>
+        <div role="group" aria-labelledby="rule-f4" class="channel-checks">
+          <label v-for="ch in CHANNELS" :key="ch" class="checkbox-label">
+            <input type="checkbox" :value="ch" v-model="form.channels" />
+            {{ ch }}
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <span id="rule-f5" class="group-label">Target Roles</span>
+        <div role="group" aria-labelledby="rule-f5" class="channel-checks">
+          <label v-for="r in ROLES" :key="r" class="checkbox-label">
+            <input type="checkbox" :value="r" v-model="form.target_roles" />
+            {{ r }}
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="rule-f6">Cooldown (seconds)</label>
+        <input id="rule-f6" type="number" v-model.number="form.cooldown_seconds" class="select-full" placeholder="300" min="0" />
+      </div>
+      <div class="form-group">
+        <label for="rule-f7">Escalation Policy (optional)</label>
+        <select id="rule-f7" v-model="form.escalation_policy_id" class="select-full">
+          <option value="">None</option>
+          <option v-for="p in policies" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="rule-f8">Message Template</label>
+        <textarea id="rule-f8" v-model="form.message_template" class="select-full" rows="3" placeholder="Use {field} placeholders matching the event's context payload, e.g. {plate_number}, {violation_type}, {station}, {weight_kg}…" />
+      </div>
+      <div v-if="saveError" class="banner-icon-warn" role="alert" style="font-size:12px;color:var(--danger-fg)">{{ saveError }}</div>
     </div>
-  </div>
+    <template #footer>
+    <button class="btn" @click="closeModal">Cancel</button>
+    <button class="btn btn-primary" :disabled="!form.name || !form.event_type || saving" @click="saveRule">
+      {{ saving ? 'Saving…' : editId ? 'Update' : 'Create' }}
+    </button>
+    </template>
+  </AppModal>
 
   <!-- Create / Edit escalation policy modal -->
-  <div v-if="showPolicyModal" class="modal-backdrop" @click.self="closePolicyModal">
-    <div class="modal modal--wide">
-      <div class="modal-header">
-        {{ editPolicyId ? 'Edit Escalation Workflow' : 'New Escalation Workflow' }}
-        <button class="modal-close" @click="closePolicyModal">×</button>
+  <AppModal :model-value="showPolicyModal" :title="editPolicyId ? 'Edit Escalation Workflow' : 'New Escalation Workflow'" max-width="620px" @update:model-value="(open) => { if (!open) closePolicyModal() }">
+    <div class="modal-stack">
+      <div class="form-group">
+        <label for="policy-f1">Workflow Name *</label>
+        <input id="policy-f1" v-model="policyForm.name" class="select-full" placeholder="e.g. Critical Incident Escalation" />
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Workflow Name *</label>
-          <input v-model="policyForm.name" class="select-full" placeholder="e.g. Critical Incident Escalation" />
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <input v-model="policyForm.description" class="select-full" placeholder="What this workflow is for" />
-        </div>
+      <div class="form-group">
+        <label for="policy-f2">Description</label>
+        <input id="policy-f2" v-model="policyForm.description" class="select-full" placeholder="What this workflow is for" />
+      </div>
 
-        <div class="form-group">
-          <label>Steps (after the initial trigger)</label>
-          <div class="step-editor">
-            <div v-for="(s, i) in policyForm.steps" :key="i" class="step-editor-row">
-              <div class="step-editor-num">{{ i + 1 }}</div>
-              <div class="step-editor-fields">
-                <input v-model="s.title" class="select-sm" placeholder="Step title, e.g. Notify On-Call Operator" />
-                <input v-model="s.description" class="select-sm" placeholder="Description" />
-                <div class="step-editor-row2">
-                  <select v-model="s.target_role" class="select-sm">
-                    <option value="">Target role…</option>
-                    <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
-                  </select>
-                  <input type="number" v-model.number="s.wait_minutes" class="select-sm" placeholder="Wait (min)" min="0" style="width:90px" />
-                  <label class="checkbox-label" style="white-space:nowrap">
-                    <input type="checkbox" v-model="s.is_emergency" /> Emergency
-                  </label>
-                </div>
-                <div class="channel-checks">
-                  <label v-for="ch in CHANNELS" :key="ch" class="checkbox-label">
-                    <input type="checkbox" :value="ch" v-model="s.channels" />
-                    {{ ch }}
-                  </label>
-                </div>
+      <div class="form-group">
+        <label>Steps (after the initial trigger)</label>
+        <div class="step-editor">
+          <div v-for="(s, i) in policyForm.steps" :key="i" class="step-editor-row">
+            <div class="step-editor-num">{{ i + 1 }}</div>
+            <div class="step-editor-fields">
+              <input v-model="s.title" class="select-sm" placeholder="Step title, e.g. Notify On-Call Operator" />
+              <input v-model="s.description" class="select-sm" placeholder="Description" />
+              <div class="step-editor-row2">
+                <select v-model="s.target_role" class="select-sm">
+                  <option value="">Target role…</option>
+                  <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
+                </select>
+                <input type="number" v-model.number="s.wait_minutes" class="select-sm" placeholder="Wait (min)" min="0" style="width:90px" />
+                <label class="checkbox-label" style="white-space:nowrap">
+                  <input type="checkbox" v-model="s.is_emergency" /> Emergency
+                </label>
               </div>
-              <button class="remove-btn" title="Remove step" @click="policyForm.steps.splice(i, 1)">×</button>
+              <div class="channel-checks">
+                <label v-for="ch in CHANNELS" :key="ch" class="checkbox-label">
+                  <input type="checkbox" :value="ch" v-model="s.channels" />
+                  {{ ch }}
+                </label>
+              </div>
             </div>
+            <button type="button" class="remove-btn" title="Remove step" :aria-label="`Remove step ${i + 1}`" @click="policyForm.steps.splice(i, 1)"><X :size="14" aria-hidden="true" /></button>
           </div>
-          <button class="mini-btn" style="margin-top:8px" @click="addStep">+ Add Step</button>
         </div>
-        <div v-if="policySaveError" style="font-size:12px;color:var(--danger-fg)">⚠ {{ policySaveError }}</div>
+        <button class="mini-btn" style="margin-top:8px" @click="addStep">+ Add Step</button>
       </div>
-      <div class="modal-footer">
-        <button class="btn" @click="closePolicyModal">Cancel</button>
-        <button class="btn btn-primary" :disabled="!policyForm.name || policySaving" @click="savePolicy">
-          {{ policySaving ? 'Saving…' : editPolicyId ? 'Update' : 'Create' }}
-        </button>
-      </div>
+      <div v-if="policySaveError" class="banner-icon-warn" role="alert" style="font-size:12px;color:var(--danger-fg)">{{ policySaveError }}</div>
     </div>
-  </div>
+    <template #footer>
+    <button class="btn" @click="closePolicyModal">Cancel</button>
+    <button class="btn btn-primary" :disabled="!policyForm.name || policySaving" @click="savePolicy">
+      {{ policySaving ? 'Saving…' : editPolicyId ? 'Update' : 'Create' }}
+    </button>
+    </template>
+  </AppModal>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, X } from 'lucide-vue-next'
 import { useNotifications } from '~/composables/api'
 
 const { hasCapability } = usePermissions()
@@ -593,25 +581,18 @@ function fmtClock(iso: string) {
 textarea.select-full { resize:vertical; font-family:monospace; }
 .channel-checks { display:flex; gap:14px; flex-wrap:wrap; }
 .checkbox-label { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; }
-.toggle-btn { padding:3px 12px; border-radius:12px; border:2px solid var(--border-interactive); background:var(--surface-sunken); font-size:12px; font-weight:600; cursor:pointer; color:var(--fg-2); transition:all .15s; }
+.toggle-btn { padding:3px 12px; border-radius:12px; border:2px solid var(--border-interactive); background:var(--surface-sunken); font-size:12px; font-weight:600; cursor:pointer; color:var(--fg-2); transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s; }
 .toggle-btn.active { background:var(--success); border-color:var(--success-fg); color:#fff; }
-.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; }
-.modal { background:var(--surface-2); border-radius:10px; width:500px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:var(--elev-3); }
-.modal--wide { width:620px; }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--border-subtle); position:sticky; top:0; background:var(--surface-2); z-index:1; }
-.modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:var(--fg-3); line-height:1; }
-.modal-body { padding:16px 20px; display:flex; flex-direction:column; gap:12px; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid var(--border-subtle); position:sticky; bottom:0; background:var(--surface-2); }
 .form-group { display:flex; flex-direction:column; gap:4px; }
-.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); }
+.form-group label, .form-group .group-label { font-size:12px; font-weight:600; color:var(--fg-2); }
 .empty-row { text-align:center; color:var(--fg-3); padding:20px; }
 .mono-cell { font-family:monospace; font-size:12px; }
 .mini-btn { font-size:11px; padding:3px 10px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-1); color:var(--fg-2); cursor:pointer; }
 .mini-btn:hover { background:var(--surface-sunken); }
 .mini-btn--danger { color:var(--danger-fg); }
 .mini-btn--warn { color:var(--warning-fg); }
-.remove-btn { background:none; border:none; font-size:16px; color:var(--fg-3); cursor:pointer; line-height:1; padding:0 4px; }
-.remove-btn:hover { color:var(--danger-fg); }
+.remove-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; background:none; border:1px solid transparent; border-radius:var(--r-sm); color:var(--fg-3); cursor:pointer; flex-shrink:0; }
+.remove-btn:hover { background:var(--danger-bg); color:var(--danger-fg); }
 .divider { border:none; border-top:1px solid var(--border-subtle); margin:16px 0; }
 
 /* ── Stats strip ── */
@@ -647,7 +628,7 @@ textarea.select-full { resize:vertical; font-family:monospace; }
 }
 .timeline-dot {
   position:absolute; left:-22px; top:2px; width:18px; height:18px; border-radius:50%;
-  background:var(--primary-fill); color:#fff; font-size:9px; font-weight:700;
+  background:var(--primary-fill); color:#fff; font-size:10.5px; font-weight:700;
   display:flex; align-items:center; justify-content:center;
 }
 .timeline-dot--trigger { background:var(--destructive); }
@@ -657,12 +638,12 @@ textarea.select-full { resize:vertical; font-family:monospace; }
 .timeline-title { font-size:12.5px; font-weight:700; color:var(--fg-1); margin-bottom:2px; }
 .timeline-sub { font-size:11px; color:var(--fg-2); }
 .timeline-tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
-.timeline-tag { font-size:10px; padding:2px 7px; border-radius:10px; background:var(--surface-1); color:var(--fg-2); font-weight:600; }
+.timeline-tag { font-size:11px; padding:2px 7px; border-radius:10px; background:var(--surface-1); color:var(--fg-2); font-weight:600; }
 .timeline-tag--wait { background:var(--info-bg); color:var(--info-fg); }
 
 /* ── Active runs ── */
 .active-runs { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-subtle); }
-.active-runs-head { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3); margin-bottom:8px; }
+.active-runs-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3); margin-bottom:8px; }
 .run-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; }
 .run-info { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
 .run-title { font-size:12px; font-weight:600; color:var(--fg-1); }
@@ -676,15 +657,18 @@ textarea.select-full { resize:vertical; font-family:monospace; }
 .quick-stat-val--ok { color:var(--success-fg); }
 .quick-stat-val--warn { color:var(--warning-fg); }
 .quick-stat-val--crit { color:var(--danger-fg); }
-.quick-stat-lbl { font-size:10px; color:var(--fg-3); margin-top:2px; }
+.quick-stat-lbl { font-size:11px; color:var(--fg-3); margin-top:2px; }
 
 /* ── Step editor (policy modal) ── */
 .step-editor { display:flex; flex-direction:column; gap:10px; }
 .step-editor-row { display:flex; gap:8px; align-items:flex-start; background:var(--surface-1); border-radius:8px; padding:10px; }
-.step-editor-num { width:20px; height:20px; border-radius:50%; background:var(--primary-fill); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:4px; }
+.step-editor-num { width:20px; height:20px; border-radius:50%; background:var(--primary-fill); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:4px; }
 .step-editor-fields { flex:1; display:flex; flex-direction:column; gap:6px; min-width:0; }
 .step-editor-row2 { display:flex; gap:8px; align-items:center; }
 
 /* ── Recent activity table ── */
-.ch-badge { font-size:10px; padding:2px 7px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); margin-right:4px; font-weight:600; }
+.ch-badge { font-size:11px; padding:2px 7px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); margin-right:4px; font-weight:600; }
+
+/* Body of the shared AppModal - field rhythm for this page's forms. */
+.modal-stack { display:flex; flex-direction:column; gap:12px; }
 </style>

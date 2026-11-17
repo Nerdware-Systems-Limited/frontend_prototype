@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI grid -->
   <div class="kpi-grid">
@@ -194,8 +194,6 @@
       <table>
         <thead>
           <tr>
-            <th>Certificate No.</th>
-            <th>Student</th>
             <th>Outcome</th>
             <th>Score</th>
             <th>Attendance</th>
@@ -207,8 +205,6 @@
         </thead>
         <tbody v-if="completions.length">
           <tr v-for="cp in completionsPageRows" :key="cp.id">
-            <td class="mono-cell">{{ cp.certificate_number || '-' }}</td>
-            <td class="name-cell">{{ cp.enrollment_detail?.full_name ?? cp.enrollment }}</td>
             <td>
               <BadgePill :variant="outcomeBadge(cp.outcome)" size="sm">{{ outcomeLabel(cp.outcome) }}</BadgePill>
             </td>
@@ -225,7 +221,7 @@
           </tr>
         </tbody>
         <tbody v-else>
-          <tr><td colspan="9" class="empty-row">{{ loading ? 'Loading…' : 'No completions data.' }}</td></tr>
+          <tr><td colspan="7" class="empty-row">{{ loading ? 'Loading…' : 'No completions data.' }}</td></tr>
         </tbody>
       </table>
       <TablePagination

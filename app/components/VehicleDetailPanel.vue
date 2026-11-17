@@ -39,7 +39,6 @@ const text = (s: unknown) => String(s ?? '').replace(/_/g, ' ')
     <div class="dd-col">
       <div class="dd-title">Vehicle / Operator Link</div>
       <div class="dd-list">
-        <div class="dd-item dd-item-block"><span class="k">Engine no.</span><span>{{ vehicle.engine_no || '-' }}</span></div>
         <div class="dd-item dd-item-block"><span class="k">Seating / Load</span><span>{{ vehicle.seating_capacity ?? '-' }} seats · {{ num(vehicle.load_capacity_kg) }} kg</span></div>
         <div class="dd-item dd-item-block"><span class="k">Operator / Agency</span><span>{{ vehicle.operator_name ?? '-' }} ({{ vehicle.agency_code ?? '-' }})</span></div>
         <div class="dd-item dd-item-block"><span class="k">Assigned route</span><span>{{ vehicle.route_name ?? 'Unassigned' }}</span></div>

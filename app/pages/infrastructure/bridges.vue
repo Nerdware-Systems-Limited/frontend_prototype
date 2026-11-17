@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Agency tabs -->
   <div v-if="agencyOptions.length > 1" class="agency-tabs">
@@ -216,7 +216,7 @@
         </thead>
         <tbody v-if="filteredBridges.length">
           <template v-for="b in bridgesPageRows" :key="b.id">
-            <tr class="expand-row" @click="expanded = expanded === b.id ? null : b.id">
+            <tr class="expand-row" tabindex="0" :aria-expanded="expanded === b.id" @click="expanded = expanded === b.id ? null : b.id" @keydown.enter.self.prevent="expanded = expanded === b.id ? null : b.id" @keydown.space.self.prevent="expanded = expanded === b.id ? null : b.id">
               <td class="expand-cell">{{ expanded === b.id ? '▾' : '▸' }}</td>
               <td style="font-weight:600">{{ b.bridge_name }}</td>
               <td style="font-family:monospace;font-size:12px">{{ b.bridge_code }}</td>
@@ -495,7 +495,7 @@ function condBadge(cls: string) {
 
 <style scoped>
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s; }
 .agency-tab:hover { border-color:var(--primary); color:var(--primary); }
 .agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
@@ -505,7 +505,7 @@ function condBadge(cls: string) {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col-map { display:grid; grid-template-columns:3fr 2fr; gap:16px; margin-bottom:16px; }
 @media(max-width:1000px) { .two-col-map { grid-template-columns:1fr; } }

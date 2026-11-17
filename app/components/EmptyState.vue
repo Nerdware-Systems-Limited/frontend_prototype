@@ -5,7 +5,7 @@
     boxes, and stuck "Loading..." text with one sentence-based pattern
     (originally proven in Query Builder / Flight Log / Waterways).
   -->
-  <div class="empty-state" :class="{ 'empty-state--compact': compact }">
+  <div class="empty-state" :class="{ 'empty-state--compact': compact }" :role="loading ? 'status' : undefined">
     <div v-if="loading" class="empty-state-spinner" aria-hidden="true" />
     <svg
       v-else class="empty-state-icon" viewBox="0 0 24 24" fill="none"
@@ -16,8 +16,11 @@
       <path v-else-if="icon === 'inbox'" d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
       <path v-else d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
     </svg>
-    <span class="empty-state-message"><slot>{{ message }}</slot></span>
-    <span v-if="$slots.action" class="empty-state-action"><slot name="action" /></span>
+    <!-- While loading, never state the empty outcome: "No flights" before the
+         request has answered is a claim the page cannot make yet. -->
+    <span v-if="loading" class="empty-state-message">{{ loadingMessage }}</span>
+    <span v-else class="empty-state-message"><slot>{{ message }}</slot></span>
+    <span v-if="$slots.action && !loading" class="empty-state-action"><slot name="action" /></span>
   </div>
 </template>
 
@@ -25,14 +28,17 @@
 withDefaults(defineProps<{
   /** Sentence shown when no default slot content is given, e.g. "No flights match the current filters." */
   message?: string
-  /** true while data is still loading - shows a spinner instead of the icon */
+  /** true while data is still loading - shows a spinner and `loadingMessage` instead of the icon and message */
   loading?: boolean
+  /** Shown while `loading`; the empty-state message only appears once loading has finished. */
+  loadingMessage?: string
   icon?: 'dataset' | 'search' | 'inbox'
   /** Smaller footprint for use inside a chart/panel rather than a full page section */
   compact?: boolean
 }>(), {
   message: 'Nothing here yet.',
   loading: false,
+  loadingMessage: 'Loading…',
   icon: 'dataset',
   compact: false,
 })

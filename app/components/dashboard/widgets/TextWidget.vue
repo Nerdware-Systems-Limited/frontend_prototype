@@ -19,7 +19,7 @@ const variant = computed(() => String(props.config.variant ?? 'section') as 'hea
 /* Matches the Command Centre's .section-label rule-after style. */
 .tw-section {
   display: flex; align-items: center; gap: 10px; height: 100%;
-  font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3);
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3);
 }
 .tw-section::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
 .tw-note { font-size: 12px; color: var(--fg-2); line-height: 1.55; margin: 0; max-width: 80ch; }

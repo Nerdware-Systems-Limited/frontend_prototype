@@ -12,7 +12,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- ── Connection details - only for feeds registered through the
        Register-an-API console (blank protocol = legacy/seeded feed). ─── -->
@@ -28,7 +28,7 @@
       </div>
     </div>
     <div class="ih-card-body">
-      <div v-if="saveNote" class="save-note">✓ {{ saveNote }}</div>
+      <div v-if="saveNote" class="save-note banner-icon-ok" role="status">{{ saveNote }}</div>
       <dl v-if="!editing" class="conn-meta">
         <dt>Protocol</dt><dd>{{ protocolLabel }}</dd>
         <dt>Auth method</dt><dd>{{ authMethodLabel }}</dd>
@@ -58,11 +58,11 @@
         <dt>Last test</dt>
         <dd>
           <template v-if="testResult">
-            <span :class="testResult.ok ? 'test-ok' : 'test-bad'">{{ testResult.ok ? '✓ ' + testResult.detail : '✕ ' + testResult.detail }}</span>
+            <span :class="testResult.ok ? 'test-ok banner-icon-ok' : 'test-bad banner-icon-fail'">{{ testResult.detail }}</span>
             <span class="hint"> · just now</span>
           </template>
           <template v-else-if="source.last_test_at">
-            <span :class="source.last_test_ok ? 'test-ok' : 'test-bad'">{{ source.last_test_ok ? '✓ working' : '✕ failed' }}</span>
+            <span :class="source.last_test_ok ? 'test-ok banner-icon-ok' : 'test-bad banner-icon-fail'">{{ source.last_test_ok ? 'Working' : 'Failed' }}</span>
             <span class="hint"> · {{ fmtDate(source.last_test_at) }}</span>
           </template>
           <span v-else class="hint">never tested{{ isPullProtocol ? '' : ' (nothing to reach for a push feed)' }}</span>
@@ -106,7 +106,7 @@
           </p>
         </template>
         <p class="hint">Leave the key empty to keep the current one. A pasted sample call with <code>?key=…</code> is split for you.</p>
-        <div v-if="editError" class="error-banner">⚠ {{ editError }}</div>
+        <div v-if="editError" class="error-banner banner-icon-warn" role="alert">{{ editError }}</div>
         <div class="edit-actions">
           <button type="submit" class="btn btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save changes' }}</button>
           <button type="button" class="btn" :disabled="saving" @click="editing = false">Cancel</button>
@@ -151,8 +151,8 @@
           { label: 'Written', value: stats.domain_rows_created, variant: stats.domain_rows_created ? 'success' : 'danger' },
         ]"
       />
-      <div v-if="stats.received_7d > 0 && stats.domain_rows_created === 0" class="silent-failure-banner">
-        ⚠ This feed received {{ stats.received_7d.toLocaleString('en-KE') }} record(s) in the last 7 days and
+      <div v-if="stats.received_7d > 0 && stats.domain_rows_created === 0" class="silent-failure-banner banner-icon-warn" role="alert">
+        This feed received {{ stats.received_7d.toLocaleString('en-KE') }} record(s) in the last 7 days and
         wrote <strong>zero</strong> domain rows. It still shows as “connected”: the sync works, but nothing it
         delivers is landing. Check the handler errors below.
       </div>
@@ -210,7 +210,7 @@
             <BadgePill v-else variant="neutral">unhandled</BadgePill>
             <span v-if="r.record_type" class="mono-sm hint">{{ r.record_type }}</span>
           </div>
-          <div v-if="r.handler_error" class="payload-error">⚠ {{ r.handler_error }}</div>
+          <div v-if="r.handler_error" class="payload-error banner-icon-warn">{{ r.handler_error }}</div>
           <JsonViewer :value="r.payload" label="payload" collapsible />
         </div>
       </div>

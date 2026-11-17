@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="stopStats.failed.value && !stopStats.loading.value" class="error-banner">⚠ Unable to reach the UAPTS Public Transport API.</div>
+  <div v-if="stopStats.failed.value && !stopStats.loading.value" class="error-banner banner-icon-warn" role="alert">Unable to reach the UAPTS Public Transport API.</div>
 
   <!-- KPIs: counted and averaged by the server over ALL stops, not over the first page of them -->
   <div class="kpi-grid">
@@ -106,8 +106,8 @@
       <DataTable :table="stopTable" row-key="id" title="BRT stop inventory" export-name="uapts-brt-stops" filters-open
                  placeholder="Search stop ID, name, route…" empty="No BRT stops have been registered.">
         <template #cell-stop_name="{ row }"><span class="strong">{{ row.stop_name }}</span></template>
-        <template #cell-has_shelter="{ row }"><span class="tick">{{ row.has_shelter ? '✓' : '-' }}</span></template>
-        <template #cell-has_ticket_machine="{ row }"><span class="tick">{{ row.has_ticket_machine ? '✓' : '-' }}</span></template>
+        <template #cell-has_shelter="{ row }"><span class="tick">{{ row.has_shelter ? 'Yes' : '-' }}</span></template>
+        <template #cell-has_ticket_machine="{ row }"><span class="tick">{{ row.has_ticket_machine ? 'Yes' : '-' }}</span></template>
         <template #cell-accessibility_score="{ row }">
           <div class="acc-bar-wrap">
             <div class="acc-bar" :style="{ transform: `scaleX(${row.accessibility_score})`, background: row.accessibility_score >= 0.8 ? 'var(--success)' : row.accessibility_score >= 0.5 ? 'var(--warning)' : 'var(--destructive)' }" />

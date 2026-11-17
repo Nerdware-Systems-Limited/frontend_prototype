@@ -156,8 +156,8 @@ async function handleSubmit() {
 .field-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(13, 76, 139, .16); }
 
 .error-bar {
-  padding: 12px 14px; background: rgba(185, 28, 28, .04);
-  border: 1px solid rgba(185, 28, 28, .22); border-left: 3px solid #b91c1c;
+  padding: 12px 14px; background: rgba(185, 28, 28, .06);
+  border: 1px solid rgba(185, 28, 28, .28);
   border-radius: 6px; color: #b91c1c;
 }
 .error-text { font-size: 0.8125rem; font-weight: 500; }

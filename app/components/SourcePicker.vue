@@ -13,7 +13,7 @@
     >
       <span v-if="selected">{{ selected.agency_code }} - {{ selected.name }}</span>
       <span v-else class="source-picker-placeholder">Choose a feed…</span>
-      <span class="source-picker-caret" aria-hidden="true">▾</span>
+      <ChevronDown class="source-picker-caret" :size="14" aria-hidden="true" />
     </button>
 
     <div v-if="open" id="source-picker-listbox" ref="listEl" class="source-picker-menu" role="listbox" @keydown="onListKeydown">
@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { ChevronDown } from 'lucide-vue-next'
 import type { DataSource } from '~/composables/api'
 
 const props = defineProps<{
@@ -178,7 +179,7 @@ onClickOutside(rootEl, close)
 .source-picker-trigger:hover, .source-picker-trigger.open { border-color: var(--primary); }
 .source-picker-trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .source-picker-placeholder { color: var(--fg-3); }
-.source-picker-caret { color: var(--fg-3); font-size: 10px; }
+.source-picker-caret { color: var(--fg-3); flex-shrink: 0; }
 
 .source-picker-menu {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;

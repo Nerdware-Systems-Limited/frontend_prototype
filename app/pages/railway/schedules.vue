@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- OTP visual panel -->
   <div v-if="otp" id="otp-panel" class="otp-panel drill-target">
@@ -27,9 +27,9 @@
         }" />
       </div>
       <div class="otp-panel-stats">
-        <div class="otp-stat-pill otp-ok"><span>✓</span> {{ otp.total_operations - otp.delayed - otp.cancelled }} on-time</div>
-        <div class="otp-stat-pill otp-delay"><span>⏱</span> {{ otp.delayed }} delayed</div>
-        <div class="otp-stat-pill otp-cancel"><span>✕</span> {{ otp.cancelled }} cancelled</div>
+        <div class="otp-stat-pill otp-ok"><Check :size="13" aria-hidden="true" /> {{ otp.total_operations - otp.delayed - otp.cancelled }} on-time</div>
+        <div class="otp-stat-pill otp-delay"><Clock :size="13" aria-hidden="true" /> {{ otp.delayed }} delayed</div>
+        <div class="otp-stat-pill otp-cancel"><X :size="13" aria-hidden="true" /> {{ otp.cancelled }} cancelled</div>
         <div class="otp-stat-pill otp-info"><span>≈</span> avg +{{ otp.avg_delay_min.toFixed(0) }} min</div>
       </div>
     </div>
@@ -101,10 +101,10 @@
         <template #cell-schedule_train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.schedule_train_number }}</span></template>
         <template #cell-route="{ row }">{{ row.origin_code }} → {{ row.destination_code }}</template>
         <template #cell-delay_departure_min="{ row }">
-          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min} min` : '✓' }}</span>
+          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min} min` : 'On time' }}</span>
         </template>
         <template #cell-delay_arrival_min="{ row }">
-          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min} min` : '✓' }}</span>
+          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min} min` : 'On time' }}</span>
         </template>
       </DataTable>
     </div>
@@ -114,7 +114,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, Check, Clock, X } from 'lucide-vue-next'
 import type { OnTimeStats } from '~/composables/api'
 import { useApi } from '~/composables/api/_client'
 import { useEndpointTable } from '~/composables/useEndpointTable'

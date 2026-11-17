@@ -18,8 +18,8 @@
   </PageHeader>
 
   <div v-if="error" class="error-banner">
-    <span>⚠ {{ error }}</span>
-    <button type="button" class="error-dismiss" aria-label="Dismiss" @click="error = null">×</button>
+    <span class="banner-icon-warn">{{ error }}</span>
+    <button type="button" class="error-dismiss" aria-label="Dismiss" @click="error = null"><X :size="14" aria-hidden="true" /></button>
   </div>
 
   <div class="gis-workspace">
@@ -47,7 +47,7 @@
             @blur="searchOpen = false"
             @keydown="onSearchKeydown"
           />
-          <button v-if="searchQuery" type="button" class="search-clear" aria-label="Clear search" @mousedown.prevent="searchQuery = ''">×</button>
+          <button v-if="searchQuery" type="button" class="search-clear" aria-label="Clear search" @mousedown.prevent="searchQuery = ''"><X :size="14" aria-hidden="true" /></button>
         </div>
         <ul v-if="searchOpen && searchResults.length" id="gis-search-listbox" role="listbox" class="search-results">
           <li
@@ -74,7 +74,7 @@
           <span class="layer-name" :class="{ 'layer-dim': !layers.boundary }">Kenya Boundary</span>
           <div class="layer-switch" :class="{ on: layers.boundary }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
-        <div v-if="layerErrors.boundary" class="layer-error">⚠ {{ layerErrors.boundary }}</div>
+        <div v-if="layerErrors.boundary" class="layer-error banner-icon-warn">{{ layerErrors.boundary }}</div>
 
         <button type="button" class="layer-row" role="switch" :aria-checked="layers.roads" @click="toggleLayer('roads')">
           <span class="layer-swatch" :style="{ background: layers.roads ? '#f59e0b' : '#334155' }" aria-hidden="true" />
@@ -96,7 +96,7 @@
           <span v-if="routeCount" class="layer-badge">{{ fmtNum(routeCount) }}</span>
           <div class="layer-switch" :class="{ on: layers.routes }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
-        <div v-if="layerErrors.routes" class="layer-error">⚠ {{ layerErrors.routes }}</div>
+        <div v-if="layerErrors.routes" class="layer-error banner-icon-warn">{{ layerErrors.routes }}</div>
 
         <button type="button" class="layer-row" role="switch" :aria-checked="layers.stations" @click="toggleLayer('stations')">
           <span class="layer-swatch" :style="{ background: layers.stations ? '#10b981' : '#334155' }" aria-hidden="true" />
@@ -111,7 +111,7 @@
           <span v-if="eventCount" class="layer-badge">{{ fmtNum(eventCount) }}</span>
           <div class="layer-switch" :class="{ on: layers.events }" aria-hidden="true"><span class="layer-thumb" /></div>
         </button>
-        <div v-if="layerErrors.overview" class="layer-error">⚠ {{ layerErrors.overview }}</div>
+        <div v-if="layerErrors.overview" class="layer-error banner-icon-warn">{{ layerErrors.overview }}</div>
       </div>
 
       <!-- Live-data viewport sync (shown once anything bbox-scoped is on) -->
@@ -387,7 +387,7 @@
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-import { AlertCircle, Check, Link2, RefreshCw } from 'lucide-vue-next'
+import { AlertCircle, Check, Link2, RefreshCw, X } from 'lucide-vue-next'
 import { useGis } from '~/composables/api'
 import type { GeoJSONFeatureCollection } from '~/composables/api'
 import type { LineSpec, MarkerSpec, MarkerColor } from '~/components/UaptsMap.vue'
@@ -982,7 +982,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 
 .panel-section-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1012,7 +1012,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   user-select: none;
 }
 .layer-row:hover { background: var(--surface-quiet); }
-.layer-row:focus-visible { outline: 2px solid #6366f1; outline-offset: 1px; }
+.layer-row:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
 .layer-swatch {
   display: inline-block;
@@ -1033,7 +1033,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 .layer-dim { color: var(--fg-3); }
 
 .layer-badge {
-  font-size: 10px;
+  font-size: 11px;
   padding: 1px 6px;
   border-radius: 8px;
   background: var(--surface-sunken);
@@ -1107,7 +1107,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 
 /* ── Detail slider ───────────────────────────────────────────────── */
 .detail-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--primary);
   text-transform: none;
@@ -1146,7 +1146,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 .detail-hints {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fg-3);
   margin-top: 2px;
 }
@@ -1179,7 +1179,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 
 .legend-text { font-size: 12px; color: var(--fg-2); flex: 1; }
-.legend-agency { font-size: 10px; color: var(--fg-3); white-space: nowrap; }
+.legend-agency { font-size: 11px; color: var(--fg-3); white-space: nowrap; }
 
 /* ── Stats ───────────────────────────────────────────────────────── */
 .panel-stats { flex: 1; }
@@ -1228,7 +1228,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 
 .panel-footer-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1243,7 +1243,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 
 .agency-chip {
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 7px;
   border-radius: 4px;
   background: var(--surface-2);
@@ -1369,13 +1369,13 @@ function onSearchKeydown(e: KeyboardEvent) {
   background: var(--surface-2);
   color: var(--fg-2);
   cursor: pointer;
-  transition: all 0.12s;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
   text-align: center;
 }
-.admin-level-btn:hover { border-color: #6366f1; color: #6366f1; }
+.admin-level-btn:hover { border-color: var(--primary); color: var(--primary); }
 .admin-level-btn.active {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
   color: #fff;
 }
 
@@ -1385,7 +1385,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #6366f1;
+  color: var(--fg-1);
   padding: 4px 0;
 }
 .selected-county-dot {
@@ -1396,7 +1396,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   flex-shrink: 0;
 }
 
-.statusbar-county { color: #6366f1; font-weight: 600; }
+.statusbar-county { color: var(--primary); font-weight: 600; }
 
 /* ── Search ──────────────────────────────────────────────────────── */
 .panel-search { position: relative; }
@@ -1424,13 +1424,13 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 .search-input::placeholder { color: var(--fg-3); }
 .search-input:hover { border-color: var(--border-interactive); }
-.search-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, .12); }
+.search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-wash); }
 
 .search-clear {
   position: absolute;
-  right: 6px;
-  width: 18px;
-  height: 18px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1469,13 +1469,13 @@ function onSearchKeydown(e: KeyboardEvent) {
   cursor: pointer;
 }
 .search-result-row.active,
-.search-result-row:hover { background: #eef2ff; }
+.search-result-row:hover { background: var(--primary-wash); }
 .search-result-kind {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #a5b4fc;
+  color: var(--fg-3);
   flex-shrink: 0;
 }
 .search-result-name { font-size: 12.5px; color: var(--fg-1); }
@@ -1513,8 +1513,8 @@ function onSearchKeydown(e: KeyboardEvent) {
 }
 .error-dismiss {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1522,9 +1522,7 @@ function onSearchKeydown(e: KeyboardEvent) {
   border-radius: 50%;
   background: transparent;
   color: var(--warning-fg);
-  font-size: 16px;
-  line-height: 1;
   cursor: pointer;
 }
-.error-dismiss:hover { background: rgba(202, 138, 4, 0.15); }
+.error-dismiss:hover { background: var(--warning-bg); }
 </style>

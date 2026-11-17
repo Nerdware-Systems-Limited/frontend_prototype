@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="actionError" class="error-banner" role="alert">⚠ {{ actionError }}</div>
+  <div v-if="actionError" class="error-banner banner-icon-warn" role="alert">{{ actionError }}</div>
 
   <!-- KPIs: every figure is counted by the server, so none depends on how many rows a page happened to load -->
   <div class="kpi-grid">

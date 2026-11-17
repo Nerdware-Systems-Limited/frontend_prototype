@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI Ribbon -->
   <div class="kpi-grid">
@@ -400,7 +400,7 @@ function statusColor(s: string) {
 .otp-bar-wrap { background:var(--surface-sunken); border-radius:6px; height:12px; overflow:hidden; margin:4px 0 8px; }
 .otp-bar { height:100%; width:100%; border-radius:6px; transform-origin:left; transition:transform .5s; }
 .otp-stats { display:flex; justify-content:space-around; }
-.stat-label { font-size:10px; display:block; color:var(--fg-3); }
+.stat-label { font-size:11px; display:block; color:var(--fg-3); }
 .cong-list { display:flex; flex-direction:column; gap:7px; }
 .cong-row { display:grid; grid-template-columns:90px 1fr 44px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; text-transform:capitalize; }

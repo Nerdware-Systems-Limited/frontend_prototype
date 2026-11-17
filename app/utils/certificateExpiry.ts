@@ -106,9 +106,16 @@ export function countByStatus(list: CertificateView[]): CertificateCounts {
   return c
 }
 
-/** "Expired 3 days ago", "Expires today", "12 days left". */
+/** A span a reader can take in at a glance: days under two months, then months, then years. */
+function spanText(days: number): string {
+  if (days >= 365) { const y = Math.round(days / 36.5) / 10; return `${y} year${y === 1 ? '' : 's'}` }
+  if (days >= 60) return `${Math.round(days / 30.4)} months`
+  return `${days} day${days === 1 ? '' : 's'}`
+}
+
+/** "Expired 3 days ago", "Expired 6.3 years ago", "Expires today", "12 days left". */
 export function remainingText(daysRemaining: number): string {
-  if (daysRemaining < 0) { const n = -daysRemaining; return `Expired ${n} day${n === 1 ? '' : 's'} ago` }
+  if (daysRemaining < 0) return `Expired ${spanText(-daysRemaining)} ago`
   if (daysRemaining === 0) return 'Expires today'
   return `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`
 }

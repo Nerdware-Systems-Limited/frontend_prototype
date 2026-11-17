@@ -6,8 +6,8 @@
   >
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
-  <div v-if="successMsg" class="success-banner">✓ {{ successMsg }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
+  <div v-if="successMsg" class="success-banner banner-icon-ok" role="status">{{ successMsg }}</div>
 
   <!-- KPI row -->
   <div class="kpi-grid">
@@ -17,7 +17,7 @@
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
       period="LIVE"
-      sub="Currently open"
+      sub="Open now · any report date"
       :status="!summary ? undefined : summary.kpis.active > 10 ? 'below' : 'monitoring'"
       to="#active-queue"
     />
@@ -27,7 +27,7 @@
       :unavailable="!summary"
       :unavailable-note="loading ? 'Loading…' : 'NTSA IRSMS feed unavailable'"
       :period="range.period.value"
-      :sub="`All severities · ${range.label.value}`"
+      :sub="`Reported · ${range.label.value}`"
       status="monitoring"
       to="#all-incidents"
     />
@@ -106,7 +106,7 @@
         </thead>
         <tbody v-if="filteredIncidents.length">
           <template v-for="inc in incidentsPageRows" :key="inc.id">
-            <tr class="expand-row" @click="expanded = expanded === inc.id ? null : inc.id">
+            <tr class="expand-row" tabindex="0" :aria-expanded="expanded === inc.id" @click="expanded = expanded === inc.id ? null : inc.id" @keydown.enter.self.prevent="expanded = expanded === inc.id ? null : inc.id" @keydown.space.self.prevent="expanded = expanded === inc.id ? null : inc.id">
               <td class="expand-cell">{{ expanded === inc.id ? '▾' : '▸' }}</td>
               <td>{{ countyFromCoords(inc) }}</td>
               <td>{{ inc.incident_type.replace(/_/g,' ') }}</td>
@@ -161,7 +161,7 @@
         <tbody v-else>
           <tr>
             <td colspan="12" style="text-align:center;color:var(--fg-3);padding:16px">
-              {{ loading ? 'Loading…' : 'No incidents found' }}
+              {{ loading ? 'Loading…' : emptyTableMessage }}
             </td>
           </tr>
         </tbody>
@@ -203,7 +203,7 @@
 
     <CollapsibleSection
       id="active-queue" class="card drill-target" default-open storage-key="incidents:safety/active"
-      title="Active Incidents" :count="activeIncidents.length" :tone="activeTone"
+      title="Active Incidents" :count="activeCountLabel" :tone="activeTone"
     >
       <div class="card-body scroll-body">
         <div
@@ -315,9 +315,10 @@
   >
     <EmptyState v-if="reportersLoading || reporters.length === 0" :loading="reportersLoading" message="No individual reports found for this incident." compact />
     <div v-else class="reporters-list">
-      <div v-for="r in reporters" :key="r.id" class="reporter-item">
+      <div v-for="(r, idx) in reporters" :key="r.id" class="reporter-item">
         <div class="reporter-item-head">
-          <span class="reporter-email">{{ r.reported_by_email ?? 'Unknown reporter' }}</span>
+          <!-- The reporter's email identifies a person, so reports are numbered instead. -->
+          <span class="reporter-email">Reporter {{ idx + 1 }}</span>
           <BadgePill :variant="sevBadge(r.severity)">{{ r.severity }}</BadgePill>
         </div>
         <div class="reporter-title">{{ r.title || '(no title)' }}</div>
@@ -469,7 +470,10 @@ async function load() {
     incidents.value = incRes.value.results
     incidentsCount.value = incRes.value.count
   }
-  if (activeRes.status === 'fulfilled') activeList.value = (activeRes.value as any).results ?? []
+  if (activeRes.status === 'fulfilled') {
+    activeList.value = (activeRes.value as any).results ?? []
+    activeTotal.value = (activeRes.value as any).count ?? activeList.value.length
+  }
   if (dispRes.status  === 'fulfilled') dispatches.value = (dispRes.value as any).results ?? []
   if (roadsRes.status === 'fulfilled') roadsGeo.value   = roadsRes.value
   if (boundaryRes.status === 'fulfilled' && boundaryRes.value) {
@@ -499,6 +503,7 @@ watch(() => route.query, () => { adoptQueryFilters(); applyFilters() })
 async function loadLive() {
   const res: any = await useSafety().activeIncidents({ page_size: 100, ...tableFilters() })
   activeList.value = res.results ?? []
+  activeTotal.value = res.count ?? activeList.value.length
 }
 const mapLive = useLivePoll(loadLive, { intervalMs: 15_000 })
 const mapLegend = [
@@ -557,9 +562,20 @@ const activeIncidents = computed(() =>
 )
 
 /** The header colour while the list is folded: the worst thing still open. */
+// The queue shows the first 100 open incidents; the badge says so when there are more.
+const activeTotal = ref(0)
+const activeCountLabel = computed(() => {
+  const shown = activeIncidents.value.length
+  return activeTotal.value > shown ? `${fmtNum(shown)} of ${fmtNum(activeTotal.value)}` : shown
+})
 const activeTone = computed(() =>
   activeIncidents.value.some(i => i.severity === 'fatal') ? 'danger'
     : activeIncidents.value.length ? 'warning' : 'success')
+const emptyTableMessage = computed(() => {
+  const open = summary.value?.kpis.active ?? 0
+  const base = `No incidents reported · ${range.label.value}`
+  return open > 0 ? `${base}. ${fmtNum(open)} older incidents are still open - see Active Incidents.` : `${base}.`
+})
 const filteredIncidents = computed(() => incidents.value.filter(i => {
   if (incidentSearch.value) {
     const q = incidentSearch.value.toLowerCase()
@@ -720,7 +736,7 @@ function countyFromCoords(inc: Incident): string {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 
 /* Verification: its own action row, not a raw button jammed into the data grid. */
 .dd-verify {

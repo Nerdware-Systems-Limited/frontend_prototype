@@ -429,6 +429,14 @@ button { font-family: inherit; }
 .bell-btn.is-shaking .bell-icon { animation: bellShake .6s ease-in-out; transform-origin: 50% 0; }
 @media (prefers-reduced-motion: reduce) { .bell-btn.is-shaking .bell-icon { animation: none; } }
 
+.guide-link {
+  color: #fff; font-size: 0.8125rem; text-decoration: none; white-space: nowrap;
+  padding: 0.35rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, .18);
+}
+.guide-link:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .32); }
+.guide-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; }
+@media (max-width: 768px) { .guide-link { display: none; } }
+
 .avatar {
   width: 32px; height: 32px; border-radius: var(--r-pill);
   background: #1e3a5c; color: #fff;

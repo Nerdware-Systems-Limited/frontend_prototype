@@ -7,11 +7,11 @@
     <!-- <template #actions>
       
       <BadgePill variant="success">{{ liveVehicles.length }} Live</BadgePill>
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <button class="btn" :disabled="loading" @click="load"><RefreshCw :size="14" aria-hidden="true" />Refresh</button>
     </template> -->
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Filter bar -->
   <div class="filter-row">
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { RefreshCw } from 'lucide-vue-next'
 definePageMeta({ layout: 'default' })
 import { useFleet, useGis } from '~/composables/api'
 import type { Vehicle, GeofenceEvent } from '~/composables/api'

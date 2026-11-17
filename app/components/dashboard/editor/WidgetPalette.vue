@@ -111,7 +111,7 @@ function onDragStart(e: DragEvent, item: string) {
 .wp-search { position: relative; display: flex; align-items: center; }
 .wp-search input { height: 32px; padding-left: 29px; font-size: 12px; }
 .wp-search-icon { position: absolute; left: 9px; color: var(--fg-3); pointer-events: none; }
-.wp-group-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin: 6px 0 2px; }
+.wp-group-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin: 6px 0 2px; }
 .wp-group { display: flex; flex-direction: column; gap: 6px; }
 .wp-item {
   display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 9px 10px; cursor: grab;
@@ -123,7 +123,7 @@ function onDragStart(e: DragEvent, item: string) {
 .wp-item-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--fg-1); }
 .wp-icon { flex-shrink: 0; color: var(--fg-3); }
 .wp-item-desc { font-size: 11px; color: var(--fg-3); line-height: 1.45; }
-.wp-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 10px; color: var(--fg-3); }
+.wp-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11px; color: var(--fg-3); }
 .wp-size { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .wp-tag { display: inline-flex; align-items: center; gap: 3px; }
 .wp-tag { font-family: var(--font-mono); }

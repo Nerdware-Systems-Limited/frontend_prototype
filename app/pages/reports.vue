@@ -5,61 +5,55 @@
     subtitle="Generate scheduled and on-demand reports - download PDF or XLSX across all UAPTS modules"
   >
     <template #actions>
-      <span class="freshness-badge">{{ runs.length ? `${runs.length} recent runs` : 'No recent runs' }}</span>
+      <span class="freshness-badge">{{ runs.length ? `${runs.length} recent ${runs.length === 1 ? 'run' : 'runs'}` : 'No recent runs' }}</span>
       <button v-if="hasCapability('run_reports')" class="btn btn-primary" @click="showGenerateModal = true">+ Generate Report</button>
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Generate modal -->
-  <div v-if="showGenerateModal" class="modal-backdrop" @click.self="showGenerateModal = false">
-    <div class="modal">
-      <div class="modal-header">
-        Generate Report
-        <button class="modal-close" @click="showGenerateModal = false">×</button>
+  <AppModal :model-value="showGenerateModal" :title="'Generate Report'" max-width="460px" @update:model-value="(open) => { if (!open) showGenerateModal = false }">
+    <div class="modal-stack">
+      <div class="form-group">
+        <label for="gen-f1">Template</label>
+        <select id="gen-f1" v-model="genForm.template_id" class="select-full">
+          <option value="">Select a template…</option>
+          <option v-for="tmpl in catalog" :key="tmpl.id" :value="tmpl.id">{{ tmpl.name }}</option>
+        </select>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Template</label>
-          <select v-model="genForm.template_id" class="select-full">
-            <option value="">Select a template…</option>
-            <option v-for="tmpl in catalog" :key="tmpl.id" :value="tmpl.id">{{ tmpl.name }}</option>
-          </select>
+      <div class="form-group" v-if="selectedTemplate">
+        <div class="tmpl-preview-desc">{{ selectedTemplate.description }}</div>
+        <div class="tmpl-preview-formats">
+          <BadgePill v-for="f in selectedTemplate.formats" :key="f" variant="neutral">{{ f }}</BadgePill>
         </div>
-        <div class="form-group" v-if="selectedTemplate">
-          <div class="tmpl-preview-desc">{{ selectedTemplate.description }}</div>
-          <div class="tmpl-preview-formats">
-            <BadgePill v-for="f in selectedTemplate.formats" :key="f" variant="neutral">{{ f }}</BadgePill>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Format</label>
-          <div class="format-select">
-            <label v-for="f in availableFormats" :key="f" class="radio-label">
-              <input type="radio" :value="f" v-model="genForm.format" />
-              {{ f.toUpperCase() }}
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Date From</label>
-          <input type="date" v-model="genForm.params.date_from" class="select-full" />
-        </div>
-        <div class="form-group">
-          <label>Date To</label>
-          <input type="date" v-model="genForm.params.date_to" class="select-full" />
-        </div>
-        <div v-if="genError" style="font-size:12px;color:var(--danger-fg)">⚠ {{ genError }}</div>
       </div>
-      <div class="modal-footer">
-        <button class="btn" @click="showGenerateModal = false">Cancel</button>
-        <button class="btn btn-primary" :disabled="!genForm.template_id || generating" @click="generateReport">
-          {{ generating ? 'Generating…' : 'Generate' }}
-        </button>
+      <div class="form-group">
+        <span id="gen-f2" class="group-label">Format</span>
+        <div role="group" aria-labelledby="gen-f2" class="format-select">
+          <label v-for="f in availableFormats" :key="f" class="radio-label">
+            <input type="radio" :value="f" v-model="genForm.format" />
+            {{ f.toUpperCase() }}
+          </label>
+        </div>
       </div>
+      <div class="form-group">
+        <label for="gen-f3">Date From</label>
+        <input id="gen-f3" type="date" v-model="genForm.params.date_from" class="select-full" />
+      </div>
+      <div class="form-group">
+        <label for="gen-f4">Date To</label>
+        <input id="gen-f4" type="date" v-model="genForm.params.date_to" class="select-full" />
+      </div>
+      <div v-if="genError" class="banner-icon-warn" role="alert" style="font-size:12px;color:var(--danger-fg)">{{ genError }}</div>
     </div>
-  </div>
+    <template #footer>
+    <button class="btn" @click="showGenerateModal = false">Cancel</button>
+    <button class="btn btn-primary" :disabled="!genForm.template_id || generating" @click="generateReport">
+      {{ generating ? 'Generating…' : 'Generate' }}
+    </button>
+    </template>
+  </AppModal>
 
   <!-- Template catalog -->
   <SectionTitle pill="Available Templates">Report Templates</SectionTitle>
@@ -69,7 +63,7 @@
       <div class="tc-top">
         <div class="tc-head">
           <span class="tc-name">{{ tmpl.name }}</span>
-          <BadgePill v-if="tmpl.schedule" variant="fair">Scheduled</BadgePill>
+          <BadgePill v-if="tmpl.schedule" variant="neutral">Scheduled</BadgePill>
           <BadgePill v-else variant="neutral">On-demand</BadgePill>
         </div>
         <div v-if="tmpl.module" class="tc-module">{{ tmpl.module }}</div>
@@ -91,7 +85,7 @@
   <SectionTitle pill="Query Builder · Distribution">Saved Query Templates</SectionTitle>
   <div class="card" style="margin-bottom:16px">
     <div class="card-body">
-      <div v-if="savedError" class="query-error" style="margin-bottom:8px">⚠ {{ savedError }}</div>
+      <div v-if="savedError" class="query-error banner-icon-warn" style="margin-bottom:8px" role="alert">{{ savedError }}</div>
       <div v-if="savedQueries.length" class="saved-list">
         <div v-for="sq in savedQueries" :key="sq.id" class="saved-row">
           <div class="saved-main">
@@ -109,9 +103,9 @@
           </div>
           <div class="saved-actions">
             <button class="btn btn-primary" :disabled="runningSavedId === sq.id" @click="runSavedNow(sq)">
-              {{ runningSavedId === sq.id ? 'Running…' : '▶ Run Now' }}
+              <Play v-if="runningSavedId !== sq.id" :size="14" aria-hidden="true" />{{ runningSavedId === sq.id ? 'Running…' : 'Run Now' }}
             </button>
-            <button class="remove-btn" title="Delete" @click="deleteSaved(sq.id)">×</button>
+            <button type="button" class="remove-btn" title="Delete saved query" aria-label="Delete saved query" @click="deleteSaved(sq.id)"><X :size="14" aria-hidden="true" /></button>
           </div>
         </div>
       </div>
@@ -153,7 +147,7 @@
               <button v-if="r.status === 'completed'" class="btn run-dl" @click="useReports().download(r.id)"><Download :size="14" aria-hidden="true" />Download</button>
               <span v-else-if="r.status === 'running'" class="run-progress">● Generating…</span>
               <span v-else-if="r.status === 'queued'" class="run-queued">⏳ Queued…</span>
-              <span v-else-if="r.status === 'failed'" class="run-failed" :title="(r as any).error">✕ Failed</span>
+              <span v-else-if="r.status === 'failed'" class="run-failed banner-icon-fail" :title="(r as any).error">Failed</span>
               <span v-else class="run-na">-</span>
             </td>
           </tr>
@@ -173,7 +167,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowRight, Download } from 'lucide-vue-next'
+import { ArrowRight, Download, X, Play } from 'lucide-vue-next'
 
 const { hasCapability } = usePermissions()
 import { useReports, useQuery } from '~/composables/api'
@@ -392,11 +386,11 @@ function fmtBytes(b: number) {
 .tc-top { flex:1; display:flex; flex-direction:column; gap:6px; }
 .tc-head { display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
 .tc-name { font-size:14px; font-weight:700; color:var(--fg-1); flex:1; line-height:1.3; }
-.tc-module { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
+.tc-module { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--fg-3); }
 .tc-desc { font-size:12px; color:var(--fg-2); line-height:1.5; margin:0; }
 .tc-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--border-subtle); padding-top:10px; }
 .tc-formats { display:flex; gap:4px; flex-wrap:wrap; }
-.tc-fmt { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); border:1px solid color-mix(in srgb, var(--info-fg) 30%, transparent); }
+.tc-fmt { font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px; background:var(--info-bg); color:var(--info-fg); border:1px solid color-mix(in srgb, var(--info-fg) 30%, transparent); }
 .tc-btn { font-size:12px; }
 
 /* ── Recent runs table ── */
@@ -427,10 +421,10 @@ function fmtBytes(b: number) {
 .saved-name { font-size:13px; font-weight:700; color:var(--fg-1); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .saved-desc { font-size:12px; color:var(--fg-2); margin-top:2px; }
 .saved-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
-.saved-meta-chip { font-size:10px; padding:2px 8px; border-radius:10px; background:var(--surface-sunken); color:var(--fg-2); font-weight:600; white-space:nowrap; }
+.saved-meta-chip { font-size:11px; padding:2px 8px; border-radius:10px; background:var(--surface-sunken); color:var(--fg-2); font-weight:600; white-space:nowrap; }
 .saved-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.remove-btn { background:none; border:none; font-size:16px; color:var(--fg-3); cursor:pointer; line-height:1; padding:0; text-align:center; }
-.remove-btn:hover { color:var(--danger-fg); }
+.remove-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; background:none; border:1px solid transparent; border-radius:var(--r-sm); color:var(--fg-3); cursor:pointer; }
+.remove-btn:hover { background:var(--danger-bg); color:var(--danger-fg); }
 
 /* ── Modal ── */
 .select-full { width:100%; padding:7px 10px; border:1px solid var(--border-interactive); border-radius:7px; font-size:13px; background:var(--surface-2); color:var(--fg-2); }
@@ -440,13 +434,9 @@ function fmtBytes(b: number) {
 .radio-label input[type="radio"] { accent-color:var(--primary-fill); cursor:pointer; }
 .tmpl-preview-desc { font-size:12px; color:var(--fg-2); margin-bottom:6px; line-height:1.5; }
 .tmpl-preview-formats { display:flex; gap:4px; flex-wrap:wrap; }
-.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
-.modal { background:var(--surface-2); border-radius:12px; width:460px; max-width:95vw; box-shadow:var(--elev-3); }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 16px; font-weight:700; font-size:15px; border-bottom:1px solid var(--border-subtle); color:var(--fg-1); }
-.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--fg-3); line-height:1; padding:0 2px; }
-.modal-close:hover { color:var(--fg-2); }
-.modal-body { padding:16px 20px; display:flex; flex-direction:column; gap:14px; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border-subtle); }
 .form-group { display:flex; flex-direction:column; gap:5px; }
-.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); text-transform:uppercase; letter-spacing:.04em; }
+.form-group label, .form-group .group-label { font-size:12px; font-weight:600; color:var(--fg-2); text-transform:uppercase; letter-spacing:.04em; }
+
+/* Body of the shared AppModal - field rhythm for this page's forms. */
+.modal-stack { display:flex; flex-direction:column; gap:14px; }
 </style>

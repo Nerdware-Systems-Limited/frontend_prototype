@@ -227,10 +227,10 @@ function applySaved(id: string) {
 .qe-fields summary { font-size: 11px; color: var(--fg-2); font-weight: 500; cursor: pointer; display: flex; gap: 6px; align-items: baseline; }
 .qe-fields summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .qe-fields[open] summary { margin-bottom: 4px; }
-.qe-meta { font-size: 10px; font-family: var(--font-mono); color: var(--fg-3); }
+.qe-meta { font-size: 11px; font-family: var(--font-mono); color: var(--fg-3); }
 .qe-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-2); cursor: pointer; padding: 1px 0; }
 .qe-check input { width: auto; accent-color: var(--primary); }
-.qe-type { margin-left: auto; font-size: 9.5px; font-family: var(--font-mono); color: var(--fg-3); }
+.qe-type { margin-left: auto; font-size: 10.5px; font-family: var(--font-mono); color: var(--fg-3); }
 .qe-filters { display: flex; flex-direction: column; gap: 5px; }
 .qe-filter { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1.2fr) 22px; gap: 4px; align-items: center; }
 .qe-x { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 0; background: none; color: var(--fg-3); cursor: pointer; border-radius: var(--r-xs); padding: 0; }

@@ -6,7 +6,7 @@
   >
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Headline KPIs from trend aggregate -->
   <div class="kpi-grid">
@@ -326,7 +326,7 @@ function shortDate(s: string) {
    its far end back up over the bar/neighbouring column instead of reading
    downward - the exact overlap this replaced. Shown on every Nth bar only
    (see showDateLabel()). */
-.bar-date { height:11px; line-height:11px; font-size:9px; color:var(--fg-3); margin-top:4px; white-space:nowrap; flex-shrink:0; }
+.bar-date { height:11px; line-height:11px; font-size:10.5px; color:var(--fg-3); margin-top:4px; white-space:nowrap; flex-shrink:0; }
 .violations-grid { display:flex; flex-direction:column; gap:8px; }
 .viol-row { display:grid; grid-template-columns:180px 1fr 70px; align-items:center; gap:10px; }
 .viol-label { font-size:13px; }

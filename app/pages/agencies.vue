@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Access Control"
     title="Agencies"
-    :subtitle="canWrite ? 'Platform-wide agency directory (tbl_agencies) - create and adjust the agencies UAPTS tracks' : 'Platform-wide agency directory - read-only for your role, contact a Super Admin to make changes'"
+    :subtitle="canWrite ? 'Platform-wide agency directory - create and adjust the agencies UAPTS tracks' : 'Platform-wide agency directory - read-only for your role, contact a Super Admin to make changes'"
   >
     <template #actions>
       <ExportButton :rows="exportRows" :columns="exportColumns" filename="uapts-agencies" label="Export" />
@@ -10,9 +10,9 @@
     </template>
   </PageHeader>
 
-  <div v-if="error"         class="error-banner">⚠ {{ error }}</div>
-  <div v-if="actionError"   class="error-banner action-error">⚠ {{ actionError }}</div>
-  <div v-if="actionSuccess" class="success-banner">✓ {{ actionSuccess }}</div>
+  <div v-if="error"         class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
+  <div v-if="actionError"   class="error-banner action-error banner-icon-warn" role="alert">{{ actionError }}</div>
+  <div v-if="actionSuccess" class="success-banner banner-icon-ok" role="status">{{ actionSuccess }}</div>
 
   <!-- Metric strip -->
   <div class="metric-strip" role="group" aria-label="Agency directory statistics">
@@ -56,7 +56,7 @@
             <td v-if="canWrite" class="stack-actions">
               <div class="action-group">
                 <button class="btn btn-sm" :disabled="actionId === a.id" @click="openEdit(a)">Edit</button>
-                <button class="btn btn-sm btn-danger-outline" :disabled="actionId === a.id" @click="confirmDeleteAgency(a)">Delete</button>
+                <button class="btn btn-sm btn-ghost row-delete" :disabled="actionId === a.id" :aria-label="`Delete ${a.agency_name}`" @click="confirmDeleteAgency(a)">Delete</button>
               </div>
             </td>
           </tr>
@@ -90,61 +90,56 @@
   />
 
   <!-- Create / Edit Agency Modal -->
-  <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
-    <div class="modal">
-      <div class="modal-header">
-        <span>{{ editId ? 'Edit Agency' : 'Add Agency' }}</span>
-        <button class="modal-close" @click="closeModal">×</button>
+  <AppModal :model-value="showModal" :title="editId ? 'Edit Agency' : 'Add Agency'" max-width="440px" @update:model-value="(open) => { if (!open) closeModal() }">
+    <div class="modal-stack">
+      <div class="form-group">
+        <label for="agency-f1">Agency code <span class="required">*</span></label>
+        <input id="agency-f1"
+          v-model="form.agency_code"
+          class="input-full"
+          placeholder="e.g. KENHA"
+          :disabled="!!editId"
+          :title="editId ? 'Agency code cannot be changed after creation' : undefined"
+          :class="{ 'input-error': formErrors.agency_code }"
+          @input="formErrors.agency_code = ''"
+        />
+        <span v-if="formErrors.agency_code" class="field-error">{{ formErrors.agency_code }}</span>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Agency code <span class="required">*</span></label>
-          <input
-            v-model="form.agency_code"
-            class="input-full"
-            placeholder="e.g. KENHA"
-            :disabled="!!editId"
-            :title="editId ? 'Agency code cannot be changed after creation' : undefined"
-            :class="{ 'input-error': formErrors.agency_code }"
-            @input="formErrors.agency_code = ''"
-          />
-          <span v-if="formErrors.agency_code" class="field-error">{{ formErrors.agency_code }}</span>
-        </div>
-        <div class="form-group">
-          <label>Agency name <span class="required">*</span></label>
-          <input
-            v-model="form.agency_name"
-            class="input-full"
-            placeholder="e.g. Kenya National Highways Authority"
-            :class="{ 'input-error': formErrors.agency_name }"
-            @input="formErrors.agency_name = ''"
-          />
-          <span v-if="formErrors.agency_name" class="field-error">{{ formErrors.agency_name }}</span>
-        </div>
-        <div class="form-group">
-          <label>Contact email <span class="hint">(optional)</span></label>
-          <input
-            type="email"
-            v-model="form.contact_email"
-            class="input-full"
-            placeholder="contact@agency.go.ke"
-          />
-        </div>
-        <div v-if="saveApiError" class="api-error">⚠ {{ saveApiError }}</div>
+      <div class="form-group">
+        <label for="agency-f2">Agency name <span class="required">*</span></label>
+        <input id="agency-f2"
+          v-model="form.agency_name"
+          class="input-full"
+          placeholder="e.g. Kenya National Highways Authority"
+          :class="{ 'input-error': formErrors.agency_name }"
+          @input="formErrors.agency_name = ''"
+        />
+        <span v-if="formErrors.agency_name" class="field-error">{{ formErrors.agency_name }}</span>
       </div>
-      <div class="modal-footer">
-        <button class="btn" @click="closeModal">Cancel</button>
-        <button
-          class="btn btn-primary"
-          :disabled="!form.agency_code || !form.agency_name || saving"
-          @click="doSave"
-        >{{ saving ? 'Saving…' : (editId ? 'Save Changes' : 'Add Agency') }}</button>
+      <div class="form-group">
+        <label for="agency-f3">Contact email <span class="hint">(optional)</span></label>
+        <input id="agency-f3"
+          type="email"
+          v-model="form.contact_email"
+          class="input-full"
+          placeholder="contact@agency.go.ke"
+        />
       </div>
+      <div v-if="saveApiError" class="api-error banner-icon-warn" role="alert">{{ saveApiError }}</div>
     </div>
-  </div>
+    <template #footer>
+    <button class="btn" @click="closeModal">Cancel</button>
+    <button
+      class="btn btn-primary"
+      :disabled="!form.agency_code || !form.agency_name || saving"
+      @click="doSave"
+    >{{ saving ? 'Saving…' : (editId ? 'Save Changes' : 'Add Agency') }}</button>
+    </template>
+  </AppModal>
 </template>
 
 <script setup lang="ts">
+import { X } from 'lucide-vue-next'
 definePageMeta({ layout: 'default' })
 import { useAgencies as _useAgencies } from '~/composables/api'
 import type { Agency } from '~/types/uapts'
@@ -359,22 +354,16 @@ function flash(msg: string) {
 .agencies-table th, .agencies-table td { padding:8px 12px; }
 .dim { color:var(--fg-3); }
 .action-group { display:flex; gap:6px; }
-.btn-danger-outline { color:var(--danger-fg); border-color:color-mix(in srgb, var(--danger-fg) 40%, transparent); }
-.btn-danger-outline:hover { background:var(--danger-bg); }
+/* Delete stays quiet in every row and only turns red under the pointer or focus; the confirm dialog guards it. */
+.row-delete { color:var(--fg-3); }
+.row-delete:hover:not(:disabled), .row-delete:focus-visible { color:var(--danger-fg); background:var(--danger-bg); }
 
 .empty-row { text-align:center; color:var(--fg-3); font-size:13px; padding:24px; }
 
 /* Modal */
-.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
-.modal { background:var(--surface-2); border-radius:var(--r-lg); width:440px; max-width:100%; box-shadow:var(--elev-3); display:flex; flex-direction:column; }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--border-subtle); }
-.modal-close  { background:none; border:none; font-size:22px; cursor:pointer; color:var(--fg-3); line-height:1; padding:0 4px; }
-.modal-close:hover { color:var(--fg-2); }
-.modal-body   { padding:20px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:70vh; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border-subtle); }
 
 .form-group { display:flex; flex-direction:column; gap:4px; }
-.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); }
+.form-group label, .form-group .group-label { font-size:12px; font-weight:600; color:var(--fg-2); }
 .input-full { width:100%; padding:7px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); box-sizing:border-box; }
 .input-full:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-wash); }
 .input-full:disabled { opacity:.6; cursor:not-allowed; }
@@ -389,14 +378,12 @@ function flash(msg: string) {
   .action-group { gap:8px; }
 }
 @media (max-width:600px) {
-  .modal-backdrop { padding:8px; }
-  .modal          { width:100%; max-height:calc(100dvh - 16px); }
   /* Header and footer stay put; only the form scrolls, and it never outgrows the
      screen when the on-screen keyboard shrinks the viewport. */
-  .modal-body     { max-height:none; flex:1 1 auto; min-height:0; padding:16px; }
-  .modal-header, .modal-footer { padding-left:16px; padding-right:16px; }
-  .modal-close    { padding:6px 10px; }
   .input-full     { min-height:40px; font-size:16px; } /* 16px stops iOS zooming on focus */
   .modal-footer .btn, .modal-footer .btn-primary { min-height:40px; }
 }
+
+/* Body of the shared AppModal - field rhythm for this page's forms. */
+.modal-stack { display:flex; flex-direction:column; gap:14px; }
 </style>

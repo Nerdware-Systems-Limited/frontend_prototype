@@ -11,8 +11,8 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">
-    ⚠ {{ error }} Runway condition, navaid status, terminal/ATC facility health, and capital-works integration with KCAA/KAA asset management is not yet live - airport registry and capacity figures below are computed from the live airport catalogue.
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">
+    {{ error }} Runway condition, navaid status, terminal/ATC facility health, and capital-works integration with KCAA/KAA asset management is not yet live - airport registry and capacity figures below are computed from the live airport catalogue.
   </div>
 
   <!-- Real registry KPIs -->
@@ -106,7 +106,7 @@
               <td>{{ a.runway_count }}</td>
               <td>{{ fmtNum(a.elevation_ft) }}</td>
               <td style="font-size:12px">{{ a.operator }}</td>
-              <td style="text-align:center">{{ a.has_international ? '✓' : '-' }}</td>
+              <td style="text-align:center">{{ a.has_international ? 'Yes' : '-' }}</td>
               <td><BadgePill :variant="a.active ? 'success' : 'neutral'">{{ a.active ? 'Active' : 'Inactive' }}</BadgePill></td>
             </tr>
           </tbody>

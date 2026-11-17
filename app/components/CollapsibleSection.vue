@@ -63,7 +63,7 @@ const props = withDefaults(defineProps<{
   source?: string
   /** Draw its own bordered header (for sections that are not already inside a `.card`). */
   plain?: boolean
-}>(), { title: '', count: null, tone: '', defaultOpen: false, storageKey: '', eager: false, headingLevel: 3, plain: false, source: '' })
+}>(), { title: '', count: null, tone: '', defaultOpen: false, storageKey: '', eager: false, headingLevel: 2, plain: false, source: '' })
 
 const emit = defineEmits<{ toggle: [open: boolean] }>()
 
@@ -115,9 +115,9 @@ defineExpose({ open: () => set(true), close: () => set(false), toggle })
 .cs-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cs-chevron { flex-shrink: 0; color: var(--fg-3); transform: rotate(-90deg); transition: transform var(--dur-fast, .12s) var(--ease-standard, ease); }
 .cs--open > .cs-head .cs-chevron { transform: rotate(0deg); }
-.cs-source { flex-shrink: 0; font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: none; color: var(--fg-3); }
+.cs-source { flex-shrink: 0; font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: none; color: var(--fg-3); }
 .cs-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.cs-hint { margin-left: auto; flex-shrink: 0; font-size: 10px; font-weight: 500; letter-spacing: .06em; color: var(--fg-3); }
+.cs-hint { margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 500; letter-spacing: .06em; color: var(--fg-3); }
 .cs-actions { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding-right: 12px; }
 .cs--open > .cs-head { border-bottom: 1px solid var(--border-subtle); }
 .cs--plain > .cs-head { border: 1px solid var(--border-subtle); border-radius: var(--r-md, 8px); overflow: hidden; background: var(--surface-1); }

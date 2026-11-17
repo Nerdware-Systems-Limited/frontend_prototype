@@ -14,5 +14,5 @@ defineEmits<{ prev: []; next: [] }>()
 
 <style scoped>
 .table-pagination { display:flex; align-items:center; justify-content:center; gap:14px; padding:10px 0 2px; }
-.tp-info { font-size:12px; color:#64748b; }
+.tp-info { font-size:12px; color:var(--fg-3); font-variant-numeric:tabular-nums; }
 </style>

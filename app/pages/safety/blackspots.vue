@@ -6,7 +6,7 @@
   >
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -121,7 +121,7 @@
         </thead>
         <tbody v-if="filteredSpots.length">
           <template v-for="bs in spotsPageRows" :key="bs.id">
-            <tr class="expand-row" @click="expanded = expanded === bs.id ? null : bs.id">
+            <tr class="expand-row" tabindex="0" :aria-expanded="expanded === bs.id" @click="expanded = expanded === bs.id ? null : bs.id" @keydown.enter.self.prevent="expanded = expanded === bs.id ? null : bs.id" @keydown.space.self.prevent="expanded = expanded === bs.id ? null : bs.id">
               <td class="expand-cell">{{ expanded === bs.id ? '▾' : '▸' }}</td>
               <td>{{ bs.segment_road_name ?? bs.segment_road_code ?? '-' }}</td>
               <td><BadgePill :variant="tierBadge(bs.ranking_tier)">{{ bs.ranking_tier }}</BadgePill></td>
@@ -380,7 +380,7 @@ function riskBadge(t: string | null) {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 .bar-list { display:flex; flex-direction:column; gap:8px; }

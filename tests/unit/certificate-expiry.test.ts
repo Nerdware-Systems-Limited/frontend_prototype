@@ -58,6 +58,9 @@ describe('text and dedupe', () => {
   it('words the remaining time', () => {
     expect(remainingText(-1)).toBe('Expired 1 day ago')
     expect(remainingText(-5)).toBe('Expired 5 days ago')
+    expect(remainingText(-90)).toBe('Expired 3 months ago')
+    expect(remainingText(-365)).toBe('Expired 1 year ago')
+    expect(remainingText(-2308)).toBe('Expired 6.3 years ago')
     expect(remainingText(0)).toBe('Expires today')
     expect(remainingText(1)).toBe('1 day left')
     expect(remainingText(12)).toBe('12 days left')

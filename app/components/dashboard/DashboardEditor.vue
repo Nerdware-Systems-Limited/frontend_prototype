@@ -46,7 +46,7 @@
       <button type="button" class="btn btn-sm" @click="previewViewer = null">Stop</button>
     </div>
     <div v-if="error" class="error-banner de-error" role="alert" aria-live="polite">
-      <span>⚠ {{ error }}</span>
+      <span class="banner-icon-warn">{{ error }}</span>
       <button type="button" class="error-retry-btn" @click="error = null">Dismiss</button>
     </div>
 
@@ -158,7 +158,7 @@
 
     <!-- ── Versions ── -->
     <SideDrawer :open="historyOpen" title="Versions" subtitle="Restoring copies a version into the draft. Viewers keep the published one until you publish." @close="historyOpen = false">
-      <div v-if="versionsError" class="error-banner" role="alert">⚠ {{ versionsError }}</div>
+      <div v-if="versionsError" class="error-banner banner-icon-warn" role="alert">{{ versionsError }}</div>
       <EmptyState v-if="versionsLoading" loading compact />
       <ol v-else-if="versions.length" class="de-versions">
         <li v-for="v in versions" :key="v.version" class="de-version">
@@ -499,14 +499,14 @@ onBeforeRouteLeave(() => (dirty.value ? window.confirm('You have unsaved changes
 }
 .de-tabs button.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 .de-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.de-tab-n { font-size: 10px; font-family: var(--font-mono); background: var(--surface-sunken); border-radius: var(--r-pill); padding: 0 5px; color: var(--fg-2); font-weight: 600; }
-.de-tabs button.on .de-tab-n { background: var(--primary); color: #fff; }
+.de-tab-n { font-size: 11px; font-family: var(--font-mono); background: var(--surface-sunken); border-radius: var(--r-pill); padding: 0 5px; color: var(--fg-2); font-weight: 600; }
+.de-tabs button.on .de-tab-n { background: var(--primary-fill); color: #fff; }
 .de-tab-body { padding: 14px 12px; }
 
 /* ── settings tab ── */
 .de-settings { display: flex; flex-direction: column; gap: 12px; }
 .de-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.de-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); font-weight: 700; }
+.de-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); font-weight: 700; }
 .de-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .de-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .de-danger { display: flex; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
@@ -518,7 +518,7 @@ onBeforeRouteLeave(() => (dirty.value ? window.confirm('You have unsaved changes
 .de-summary { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--r-sm); }
 .de-summary > div { padding: 10px 12px; }
 .de-summary > div + div { border-left: 1px solid var(--border-subtle); }
-.de-summary dt { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); font-weight: 700; }
+.de-summary dt { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); font-weight: 700; }
 .de-summary dd { margin: 2px 0 0; font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--fg-1); font-variant-numeric: tabular-nums; }
 .de-aud { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .de-muted { margin: 0; font-size: 12.5px; color: var(--fg-3); }

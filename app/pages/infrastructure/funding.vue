@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Agency tabs -->
   <div v-if="agencyOptions.length > 1" class="agency-tabs">
@@ -391,7 +391,7 @@ const budgetExportHref = computed(() => {
 <style scoped>
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
 .table-agency-switch { margin-bottom:12px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s; }
 .agency-tab:hover { border-color:var(--primary); color:var(--primary); }
 .agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }

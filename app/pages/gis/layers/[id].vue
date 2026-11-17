@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <template v-if="layer">
     <div class="ih-ribbon">
@@ -119,7 +119,7 @@
       <button v-if="featField || featBbox" class="btn btn-sm" @click="clearFeatureFilter">Clear</button>
       <span class="hint">{{ feats ? `${fmtInt(feats.count)} matching` : '' }}</span>
     </FilterBar>
-    <p v-if="featError" class="upload-banner upload-banner-error">⚠ {{ featError }}</p>
+    <p v-if="featError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ featError }}</p>
     <div class="card"><div class="card-body">
       <EmptyState v-if="feats && !feats.features.length" icon="search" message="No features match." />
       <div v-else class="table-scroll">
@@ -231,7 +231,7 @@ onMounted(async () => {
 
 <style scoped>
 .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 18px; font-size: 13px; }
-.m-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); margin-bottom: 2px; }
+.m-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); margin-bottom: 2px; }
 .m-wide { grid-column: 1 / -1; }
 .chip { display: inline-block; margin: 0 6px 4px 0; padding: 1px 6px; border: 1px solid var(--border-subtle); border-radius: 4px; font-size: 12px; }
 .bd-controls { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }

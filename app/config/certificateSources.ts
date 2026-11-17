@@ -51,8 +51,9 @@ export const CERTIFICATE_SOURCES: CertificateSource[] = [
       const [soon, expired] = await Promise.all([av.expiring(windowDays), av.list({ status: 'expired', page_size: 100 })])
       return [...rows(soon), ...rows(expired)].map((l): CertificateRecord => ({
         key: `aviation:${l.id}`, source: 'aviation', category: humanize(l.category),
-        name: l.certificate_number,
-        owner: l.aircraft_registration ?? l.airline_name ?? l.pilot_name ?? null,
+        name: l.holder_type === 'aircraft' || l.holder_type === 'airline' ? l.certificate_number : 'Pilot licence',
+        // A pilot's name is personal data and is never shown as the owner.
+        owner: l.aircraft_registration ?? l.airline_name ?? null,
         expiry: day(l.expiry_date), route: '/aviation/licensing', sourceExpired: l.status === 'expired',
       }))
     },
@@ -64,7 +65,8 @@ export const CERTIFICATE_SOURCES: CertificateSource[] = [
       const [soon, expired] = await Promise.all([ms.licencesExpiring(windowDays), ms.licences({ status: 'expired', page_size: 100 })])
       return [...rows(soon), ...rows(expired)].map((l): CertificateRecord => ({
         key: `maritime:${l.id}`, source: 'maritime', category: `${humanize(l.licence_type)} licence`,
-        name: l.licence_number, owner: l.vessel_name ?? (l.holder_id || null),
+        // A pilot's licence number / holder_id identifies a person; only the vessel is shown.
+        name: l.licence_type === 'pilot' ? 'Pilot licence' : l.licence_number, owner: l.vessel_name ?? null,
         expiry: day(l.expiry_date), route: '/maritime/services', sourceExpired: l.is_expired || l.status === 'expired',
       }))
     },
@@ -76,7 +78,8 @@ export const CERTIFICATE_SOURCES: CertificateSource[] = [
       const [soon, expired] = await Promise.all([dl.expiring(windowDays), dl.licences({ status: 'expired', page_size: 100 })])
       return [...rows(soon), ...rows(expired)].map((l): CertificateRecord => ({
         key: `driver:${l.id}`, source: 'driver', category: l.is_psv ? 'PSV driving licence' : 'Driving licence',
-        name: l.license_number, owner: l.driver_name ?? null,
+        // No driver name or licence number: the licence is described by its class only.
+        name: `Class ${Array.isArray(l.license_class) ? l.license_class.join(', ') : (l.license_class || '-')}`, owner: null,
         expiry: day(l.expiry_date), route: '/public-transport/driver-licensing', sourceExpired: l.is_expired || l.status === 'expired',
       }))
     },

@@ -98,7 +98,7 @@ const SPECS: Record<string, Spec> = {
       const dwell = ports.length ? ports.reduce((s, p) => s + (p.avg_yard_dwell_days || 0), 0) / ports.length : null
       return [
         ...ports.slice(0, 2).map(p => plain(`${p.port_name} TEUs (30d)`, formatValue(p.teu_throughput_30d, 'count'))),
-        plain('Live vessels in port', formatValue(maritime.kpis.live_vessels, 'count')),
+        plain('Vessels tracked (AIS)', formatValue(maritime.kpis.live_vessels, 'count')),
         judged('Avg yard dwell', dwell, 'maritime.yard_dwell_days'),
       ]
     },
@@ -166,7 +166,7 @@ function pick() {
 .agency-row-label { font-size: 10.5px; color: var(--fg-2); }
 .agency-muted { font-size: 11px; color: var(--fg-3); padding: 4px 0; line-height: 1.5; }
 .agency-link {
-  margin-top: auto; padding-top: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  margin-top: auto; padding-top: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   color: var(--primary); text-decoration: none;
 }
 .agency-link:hover { text-decoration: underline; text-underline-offset: 3px; }

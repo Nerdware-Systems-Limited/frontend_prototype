@@ -61,8 +61,9 @@
     <div v-if="engine.activeSelections.value.length" class="fbar-chips" aria-label="Active selections">
       <button
         v-for="s in engine.activeSelections.value" :key="s.action.id" type="button" class="fbar-chip"
-        :title="`From '${s.action.name}' - click to clear`" @click="engine.clearSelection(s.action.id)"
-      >{{ FIELD_LABELS[s.action.field] }}: {{ fmt(s.value) }} <span aria-hidden="true">×</span></button>
+        :title="`From '${s.action.name}' - click to clear`"
+        :aria-label="`Clear ${FIELD_LABELS[s.action.field]}: ${fmt(s.value)}`" @click="engine.clearSelection(s.action.id)"
+      >{{ FIELD_LABELS[s.action.field] }}: {{ fmt(s.value) }} <X :size="12" aria-hidden="true" /></button>
     </div>
 
     <button v-if="hasAnything" type="button" class="fbar-reset" @click="engine.clearAll()">Reset</button>
@@ -70,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { Lock } from 'lucide-vue-next'
+import { Lock, X } from 'lucide-vue-next'
 import type { DashboardFilter, FilterOption, FilterValue } from '~/types/dashboard'
 import type { DashboardFilterEngine } from '~/composables/useDashboardFilters'
 import { FIELD_LABELS, FIELD_OPTIONS } from '~/utils/filterFields'
@@ -141,7 +142,7 @@ function fmt(v: FilterValue): string {
   position: sticky; top: var(--nav-h); z-index: 20;
 }
 .fbar-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.fbar-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3); display: flex; gap: 4px; align-items: center; }
+.fbar-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3); display: flex; gap: 4px; align-items: center; }
 .fbar-lock { color: var(--fg-3); }
 .fbar-input { width: auto; height: 30px; padding: 0 8px; font-size: 12px; min-width: 120px; }
 .fbar-input[multiple] { height: auto; min-height: 30px; max-height: 90px; padding: 4px; }

@@ -333,7 +333,7 @@ onMounted(async () => {
   transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .feed-filter-chip:hover { border-color: var(--border-interactive); }
-.feed-filter-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.feed-filter-chip.active { background: var(--primary-fill); border-color: var(--primary-fill); color: #fff; }
 .feed-filter-chip--good.active { background: var(--success-fg); border-color: var(--success-fg); }
 .feed-filter-chip--warn.active { background: var(--warning-fg); border-color: var(--warning-fg); }
 .feed-filter-chip--crit.active { background: var(--danger-fg); border-color: var(--danger-fg); }

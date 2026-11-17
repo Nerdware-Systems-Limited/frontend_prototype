@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -65,7 +65,7 @@
 
   <!-- Filters -->
   <div class="filter-row" style="margin-bottom:10px">
-    <input v-model="search" class="filter-input" placeholder="Search certificate no. or student…" />
+    <input v-model="search" class="filter-input" placeholder="Search cohort…" />
     <select v-model="outcomeFilter" class="select-sm">
       <option value="">All outcomes</option>
       <option value="pass">Pass</option>
@@ -91,9 +91,6 @@
       <table>
         <thead>
           <tr>
-            <th>Certificate No.</th>
-            <th>Student</th>
-            <th>National ID</th>
             <th>Cohort</th>
             <th>Outcome</th>
             <th>Score</th>
@@ -108,9 +105,6 @@
         </thead>
         <tbody v-if="filtered.length">
           <tr v-for="c in completionsPageRows" :key="c.id">
-            <td class="mono-cell cert-no">{{ c.certificate_number || '-' }}</td>
-            <td class="name-cell">{{ c.enrollment_detail?.full_name ?? '-' }}</td>
-            <td class="mono-cell">{{ c.enrollment_detail?.national_id ?? '-' }}</td>
             <td class="mono-cell">{{ c.enrollment_detail?.cohort ? c.enrollment_detail.cohort.slice(0, 8) : '-' }}</td>
             <td>
               <BadgePill :variant="outcomeBadge(c.outcome)" size="sm">{{ outcomeLabel(c.outcome) }}</BadgePill>
@@ -143,7 +137,7 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="13" class="empty-row">
+            <td colspan="10" class="empty-row">
               {{ loading ? 'Loading certificates…' : 'No certificates match the selected filters.' }}
             </td>
           </tr>
@@ -215,11 +209,9 @@ const filtered = computed(() => {
     if (validityFilter.value === 'valid'   && !c.is_certificate_valid) return false
     if (validityFilter.value === 'expired' && c.is_certificate_valid)  return false
     if (search.value) {
+      // Student name, national ID and certificate number are personal identifiers: not shown and not searchable.
       const q = search.value.toLowerCase()
-      const name = (c.enrollment_detail?.full_name ?? '').toLowerCase()
-      const cert = (c.certificate_number ?? '').toLowerCase()
-      const nid  = (c.enrollment_detail?.national_id ?? '').toLowerCase()
-      if (!name.includes(q) && !cert.includes(q) && !nid.includes(q)) return false
+      if (!(c.enrollment_detail?.cohort ?? '').toLowerCase().includes(q)) return false
     }
     return true
   })

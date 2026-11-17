@@ -547,7 +547,7 @@ onMounted(loadProfile)
 .meta-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; border-bottom: 1px solid var(--border-subtle); }
 .meta-item:last-child { border-bottom: none; }
 .meta-icon { color: var(--fg-3); flex-shrink: 0; }
-.meta-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-3); }
+.meta-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-3); }
 .meta-value { font-size: 12.5px; font-weight: 500; color: var(--fg-1); margin-top: 1px; }
 .meta-value-mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
 

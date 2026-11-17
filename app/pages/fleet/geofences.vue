@@ -6,11 +6,11 @@
   >
     <!-- <template #actions>
       
-      <button class="btn" :disabled="loading" @click="load">↻ Refresh</button>
+      <button class="btn" :disabled="loading" @click="load"><RefreshCw :size="14" aria-hidden="true" />Refresh</button>
     </template> -->
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -127,7 +127,7 @@
         </thead>
         <tbody v-if="filteredZones.length">
           <template v-for="z in zonesPageRows" :key="z.id">
-            <tr class="expand-row" @click="expanded = expanded === z.id ? null : z.id">
+            <tr class="expand-row" tabindex="0" :aria-expanded="expanded === z.id" @click="expanded = expanded === z.id ? null : z.id" @keydown.enter.self.prevent="expanded = expanded === z.id ? null : z.id" @keydown.space.self.prevent="expanded = expanded === z.id ? null : z.id">
               <td class="expand-cell">{{ expanded === z.id ? '▾' : '▸' }}</td>
               <td style="font-weight:600">{{ z.zone_name }}</td>
               <td><BadgePill variant="info">{{ z.zone_type }}</BadgePill></td>
@@ -168,6 +168,7 @@
 </template>
 
 <script setup lang="ts">
+import { RefreshCw } from 'lucide-vue-next'
 definePageMeta({ layout: 'default' })
 import { useFleet, useGis } from '~/composables/api'
 import type { Geofence, GeofenceEvent } from '~/composables/api'
@@ -303,5 +304,5 @@ const { riskBadge: sevBadge, geofenceEventBadge: eventBadge } = useSeverityBadge
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

@@ -38,6 +38,18 @@ export default defineNuxtConfig({
 
   modules: ['@nuxtjs/tailwindcss', '@vueuse/nuxt', '@pinia/nuxt'],
 
+  // @nuxtjs/tailwindcss registers `tailwindcss/nesting`, but Nuxt 4 loads
+  // PostCSS plugins as ES modules and Tailwind 3 has no `exports` map, so that
+  // bare directory import fails (NUXT_B7027) and nesting silently stops
+  // working. Point at the file instead; declared here so it still runs
+  // before `tailwindcss`. SFC <style> blocks rely on `&` nesting.
+  postcss: {
+    plugins: {
+      'tailwindcss/nesting': false,
+      'tailwindcss/nesting/index.js': {},
+    },
+  },
+
   // Dev-only same-origin proxy to the backend (it's on another host and we
   // can't change its CORS/CSRF settings). Auth is a Bearer header, which the
   // proxy forwards untouched; changeOrigin sets Host to the backend's.
@@ -52,6 +64,7 @@ export default defineNuxtConfig({
     devProxy: {
       '/api': { target: `${API_TARGET}/api`, changeOrigin: true },
       '/media': { target: `${API_TARGET}/media`, changeOrigin: true },
+      '/guide': { target: `${API_TARGET}/guide`, changeOrigin: true },
     },
   },
 
@@ -68,6 +81,7 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_NOTIFICATIONS_WS_URL ??
         'wss://uapts.eu.cc/ws/notifications/',
       tilesBase: process.env.NUXT_PUBLIC_TILES_BASE ?? 'https://uapts.eu.cc/media/', // works on nginx
+      guideUrl: process.env.NUXT_PUBLIC_GUIDE_URL || '/guide/',
     }
   },
 

@@ -79,7 +79,7 @@ function pick(code: string) {
 .fh-n { font-family: var(--font-mono); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fg-1); }
 .fh-count.warn .fh-n { color: var(--warning-fg); }
 .fh-count.crit .fh-n { color: var(--danger-fg); }
-.fh-l { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
+.fh-l { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
 .fh-agencies { display: flex; flex-wrap: wrap; gap: 6px; }
 .fh-agency {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono);

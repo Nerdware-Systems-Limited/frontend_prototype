@@ -6,21 +6,21 @@
     date column they mean.
   -->
   <div class="date-range-filter">
-    <div class="drf-segmented" role="tablist">
+    <div class="drf-segmented" role="group" aria-label="Date to filter by">
       <button
-        v-for="f in fields" :key="f.key" type="button" role="tab"
+        v-for="f in fields" :key="f.key" type="button"
         class="drf-segment" :class="{ active: field === f.key }"
-        :aria-selected="field === f.key"
+        :aria-pressed="field === f.key"
         @click="emit('update:field', f.key)"
       >{{ f.label }}</button>
     </div>
     <input
-      type="date" class="select-sm drf-date" :value="from"
+      type="date" class="select-sm drf-date" aria-label="From" :value="from"
       @change="emit('update:from', ($event.target as HTMLInputElement).value)"
     />
     <span class="drf-arrow" aria-hidden="true">→</span>
     <input
-      type="date" class="select-sm drf-date" :value="to"
+      type="date" class="select-sm drf-date" aria-label="To" :value="to"
       @change="emit('update:to', ($event.target as HTMLInputElement).value)"
     />
   </div>
@@ -42,14 +42,15 @@ const emit = defineEmits<{
 
 <style scoped>
 .date-range-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.drf-segmented { display: flex; border: 1px solid var(--border-subtle); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
+.drf-segmented { display: flex; border: 1px solid var(--border-interactive); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
 .drf-segment {
   background: var(--surface-2); border: none; padding: 5px 8px; font-size: 11.5px; color: var(--fg-2);
   cursor: pointer; border-right: 1px solid var(--border-subtle); white-space: nowrap;
 }
 .drf-segment:last-child { border-right: none; }
-.drf-segment:hover:not(.active) { background: var(--surface-quiet); }
-.drf-segment.active { background: var(--primary); color: #fff; }
+.drf-segment:hover:not(.active) { background: var(--surface-quiet); color: var(--fg-1); }
+.drf-segment:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.drf-segment.active { background: var(--primary-fill); color: #fff; }
 .drf-arrow { font-size: 11px; color: var(--fg-3); flex-shrink: 0; }
 .drf-date { width: 128px; flex-shrink: 0; }
 /* Phones: the two dates share the row instead of a fixed 128px each, which

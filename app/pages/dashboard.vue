@@ -20,7 +20,7 @@
     <template v-else-if="state === 'custom' && resolved">
       <!-- personal layout editing -->
       <template v-if="personalizing">
-        <div v-if="personalError" class="error-banner" role="alert" aria-live="polite">⚠ {{ personalError }}</div>
+        <div v-if="personalError" class="error-banner banner-icon-warn" role="alert" aria-live="polite">{{ personalError }}</div>
         <div class="pz-bar" role="region" aria-label="Customise your view">
           <span><strong>Customising your view.</strong> Drag to move, drag the corner to resize, “Hide” what you don't need. Only you see this.</span>
           <div class="pz-actions">

@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="kpi-grid">
     <KpiCard label="Avg waiting time" :value="avgWait != null ? avgWait.toFixed(1) : '-'" unit="h" :unavailable="avgWait == null" :period="`${days}D`"

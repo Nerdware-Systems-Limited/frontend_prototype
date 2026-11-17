@@ -17,7 +17,7 @@
       </div>
     </header>
 
-    <div v-if="error" class="route-panel-banner route-panel-banner--error">⚠ {{ error }}</div>
+    <div v-if="error" class="route-panel-banner route-panel-banner--error banner-icon-warn" role="alert">{{ error }}</div>
 
     <!-- ── The file's columns ─────────────────────────────────────────── -->
     <section class="route-panel-section">

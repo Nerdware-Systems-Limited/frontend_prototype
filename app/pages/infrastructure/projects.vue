@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Agency tabs -->
   <div v-if="agencyOptions.length > 1" class="agency-tabs">
@@ -222,7 +222,7 @@
           </thead>
           <tbody v-if="filteredProjects.length">
             <template v-for="p in projectsPageRows" :key="p.id">
-              <tr class="expand-row" :class="{ 'row-delayed': isDelayed(p.id) }" @click="expandedProject = expandedProject === p.id ? null : p.id">
+              <tr class="expand-row" :class="{ 'row-delayed': isDelayed(p.id) }" tabindex="0" :aria-expanded="expandedProject === p.id" @click="expandedProject = expandedProject === p.id ? null : p.id" @keydown.enter.self.prevent="expandedProject = expandedProject === p.id ? null : p.id" @keydown.space.self.prevent="expandedProject = expandedProject === p.id ? null : p.id">
                 <td class="expand-cell">{{ expandedProject === p.id ? '▾' : '▸' }}</td>
                 <td>
                   <div style="font-weight:600;font-size:13px">{{ p.project_name }}</div>
@@ -686,7 +686,7 @@ function progColor(pct: number | null | undefined) {
 
 <style scoped>
 .agency-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition:all .12s; }
+.agency-tab { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border-subtle); background:var(--surface-2); font-size:12.5px; font-weight:600; color:var(--fg-2); cursor:pointer; transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s; }
 .agency-tab:hover { border-color:var(--primary); color:var(--primary); }
 .agency-tab.active { background:var(--primary-fill); border-color:var(--primary-fill); color:#fff; }
 .agency-tab-count { font-size:11px; opacity:.75; }
@@ -705,8 +705,8 @@ function progColor(pct: number | null | undefined) {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
-.dd-group-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-2); margin-bottom:8px; }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--fg-2); margin-bottom:8px; }
 .dd-group-title:not(:first-child) { margin-top:4px; }
 .dd-description { font-size:12.5px; line-height:1.5; color:var(--fg-1); white-space:pre-wrap; }
 .county-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }

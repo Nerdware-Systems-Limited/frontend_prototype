@@ -2,14 +2,14 @@
   <PageHeader
     eyebrow="Public Transport · NTSA"
     title="Vehicle Registration"
-    subtitle="NTSA - Vehicle registry, compliance linkage (inspection, insurance, tracking), search by plate/chassis, and drill-down"
+    subtitle="NTSA - Vehicle registry, compliance linkage (inspection, insurance, tracking), and drill-down"
   >
     <template #actions>
       <NuxtLink to="/public-transport/vehicle-inspections" class="btn">Inspections<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI cards: counted by the server over ALL vehicles in the chosen window, not over a first page -->
   <div class="kpi-grid">
@@ -91,8 +91,7 @@
   <div id="vehicle-registry" class="card drill-target">
     <div class="card-body">
       <DataTable :table="vehicleTable" row-key="id" title="Vehicle registry" export-name="uapts-vehicle-registry" expandable filters-open
-                 placeholder="Search plate, chassis, make, operator…" empty="No vehicles match the current filters.">
-        <template #cell-plate_number="{ row }"><span style="font-weight:700;font-family:monospace">{{ row.plate_number }}</span></template>
+                 placeholder="Search make, operator…" empty="No vehicles match the current filters.">
         <template #cell-make="{ row }">{{ row.make }} {{ row.model_name }}</template>
         <template #cell-operator_name="{ row }">{{ row.operator_name ?? row.agency_code ?? '-' }}</template>
         <template #cell-inspection_expiry="{ row }"><BadgePill :variant="expiryBadge(row.inspection_expiry)">{{ expiryLabel(row.inspection_expiry) }}</BadgePill></template>
@@ -141,9 +140,8 @@ const STATUS_BADGE: Record<string, string> = { operational: 'success', maintenan
 
 // ── Vehicle registry ─────────────────────────────────────────────────────
 const vehicleColumns: TableColumn[] = [
-  { key: 'plate_number', label: 'Plate No.', priority: 1, pin: 'left' },
-  { key: 'chassis_no', label: 'Chassis No.', type: 'mono', priority: 3 },
-  { key: 'make', label: 'Make / Model', priority: 2, exportAs: r => `${r.make} ${r.model_name}` },
+  // Personal identifiers (registration / plate no., chassis no., engine no., owner name / ID / phone) are deliberately not displayed.
+  { key: 'make', label: 'Make / Model', priority: 1, pin: 'left', exportAs: r => `${r.make} ${r.model_name}` },
   { key: 'year_of_manufacture', label: 'Year', type: 'num', digits: 0, priority: 3 },
   { key: 'vehicle_type', label: 'Type', priority: 2 },
   { key: 'fuel_type', label: 'Fuel', priority: 3 },
@@ -157,7 +155,7 @@ const vehicleColumns: TableColumn[] = [
 ]
 const vehicleTable = useEndpointTable({
   key: 'pt-vehicle-registry', path: V, columns: vehicleColumns, countyKey: 'public-transport', pageSize: 15,
-  params: windowQuery, defaultSort: [{ key: 'plate_number', dir: 'asc' }],
+  params: windowQuery, defaultSort: [{ key: 'updated_at', dir: 'desc' }],
 })
 
 // ── KPIs and breakdowns: counted by the server ───────────────────────────

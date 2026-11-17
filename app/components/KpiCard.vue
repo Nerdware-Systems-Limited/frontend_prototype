@@ -37,6 +37,7 @@
         'kpi-card--link': isLink,
         'kpi-card--loading': loading,
         'kpi-card--unavailable': isUnavailable,
+        'kpi-card--pending': isPending,
         'kpi-card--prominent': prominent,
       },
     ]"
@@ -68,7 +69,8 @@
       </slot>
     </div>
 
-    <p v-if="isUnavailable" class="kpi-card__reason">
+    <p v-if="isPending" class="kpi-card__syncing" role="status">Syncing…</p>
+    <p v-else-if="isUnavailable" class="kpi-card__reason" :class="{ 'kpi-card__reason--failed': isFeedDown }">
       <span class="kpi-card__reason-tag">No data</span>
       <span v-if="reasonText" class="kpi-card__reason-why">· {{ reasonText }}</span>
     </p>
@@ -96,7 +98,7 @@
     </p>
 
     <div class="kpi-card__foot">
-      <div v-if="resolvedStatus" class="kpi-card__status">
+      <div v-if="resolvedStatus && !isUnavailable" class="kpi-card__status">
         <span class="kpi-card__status-dot" aria-hidden="true" />
         <span>{{ statusLabelResolved }}</span>
       </div>
@@ -325,6 +327,12 @@ const isLivePeriod = computed(() => props.period.trim().toUpperCase() === 'LIVE'
 // ── Text fields (with legacy aliases) ────────────────────────────────
 const descriptionText = computed(() => props.description || props.sub || '')
 const reasonText = computed(() => props.unavailableReason || props.unavailableNote || '')
+// Three kinds of "no value", told apart so a page that is still loading never reads as broken:
+//  - pending: the request is in flight (the `loading` prop, or callers' 'Loading…' note);
+//  - feed down: the source failed - the only case drawn in the danger colour;
+//  - no records: the source answered but had nothing for the period - neutral.
+const isPending = computed(() => isUnavailable.value && (props.loading || /^loading/i.test(reasonText.value)))
+const isFeedDown = computed(() => /unavailable|failed|offline|error/i.test(reasonText.value))
 
 // ── Comparison ───────────────────────────────────────────────────────
 interface Comparison { value: string; period: string; direction: TrendDirection; favorable: boolean | undefined }
@@ -390,7 +398,9 @@ const sparkTone = computed<'neutral' | 'critical' | 'below' | 'ontarget' | 'moni
 const ariaLabelResolved = computed(() => {
   if (props.ariaLabel) return props.ariaLabel
   if (!isLink.value) return undefined
-  const val = isUnavailable.value
+  const val = isPending.value
+    ? 'loading'
+    : isUnavailable.value
     ? 'no data available'
     : `${props.value}${props.unit ? ' ' + props.unit : ''}`
   const bits = [`${props.label}: ${val}`]
@@ -457,7 +467,7 @@ const ariaLabelResolved = computed(() => {
   gap: 8px;
 }
 .kpi-card__label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -475,7 +485,7 @@ const ariaLabelResolved = computed(() => {
 }
 .kpi-card__abbr {
   margin-left: 5px;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--fg-3);
   text-decoration: underline dotted;
@@ -485,7 +495,7 @@ const ariaLabelResolved = computed(() => {
 .kpi-card__period {
   flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--fg-3);
@@ -505,7 +515,7 @@ const ariaLabelResolved = computed(() => {
   border: none;
   padding: 0;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
 }
@@ -557,9 +567,15 @@ const ariaLabelResolved = computed(() => {
   max-width: 42ch;
 }
 
+.kpi-card__syncing {
+  font-size: 11px;
+  color: var(--fg-3);
+  margin: 3px 0 0;
+}
+.kpi-card--pending .kpi-card__value { opacity: 0.5; }
 .kpi-card__reason {
-  font-size: 10px;
-  color: var(--danger-fg);
+  font-size: 11px;
+  color: var(--fg-2);
   margin: 3px 0 0;
   line-height: 1.4;
   display: flex;
@@ -567,6 +583,7 @@ const ariaLabelResolved = computed(() => {
   gap: 4px;
 }
 .kpi-card__reason-tag { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi-card__reason--failed .kpi-card__reason-tag { color: var(--danger-fg); }
 .kpi-card__reason-why { color: var(--fg-3); }
 
 .kpi-card__spark { margin-top: 8px; }
@@ -606,7 +623,7 @@ const ariaLabelResolved = computed(() => {
   justify-content: space-between;
   gap: 8px;
   margin-top: 4px;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -615,7 +632,7 @@ const ariaLabelResolved = computed(() => {
 .kpi-card__bullet-val { color: var(--fg-2); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .kpi-card__target {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fg-3);
   margin: 5px 0 0;
   text-transform: uppercase;
@@ -636,7 +653,7 @@ const ariaLabelResolved = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;

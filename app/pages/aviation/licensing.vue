@@ -10,8 +10,8 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">
-    ⚠ {{ error }} Certificate/licence records are not yet integrated from KCAA - the aircraft and airline registries below remain live.
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">
+    {{ error }} Certificate/licence records are not yet integrated from KCAA - the aircraft and airline registries below remain live.
   </div>
 
   <!-- KPIs -->
@@ -58,7 +58,7 @@
           <option value="revoked">Revoked</option>
         </select>
         <button class="btn" @click="categoryFilter=''; holderTypeFilter=''; statusFilter=''">Clear</button>
-        <ExportButton filename="uapts-aviation-licensing.csv" :rows="filteredLicences" :columns="licenceExportColumns" style="margin-left:auto" />
+        <ExportButton filename="uapts-aviation-licensing.csv" :rows="licenceExportRows" :columns="licenceExportColumns" style="margin-left:auto" />
       </div>
       <div class="table-scroll">
         <table>
@@ -69,7 +69,7 @@
             <tr v-for="l in licencesPageRows" :key="l.id">
               <td style="font-weight:600;font-size:12px">{{ holderLabel(l) }}</td>
               <td><BadgePill variant="info">{{ categoryLabel(l.category) }}</BadgePill></td>
-              <td style="font-family:monospace;font-size:12px">{{ l.certificate_number }}</td>
+              <td style="font-family:monospace;font-size:12px">{{ certificateNo(l) }}</td>
               <td style="font-size:12px">{{ l.issuing_authority }}</td>
               <td style="font-size:11px">{{ l.issued_date ? fmtDay(l.issued_date) : '-' }}</td>
               <td style="font-size:11px">{{ fmtDay(l.expiry_date) }}</td>
@@ -223,7 +223,6 @@ const licenceExportColumns = [
   { key: 'holder_type', label: 'Holder Type' },
   { key: 'aircraft_registration', label: 'Aircraft' },
   { key: 'airline_iata', label: 'Airline' },
-  { key: 'pilot_name', label: 'Pilot' },
   { key: 'category', label: 'Category' },
   { key: 'certificate_number', label: 'Certificate No.' },
   { key: 'issuing_authority', label: 'Issuing Authority' },
@@ -245,11 +244,17 @@ function cofaStatusFor(registration: string) {
   return cofaByRegistration.value.get(registration) ?? null
 }
 
+// A pilot's name, licence number and certificate number identify a person, so they are never displayed or exported.
+const isPersonHolder = (l: AviationLicence) => l.holder_type !== 'aircraft' && l.holder_type !== 'airline'
 function holderLabel(l: AviationLicence) {
   if (l.holder_type === 'aircraft') return l.aircraft_registration ?? '-'
   if (l.holder_type === 'airline') return l.airline_name ?? l.airline_iata ?? '-'
-  return l.pilot_name ?? l.pilot_licence_no ?? '-'
+  return 'Pilot'
 }
+function certificateNo(l: AviationLicence) {
+  return isPersonHolder(l) ? '-' : l.certificate_number
+}
+const licenceExportRows = computed(() => filteredLicences.value.map(l => ({ ...l, certificate_number: certificateNo(l) })))
 function categoryLabel(c: AviationLicenceCategory) {
   const m: Record<AviationLicenceCategory, string> = {
     certificate_of_registration: 'Cert. of Registration',

@@ -10,8 +10,8 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">
-    ⚠ {{ error }}
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">
+    {{ error }}
   </div>
 
   <!-- KPIs -->
@@ -82,7 +82,7 @@
             <tr><th>Waterway</th><th>Category</th><th>Region</th><th>Channel Depth</th><th>Last Survey</th><th>Access Restrictions</th></tr>
           </thead>
           <tbody v-if="filteredWaterways.length">
-            <tr v-for="w in waterwaysPageRows" :key="w.id" class="pick" :class="{ picked: pickedId === w.id }" @click="pick(w)">
+            <tr v-for="w in waterwaysPageRows" :key="w.id" class="pick" :class="{ picked: pickedId === w.id }" tabindex="0" :aria-selected="pickedId === w.id" @click="pick(w)" @keydown.enter.self.prevent="pick(w)" @keydown.space.self.prevent="pick(w)">
               <td style="font-weight:600;font-size:12px">{{ w.name }}</td>
               <td><BadgePill :variant="w.category === 'chartered' ? 'success' : 'warning'">{{ w.category }}</BadgePill></td>
               <td style="font-size:12px">{{ w.region || '-' }}</td>

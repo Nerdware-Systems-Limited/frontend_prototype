@@ -154,7 +154,7 @@
                 </p>
                 <div class="secret-row">
                   <code class="secret-value">{{ registeredResult.issued_secret }}</code>
-                  <button type="button" class="btn" @click="copySecret">{{ secretCopied ? 'Copied ✓' : 'Copy' }}</button>
+                  <button type="button" class="btn" @click="copySecret">{{ secretCopied ? 'Copied' : 'Copy' }}</button>
                 </div>
                 <pre class="curl-block" style="margin-top:10px">{{ curlExample }}</pre>
               </template>
@@ -338,7 +338,7 @@
               <span class="hint">{{ protocol.direction === 'push' ? 'validates the Feed ID shape' : 'a real, SSRF-guarded reachability check' }}</span>
             </div>
             <div class="ih-card-body">
-              <div v-if="registerError" class="upload-banner upload-banner-error">⚠ {{ registerError }}</div>
+              <div v-if="registerError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ registerError }}</div>
               <div class="test-row">
                 <button type="button" class="btn" :disabled="testState === 'running'" @click="runTest">
                   {{ testState === 'running' ? 'Testing…' : 'Run test' }}
@@ -349,8 +349,8 @@
                 </span>
               </div>
 
-              <div v-if="testState === 'passed'" class="test-result test-result--ok">✓ {{ testDetail }}</div>
-              <div v-else-if="testState === 'failed'" class="test-result test-result--bad">✕ {{ testDetail }}</div>
+              <div v-if="testState === 'passed'" class="test-result test-result--ok banner-icon-ok" role="status">{{ testDetail }}</div>
+              <div v-else-if="testState === 'failed'" class="test-result test-result--bad banner-icon-fail" role="alert">{{ testDetail }}</div>
             </div>
           </div>
         </template>

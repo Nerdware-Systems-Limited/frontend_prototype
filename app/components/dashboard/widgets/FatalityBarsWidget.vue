@@ -98,7 +98,7 @@ function onKey(e: KeyboardEvent) {
 .spark-red { background: var(--destructive); }
 .spark-amber { background: var(--warning); }
 .spark-green { background: var(--success); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 10px; color: var(--fg-3); padding-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--fg-3); padding-top: 6px; }
 .legend-item { display: inline-flex; align-items: center; }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--r-pill); margin-right: 4px; }
 </style>

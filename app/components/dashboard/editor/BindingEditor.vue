@@ -686,7 +686,7 @@ function cell(v: unknown, f: FrameField) {
 
 .be-preview { border-top: 1px solid var(--border-subtle); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .be-preview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.be-meta { font-size: 10px; font-family: var(--font-mono); color: var(--fg-3); }
+.be-meta { font-size: 11px; font-family: var(--font-mono); color: var(--fg-3); }
 .be-table-wrap { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--r-xs); }
 .be-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .be-table th { text-align: left; font-weight: 600; color: var(--fg-3); background: var(--surface-1); padding: 4px 6px; white-space: nowrap; }

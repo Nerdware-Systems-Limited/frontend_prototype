@@ -19,8 +19,8 @@
     <Info :size="15" class="notice-icon" aria-hidden="true" />
     <p>Your role can view this agency's access but not change it.</p>
   </div>
-  <div v-if="store.saveError" class="error-banner" role="alert" aria-live="polite">⚠ {{ store.saveError }}</div>
-  <div v-if="actionError" class="error-banner" role="alert" aria-live="polite">⚠ {{ actionError }}</div>
+  <div v-if="store.saveError" class="error-banner banner-icon-warn" role="alert" aria-live="polite">{{ store.saveError }}</div>
+  <div v-if="actionError" class="error-banner banner-icon-warn" role="alert" aria-live="polite">{{ actionError }}</div>
 
   <p v-if="!selected" class="error-banner">
     Your account isn't linked to an agency this page knows about, so there is nothing to manage here.

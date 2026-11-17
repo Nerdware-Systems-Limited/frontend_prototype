@@ -11,7 +11,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI ribbon -->
   <SectionTitle :pill="summary ? 'NaMATA / NTSA · ' + freshnessLabel(summary.generated_at) : ''">

@@ -85,7 +85,7 @@ const summary = computed(() => `${props.title}: ${counts.value.map(c => `${c.n} 
 }
 a.vsl-item, button.vsl-item { cursor: pointer; }
 .vsl-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.vsl-status { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; min-width: 66px; }
+.vsl-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; min-width: 66px; }
 .vsl-main { display: flex; flex-direction: column; min-width: 0; }
 .vsl-label { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vsl-detail { font-size: 10.5px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -435,16 +435,16 @@ const isEmpty = computed(() => !t.loading.value && !t.error.value && t.loaded.va
 .dt-btn { display: inline-flex; align-items: center; gap: 6px; }
 .dt-btn.is-on { background: var(--primary-wash); color: var(--primary); border-color: var(--primary); }
 .dt-icon { padding-left: 8px; padding-right: 8px; }
-.dt-count { min-width: 16px; padding: 0 5px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.dt-count { min-width: 16px; padding: 0 5px; border-radius: 999px; background: var(--primary-fill); color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
 .dt-menu-wrap { position: relative; }
 .dt-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 200px; max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--elev-3); }
-.dt-menu-title { margin: 6px 4px 2px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+.dt-menu-title { margin: 6px 4px 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
 .dt-check, .dt-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: var(--r-sm); font-size: 12px; color: var(--fg-1); cursor: pointer; text-align: left; background: transparent; border: 0; }
 .dt-check:hover, .dt-item:hover { background: var(--surface-quiet); }
 .dt-seg { display: flex; border: 1px solid var(--border-interactive); border-radius: var(--r-sm); overflow: hidden; }
 .dt-seg button { flex: 1; padding: 4px 6px; font-size: 11px; text-transform: capitalize; background: var(--surface-2); border: 0; border-right: 1px solid var(--border-subtle); color: var(--fg-2); cursor: pointer; }
 .dt-seg button:last-child { border-right: 0; }
-.dt-seg button.on { background: var(--primary); color: #fff; }
+.dt-seg button.on { background: var(--primary-fill); color: #fff; }
 .dt-link { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; background: transparent; border: 0; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
 .dt-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .dt-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px 2px 9px; font-size: 11px; color: var(--fg-2); background: var(--primary-wash); border: 1px solid var(--border-subtle); border-radius: 999px; }
@@ -469,7 +469,7 @@ const isEmpty = computed(() => !t.loading.value && !t.error.value && t.loaded.va
 .dt-sort svg { opacity: .35; flex-shrink: 0; }
 .dt-sort svg.dt-sorted { opacity: 1; color: var(--primary); }
 .dt-sort:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.dt-rank { font-size: 9px; color: var(--primary); }
+.dt-rank { font-size: 10.5px; color: var(--primary); }
 .dt-label { flex: 1; padding: 0 6px; font: 700 10px/1 var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--fg-2); }
 .dt-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 7px; cursor: col-resize; touch-action: none; }
 .dt-resize::after { content: ''; position: absolute; right: 3px; top: 8px; bottom: 8px; width: 1px; background: var(--border-strong); }
@@ -516,7 +516,7 @@ const isEmpty = computed(() => !t.loading.value && !t.error.value && t.loaded.va
 .dt-page { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; color: var(--fg-2); }
 .dt-page-input { width: 46px; height: 26px; text-align: center; font: inherit; font-size: 12px; color: var(--fg-1); background: var(--surface-2); border: 1px solid var(--border-interactive); border-radius: var(--r-sm); }
 .dt-size { display: inline-flex; align-items: center; gap: 6px; }
-.dt-size select { height: 26px; font: inherit; font-size: 9px; background: var(--surface-2); color: var(--fg-1); border: 1px solid var(--border-interactive); border-radius: var(--r-sm); }
+.dt-size select { height: 26px; font: inherit; font-size: 10.5px; background: var(--surface-2); color: var(--fg-1); border: 1px solid var(--border-interactive); border-radius: var(--r-sm); }
 .dt-spin { animation: dt-rotate .8s linear infinite; }
 @keyframes dt-rotate { to { transform: rotate(360deg); } }
 @keyframes dt-shimmer { to { background-position: -200% 0; } }

@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI ribbon -->
   <SectionTitle :pill="summary ? 'KeNHA ATC / RTMS · ' + freshnessLabel(summary.generated_at) : ''">
@@ -193,7 +193,7 @@
               <div v-if="ev.description" style="font-size:11px;color:var(--fg-3)">{{ ev.description.slice(0,60) }}…</div>
             </td>
             <td><BadgePill :variant="sevBadge(ev.severity)">{{ ev.severity }}</BadgePill></td>
-            <td><BadgePill :variant="ev.status === 'active' ? 'danger' : 'success'">{{ ev.status }}</BadgePill></td>
+            <td><BadgePill :variant="ev.status === 'active' ? 'info' : 'neutral'">{{ ev.status === 'active' ? 'Ongoing' : ev.status }}</BadgePill></td>
             <td :style="{ color: ev.avg_speed_kmh < 20 ? 'var(--danger-fg)' : ev.avg_speed_kmh < 40 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight:'600' }">
               {{ ev.avg_speed_kmh.toFixed(0) }}
             </td>

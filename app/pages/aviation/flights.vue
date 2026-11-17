@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -58,7 +58,7 @@
           </thead>
           <tbody v-if="filteredFlights.length">
             <template v-for="f in flightsPageRows" :key="f.id">
-              <tr class="expand-row" @click="expanded = expanded === f.id ? null : f.id">
+              <tr class="expand-row" tabindex="0" :aria-expanded="expanded === f.id" @click="expanded = expanded === f.id ? null : f.id" @keydown.enter.self.prevent="expanded = expanded === f.id ? null : f.id" @keydown.space.self.prevent="expanded = expanded === f.id ? null : f.id">
                 <td class="expand-cell">{{ expanded === f.id ? '▾' : '▸' }}</td>
                 <td style="font-family:monospace;font-weight:700">{{ f.schedule_flight_number }}</td>
                 <td style="font-size:12px">{{ f.airline_iata }}</td>
@@ -199,5 +199,5 @@ function flightBadge(s: string) {
 .detail-row td { background:var(--surface-1); padding:14px 18px; border-bottom:1px solid var(--border-subtle); }
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 </style>

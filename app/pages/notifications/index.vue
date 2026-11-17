@@ -10,8 +10,8 @@
   </PageHeader>
 
   <!-- Only shown when something's actually wrong - keeps the page clean the rest of the time -->
-  <div v-if="streamError" class="live-error-banner">⚠ Live feed unavailable - {{ streamError }}</div>
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="streamError" class="live-error-banner banner-icon-warn" role="alert">Live feed unavailable - {{ streamError }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="notif-panel">
     <div class="notif-panel-header">
@@ -21,7 +21,7 @@
       </div>
       <label class="unread-toggle-wrap">
         <span>Only Show Unread</span>
-        <div class="pill-toggle" :class="{ on: unreadOnly }" @click="unreadOnly = !unreadOnly" />
+        <button type="button" class="pill-toggle" role="switch" :class="{ on: unreadOnly }" :aria-checked="unreadOnly" @click="unreadOnly = !unreadOnly" />
       </label>
     </div>
 
@@ -84,7 +84,7 @@
             {{ readingId === n.id ? 'Marking…' : 'Mark as Read' }}
           </button>
           <span v-else class="mark-read-done">Mark as Read</span>
-          <button class="row-del-btn" :disabled="deletingId === n.id" title="Delete" @click="deleteNotif(n.id)">×</button>
+          <button type="button" class="row-del-btn" :disabled="deletingId === n.id" title="Delete" aria-label="Delete notification" @click="deleteNotif(n.id)"><X :size="14" aria-hidden="true" /></button>
         </div>
       </div>
 
@@ -101,7 +101,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, X } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useNotifications } from '~/composables/api'
 import type { Notification } from '~/composables/api'
@@ -250,7 +250,7 @@ function fmtRowTime(iso: string) {
 .help-icon {
   width: 16px; height: 16px; border-radius: 50%;
   background: var(--surface-sunken); color: var(--fg-3);
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: help;
 }
@@ -258,6 +258,7 @@ function fmtRowTime(iso: string) {
 .pill-toggle {
   width: 36px; height: 20px; border-radius: 10px; background: var(--border-strong);
   position: relative; cursor: pointer; transition: background .15s; flex-shrink: 0;
+  border: 0; padding: 0;
 }
 .pill-toggle::after {
   /* Toggle knob stays white in both themes - same convention as the app's
@@ -266,7 +267,7 @@ function fmtRowTime(iso: string) {
   width: 16px; height: 16px; border-radius: 50%; background: #fff;
   transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
 }
-.pill-toggle.on { background: var(--primary); }
+.pill-toggle.on { background: var(--primary-fill); }
 .pill-toggle.on::after { left: 18px; }
 
 /* ── Toolbar ──────────────────────────────────────────────────────── */
@@ -335,12 +336,14 @@ function fmtRowTime(iso: string) {
 .mark-read-done { font-size: 12.5px; color: var(--fg-3); white-space: nowrap; }
 
 .row-del-btn {
-  width: 20px; height: 20px; border-radius: 5px; border: none; background: none;
-  color: var(--fg-3); font-size: 14px; font-weight: 700; cursor: pointer;
+  width: 26px; height: 26px; border-radius: var(--r-sm); border: none; background: none;
+  color: var(--fg-3); cursor: pointer;
   opacity: 0; transition: opacity .12s, color .12s, background .12s;
   display: flex; align-items: center; justify-content: center; line-height: 1;
 }
-.notif-row:hover .row-del-btn { opacity: 1; }
+.notif-row:hover .row-del-btn, .row-del-btn:focus-visible { opacity: 1; }
+/* Touch has no hover - keep delete visible there. */
+@media (hover: none) { .row-del-btn { opacity: 1; } }
 .row-del-btn:hover { background: var(--danger-bg); color: var(--danger-fg); }
 .row-del-btn:disabled { opacity: .4; pointer-events: none; }
 

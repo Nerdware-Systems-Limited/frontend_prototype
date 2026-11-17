@@ -16,16 +16,16 @@
 
   <div v-if="isSuperAdmin && chainEnabled" class="chain-bar">
     <button class="btn" :disabled="verifying" @click="verifyChain">{{ verifying ? 'Verifying…' : 'Verify log integrity' }}</button>
-    <span v-if="chain && chain.ok" class="chain-ok">✔ Chain intact - {{ fmtNum(chain.checked) }} entries verified</span>
-    <span v-else-if="chain" class="chain-bad">✖ Chain broken at entry {{ chain.broken_at ?? '?' }}: {{ chain.reason }}</span>
+    <span v-if="chain && chain.ok" class="chain-ok banner-icon-ok" role="status">Chain intact - {{ fmtNum(chain.checked) }} entries verified</span>
+    <span v-else-if="chain" class="chain-bad banner-icon-fail" role="alert">Chain broken at entry {{ chain.broken_at ?? '?' }}: {{ chain.reason }}</span>
   </div>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- WebSocket status -->
-  <div v-if="streamError" class="ws-banner">⚡ Live feed unavailable - {{ streamError }}</div>
-  <div v-else-if="streamConnected && isDefaultView" class="ws-connected">⚡ Live - connected</div>
-  <div v-else-if="streamConnected" class="ws-paused">⏸ Live - connected, but paused while filtered/paginated</div>
+  <div v-if="streamError" class="ws-banner banner-icon-live" role="status">Live feed unavailable - {{ streamError }}</div>
+  <div v-else-if="streamConnected && isDefaultView" class="ws-connected banner-icon-live" role="status">Live - connected</div>
+  <div v-else-if="streamConnected" class="ws-paused banner-icon-pause" role="status">Live - connected, but paused while filtered/paginated</div>
 
   <!-- Filter bar -->
   <div class="filter-bar filter-bar--grid">
@@ -58,8 +58,8 @@
   <!-- Active pivot chips -->
   <div v-if="activePivots.length" class="pivot-chips">
     <span class="filter-label">Pivot:</span>
-    <button v-for="p in activePivots" :key="p.key" class="pivot-chip" :title="`Remove ${p.label} filter`" @click="clearPivot(p.key)">
-      {{ p.label }}: <code>{{ p.value }}</code> ✕
+    <button v-for="p in activePivots" :key="p.key" class="pivot-chip" :title="`Remove ${p.label} filter`" :aria-label="`Remove ${p.label} filter: ${p.value}`" @click="clearPivot(p.key)">
+      {{ p.label }}: <code>{{ p.value }}</code> <X :size="12" aria-hidden="true" class="pivot-x" />
     </button>
   </div>
 
@@ -82,7 +82,7 @@
           <!-- One loop, two rows per entry: the diff row has to sit directly
                under the entry it belongs to, not after the last entry. -->
           <template v-for="e in entries" :key="e.id">
-            <tr class="audit-row" :class="{ 'is-open': expanded === e.id && entryDiffKeys(e).length }" @click="openDetail(e)">
+            <tr class="audit-row" :class="{ 'is-open': expanded === e.id && entryDiffKeys(e).length }" tabindex="0" @click="openDetail(e)" @keydown.enter.self.prevent="openDetail(e)" @keydown.space.self.prevent="openDetail(e)">
               <!-- Timestamp: API field is created_at -->
               <td class="cell-time stack-title">{{ fmtTime(entryField(e, 'created_at') ?? e.timestamp) }}</td>
               <!-- User: username (nullable) → user_id → 'System' -->
@@ -237,7 +237,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowLeft, ArrowRight } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 // Visibility is enforced by the backend (apps/audit/views.py
 // scope_audit_queryset): super_admin sees the whole platform, an agency admin
 // sees every user in their own agency, everyone else sees only their own
@@ -568,6 +568,8 @@ function fmtNum(v: number) {
 .pivot-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 10px; }
 .pivot-chip { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid var(--border-strong); background:var(--primary-wash); color:var(--fg-1); cursor:pointer; }
 .pivot-chip code { font-size:11px; }
+.pivot-x { vertical-align:-2px; margin-left:2px; color:var(--fg-3); }
+.pivot-chip:hover .pivot-x { color:var(--fg-1); }
 .diff-toggle { cursor:pointer; }
 .dr-desc { margin:0 0 12px; color:var(--fg-2); font-size:13px; }
 .dr-sec { margin-bottom:16px; }
@@ -645,7 +647,7 @@ function fmtNum(v: number) {
   .diff-table tr:last-child { border-bottom:0; }
   .diff-table td { display:block; padding:1px 0; border:0; white-space:normal; overflow-wrap:anywhere; }
   .diff-table td[data-label]::before {
-    content:attr(data-label) ": "; font-size:10px; font-weight:700; text-transform:uppercase;
+    content:attr(data-label) ": "; font-size:11px; font-weight:700; text-transform:uppercase;
     letter-spacing:.06em; color:var(--fg-3);
   }
   .diff-field { font-size:12px; font-weight:600; color:var(--fg-1); }

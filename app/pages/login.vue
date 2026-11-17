@@ -102,6 +102,11 @@
             </svg>
           </button>
         </form>
+
+        <p class="guide-row">
+          New to UAPTS?
+          <a :href="guideUrl" target="_blank" rel="noopener" class="forgot-link">Read the user guide</a>
+        </p>
       </template>
 
       <!-- MFA step -->
@@ -245,6 +250,7 @@ const password = ref('')
 const showPwd = ref(false)
 const rememberMe = ref(false)
 const { login, mfaVerify, mfaResend, isLoading } = useAuth()
+const guideUrl = useRuntimeConfig().public.guideUrl
 const loginError = ref('')
 const mfaError = ref('')
 const isResending = ref(false)
@@ -478,6 +484,7 @@ function onOTPPaste(e: ClipboardEvent) {
   text-decoration: none; letter-spacing: 0.005em;
 }
 .forgot-link:hover { text-decoration: underline; }
+.guide-row { font-size: 0.8125rem; color: #6b7280; text-align: center; margin: 0; }
 .forgot-link:focus-visible { outline: 3px solid #FDB913; outline-offset: 2px; border-radius: 4px; }
 
 .field-input-wrap { position: relative; display: flex; align-items: center; }

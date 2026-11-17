@@ -33,13 +33,13 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   justify-content: center;
   border-radius: var(--r-pill);
   border: 1px solid var(--border-subtle);
-  background: var(--primary);
+  background: var(--primary-fill);
   color: var(--primary-fg);
   box-shadow: var(--elev-3);
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
-.back-to-top-btn:hover { background: var(--primary-dark, var(--primary)); transform: translateY(-2px); }
+.back-to-top-btn:hover { background: var(--primary-fill-hover); transform: translateY(-2px); }
 .back-to-top-btn svg { width: 18px; height: 18px; }
 .back-to-top-fade-enter-active, .back-to-top-fade-leave-active {
   transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);

@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="ih-ribbon">
     <KpiTile label="Layers loaded" :value="readyCount" :state="kpi" :sub="`of ${reqs.length} expected`" />
@@ -166,10 +166,10 @@ onMounted(async () => {
 .ov-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 .ov-card--idle { background: var(--surface-quiet); }
 .ov-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-.ov-agency { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); }
+.ov-agency { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); }
 .ov-title { margin: 2px 0 0; font-size: 14px; }
 .ov-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.ov-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
+.ov-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); }
 .ov-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 700; }
 .ov-bars-title { font-size: 11px; color: var(--fg-3); margin-bottom: 4px; }
 .ov-bar { display: grid; grid-template-columns: 84px 1fr auto; gap: 8px; align-items: center; font-size: 12px; margin-top: 3px; }

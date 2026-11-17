@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs: counted by the server over ALL incidents in the chosen period / county -->
   <div class="kpi-grid">
@@ -59,7 +59,7 @@
                  placeholder="Search incident, owner, reference…" empty="Corrective-action tracking has not been integrated from RSSB yet.">
         <template #cell-incident_ref="{ row }"><span style="font-family:monospace;font-size:11px">{{ row.incident_ref }}</span></template>
         <template #cell-due_date="{ row }"><span :style="{ color: isOverdue(row) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(row.due_date) }}</span></template>
-        <template #cell-recurrence_flag="{ row }">{{ row.recurrence_flag ? '⚠' : '-' }}</template>
+        <template #cell-recurrence_flag="{ row }"><span v-if="row.recurrence_flag" style="color:var(--warning-fg);font-weight:600">Recurring</span><template v-else>-</template></template>
       </DataTable>
     </div>
   </div>

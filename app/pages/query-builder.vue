@@ -59,7 +59,7 @@
               <button class="tree-row lvl-1" @click="toggleNode(g.id)">
                 <component :is="nodeOpen(g.id) ? ChevronDown : ChevronRight" :size="13" class="tree-caret" />
                 <Layers :size="13" class="tree-ic ic-schema" />
-                <span class="tree-name">{{ g.schema }}</span>
+                <span class="tree-name">{{ g.label }}</span>
                 <span class="tree-badge">{{ g.tables.length }}</span>
               </button>
 
@@ -71,11 +71,11 @@
                     </button>
                     <button
                       class="tree-row-main"
-                      :title="`${t.kind} · ~${t.estimated_rows.toLocaleString()} rows · ${t.size_pretty}`"
+                      :title="`${t.schema}.${t.name} · ${t.kind} · ~${t.estimated_rows.toLocaleString()} rows · ${t.size_pretty}`"
                       @click="selectTable(t)"
                     >
                       <component :is="t.kind === 'table' || t.kind === 'partitioned_table' ? Table2 : Braces" :size="13" class="tree-ic ic-table" />
-                      <span class="tree-name mono">{{ t.name }}</span>
+                      <span class="tree-name mono">{{ shortName(t.name) }}</span>
                       <span v-if="t.kind !== 'table'" class="tree-kind">{{ t.kind === 'materialized_view' ? 'matview' : t.kind }}</span>
                       <span class="tree-badge">{{ t.columns.length }}</span>
                     </button>
@@ -690,7 +690,7 @@ interface FilterRow { id: number; field: string; op: string; value: string; valu
 interface SortRow { id: number; field: string; direction: 'asc' | 'desc' }
 interface KvRow { id: number; column: string; value: string }
 interface CreateColRow { id: number; name: string; type: string; nullable: boolean; pk: boolean; default: string }
-interface DbTreeGroup { id: string; schema: string; tables: DbTable[] }
+interface DbTreeGroup { id: string; label: string; tables: DbTable[] }
 
 const PG_TYPES = [
   'text', 'varchar(255)', 'integer', 'bigint', 'smallint', 'boolean', 'uuid',
@@ -772,7 +772,6 @@ async function loadSchema() {
       consoleMessage.value = null
       const next = new Set(expandedNodes.value)
       next.add(PG_ID)
-      for (const s of new Set(dbSchema.value.map(t => t.schema))) next.add(`pg:${s}`)
       expandedNodes.value = next
       // Re-point the active table at the refreshed schema (it may have been
       // altered, renamed, or dropped by a committed DDL statement).
@@ -795,9 +794,30 @@ async function loadSchema() {
   }
 }
 
+// ~200 tables in one schema read as a wall. Group them by the transport module they belong to,
+// matched on the first word after the `tbl_` prefix; anything unmatched lands in "Other".
+const MODULE_WORDS: Record<string, string[]> = {
+  'Roads & traffic': ['road', 'traffic', 'congestion', 'counting', 'speed', 'bridges', 'drainage', 'construction', 'deterioration', 'asset', 'maintenance', 'weighbridge', 'wim', 'street', 'rural', 'nmt', 'monitoring', 'field', 'equipment'],
+  'Safety': ['safety', 'accidents', 'black', 'incident', 'incidents', 'emergency'],
+  'Fleet': ['fleet', 'vehicle', 'vehicles', 'driver', 'drivers', 'gps', 'geofence', 'geofences', 'government', 'trip', 'ev'],
+  'Public transport': ['pt', 'psv', 'brt', 'fare', 'route', 'transit', 'operator', 'passenger', 'onward', 'demand', 'od', 'intermodal', 'payment', 'revenue', 'service'],
+  'Railway': ['rail', 'otp', 'schedule'],
+  'Aviation': ['aviation', 'air', 'aircraft', 'airlines', 'airport', 'airports', 'airspace', 'atm', 'flight', 'flights', 'ground'],
+  'Maritime & ports': ['maritime', 'marine', 'vessel', 'vessels', 'berths', 'port', 'ports', 'container', 'crane', 'channels', 'dry', 'bulk', 'reefer', 'pilotage', 'navigation', 'waterways', 'yard', 'gate', 'cargo'],
+  'Corridor & trade': ['corridor', 'corridors', 'border', 'regional'],
+  'GIS & weather': ['geo', 'met', 'weather'],
+  'Training': ['training'],
+  'Analytics': ['kpi', 'predictive', 'ml', 'ai', 'dashboards', 'saved'],
+  'Platform & access': ['users', 'user', 'roles', 'access', 'audit', 'agencies', 'agency', 'departments', 'escalation', 'notification', 'data', 'ingested', 'upload', 'ws'],
+}
+const MODULE_ORDER = [...Object.keys(MODULE_WORDS), 'Other']
+const MODULE_BY_WORD = new Map(Object.entries(MODULE_WORDS).flatMap(([m, ws]) => ws.map(w => [w, m] as const)))
+function tableModule(name: string) { return MODULE_BY_WORD.get(name.replace(/^tbl_/, '').split('_')[0]) ?? 'Other' }
+/** The tree shows the name without the shared `tbl_` prefix; the full name is in the tooltip and in SQL. */
+function shortName(name: string) { return name.replace(/^tbl_/, '') }
+
 const dbTree = computed<DbTreeGroup[]>(() => {
   const q = schemaSearch.value.trim().toLowerCase()
-  const order: string[] = []
   const bucket = new Map<string, DbTable[]>()
   for (const t of dbSchema.value) {
     const nameHit = !q
@@ -805,10 +825,14 @@ const dbTree = computed<DbTreeGroup[]>(() => {
       || `${t.schema}.${t.name}`.toLowerCase().includes(q)
     const colHit = q && !nameHit ? t.columns.some(c => c.name.toLowerCase().includes(q)) : true
     if (q && !nameHit && !colHit) continue
-    if (!bucket.has(t.schema)) { bucket.set(t.schema, []); order.push(t.schema) }
-    bucket.get(t.schema)!.push(t)
+    const g = t.schema === 'public' ? tableModule(t.name) : t.schema
+    if (!bucket.has(g)) bucket.set(g, [])
+    bucket.get(g)!.push(t)
   }
-  return order.map(s => ({ id: `pg:${s}`, schema: s, tables: bucket.get(s)! }))
+  const rank = (g: string) => { const i = MODULE_ORDER.indexOf(g); return i < 0 ? MODULE_ORDER.length : i }
+  return [...bucket.keys()]
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(g => ({ id: `pg:${g}`, label: g, tables: bucket.get(g)!.sort((a, b) => a.name.localeCompare(b.name)) }))
 })
 
 function nodeOpen(id: string) {
@@ -1599,7 +1623,7 @@ onMounted(() => {
   border-radius: var(--r-sm, 8px); padding: 8px 10px; margin: 10px 0 2px;
 }
 .qb-error .sqlstate {
-  display: block; margin-top: 3px; font-size: 10px; font-weight: 700;
+  display: block; margin-top: 3px; font-size: 11px; font-weight: 700;
   letter-spacing: .04em; opacity: .8;
 }
 
@@ -1664,7 +1688,7 @@ onMounted(() => {
   color: var(--accent-purple, #6d28d9); background: color-mix(in srgb, var(--accent-purple, #6d28d9) 14%, transparent); padding: 0 4px; border-radius: 3px; flex-shrink: 0;
 }
 .tree-badge {
-  font-size: 9.5px; font-weight: 700; padding: 0 5px; border-radius: var(--r-pill, 999px);
+  font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: var(--r-pill, 999px);
   background: var(--surface-sunken, #dce3ec); color: var(--fg-3, #586778); flex-shrink: 0;
 }
 
@@ -1681,7 +1705,7 @@ onMounted(() => {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: var(--fg-1, #16202b);
 }
-.tree-col-type { font-size: 9.5px; color: var(--fg-3, #94a3b8); text-transform: lowercase; flex-shrink: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-col-type { font-size: 10.5px; color: var(--fg-3, #94a3b8); text-transform: lowercase; flex-shrink: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .foot-btn {
   width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -1704,7 +1728,7 @@ onMounted(() => {
 }
 .qc-title {
   font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--fg-1, #16202b); border-left: 3px solid var(--primary, #0d4c8b); padding-left: 8px;
+  color: var(--fg-1, #16202b);
 }
 .qc-head-right { display: flex; align-items: center; gap: 6px; }
 .qc-add {
@@ -1756,7 +1780,7 @@ onMounted(() => {
 .menu-empty { font-size: 11px; color: var(--fg-3, #94a3b8); padding: 6px 8px; }
 
 .frow-conj {
-  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
   color: var(--fg-3, #94a3b8); padding: 4px 0 2px 2px;
 }
 .frow {
@@ -1786,7 +1810,7 @@ onMounted(() => {
 .andor { display: inline-flex; border: 1px solid var(--border-interactive, #7b8ea8); border-radius: 6px; overflow: hidden; }
 .andor button {
   border: none; background: var(--surface-2, #fff); cursor: pointer;
-  font-size: 10px; font-weight: 700; padding: 3px 8px; color: var(--fg-3, #586778);
+  font-size: 11px; font-weight: 700; padding: 3px 8px; color: var(--fg-3, #586778);
 }
 .andor button.on { background: var(--primary, #0d4c8b); color: #fff; }
 
@@ -1806,7 +1830,7 @@ onMounted(() => {
 
 .qc-note { font-size: 10.5px; color: var(--fg-3, #94a3b8); margin-top: 6px; }
 .qc-note code {
-  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
   background: var(--surface-sunken, #eef2f7); padding: 0 4px; border-radius: 3px;
 }
 
@@ -1858,7 +1882,7 @@ onMounted(() => {
   border-bottom: 1px solid var(--border-subtle, #eef2f7);
 }
 .sqlc-title {
-  font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
   color: var(--fg-2, #4a5a6e);
 }
 .sqlc-actions { display: flex; gap: 6px; }
@@ -1919,7 +1943,7 @@ onMounted(() => {
 .sqled-area::placeholder { color: var(--fg-3, #5b6773); opacity: .8; }
 .sqled-note { font-size: 10.5px; color: var(--fg-3, #586778); line-height: 1.6; }
 .sqled-note kbd {
-  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
   background: var(--surface-sunken, #dce3ec); border: 1px solid var(--border-subtle, #d5dee9);
   border-radius: 3px; padding: 0 4px;
 }
@@ -1969,7 +1993,7 @@ onMounted(() => {
 .stmt-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .stmt-table th {
   text-align: left; padding: 6px 10px; background: var(--surface-sunken, #eef2f7);
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-2, #4a5a6e);
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-2, #4a5a6e);
   border-bottom: 1px solid var(--border-strong, #b8c0c9);
 }
 .stmt-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-subtle, #eef2f7); vertical-align: top; }
@@ -1980,7 +2004,7 @@ onMounted(() => {
   position: sticky; top: 0; z-index: 1;
   background: var(--surface-sunken, #eef2f7); cursor: pointer;
   padding: 8px 12px; text-align: left; white-space: nowrap;
-  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
   color: var(--fg-2, #4a5a6e); font-weight: 700;
   border-bottom: 1px solid var(--border-strong, #b8c0c9);
 }
@@ -2001,7 +2025,7 @@ onMounted(() => {
 .pill {
   display: inline-flex; align-items: center;
   padding: 2px 8px; border-radius: var(--r-pill, 999px);
-  font-size: 10px; font-weight: 700; text-transform: lowercase; letter-spacing: .02em;
+  font-size: 11px; font-weight: 700; text-transform: lowercase; letter-spacing: .02em;
   border: 1px solid transparent;
 }
 .pill-danger { background: var(--danger-bg, rgba(180, 35, 24, .1)); color: var(--danger-fg, #b42318); border-color: color-mix(in srgb, var(--danger-fg, #b42318) 25%, transparent); }

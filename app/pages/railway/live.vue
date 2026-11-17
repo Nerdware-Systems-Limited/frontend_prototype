@@ -12,7 +12,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs: counted by the server over every operation of today's service, not over the first page -->
   <div class="kpi-grid">
@@ -82,7 +82,7 @@
             </div>
           </div>
           <div v-if="maintenanceStats.count.value" class="maint-alert">
-            <div class="maint-alert-head">⚠ {{ maintenanceStats.count.value }} unit{{ maintenanceStats.count.value > 1 ? 's' : '' }} - maintenance due</div>
+            <div class="maint-alert-head banner-icon-warn">{{ maintenanceStats.count.value }} unit{{ maintenanceStats.count.value > 1 ? 's' : '' }} - maintenance due</div>
             <div v-for="t in maintenanceUnits" :key="t.id" class="maint-unit">
               {{ t.unit_id }} · {{ String(t.train_type).replace(/_/g,' ') }} · Due {{ fmtDate(t.next_maintenance) }}
             </div>
@@ -102,10 +102,10 @@
         <template #cell-schedule_train_number="{ row }"><span style="font-family:monospace;font-weight:700">{{ row.schedule_train_number }}</span></template>
         <template #cell-route="{ row }">{{ row.origin_code }} → {{ row.destination_code }}</template>
         <template #cell-delay_departure_min="{ row }">
-          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min}` : '✓' }}</span>
+          <span :style="{ color: row.delay_departure_min > 30 ? 'var(--danger-fg)' : row.delay_departure_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_departure_min > 0 ? `+${row.delay_departure_min}` : 'On time' }}</span>
         </template>
         <template #cell-delay_arrival_min="{ row }">
-          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min}` : '✓' }}</span>
+          <span :style="{ color: row.delay_arrival_min > 30 ? 'var(--danger-fg)' : row.delay_arrival_min > 0 ? 'var(--warning-fg)' : 'var(--success-fg)', fontWeight: '600' }">{{ row.delay_arrival_min > 0 ? `+${row.delay_arrival_min}` : 'On time' }}</span>
         </template>
         <template #cell-occupancy_pct="{ row }">
           <template v-if="row.occupancy_pct != null">

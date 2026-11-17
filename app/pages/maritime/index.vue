@@ -11,7 +11,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid kpi-grid-primary">
@@ -22,10 +22,10 @@
       period="LIVE" description="KPA/KMA managed" to="#port-cards"
     />
     <KpiCard
-      label="Vessels in Port" prominent subtle-period
+      label="Vessels Tracked" prominent subtle-period
       :value="ops ? fmtNum(ops.kpis.live_vessels) : '-'"
       :unavailable="!ops" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
-      period="LIVE" description="Currently in Kenyan waters" to="#vessel-movements-live"
+      period="LIVE" description="AIS positions · Kenyan waters" to="#vessel-movements-live"
     />
     <KpiCard
       label="Incidents" prominent subtle-period
@@ -386,7 +386,7 @@ function certBadge(s: string) {
 .port-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
 .port-count { margin-left:auto; font-size:12px; color:var(--fg-2); font-weight:600; }
 .port-stats { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
-.ps-label { display:block; font-size:10px; color:var(--fg-3); }
+.ps-label { display:block; font-size:11px; color:var(--fg-3); }
 .cong-list { display:flex; flex-direction:column; gap:7px; }
 .cong-row { display:grid; grid-template-columns:80px 1fr 70px; align-items:center; gap:8px; }
 .cong-label { font-size:12px; }

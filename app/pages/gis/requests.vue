@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="ih-ribbon">
     <KpiTile label="Open" :value="count('open')" :state="kpi" sub="waiting on an upload" />

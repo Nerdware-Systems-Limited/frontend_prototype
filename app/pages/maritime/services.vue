@@ -10,8 +10,8 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">
-    ⚠ {{ error }}
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">
+    {{ error }}
   </div>
 
   <!-- KPIs -->
@@ -99,13 +99,12 @@
     <div class="card-body">
       <table>
         <thead>
-          <tr><th>Vessel</th><th>Port</th><th>Pilot</th><th>Boarding</th><th>Berthing</th><th>Duration</th><th>Tugs</th><th>Incident</th></tr>
+          <tr><th>Vessel</th><th>Port</th><th>Boarding</th><th>Berthing</th><th>Duration</th><th>Tugs</th><th>Incident</th></tr>
         </thead>
         <tbody v-if="pilotage.length">
           <tr v-for="p in pilotagePageRows" :key="p.id">
             <td style="font-weight:600;font-size:12px">{{ p.vessel_name }}</td>
             <td style="font-family:monospace;font-size:12px">{{ p.port_unlocode }}</td>
-            <td style="font-size:12px;font-family:monospace">{{ p.pilot_id }}</td>
             <td style="font-size:11px">{{ fmtDate(p.boarding_time) }}</td>
             <td style="font-size:11px">{{ p.berthing_time ? fmtDate(p.berthing_time) : '-' }}</td>
             <td :style="{ color: (p.duration_hours ?? 0) > 2 ? 'var(--danger-fg)' : 'var(--success-fg)', fontWeight:'600' }">{{ p.duration_hours != null ? `${Math.round(p.duration_hours * 60)} min` : '-' }}</td>
@@ -113,7 +112,7 @@
             <td><BadgePill :variant="p.incident_flag ? 'danger' : 'success'">{{ p.incident_flag ? 'Flagged' : 'None' }}</BadgePill></td>
           </tr>
         </tbody>
-        <tbody v-else><tr><td colspan="8" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No pilotage records in the current view.' }}</td></tr></tbody>
+        <tbody v-else><tr><td colspan="7" style="text-align:center;color:var(--fg-3);padding:16px">{{ loading ? 'Loading…' : 'No pilotage records in the current view.' }}</td></tr></tbody>
       </table>
       <TablePagination
         :page="pilotagePage" :total-pages="pilotageTotalPages" :total="pilotageTotal"
@@ -151,8 +150,9 @@
         <tbody v-if="filteredLicences.length">
           <tr v-for="l in licencesPageRows" :key="l.id">
             <td><BadgePill variant="info">{{ l.licence_type.replace(/_/g,' ') }}</BadgePill></td>
-            <td style="font-family:monospace;font-size:11px">{{ l.licence_number }}</td>
-            <td style="font-weight:600;font-size:12px">{{ l.vessel_name ?? l.holder_id ?? '-' }}</td>
+            <!-- A pilot's licence number / holder ID identifies a person, so only vessel and equipment licences show them. -->
+            <td style="font-family:monospace;font-size:11px">{{ l.licence_type === 'pilot' ? '-' : l.licence_number }}</td>
+            <td style="font-weight:600;font-size:12px">{{ l.vessel_name ?? (l.licence_type === 'pilot' ? 'Pilot' : l.holder_id || '-') }}</td>
             <td style="font-size:12px">{{ l.issuing_authority }}</td>
             <td style="font-size:11px">{{ l.issue_date ? fmtDay(l.issue_date) : '-' }}</td>
             <td style="font-size:11px">{{ fmtDay(l.expiry_date) }}</td>

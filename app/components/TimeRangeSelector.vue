@@ -14,9 +14,10 @@
     asked for a past year (`range.years`), so it never promises history the
     endpoint cannot return. Stepping the year never collapses the control.
   -->
-  <div class="trs" :class="{ 'trs--open': open }">
+  <div ref="root" class="trs" :class="{ 'trs--open': open }">
     <button
       v-if="!open"
+      ref="pill"
       type="button" class="trs-pill" :aria-expanded="false" :aria-controls="panelId"
       :aria-label="`Time range: ${summary}. Change`"
       @click="open = true"
@@ -77,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock } from 'lucide-vue-next'
 import { EARLIEST_DAY, EARLIEST_YEAR, PRESET_LABEL, currentYear, isIsoDay, type RangeMode, type RangePreset } from '~/utils/timeRange'
 import type { TimeRange } from '~/composables/useTimeRange'
@@ -123,6 +124,21 @@ function step(delta: number) {
 }
 
 function onKey(e: KeyboardEvent) { if (e.key === 'Escape' && open.value) open.value = false }
+
+// The pill and the panel swap places, so the focused element is removed on
+// every open/close. Hand focus across (to the chosen option, or back to the
+// pill) - but only when it was inside this control, never stealing it.
+const root = ref<HTMLElement | null>(null)
+const pill = ref<HTMLButtonElement | null>(null)
+watch(open, (isOpen) => {
+  const active = document.activeElement
+  const hadFocus = !active || active === document.body || !!root.value?.contains(active)
+  if (!hadFocus) return
+  nextTick(() => {
+    if (isOpen) root.value?.querySelector<HTMLElement>('.segmented button.active, .segmented button')?.focus()
+    else pill.value?.focus()
+  })
+})
 onMounted(() => document.addEventListener('keydown', onKey))
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>

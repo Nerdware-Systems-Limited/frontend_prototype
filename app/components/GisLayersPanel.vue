@@ -13,7 +13,7 @@
       <KpiTile label="Requested / processing" :value="coverage ? coverage.requested + coverage.processing : ''" :state="kpiState" :sub="coverage ? `${coverage.failed} failed` : ''" />
     </div>
 
-    <p v-if="loadError" class="upload-banner upload-banner-error">⚠ {{ loadError }}</p>
+    <p v-if="loadError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ loadError }}</p>
 
     <!-- My requests -->
     <div v-if="myRequests.length" class="ih-card ih-rise">
@@ -210,7 +210,7 @@
             lines, roads ...). Untick to only store the layer on the map.</span></span>
       </label>
 
-      <p v-if="upError" class="upload-banner upload-banner-error">⚠ {{ upError }}</p>
+      <p v-if="upError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ upError }}</p>
 
       <ul v-if="targets.length" class="gis-targets" aria-live="polite">
         <li v-for="t in targets" :key="t.key">
@@ -220,9 +220,9 @@
           </div>
           <p v-if="t.state === 'processing'" class="hint"><span class="spinner" aria-hidden="true" /> Reprojecting and validating features…</p>
           <p v-else-if="t.state === 'ready' && t.layer" class="hint">
-            ✓ {{ t.layer.feature_count.toLocaleString('en-KE') }} feature(s) loaded<template v-if="t.layer.error_count">, {{ t.layer.error_count }} skipped</template><template v-if="t.layer.filtered_count">, {{ t.layer.filtered_count.toLocaleString('en-KE') }} left out by the filter</template>.
+            <span class="banner-icon-ok" aria-hidden="true" />{{ t.layer.feature_count.toLocaleString('en-KE') }} feature(s) loaded<template v-if="t.layer.error_count">, {{ t.layer.error_count }} skipped</template><template v-if="t.layer.filtered_count">, {{ t.layer.filtered_count.toLocaleString('en-KE') }} left out by the filter</template>.
           </p>
-          <p v-else-if="t.error" class="gis-err">✕ {{ t.error }}</p>
+          <p v-else-if="t.error" class="gis-err banner-icon-fail">{{ t.error }}</p>
           <ul v-if="t.layer?.errors?.length" class="gis-errors">
             <li v-for="e in t.layer.errors.slice(0, 5)" :key="e.row">Row {{ e.row }}: {{ e.error }}</li>
             <li v-if="t.layer.error_count > 5" class="hint">…and {{ t.layer.error_count - 5 }} more (see Details)</li>
@@ -238,7 +238,7 @@
 
     <!-- Layer details -->
     <AppModal v-model="detailsModal" :title="detail?.name || 'Layer'" :subtitle="detail ? `${detail.agency_code || 'Reference'} · v${detail.version} · ${detail.original_filename || 'no file'}` : ''" max-width="640px">
-      <p v-if="detailError" class="upload-banner upload-banner-error">⚠ {{ detailError }}</p>
+      <p v-if="detailError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ detailError }}</p>
       <template v-if="detail">
         <p><BadgePill :variant="LAYER_BADGE[detail.status]">{{ detail.status }}</BadgePill>
           {{ detail.feature_count.toLocaleString('en-KE') }} feature(s)<template v-if="detail.error_count">, {{ detail.error_count }} skipped</template>
@@ -285,7 +285,7 @@
       <div class="form-group"><label class="input-label">Due date</label><input v-model="rq.due_date" type="date" /></div>
       <div class="form-group"><label class="input-label">Message</label>
         <textarea v-model="rq.message" rows="3" placeholder="Optional - what you need and why" /></div>
-      <p v-if="rqError" class="upload-banner upload-banner-error">⚠ {{ rqError }}</p>
+      <p v-if="rqError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ rqError }}</p>
       <template #footer>
         <button class="btn" @click="requestModal = false">Cancel</button>
         <button class="btn btn-primary" :disabled="!rq.assignee || rqBusy" @click="submitRequest">Send request</button>
@@ -305,7 +305,7 @@
           <input v-model="nr.fields" class="input" type="text" placeholder="road_code, class" /></div>
       </div>
       <div class="form-group"><label class="input-label">Description</label><textarea v-model="nr.description" rows="2" /></div>
-      <p v-if="nrError" class="upload-banner upload-banner-error">⚠ {{ nrError }}</p>
+      <p v-if="nrError" class="upload-banner upload-banner-error banner-icon-warn" role="alert">{{ nrError }}</p>
       <template #footer>
         <button class="btn" @click="reqModal = false">Cancel</button>
         <button class="btn btn-primary" :disabled="!nr.name || nrBusy" @click="submitRequirement">Add</button>
@@ -704,7 +704,7 @@ async function submitRequirement() {
 .gis-h { margin: 0 0 8px; font-size: 14px; }
 .gis-head .gis-h { margin: 0; }
 .gis-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.gis-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); }
+.gis-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); }
 .gis-table td { padding: 8px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
 .gis-row-actions { white-space: nowrap; display: flex; gap: 6px; }
 .gis-assignee { display: block; }

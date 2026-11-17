@@ -270,7 +270,7 @@ const tipStyle = computed(() => {
 .vsr-svg { display: block; overflow: visible; }
 .vsr-grid { stroke: var(--border-subtle); stroke-width: 1; shape-rendering: crispEdges; }
 .vsr-grid--zero { stroke: var(--border-strong); }
-.vsr-tick { font-family: var(--font-mono); font-size: 9.5px; font-variant-numeric: tabular-nums; fill: var(--fg-3); }
+.vsr-tick { font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; fill: var(--fg-3); }
 .vsr-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .vsr-area { opacity: .1; stroke: none; }
 .vsr-bar { transition: opacity var(--dur-fast) var(--ease-standard); }
@@ -279,14 +279,14 @@ const tipStyle = computed(() => {
 .vsr-cross { stroke: var(--fg-3); stroke-width: 1; shape-rendering: crispEdges; }
 /* 2px surface ring keeps the marker legible over the line */
 .vsr-dot { stroke: var(--surface-2); stroke-width: 2; }
-.vsr-end { font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; fill: var(--fg-2); }
+.vsr-end { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; fill: var(--fg-2); }
 
 .vsr-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .vsr-tip {
   position: absolute; z-index: 5; pointer-events: none; min-width: 120px; padding: 7px 9px;
   background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); box-shadow: var(--elev-2);
 }
-.vsr-tip-time { font-size: 10px; color: var(--fg-3); margin-bottom: 3px; }
+.vsr-tip-time { font-size: 11px; color: var(--fg-3); margin-bottom: 3px; }
 .vsr-tip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.6; }
 .vsr-tip-key { width: 10px; height: 2px; border-radius: 1px; flex-shrink: 0; }
 .vsr-tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--fg-1); }

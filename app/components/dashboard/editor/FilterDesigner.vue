@@ -158,11 +158,11 @@ function onToggle(e: Event, id: string) {
 .fd-radios label, .fd-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-2); cursor: pointer; }
 .fd-radios input, .fd-check input { width: auto; accent-color: var(--primary); }
 .fd-applies { border-top: 1px solid var(--border-subtle); padding-top: 8px; }
-.fd-applies-head { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); margin-bottom: 6px; }
+.fd-applies-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); margin-bottom: 6px; }
 .fd-applies-head .fd-check { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .fd-widgets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; }
 .fd-widgets li.off { opacity: .55; }
-.fd-na { font-size: 9px; font-family: var(--font-mono); color: var(--fg-3); margin-left: auto; }
+.fd-na { font-size: 10.5px; font-family: var(--font-mono); color: var(--fg-3); margin-left: auto; }
 .fd-remove { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--danger-fg); font-size: 12px; font-weight: 500; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .fd-chevron { transition: none; } }
 .fd-remove:hover { text-decoration: underline; }

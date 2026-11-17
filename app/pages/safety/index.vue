@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI ribbon -->
   <SectionTitle :pill="summary ? 'NTSA IRSMS · ' + freshnessLabel(summary.generated_at) : ''">
@@ -554,7 +554,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .hs-info { flex:1; min-width:0; }
 .hs-segment { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
 .hs-factor-chips { display:flex; gap:4px; flex-wrap:wrap; }
-.hs-factor-chip { font-size:10px; padding:1px 5px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; }
+.hs-factor-chip { font-size:11px; padding:1px 5px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; }
 .hs-factors { font-size:11px; color:var(--fg-3); }
 .hs-score { font-size:14px; font-weight:700; color:var(--danger-fg); min-width:36px; text-align:right; }
 .hs-horizon { font-size:11px; color:var(--fg-3); white-space:nowrap; }

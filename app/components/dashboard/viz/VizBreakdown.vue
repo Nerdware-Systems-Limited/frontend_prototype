@@ -100,7 +100,7 @@ const summary = computed(() => {
 .vb-head { display: flex; flex-direction: column; gap: 2px; height: 100%; justify-content: center; min-width: 0; }
 .vb-head-val { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--fg-1); line-height: 1.1; }
 .vb-head-lbl { font-size: 11px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vb-head-of { font-size: 10px; color: var(--fg-3); }
+.vb-head-of { font-size: 11px; color: var(--fg-3); }
 
 .vb-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; height: 100%; overflow-y: auto; }
 .vb-row {

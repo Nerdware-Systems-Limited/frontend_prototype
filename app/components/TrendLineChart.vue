@@ -199,9 +199,9 @@ const tooltipStyle = computed(() => {
 .tlc-grid { stroke:var(--border-subtle); stroke-width:1; }
 .tlc-crosshair { stroke:var(--border-interactive); stroke-width:1; }
 .tlc-marker-ring { stroke:var(--surface-2); }
-.tlc-ytick { font-size:9px; fill:var(--fg-3); font-variant-numeric:tabular-nums; }
-.tlc-xtick { font-size:9px; fill:var(--fg-3); }
-.tlc-endlabel { font-size:10px; font-weight:600; fill:var(--fg-2); }
+.tlc-ytick { font-size:10.5px; fill:var(--fg-3); font-variant-numeric:tabular-nums; }
+.tlc-xtick { font-size:10.5px; fill:var(--fg-3); }
+.tlc-endlabel { font-size:11px; font-weight:600; fill:var(--fg-2); }
 .tlc-tooltip {
   position:absolute; transform:translate(-50%, -100%);
   background:var(--surface-2); color:var(--fg-1); border:1px solid var(--border-subtle);
@@ -210,6 +210,6 @@ const tooltipStyle = computed(() => {
   box-shadow:var(--elev-2); z-index:5;
 }
 .tlc-tooltip-value { font-weight:700; }
-.tlc-tooltip-label { color:var(--fg-2); font-size:10px; }
-.tlc-tooltip-meta { color:var(--fg-3); font-size:10px; margin-top:2px; }
+.tlc-tooltip-label { color:var(--fg-2); font-size:11px; }
+.tlc-tooltip-meta { color:var(--fg-3); font-size:11px; margin-top:2px; }
 </style>

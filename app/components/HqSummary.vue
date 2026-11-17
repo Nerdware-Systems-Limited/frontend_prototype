@@ -132,7 +132,9 @@ const issues = computed(() => {
 .hq-dek { margin: 2px 0 0; font-size: 12px; color: var(--fg-3); }
 .hq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .hq-muted { opacity: .7; }
-.hq-issues { border: 1px solid var(--border-subtle); border-left: 3px solid var(--warning-fg); border-radius: var(--r-sm); background: var(--surface-1); padding: 10px 14px; }
+/* Same wash + tinted hairline as theme.css's .error-banner / .notice. */
+.hq-issues { border: 1px solid color-mix(in srgb, var(--warning-fg) 25%, transparent); border-radius: var(--r-sm); background: var(--warning-bg); padding: 10px 14px; }
+.hq-issues-h svg { color: var(--warning-fg); }
 .hq-issues-h { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-1); }
 .hq-issues ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; }
 .hq-issues li { margin: 2px 0; }

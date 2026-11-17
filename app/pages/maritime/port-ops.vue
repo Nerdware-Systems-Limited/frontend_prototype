@@ -18,7 +18,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -29,10 +29,10 @@
       period="LIVE" description="KPA operational" to="#port-performance"
     />
     <KpiCard
-      label="Live Vessels"
+      label="Vessels Tracked"
       :value="opsData ? fmtNum(opsData.kpis.live_vessels) : '-'"
       :unavailable="!opsData" :unavailable-note="loading ? 'Loading…' : 'KMA AIS feed unavailable'"
-      period="LIVE" description="Currently in port" to="#port-performance"
+      period="LIVE" description="AIS positions · Kenyan waters" to="#port-performance"
     />
     <KpiCard
       label="Avg Yard Dwell"
@@ -374,7 +374,7 @@ function dirBadge(d: string) {
 .ppc-kpis { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
 .ppc-kpi { text-align:center; }
 .ppc-val { font-size:14px; font-weight:700; }
-.ppc-label { font-size:10px; color:var(--fg-3); margin-top:1px; }
+.ppc-label { font-size:11px; color:var(--fg-3); margin-top:1px; }
 .dwell-indicator { }
 .di-bar-wrap { background:var(--surface-sunken); border-radius:4px; height:6px; overflow:hidden; margin-top:3px; }
 .di-bar { height:100%; width:100%; border-radius:4px; transform-origin:left; transition:transform .5s; }

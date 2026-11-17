@@ -10,8 +10,8 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">
-    ⚠ {{ error }}
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">
+    {{ error }}
   </div>
 
   <!-- Live-derived KPIs -->

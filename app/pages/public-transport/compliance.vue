@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="licenceFailed" class="error-banner">⚠ Unable to reach the UAPTS Public Transport API.</div>
+  <div v-if="licenceFailed" class="error-banner banner-icon-warn" role="alert">Unable to reach the UAPTS Public Transport API.</div>
 
   <!-- KPI strip: counted and averaged by the server over ALL licences / operators, not over the first page of them -->
   <div class="kpi-grid">

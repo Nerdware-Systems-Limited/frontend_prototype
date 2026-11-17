@@ -67,7 +67,7 @@ const caps = computed(() => [...capabilitiesFor(props.overrides, subject.value)]
 .preview-empty { font-size: 12px; color: var(--fg-3); margin: 0; }
 .preview-group + .preview-group, .preview-caps { margin-top: 14px; }
 .preview-module {
-  margin: 0 0 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3);
+  margin: 0 0 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3);
 }
 .preview-list { list-style: none; margin: 0; padding: 0; }
 .preview-item {

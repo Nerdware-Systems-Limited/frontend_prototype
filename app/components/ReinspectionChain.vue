@@ -21,7 +21,7 @@ const fmtDate = (s?: string | null) => { if (!s) return '-'; try { return new Da
     <div v-if="rows.length" class="dd-list">
       <div v-for="r in rows" :key="r.id" class="dd-item">
         <BadgePill :variant="BADGE[r.result] ?? 'neutral'">{{ String(r.result).replace(/_/g, ' ') }}</BadgePill>
-        <span>{{ fmtDate(r.inspected_at) }} · {{ r.inspection_centre }} · {{ r.inspector_name || '-' }}</span>
+        <span>{{ fmtDate(r.inspected_at) }} · {{ r.inspection_centre }}</span>
       </div>
     </div>
     <div v-else class="dd-empty">{{ loaded ? 'No follow-up re-inspections on file.' : 'Loading…' }}</div>

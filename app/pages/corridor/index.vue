@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Headline numbers -->
   <div class="kpi-grid">
@@ -247,7 +247,7 @@ const lenses = computed(() => [
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .dot-sm { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 8px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stat-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 3px; }
+.stat-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 3px; }
 .val { font: 600 18px 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--fg-1); }
 .val small { font-size: 11px; color: var(--fg-3); }
 .mix { display: flex; height: 10px; border-radius: 2px; overflow: hidden; gap: 1px; background: var(--surface-sunken); }
@@ -264,7 +264,7 @@ const lenses = computed(() => [
 .lens { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; text-decoration: none; color: inherit; }
 .lens:hover { background: var(--primary-wash); }
 .lens.disabled { opacity: .55; pointer-events: none; }
-.lens-agency { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--primary); }
+.lens-agency { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--primary); }
 .lens-title { font-size: 15px; font-weight: 700; color: var(--fg-1); letter-spacing: -.01em; }
 .lens-desc { font-size: 12px; color: var(--fg-2); line-height: 1.45; flex: 1; }
 .lens-fig { font: 500 11px 'JetBrains Mono', ui-monospace, monospace; color: var(--fg-1); min-height: 15px; }

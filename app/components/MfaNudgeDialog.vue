@@ -386,7 +386,7 @@ onUnmounted(() => {
   cursor: pointer;
   transition: background .12s;
 }
-.nudge-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.nudge-primary:hover:not(:disabled) { background: var(--primary-fill-hover); border-color: var(--primary-fill-hover); }
 .nudge-primary:disabled { opacity: .6; cursor: not-allowed; }
 
 .nudge-row { display: flex; justify-content: space-between; }

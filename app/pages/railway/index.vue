@@ -11,7 +11,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Legacy system EOL alerts - always shown -->
   <!-- <div class="eol-banner">
@@ -392,7 +392,7 @@ function opBadge(s: string) {
 .otp-stats > div:last-child { border-right:none; }
 
 /* ── Stat labels / values ── */
-.stat-label { font-size:10px; display:block; color:var(--fg-3); margin-bottom:2px; text-transform:uppercase; letter-spacing:.04em; }
+.stat-label { font-size:11px; display:block; color:var(--fg-3); margin-bottom:2px; text-transform:uppercase; letter-spacing:.04em; }
 .rid-stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(70px,1fr)); gap:8px; }
 .freight-stats { margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle); }
 .rid-val { font-size:16px; font-weight:700; display:block; color:var(--fg-1); }

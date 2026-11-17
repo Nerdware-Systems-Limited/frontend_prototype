@@ -132,7 +132,7 @@ const alerts = computed<Alert[]>(() => {
 a.alert:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .alert-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .alert-title { font-size: 11.5px; font-weight: 600; color: var(--fg-1); line-height: 1.4; }
-.alert-meta { font-size: 10px; color: var(--fg-3); margin-top: 2px; font-family: var(--font-mono); }
+.alert-meta { font-size: 11px; color: var(--fg-3); margin-top: 2px; font-family: var(--font-mono); }
 .alert-chevron { font-size: 12px; color: var(--fg-3); transition: transform var(--dur-base) var(--ease-out); }
 .alerts-note { font-size: 11px; color: var(--fg-3); margin: 2px 0 0; }
 </style>

@@ -6,7 +6,7 @@
   >
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -22,7 +22,7 @@
    <!-- ── Prediction Assistant ──────────────────────────────────────── -->
   <section class="chat-panel" aria-labelledby="pa-title">
     <div class="chat-panel-header">
-      <SectionTitle id="pa-title" pill="Analyses loaded ML model forecasts">Prediction Assistant</SectionTitle>
+      <SectionTitle id="pa-title" pill="Loaded ML forecasts">Prediction Assistant</SectionTitle>
       <div class="chat-header-actions">
         <button
           type="button"
@@ -55,13 +55,13 @@
               type="button"
               class="pa-domain"
               :class="`pa-domain--${d.agency.toLowerCase()}`"
-              :disabled="querying"
+              :disabled="querying || loading || !d.count.value"
               @click="sendText(d.query)"
             >
               <span class="pa-domain-agency">{{ d.agency }}</span>
               <span class="pa-domain-title">{{ d.title }}</span>
               <span class="pa-domain-blurb">{{ d.blurb }}</span>
-              <span class="pa-domain-count">{{ fmtNum(d.count.value) }} loaded</span>
+              <span class="pa-domain-count">{{ loading ? 'Loading…' : d.count.value ? `${fmtNum(d.count.value)} loaded` : 'None loaded' }}</span>
             </button>
           </li>
         </ul>
@@ -78,6 +78,7 @@
         :key="msg.id"
         class="chat-msg"
         :class="`chat-msg--${msg.role}`"
+        :data-msg-id="msg.id"
       >
         <!-- User turn -->
         <div v-if="msg.role === 'user'" class="pa-ask">{{ msg.content }}</div>
@@ -85,20 +86,24 @@
         <!-- Assistant turn: a readout, not a bubble - tables need the width -->
         <div v-else class="pa-answer" :class="{ 'pa-answer--error': msg.isError }">
           <div class="pa-answer-meta">
-            <span v-if="msg.result" class="pa-source" :class="agencyClass(msg.result.source)">{{ msg.result.source }}</span>
+            <span v-if="msg.loading" class="pa-source pa-source--model">Analysing</span>
             <span v-else-if="msg.isError" class="pa-source pa-source--error">Query failed</span>
-            <span v-else class="pa-source pa-source--model">Loaded forecasts</span>
+            <span v-else-if="msg.origin" class="pa-source" :class="msg.origin.tone" :title="msg.origin.title">{{ msg.origin.label }}</span>
+            <span v-else class="pa-source pa-source--model">Assistant</span>
             <time class="pa-time" :datetime="msg.timestamp">{{ fmtMsgTime(msg.timestamp) }}</time>
           </div>
  
-          <!-- Loading: says what it is doing, instead of three bouncing dots -->
-          <div v-if="msg.loading" class="pa-loading">
-            <span class="pa-loading-label">Querying forecast tables…</span>
-            <span class="pa-loading-rule" aria-hidden="true"><i /></span>
+          <!-- Loading: says what it is doing and, once it runs long, for how long -->
+          <div v-if="msg.loading" class="pa-loading" role="status">
+            <span class="pa-loading-label">
+              Analysing loaded forecasts…<span v-if="elapsed >= 3" class="pa-loading-time"> {{ elapsed }}s</span>
+            </span>
+            <span class="pa-skeleton" aria-hidden="true"><i /><i /><i /></span>
           </div>
  
           <template v-else>
-            <p class="pa-text">{{ msg.content }}</p>
+            <!-- Answers arrive as light markdown; renderAnswer() escapes everything first. -->
+            <div class="pa-text" :class="{ 'pa-text--quiet': msg.stopped }" v-html="renderAnswer(msg.content)" />
  
             <!-- Result table -->
             <div v-if="msg.columns.length" class="result-wrap">
@@ -107,7 +112,7 @@
                   <strong>{{ msg.preview.length }}</strong> of {{ msg.result!.total }} predictions
                 </span>
                 <button type="button" class="pa-copy" @click="copyRows(msg)">
-                  {{ copiedId === msg.id ? 'Copied' : 'Copy as TSV' }}
+                  {{ copiedId === msg.id ? 'Copied' : 'Copy table' }}
                 </button>
               </div>
  
@@ -124,7 +129,8 @@
                         v-for="col in msg.columns"
                         :key="col"
                         class="result-cell"
-                        :class="{ 'is-num': msg.numericCols[col] }"
+                        :class="{ 'is-num': msg.numericCols[col], 'is-empty': isBlank(row[col]) }"
+                        :title="String(row[col] ?? '').length > 32 ? String(row[col]) : undefined"
                       >{{ formatCell(row[col]) }}</td>
                     </tr>
                   </tbody>
@@ -632,7 +638,10 @@ interface ChatMessage {
   timestamp: string
   loading?: boolean
   isError?: boolean
+  stopped?: boolean
   result?: ChatResult | null
+  /** Who answered, in words a reader can use; the raw model id sits in the tooltip. */
+  origin?: { label: string; title?: string; tone: string }
 }
  
 interface ThreadMessage extends ChatMessage {
@@ -860,25 +869,28 @@ async function send() {
   let responseText: string
   let result: ChatResult | null
  
+  let origin: ChatMessage['origin']
+ 
   try {
     const ask = await useMlPredictive().ask(text)
     responseText = ask.answer
-    result = ask.rows.length
-      ? { rows: ask.rows, total: ask.total, source: ask.source === 'openai' ? `OpenAI · ${ask.model_used}` : 'AI Model · Server Analysis' }
-      : null
+    const label = ask.source === 'openai' ? 'AI analysis' : 'Rule-based analysis'
+    origin = { label, title: ask.model_used ? `Answered by ${ask.model_used}` : undefined, tone: 'pa-source--model' }
+    result = ask.rows.length ? { rows: ask.rows, total: ask.total, source: label } : null
   } catch {
     await new Promise(r => setTimeout(r, 400))
     const local = analysePredictions(text)
     responseText = local.text
     result = local.result
+    origin = { label: 'Offline analysis', title: 'The prediction service did not answer; read from the forecasts loaded on this page.', tone: agencyClass(local.result?.source) }
   }
  
   if (seq !== requestSeq) return  // stopped or superseded - drop the stale answer
  
-  replaceMsg(bid, { content: responseText, result: result ?? undefined })
+  replaceMsg(bid, { content: responseText, result: result ?? undefined, origin })
   querying.value = false
  
-  await scrollIfPinned()
+  await revealAnswer(bid)
   inputEl.value?.focus()
 }
  
@@ -890,7 +902,7 @@ function sendText(query: string) {
 function stopQuery() {
   requestSeq++
   const last = messages.value[messages.value.length - 1]
-  if (last?.loading) replaceMsg(last.id, { content: 'Query stopped.' })
+  if (last?.loading) replaceMsg(last.id, { content: 'Stopped - ask again or pick another question.', stopped: true })
   querying.value = false
   inputEl.value?.focus()
 }
@@ -925,6 +937,18 @@ function scrollToLatest() {
   if (!el) return
   el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   atBottom.value = true
+}
+ 
+// A new answer is read from its first line, so bring its top into view - not the
+// bottom of its table. Still skipped if the user has scrolled up to read history.
+async function revealAnswer(id: string) {
+  if (!atBottom.value) return
+  await nextTick()
+  const el = messagesEl.value
+  const node = el?.querySelector<HTMLElement>(`[data-msg-id="${id}"]`)
+  if (!el || !node) return scrollDown()
+  el.scrollTop = node.offsetTop - el.offsetTop - 12
+  onThreadScroll()
 }
  
 // Only follows the thread when the user is already at the bottom, so an
@@ -963,11 +987,18 @@ async function copyRows(msg: ThreadMessage) {
   } catch { /* clipboard unavailable - no-op */ }
 }
  
+function isBlank(v: unknown) { return v == null || (typeof v === 'string' && v.trim() === '') }
+
 function formatCell(v: unknown): string {
-  if (v == null) return '-'
+  if (isBlank(v)) return '–'
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   if (typeof v === 'number') return v.toLocaleString()
-  const s = String(v)
+  const s = String(v).trim()
+  // Model enums ("poor", "very_high", "free_flow") read as words.
+  if (/^[a-z]+(?:[_ ][a-z]+)*$/.test(s) && s.length <= 24) {
+    const w = s.replace(/_/g, ' ')
+    return w.charAt(0).toUpperCase() + w.slice(1)
+  }
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
     try {
       return new Date(s).toLocaleString('en-KE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -976,6 +1007,63 @@ function formatCell(v: unknown): string {
   return s.length > 32 ? s.slice(0, 30) + '…' : s
 }
  
+// ── Answer rendering ──────────────────────────────────────────────────
+// The model answers in light markdown. Escape every character first, then turn
+// back on only paragraphs, bullet / numbered lists, **bold**, *italic* and `code`,
+// so nothing the model writes can inject markup.
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+function inlineMd(s: string) {
+  return s
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+}
+function renderAnswer(raw: string): string {
+  const text = escapeHtml(
+    (raw ?? '')
+      .replace(/\r\n/g, '\n')
+      .replace(/[\u2010\u2011]/g, '-')        // non-breaking hyphens from the model
+      .replace(/(\d)\s+%/g, '$1%')            // "88 %" -> "88%"
+      .replace(/^#{1,6}\s*/gm, '')            // headings read as plain lead-ins here
+      .trim(),
+  )
+  const out: string[] = []
+  let list: { tag: 'ul' | 'ol'; items: string[] } | null = null
+  let para: string[] = []
+  const flushPara = () => { if (para.length) { out.push(`<p>${inlineMd(para.join(' '))}</p>`); para = [] } }
+  const flushList = () => { if (list) { out.push(`<${list.tag}>${list.items.map(i => `<li>${inlineMd(i)}</li>`).join('')}</${list.tag}>`); list = null } }
+  for (const line of text.split('\n')) {
+    const t = line.trim()
+    const bullet = /^(?:[-*•])\s+(.*)$/.exec(t)
+    const num = /^\d+[.)]\s+(.*)$/.exec(t)
+    if (bullet || num) {
+      flushPara()
+      const tag = bullet ? 'ul' : 'ol'
+      if (list && list.tag !== tag) flushList()
+      list ??= { tag, items: [] }
+      list.items.push((bullet ?? num)![1]!)
+    } else if (!t) {
+      flushPara(); flushList()
+    } else {
+      flushList(); para.push(t)
+    }
+  }
+  flushPara(); flushList()
+  return out.join('')
+}
+
+// Seconds the current question has been running - shown once it passes 3s.
+const elapsed = ref(0)
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
+watch(querying, (on) => {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
+  elapsed.value = 0
+  if (on) elapsedTimer = setInterval(() => { elapsed.value++ }, 1000)
+})
+onBeforeUnmount(() => { if (elapsedTimer) clearInterval(elapsedTimer) })
+
 function fmtMsgTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) }
   catch { return '' }
@@ -1038,12 +1126,12 @@ function toFactors(v: unknown): string[] {
 .scenario-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:4px; }
 @media(max-width:900px) { .scenario-grid { grid-template-columns:repeat(2,1fr); } }
 .scenario-item { background:var(--surface-1); border:1px solid var(--border-subtle); border-radius:6px; padding:10px; }
-.scenario-label { font-size:10px; font-weight:600; color:var(--fg-3); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
+.scenario-label { font-size:11px; font-weight:600; color:var(--fg-3); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
 .scenario-val { font-size:16px; font-weight:600; margin-bottom:3px; color:var(--fg-2); }
 .scenario-val.good { color:var(--success-fg); }
 .scenario-val.warn { color:var(--warning-fg); }
 .scenario-val.crit { color:var(--danger-fg); }
-.scenario-sub { font-size:10px; color:var(--fg-3); line-height:1.4; }
+.scenario-sub { font-size:11px; color:var(--fg-3); line-height:1.4; }
 .scenario-note { font-size:11px; color:var(--fg-3); margin-top:10px; font-style:italic; }
 .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; align-items:start; }
@@ -1116,7 +1204,7 @@ function toFactors(v: unknown): string[] {
  
 /* ── Thread ── */
 .chat-messages {
-  height: 340px;
+  height: clamp(340px, 52vh, 560px);
   overflow-y: auto;
   padding: 16px;
   background: var(--pa-well);
@@ -1146,7 +1234,7 @@ function toFactors(v: unknown): string[] {
  
 .pa-source {
   font-family: var(--pa-mono);
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   letter-spacing: .08em; text-transform: uppercase;
   padding-left: 7px;
   border-left: 2px solid currentColor;
@@ -1158,7 +1246,7 @@ function toFactors(v: unknown): string[] {
  
 .pa-time {
   font-family: var(--pa-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--pa-mute);
 }
@@ -1169,22 +1257,38 @@ function toFactors(v: unknown): string[] {
   font-size: 13px;
   line-height: 1.6;
   color: var(--pa-ink);
-  white-space: pre-line;   /* analysePredictions() returns \n bullets */
 }
+.pa-text :deep(p) { margin: 0 0 8px; }
+.pa-text :deep(p:last-child), .pa-text :deep(ul:last-child), .pa-text :deep(ol:last-child) { margin-bottom: 0; }
+.pa-text :deep(ul), .pa-text :deep(ol) { margin: 0 0 8px; padding-left: 20px; }
+.pa-text :deep(ul) { list-style: disc; }
+.pa-text :deep(ol) { list-style: decimal; }
+.pa-text :deep(li) { margin: 2px 0; }
+.pa-text :deep(li::marker) { color: var(--pa-mute); }
+.pa-text :deep(strong) { font-weight: 700; color: var(--pa-ink); }
+.pa-text :deep(code) { font-family: var(--pa-mono); font-size: 12px; padding: 1px 4px; border-radius: var(--r-xs); background: var(--surface-sunken); }
+.pa-text--quiet { color: var(--pa-mute); font-size: 12px; }
  
 /* ── Loading ── */
-.pa-loading { display: flex; flex-direction: column; gap: 7px; }
+.pa-loading { display: flex; flex-direction: column; gap: 10px; max-width: 78ch; }
 .pa-loading-label { font-size: 12px; color: var(--pa-ink-soft); }
-.pa-loading-rule { display: block; height: 2px; background: var(--pa-line); overflow: hidden; }
-.pa-loading-rule i {
-  display: block; width: 33%; height: 100%;
-  background: var(--pa-accent);
-  animation: pa-sweep 1.1s ease-in-out infinite;
+.pa-loading-time { font-family: var(--pa-mono); font-variant-numeric: tabular-nums; color: var(--pa-mute); }
+/* Three text-shaped bars where the answer will land, so the reply doesn't jump in from nothing. */
+.pa-skeleton { display: flex; flex-direction: column; gap: 7px; }
+.pa-skeleton i {
+  display: block; height: 9px; border-radius: var(--r-xs);
+  background: linear-gradient(90deg, var(--pa-line) 0%, var(--surface-sunken) 50%, var(--pa-line) 100%);
+  background-size: 200% 100%;
+  animation: pa-shimmer 1.4s ease-in-out infinite;
 }
-@keyframes pa-sweep {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
+.pa-skeleton i:nth-child(1) { width: 92%; }
+.pa-skeleton i:nth-child(2) { width: 78%; }
+.pa-skeleton i:nth-child(3) { width: 54%; }
+@keyframes pa-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
+@media (prefers-reduced-motion: reduce) { .pa-skeleton i { animation: none; } }
  
 /* ── Results ── */
 .result-wrap { margin-top: 12px; }
@@ -1221,7 +1325,7 @@ function toFactors(v: unknown): string[] {
   padding: 6px 8px;
   text-align: left;
   font-family: var(--pa-mono);
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   letter-spacing: .05em; text-transform: uppercase;
   color: var(--pa-ink-soft);
   background: var(--pa-line-soft);
@@ -1241,6 +1345,7 @@ function toFactors(v: unknown): string[] {
 .result-table tbody tr:hover .result-cell { background: var(--primary-wash); }
  
 /* Numbers read as data, not prose */
+.result-cell.is-empty { color: var(--pa-mute); }
 .result-table .is-num {
   text-align: right;
   font-family: var(--pa-mono);
@@ -1281,10 +1386,10 @@ function toFactors(v: unknown): string[] {
 .pa-domain--ntsa  .pa-domain-agency { color: var(--pa-ntsa); }
 .pa-domain--kenha .pa-domain-agency { color: var(--pa-kenha); }
 
-.pa-domain-agency { font-family: var(--pa-mono); font-size: 9px; font-weight: 700; letter-spacing: .1em; color: var(--pa-mute); }
+.pa-domain-agency { font-family: var(--pa-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; color: var(--pa-mute); }
 .pa-domain-title  { font-size: 13px; font-weight: 700; color: var(--pa-ink); }
 .pa-domain-blurb  { font-size: 11px; line-height: 1.45; color: var(--pa-ink-soft); }
-.pa-domain-count  { margin-top: 2px; font-family: var(--pa-mono); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--pa-mute); }
+.pa-domain-count  { margin-top: 2px; font-family: var(--pa-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--pa-mute); }
  
 .pa-start-note {
   margin: 0;
@@ -1371,10 +1476,10 @@ function toFactors(v: unknown): string[] {
   cursor: pointer;
   transition: background .15s;
 }
-.chat-send-btn:hover:not(:disabled) { background: var(--primary-dark); }
+.chat-send-btn:hover:not(:disabled) { background: var(--primary-fill-hover); }
 .chat-send-btn:disabled { background: var(--pa-line); color: var(--pa-mute); cursor: default; }
-.chat-send-btn--stop { background: var(--primary-dark); }
-.chat-send-btn--stop:hover { background: var(--primary-darker); }
+.chat-send-btn--stop { background: var(--primary-fill-hover); }
+.chat-send-btn--stop:hover { background: color-mix(in srgb, var(--primary-fill-hover) 82%, #000); }
  
 @media (max-width: 640px) {
   .pa-domains { grid-template-columns: 1fr; }
@@ -1397,7 +1502,7 @@ function toFactors(v: unknown): string[] {
 .score-bar { height:100%; width:100%; border-radius:5px; transform-origin:left; transition:transform .4s ease; }
 .score-label { font-size:11px; color:var(--fg-3); font-weight:600; font-variant-numeric:tabular-nums; }
 .factor-chips { display:flex; flex-wrap:wrap; gap:3px; max-width:180px; }
-.factor-chip { font-size:10px; padding:2px 6px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; font-weight:500; }
+.factor-chip { font-size:11px; padding:2px 6px; border-radius:4px; background:var(--surface-sunken); color:var(--fg-2); white-space:nowrap; font-weight:500; }
 .mono-cell  { font-family:monospace; font-size:12px; font-weight:600; color:var(--fg-1); }
 .num-bold   { font-weight:700; color:var(--fg-1); }
 .num-cell   { font-size:12px; color:var(--fg-2); }

@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs: counted and summed by the server over ALL manifests in the chosen period / county -->
   <div class="kpi-grid">
@@ -34,7 +34,7 @@
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end">
               <span style="font-size:12px;font-weight:600">{{ fmtNum(c.tons) }}t</span>
-              <span style="font-size:10px;color:var(--fg-3)">{{ c.count }} ships</span>
+              <span style="font-size:11px;color:var(--fg-3)">{{ c.count }} ships</span>
             </div>
           </div>
         </div>
@@ -286,7 +286,7 @@ function cargoColor(t: string) {
 /* ── Filters & table ── */
 .drilldown { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .dd-item { display:flex; flex-direction:column; gap:2px; font-size:12px; }
-.dd-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.dd-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .port-list { display:flex; flex-direction:column; max-height:420px; overflow-y:auto; }
 .port-head, .port-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:10px; padding:7px 4px; font-size:13px; align-items:center; }
 .port-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--fg-3); border-bottom:1px solid var(--border-subtle); position:sticky; top:0; background:var(--surface-1, var(--surface)); }

@@ -9,7 +9,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <SectionTitle :pill="s ? 'Survey / BMS · ' + freshness(s.generated_at) : ''">Key metrics</SectionTitle>
   <div class="kpi-grid">

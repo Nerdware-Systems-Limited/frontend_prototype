@@ -11,9 +11,9 @@
     </template>
   </PageHeader>
 
-  <div v-if="error"          class="error-banner">⚠ {{ error }}</div>
-  <div v-if="actionError"    class="error-banner action-error">⚠ {{ actionError }}</div>
-  <div v-if="actionSuccess"  class="success-banner">✓ {{ actionSuccess }}</div>
+  <div v-if="error"          class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
+  <div v-if="actionError"    class="error-banner action-error banner-icon-warn" role="alert">{{ actionError }}</div>
+  <div v-if="actionSuccess"  class="success-banner banner-icon-ok" role="status">{{ actionSuccess }}</div>
 
   <!-- Metric strip - one flat row, not six separate cards -->
   <div class="metric-strip" role="group" aria-label="Account statistics">
@@ -252,82 +252,76 @@
   />
 
   <!-- Create User Modal -->
-  <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
-    <div class="modal">
-      <div class="modal-header">
-        <span>Create New User</span>
-        <button class="modal-close" @click="closeModal">×</button>
+  <AppModal :model-value="showModal" :title="'Create New User'" max-width="440px" @update:model-value="(open) => { if (!open) closeModal() }">
+    <div class="modal-stack">
+      <div class="form-group">
+        <label for="user-f1">Email address <span class="required">*</span></label>
+        <input id="user-f1"
+          type="email"
+          v-model="form.email"
+          class="input-full"
+          placeholder="user@agency.go.ke"
+          :class="{ 'input-error': formErrors.email }"
+          @input="formErrors.email = ''"
+        />
+        <span v-if="formErrors.email" class="field-error">{{ formErrors.email }}</span>
       </div>
-      <div class="modal-body">
+      <div class="form-row">
         <div class="form-group">
-          <label>Email address <span class="required">*</span></label>
-          <input
-            type="email"
-            v-model="form.email"
-            class="input-full"
-            placeholder="user@agency.go.ke"
-            :class="{ 'input-error': formErrors.email }"
-            @input="formErrors.email = ''"
-          />
-          <span v-if="formErrors.email" class="field-error">{{ formErrors.email }}</span>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Role <span class="required">*</span></label>
-            <select v-model="form.roleSelection" class="input-full" :class="{ 'input-error': formErrors.role }" @change="formErrors.role = ''">
-              <option value="" disabled>{{ roles.length ? 'Select a role…' : 'Roles could not be loaded - reload the page' }}</option>
-              <optgroup v-if="createRoleOptions.length" label="Built-in">
-                <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
-              </optgroup>
-              <optgroup v-if="createCustomRoleOptions.length" label="Custom">
-                <option v-for="r in createCustomRoleOptions" :key="r.id" :value="r.id">{{ r.role_name }}</option>
-              </optgroup>
-            </select>
-            <span v-if="formErrors.role" class="field-error">{{ formErrors.role }}</span>
-          </div>
-          <div class="form-group">
-            <label>Agency</label>
-            <select v-if="unscoped" v-model="form.agency" class="input-full">
-              <option value="">No agency (public user)</option>
-              <option v-for="a in agencies" :key="a.id" :value="a.id">
-                {{ a.agency_code }} - {{ a.agency_name }}
-              </option>
-            </select>
-            <input v-else class="input-full" disabled :value="`${ownAgencyCode} (your agency)`" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Department <span class="hint">(optional)</span></label>
-          <select v-if="createDeptOptions.length" v-model="form.department" class="input-full">
-            <option value="">No department</option>
-            <option v-for="d in createDeptOptions" :key="d.id" :value="d.id">{{ d.department_name }}</option>
+          <label for="user-f2">Role <span class="required">*</span></label>
+          <select id="user-f2" v-model="form.roleSelection" class="input-full" :class="{ 'input-error': formErrors.role }" @change="formErrors.role = ''">
+            <option value="" disabled>{{ roles.length ? 'Select a role…' : 'Roles could not be loaded - reload the page' }}</option>
+            <optgroup v-if="createRoleOptions.length" label="Built-in">
+              <option v-for="r in createRoleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
+            </optgroup>
+            <optgroup v-if="createCustomRoleOptions.length" label="Custom">
+              <option v-for="r in createCustomRoleOptions" :key="r.id" :value="r.id">{{ r.role_name }}</option>
+            </optgroup>
           </select>
-          <span v-else class="dim" style="font-size:12px">No departments set up yet for this agency - add one from Roles &amp; Permissions.</span>
+          <span v-if="formErrors.role" class="field-error">{{ formErrors.role }}</span>
         </div>
-        <div class="form-check-row">
-          <label class="check-label">
-            <input type="checkbox" v-model="form.is_active" />
-            Account active immediately
-          </label>
+        <div class="form-group">
+          <label for="user-f3">Agency</label>
+          <select id="user-f3" v-if="unscoped" v-model="form.agency" class="input-full">
+            <option value="">No agency (public user)</option>
+            <option v-for="a in agencies" :key="a.id" :value="a.id">
+              {{ a.agency_code }} - {{ a.agency_name }}
+            </option>
+          </select>
+          <input v-else class="input-full" disabled :value="`${ownAgencyCode} (your agency)`" />
         </div>
-        <div v-if="createApiError" class="api-error">⚠ {{ createApiError }}</div>
       </div>
-      <div class="modal-footer">
-        <button class="btn" @click="closeModal">Cancel</button>
-        <button
-          class="btn btn-primary"
-          :disabled="!form.email || creating"
-          @click="doCreate"
-        >{{ creating ? 'Creating…' : 'Create User' }}</button>
+      <div class="form-group">
+        <label for="user-f4">Department <span class="hint">(optional)</span></label>
+        <select id="user-f4" v-if="createDeptOptions.length" v-model="form.department" class="input-full">
+          <option value="">No department</option>
+          <option v-for="d in createDeptOptions" :key="d.id" :value="d.id">{{ d.department_name }}</option>
+        </select>
+        <span v-else class="dim" style="font-size:12px">No departments set up yet for this agency - add one from Roles &amp; Permissions.</span>
       </div>
+      <div class="form-check-row">
+        <label class="check-label">
+          <input type="checkbox" v-model="form.is_active" />
+          Account active immediately
+        </label>
+      </div>
+      <div v-if="createApiError" class="api-error banner-icon-warn" role="alert">{{ createApiError }}</div>
     </div>
-  </div>
+    <template #footer>
+    <button class="btn" @click="closeModal">Cancel</button>
+    <button
+      class="btn btn-primary"
+      :disabled="!form.email || creating"
+      @click="doCreate"
+    >{{ creating ? 'Creating…' : 'Create User' }}</button>
+    </template>
+  </AppModal>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, X } from 'lucide-vue-next'
 import { useUsers as _useUsers, useAgencies as _useAgencies, useAudit as _useAudit, useRoles as _useRoles, useDepartments as _useDepartments } from '~/composables/api'
 import type { User, Agency, Role, Department } from '~/types/uapts'
 import {
@@ -889,7 +883,7 @@ function fmtLastLogin(u: User) {
   margin-bottom:12px;
 }
 .detail-item   { display:flex; flex-direction:column; gap:2px; }
-.detail-label  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
+.detail-label  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); }
 .detail-value  { font-size:12px; color:var(--fg-1); word-break:break-all; }
 .detail-value.mono { font-family:var(--font-mono); font-size:11px; color:var(--fg-2); }
 .detail-footer { border-top:1px solid var(--border-subtle); padding-top:10px; display:flex; gap:8px; }
@@ -898,17 +892,10 @@ function fmtLastLogin(u: User) {
 .load-more { text-align:center; padding:12px 12px 4px; }
 
 /* Modal */
-.modal-backdrop { position:fixed; inset:0; background:var(--scrim); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
-.modal { background:var(--surface-2); border-radius:var(--r-lg); width:480px; max-width:100%; box-shadow:var(--elev-3); display:flex; flex-direction:column; }
-.modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--border-subtle); }
-.modal-close  { background:none; border:none; font-size:22px; cursor:pointer; color:var(--fg-3); line-height:1; padding:0 4px; }
-.modal-close:hover { color:var(--fg-2); }
-.modal-body   { padding:20px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:70vh; }
-.modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--border-subtle); }
 
 /* Form elements */
 .form-group { display:flex; flex-direction:column; gap:4px; }
-.form-group label { font-size:12px; font-weight:600; color:var(--fg-2); }
+.form-group label, .form-group .group-label { font-size:12px; font-weight:600; color:var(--fg-2); }
 .form-row   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .input-full { width:100%; padding:7px 10px; border:1px solid var(--border-interactive); border-radius:6px; font-size:13px; background:var(--surface-2); box-sizing:border-box; }
 .input-full:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-wash); }
@@ -943,16 +930,14 @@ function fmtLastLogin(u: User) {
   .detail-footer .btn { width:100%; justify-content:center; }
 }
 @media (max-width:600px) {
-  .modal-backdrop { padding:8px; }
-  .modal          { width:100%; max-height:calc(100dvh - 16px); }
   /* Header and footer stay put; only the form scrolls, and it never outgrows the
      screen when the on-screen keyboard shrinks the viewport. */
-  .modal-body     { max-height:none; flex:1 1 auto; min-height:0; padding:16px; }
-  .modal-header, .modal-footer { padding-left:16px; padding-right:16px; }
-  .modal-close    { padding:6px 10px; }
   .form-row       { grid-template-columns:1fr; }
   .input-full     { min-height:40px; font-size:16px; } /* 16px stops iOS zooming on focus */
   .check-label    { min-height:32px; }
   .modal-footer .btn, .modal-footer .btn-primary { min-height:40px; }
 }
+
+/* Body of the shared AppModal - field rhythm for this page's forms. */
+.modal-stack { display:flex; flex-direction:column; gap:14px; }
 </style>

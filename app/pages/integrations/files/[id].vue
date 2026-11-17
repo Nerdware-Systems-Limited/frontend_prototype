@@ -22,10 +22,10 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
   <div v-if="replacing" class="upload-banner upload-banner-info">Uploading replacement… {{ replaceProgress }}%</div>
-  <div v-if="upload?.duplicate_of" class="upload-banner upload-banner-warning">
-    ⚠ This exact file matches an earlier upload.
+  <div v-if="upload?.duplicate_of" class="upload-banner upload-banner-warning banner-icon-warn" role="alert">
+    This exact file matches an earlier upload.
     <NuxtLink :to="`/integrations/files/${upload.duplicate_of}`">View it</NuxtLink>
   </div>
   <div v-if="upload?.superseded_by" class="upload-banner upload-banner-info">
@@ -133,11 +133,11 @@
               <tr v-for="r in rows" :key="r.id">
                 <td class="mono-sm" data-label="Row">{{ r.source_row ?? '-' }}</td>
                 <td class="stack-block" data-label="Status">
-                  <span v-if="r.row_status === 'error'" class="row-status danger">✕ {{ r.row_errors.map(e => e.message).join('; ') }}</span>
-                  <span v-else-if="r.row_status === 'duplicate_in_file'" class="row-status warning">⚠ same key as an earlier row in this file</span>
-                  <span v-else-if="r.row_status === 'duplicate_in_db'" class="row-status warning">⚠ already recorded from an earlier upload</span>
-                  <span v-else-if="r.target_model" class="row-status success">✓ {{ modelLabel(r.target_model) }} #{{ r.target_pk.slice(0, 8) }}</span>
-                  <span v-else-if="r.handler_error" class="row-status danger">✕ {{ r.handler_error }}</span>
+                  <span v-if="r.row_status === 'error'" class="row-status danger banner-icon-fail">{{ r.row_errors.map(e => e.message).join('; ') }}</span>
+                  <span v-else-if="r.row_status === 'duplicate_in_file'" class="row-status warning banner-icon-warn">same key as an earlier row in this file</span>
+                  <span v-else-if="r.row_status === 'duplicate_in_db'" class="row-status warning banner-icon-warn">already recorded from an earlier upload</span>
+                  <span v-else-if="r.target_model" class="row-status success banner-icon-ok">{{ modelLabel(r.target_model) }} #{{ r.target_pk.slice(0, 8) }}</span>
+                  <span v-else-if="r.handler_error" class="row-status danger banner-icon-fail">{{ r.handler_error }}</span>
                   <span v-else class="hint">○ not yet committed</span>
                 </td>
                 <td class="mono-sm row-data-cell stack-block" data-label="Data">{{ rowSummary(r) }}</td>
@@ -175,8 +175,8 @@
                 </select>
               </div>
             </div>
-            <div v-if="unmappedRequired.length" class="upload-banner upload-banner-warning">
-              ⚠ Required field(s) not mapped: {{ unmappedRequired.map(c => c.header).join(', ') }}
+            <div v-if="unmappedRequired.length" class="upload-banner upload-banner-warning banner-icon-warn" role="alert">
+              Required field(s) not mapped: {{ unmappedRequired.map(c => c.header).join(', ') }}
             </div>
             <label class="mapping-save">
               <input v-model="saveMappingForAgency" type="checkbox" />
@@ -287,8 +287,8 @@
   <!-- ── Pinned action bar ────────────────────────────────────────────── -->
   <!-- Un-routed uploads drive their next step from RoutePanel, not here. -->
   <div v-if="upload && upload.status !== 'unrouted'" class="action-bar">
-    <div v-if="upload.validation_error || upload.commit_error" class="upload-banner upload-banner-error" style="margin:0 0 10px">
-      ⚠ {{ upload.validation_error || upload.commit_error }}
+    <div v-if="upload.validation_error || upload.commit_error" class="upload-banner upload-banner-error banner-icon-warn" style="margin:0 0 10px" role="alert">
+      {{ upload.validation_error || upload.commit_error }}
     </div>
     <div v-if="confirmingCommit" class="commit-confirm">
       <span>This will write {{ upload.valid_rows.toLocaleString('en-KE') }} row(s) to the domain tables for <strong>{{ upload.source_id }}</strong>. This can't be undone.</span>
@@ -563,10 +563,10 @@ async function onReplaceFileSelected(e: Event) {
 const ROWS_PAGE_SIZE = 25
 const ROW_FILTERS: { value: IngestedRowStatus; label: string }[] = [
   { value: '', label: 'All' },
-  { value: 'valid', label: '✓ Valid' },
-  { value: 'duplicate_in_file', label: '⚠ Dup (file)' },
-  { value: 'duplicate_in_db', label: '⚠ Dup (DB)' },
-  { value: 'error', label: '✕ Error' },
+  { value: 'valid', label: 'Valid' },
+  { value: 'duplicate_in_file', label: 'Duplicate in file' },
+  { value: 'duplicate_in_db', label: 'Already recorded' },
+  { value: 'error', label: 'Error' },
 ]
 const rowStatusFilter = ref<IngestedRowStatus>('')
 const rows = ref<IngestedRecord[]>([])
@@ -718,7 +718,7 @@ onMounted(async () => {
 
 .sheet-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .sheet-tab-btn { font-size: 11.5px; padding: 4px 10px; }
-.sheet-tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.sheet-tab-btn.active { background: var(--primary-fill); color: #fff; border-color: var(--primary-fill); }
 .sheet-tab-btn.unrecognised { opacity: 0.55; }
 .preview-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 2px; }
 
@@ -726,7 +726,7 @@ onMounted(async () => {
 
 .row-filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .row-filter-btn { font-size: 11.5px; padding: 4px 10px; }
-.row-filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.row-filter-btn.active { background: var(--primary-fill); color: #fff; border-color: var(--primary-fill); }
 
 /* Validation / DB-matches tabs pack multi-line cell content - top-align
    overrides the shared .ih-table's middle-align for this page only. */

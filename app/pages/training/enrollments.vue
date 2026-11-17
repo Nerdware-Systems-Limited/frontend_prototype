@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -50,7 +50,7 @@
 
   <!-- Filters -->
   <div class="filter-row" style="margin-bottom:10px">
-    <input v-model="search" class="filter-input" placeholder="Search name / National ID…" />
+    <input v-model="search" class="filter-input" placeholder="Search cohort / course…" />
     <select v-model="statusFilter" class="select-sm">
       <option value="">All statuses</option>
       <option value="registered">Registered</option>
@@ -81,12 +81,8 @@
       <table>
         <thead>
           <tr>
-            <th>National ID</th>
-            <th>Full Name</th>
             <th>Cohort</th>
             <th>Course</th>
-            <th>Phone</th>
-            <th>Email</th>
             <th>Status</th>
             <th>Payment</th>
             <th>Paid (KES)</th>
@@ -96,12 +92,8 @@
         </thead>
         <tbody v-if="filtered.length">
           <tr v-for="e in enrollmentsPageRows" :key="e.id">
-            <td class="mono-cell">{{ e.national_id }}</td>
-            <td class="name-cell">{{ e.full_name || '-' }}</td>
             <td class="mono-cell">{{ e.cohort_detail?.cohort_code ?? e.cohort }}</td>
             <td class="dim-cell">{{ e.cohort_detail?.course_name ?? '-' }}</td>
-            <td class="dim-cell">{{ e.phone_number || '-' }}</td>
-            <td class="dim-cell">{{ e.email || '-' }}</td>
             <td>
               <BadgePill :variant="statusBadge(e.status)" size="sm">{{ statusLabel(e.status) }}</BadgePill>
             </td>
@@ -115,7 +107,7 @@
         </tbody>
         <tbody v-else>
           <tr>
-            <td colspan="11" class="empty-row">
+            <td colspan="7" class="empty-row">
               {{ loading ? 'Loading enrollments…' : 'No enrollments match the selected filters.' }}
             </td>
           </tr>
@@ -167,7 +159,6 @@ async function load() {
       ordering: '-enrolled_at',
       ...(statusFilter.value  ? { status: statusFilter.value }          : {}),
       ...(paymentFilter.value ? { payment_status: paymentFilter.value } : {}),
-      ...(search.value        ? { search: search.value }                : {}),
     })
     enrollments.value = res.results ?? []
   } catch {
@@ -184,10 +175,10 @@ onMounted(load)
 const filtered = computed(() => {
   if (!search.value) return enrollments.value
   const q = search.value.toLowerCase()
+  // Students' names, national IDs, phones and emails are personal data: not shown and not searchable.
   return enrollments.value.filter(e =>
-    e.national_id.toLowerCase().includes(q)
-    || (e.full_name ?? '').toLowerCase().includes(q)
-    || (e.cohort_detail?.cohort_code ?? '').toLowerCase().includes(q),
+    (e.cohort_detail?.cohort_code ?? '').toLowerCase().includes(q)
+    || (e.cohort_detail?.course_name ?? '').toLowerCase().includes(q),
   )
 })
 

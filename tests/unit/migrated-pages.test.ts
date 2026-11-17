@@ -371,7 +371,6 @@ describe('public-transport/driver-licensing', () => {
   const FD = '/api/v1/fleet/drivers/'
   const day = (n: number) => new Date(Date.UTC(2026, 10, 4) + n * 86_400_000).toISOString().slice(0, 10)
   let licences: any[]
-  let drivers: any[]
   const mk = (i: number, status: string, expiresInDays: number, demerit: number, psv = '') => ({
     id: `l${i}`, license_number: `DL-${i}`, driver_name: `Driver ${i}`, license_class: 'B', demerit_points: demerit,
     psv_badge_no: psv, psv_badge_expiry: psv ? day(100) : null, expiry_date: day(expiresInDays), status,
@@ -384,8 +383,7 @@ describe('public-transport/driver-licensing', () => {
       mk(1, 'active', 10, 2, 'P1'), mk(2, 'active', 20, 9, 'P2'), mk(3, 'active', 300, 0), mk(4, 'active', -5, 10),   // #4 expired but still active
       mk(5, 'suspended', 100, 4), mk(6, 'revoked', 100, 12), mk(7, 'expired', -40, 0),
     ]
-    drivers = Array.from({ length: 30 }, (_, i) => ({ id: `d${i}`, full_name: `Driver ${i}`, phone: '07', date_of_birth: '1990-01-01', agency_code: 'NTSA', operator_name: 'Op', national_id: '****1234' }))
-    const licList = fakeList(licences), drvList = fakeList(drivers)
+    const licList = fakeList(licences)
     $api = vi.fn(async (path: string, o: any = {}) => {
       const q = o.query ?? {}
       if (path === FL) {
@@ -394,7 +392,6 @@ describe('public-transport/driver-licensing', () => {
         const rows = psv === '1' ? all.filter(r => r.psv_badge_no) : all
         return fakeList(rows)(rest)
       }
-      if (path === FD) return drvList(q)
       throw new Error(`unexpected ${path}`)
     })
     ;(globalThis as any).useNuxtApp = () => ({ $api })
@@ -421,27 +418,29 @@ describe('public-transport/driver-licensing', () => {
     expect(kpiOf(w, 'Expired-but-Active')).toBe('1')
   })
 
-  it('both tables page the whole dataset on the server', async () => {
+  it('both tables page the whole licence registry on the server', async () => {
     const w = mountPage(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
-    expect(w.findAll('.dt-status').map(s => s.text())).toEqual(['Showing 1–2 of 2', 'Showing 1–15 of 30'])
-    expect(calls(FL).find(q => q.page_size === 15)).toMatchObject({ psv: '1', ordering: 'psv_badge_expiry' })
-    expect(calls(FD).find(q => q.page_size === 15)).toMatchObject({ ordering: 'full_name' })
+    expect(w.findAll('.dt-status').map(s => s.text())).toEqual(['Showing 1–2 of 2', 'Showing 1–7 of 7'])
+    expect(calls(FL).find(q => q.page_size === 15 && q.psv === '1')).toMatchObject({ ordering: 'psv_badge_expiry' })
+    expect(calls(FL).find(q => q.page_size === 15 && !q.psv)).toMatchObject({ ordering: 'expiry_date' })
+    expect(calls(FD)).toEqual([])                                                  // the driver identity registry is no longer read
   })
 
-  it('the national ID is shown masked and can be neither searched nor sorted', async () => {
+  it('shows licence classes but no personal identifiers (name, licence or badge number)', async () => {
     const w = mountPage(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
-    const reg = w.find('#driver-registry')
-    expect(reg.find('tbody tr').text()).toContain('****1234')
-    const header = reg.findAll('thead tr:first-child th').find(th => th.text().includes('National ID'))!
-    expect(header.find('.dt-sort').exists()).toBe(false)
+    const text = w.text()
+    expect(w.find('#licence-registry tbody tr').text()).toContain('B')
+    expect(text).not.toMatch(/Driver \d/)
+    expect(text).not.toMatch(/DL-\d/)
+    expect(text).not.toMatch(/\bP[12]\b/)
   })
 
-  it('lists the worst expiry / demerit cases as alerts, from the server', async () => {
+  it('lists the worst expiry / demerit cases as alerts, from the server, without naming the driver', async () => {
     const w = mountPage(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
     const titles = w.findAll('.alert-item').map(a => a.text())
-    expect(titles).toContain('DL-4 - expired but marked active')
-    expect(titles).toContain('DL-2 - demerit points at 9')
-    expect(titles).toContain('DL-1 - renewal due')
+    expect(titles).toContain('Class B licence - expired but marked active')
+    expect(titles).toContain('Class B licence - demerit points at 9')
+    expect(titles).toContain('Class B licence - renewal due')
   })
 })
 
@@ -562,8 +561,15 @@ describe('public-transport/vehicle-inspections', () => {
 
   it('lists the longest-overdue inspections as alerts', async () => {
     const w = mountIt(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
-    expect(w.findAll('.alert-item').map(a => a.text()).sort()).toEqual(['KAA 3 - inspection overdue', 'KAA 4 - inspection overdue'])
+    expect(w.findAll('.alert-item').map(a => a.text()).sort()).toEqual(['Industrial - inspection overdue', 'Likoni - inspection overdue'])
     expect(calls(V).find(q => q.page_size === 20)).toMatchObject({ ordering: 'next_inspection_due', 'f.next_inspection_due__lt': '2026-11-04' })
+  })
+
+  it('shows no registration number, sticker number or inspector', async () => {
+    const w = mountIt(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
+    const text = w.text()
+    for (const pii of ['KAA', 'Ann', 'Bob', 'Inspector', 'Sticker']) expect(text).not.toContain(pii)
+    for (const q of calls(V)) expect(String(q.aggregate ?? '')).not.toContain('inspector_name')
   })
 
   it('"Re-inspections only" is a server filter on the registry', async () => {
@@ -604,6 +610,13 @@ describe('public-transport/vehicle-registration', () => {
     expect(kpiOf(w, 'Speed Governor Online')).toBe('93.2%')
     const text = w.text()
     expect(text).toContain('0-3 yrs'); expect(text).toContain('4-7 yrs'); expect(text).toContain('8-15 yrs'); expect(text).toContain('Unknown')
+  })
+
+  it('shows no plate or chassis number', async () => {
+    const w = mountIt(); await vi.advanceTimersByTimeAsync(0); await flushPromises()
+    expect(w.text()).not.toContain('KBB')
+    expect(w.text()).not.toMatch(/CH\d/)
+    expect(calls(V).find(q => q.page_size === 15)).toMatchObject({ ordering: '-updated_at' })
   })
 
   it('the global period narrows the table and every KPI on the server (and nothing is sent without one)', async () => {

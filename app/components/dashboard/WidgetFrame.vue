@@ -135,19 +135,19 @@ const footer = computed(() => {
 .wf-head {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px; flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3);
 }
 .wf--frameless .wf-head { border-bottom: 0; padding: 0 0 6px; }
 .wf-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-ignored {
-  font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: none; color: var(--warning-fg);
+  font-size: 10.5px; font-weight: 600; letter-spacing: .03em; text-transform: none; color: var(--warning-fg);
   background: var(--warning-bg); border-radius: var(--r-xs); padding: 1px 6px; white-space: nowrap; cursor: help;
 }
 .wf-body { flex: 1; min-height: 0; overflow: hidden; }
 .wf-foot {
   display: flex; align-items: center; gap: 6px; flex-shrink: 0; min-width: 0; padding: 5px 12px;
   border-top: 1px solid var(--border-subtle);
-  font-family: var(--font-mono); font-size: 9.5px; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: var(--fg-3);
+  font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: var(--fg-3);
 }
 .wf-foot-src { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-foot-tier { text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }

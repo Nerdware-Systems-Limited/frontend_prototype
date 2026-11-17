@@ -2,7 +2,7 @@
   <PageHeader
     eyebrow="Public Transport · NTSA"
     title="Vehicle Inspections"
-    subtitle="NTSA - Roadworthiness inspection records, pass/fail outcomes, re-inspection chains, and inspection-centre/inspector workload"
+    subtitle="NTSA - Roadworthiness inspection records, pass/fail outcomes, re-inspection chains, and inspection-centre workload"
   >
     <template #actions>
       <NuxtLink to="/public-transport/vehicle-registration" class="btn">Vehicle Registration<ArrowRight :size="14" aria-hidden="true" /></NuxtLink>
@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- KPI strip: counted by the server over ALL inspections, not over a first page of them -->
   <div class="kpi-grid">
@@ -23,7 +23,6 @@
     <KpiCard label="Overdue" :value="fmtNum(overdueStats.count.value)" :unavailable="overdueStats.count.value === null" :unavailable-note="note" period="LIVE" description="Next inspection due date passed" to="#overdue-queue" />
     <KpiCard label="Due ≤30d" :value="fmtNum(dueSoonStats.count.value)" :unavailable="dueSoonStats.count.value === null" :unavailable-note="note" period="30D" description="Next inspection approaching" />
     <KpiCard label="Active Centres" :value="fmtNum(centreStats.distinct('inspection_centre'))" :unavailable="centreStats.count.value === null" :unavailable-note="note" period="LIVE" description="Distinct inspection centres" to="#inspections-by-centre" />
-    <KpiCard label="Active Inspectors" :value="fmtNum(centreStats.distinct('inspector_name'))" :unavailable="centreStats.count.value === null" :unavailable-note="note" period="LIVE" description="Distinct inspectors on file" />
   </div>
 
   <!-- Analytics: grouped by the server -->
@@ -49,8 +48,8 @@
         <AlertItem
           v-for="i in overdue" :key="i.id"
           :severity="i.result === 'fail' ? 'critical' : 'warning'"
-          :title="`${i.plate_number} - inspection overdue`"
-          :meta="`Due ${fmtDate(i.next_inspection_due)} · Last result ${i.result} · ${i.inspection_centre}`"
+          :title="`${i.inspection_centre ?? 'Unknown centre'} - inspection overdue`"
+          :meta="`Due ${fmtDate(i.next_inspection_due)} · Last result ${String(i.result).replace(/_/g, ' ')}`"
         />
       </div>
       <EmptyState v-else :loading="overdueLoading" message="No overdue inspections." icon="search" compact />
@@ -62,11 +61,10 @@
   <div id="inspection-registry" class="card drill-target">
     <div class="card-body">
       <DataTable :table="inspectionTable" row-key="id" title="Inspection registry" export-name="uapts-vehicle-inspections" expandable filters-open
-                 placeholder="Search plate, centre, inspector, sticker…" empty="No inspection records match the current filters.">
+                 placeholder="Search centre…" empty="No inspection records match the current filters.">
         <template #toolbar>
           <label class="checkbox-label"><input v-model="reinspectionOnly" type="checkbox" /> Re-inspections only</label>
         </template>
-        <template #cell-plate_number="{ row }"><span style="font-weight:700;font-family:monospace">{{ row.plate_number }}</span></template>
         <template #cell-next_inspection_due="{ row }">
           <span :style="{ color: isOverdue(row.next_inspection_due) ? 'var(--danger-fg)' : 'inherit' }">{{ fmtDate(row.next_inspection_due) }}</span>
         </template>
@@ -105,12 +103,10 @@ const RESULT_BADGE: Record<string, string> = { pass: 'success', fail: 'danger', 
 
 const reinspectionOnly = ref(false)
 const inspectionColumns: TableColumn[] = [
-  { key: 'plate_number', label: 'Vehicle', priority: 1, pin: 'left' },
-  { key: 'inspection_centre', label: 'Centre', priority: 2 },
-  { key: 'inspector_name', label: 'Inspector', priority: 2 },
+  // Personal identifiers (vehicle registration no., sticker no., inspector name) are deliberately not displayed.
+  { key: 'inspection_centre', label: 'Centre', priority: 1, pin: 'left' },
   { key: 'inspected_at', label: 'Inspected', type: 'date', priority: 1 },
   { key: 'result', label: 'Result', type: 'badge', badge: RESULT_BADGE, options: RESULTS, priority: 1 },
-  { key: 'sticker_no', label: 'Sticker No.', type: 'mono', priority: 3 },
   { key: 'next_inspection_due', label: 'Next Due', type: 'date', priority: 1 },
   { key: 'is_reinspection', label: 'Re-inspection', type: 'bool', sortable: 'reinspection_of', filter: false, priority: 3 },
   { key: 'report_url', label: 'Report', sortable: false, filter: false, noExport: true, priority: 3 },
@@ -129,8 +125,8 @@ const resultStats = useServerCount(V, scope, { groupBy: ['result'] })
 const reinspectionStats = useServerCount(V, () => ({ ...scope(), 'f.reinspection_of__isnull': 'false' }))
 const overdueStats = useServerCount(V, () => ({ ...scope(), 'f.next_inspection_due__lt': today() }))
 const dueSoonStats = useServerCount(V, () => ({ ...scope(), 'f.next_inspection_due__gte': today(), 'f.next_inspection_due__lte': plusDays(30) }))
-// Per-centre totals (and distinct centres / inspectors), plus the passes per centre for the pass rate.
-const centreStats = useServerCount(V, scope, { aggregate: ['distinct:inspection_centre', 'distinct:inspector_name'], groupBy: ['inspection_centre'] })
+// Per-centre totals (and distinct centres), plus the passes per centre for the pass rate. No per-inspector figures are shown.
+const centreStats = useServerCount(V, scope, { aggregate: ['distinct:inspection_centre'], groupBy: ['inspection_centre'] })
 const centrePass = useServerCount(V, () => ({ ...scope(), 'f.result__exact': 'pass' }), { groupBy: ['inspection_centre'] })
 const allStats = [resultStats, reinspectionStats, overdueStats, dueSoonStats, centreStats, centrePass]
 

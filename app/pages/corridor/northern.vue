@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- Transit chain: where the time goes -->
   <SectionTitle pill="Observatory · latest month">Where the time goes - Mombasa to Kampala</SectionTitle>
@@ -148,10 +148,10 @@ const segmentGood = computed(() => Object.fromEntries(
 .chain { display: flex; gap: 2px; height: 58px; }
 .chain-seg { display: flex; flex-direction: column; justify-content: center; padding: 6px 12px; color: #fff; min-width: 90px; border-radius: 2px; }
 .chain-v { font: 600 16px 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-.chain-l { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .9; }
+.chain-l { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .9; }
 .chain-note { margin: 12px 0 0; font-size: 12.5px; color: var(--fg-2); }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--fg-1); }
-.seg-chip { margin-left: 8px; font-size: 10px; background: var(--surface-sunken); padding: 1px 6px; border-radius: 2px; text-transform: none; letter-spacing: 0; }
+.seg-chip { margin-left: 8px; font-size: 11px; background: var(--surface-sunken); padding: 1px 6px; border-radius: 2px; text-transform: none; letter-spacing: 0; }
 .active-fig { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
 .big { font: 600 28px 'JetBrains Mono', ui-monospace, monospace; letter-spacing: -.01em; color: var(--fg-1); }
 .unit { font-size: 12px; color: var(--fg-3); margin-right: 6px; }

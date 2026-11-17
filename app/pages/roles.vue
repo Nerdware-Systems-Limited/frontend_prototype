@@ -10,9 +10,9 @@
     </template>
   </PageHeader>
 
-  <div v-if="error"         class="error-banner">⚠ {{ error }}</div>
-  <div v-if="actionError"   class="error-banner action-error">⚠ {{ actionError }}</div>
-  <div v-if="actionSuccess" class="success-banner">✓ {{ actionSuccess }}</div>
+  <div v-if="error"         class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
+  <div v-if="actionError"   class="error-banner action-error banner-icon-warn" role="alert">{{ actionError }}</div>
+  <div v-if="actionSuccess" class="success-banner banner-icon-ok" role="status">{{ actionSuccess }}</div>
 
   <!-- Metric strip - one flat row, not six separate cards -->
   <div class="metric-strip" role="group" aria-label="User account statistics">
@@ -1089,7 +1089,7 @@ function fmtDate(d?: string | null) {
 /* Action buttons */
 .action-group    { display:flex; gap:4px; flex-wrap:wrap; }
 .btn-primary-sm  { background:var(--primary-fill); color:#fff; border-color:var(--primary-fill); }
-.btn-primary-sm:hover { background:var(--primary-dark); border-color:var(--primary-dark); }
+.btn-primary-sm:hover { background:var(--primary-fill-hover); border-color:var(--primary-fill-hover); }
 .row-menu-trigger { color:var(--fg-2); }
 
 /* Row action popover - teleported to <body>, positioned via inline top/left */

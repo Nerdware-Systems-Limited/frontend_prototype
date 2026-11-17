@@ -5,11 +5,12 @@
     own (see query-builder.vue's .mode-tab, the closest prior art, whose
     visual pattern this borrows).
   -->
-  <div class="tab-strip" role="tablist">
+  <div ref="strip" class="tab-strip" role="tablist" @keydown="onKeydown">
     <button
       v-for="t in tabs" :key="t.key" type="button" role="tab"
       class="tab-strip-tab" :class="{ active: modelValue === t.key, disabled: t.disabled }"
       :aria-selected="modelValue === t.key" :aria-disabled="t.disabled"
+      :tabindex="modelValue === t.key ? 0 : -1"
       :title="t.disabled ? t.disabledReason : undefined"
       @click="!t.disabled && emit('update:modelValue', t.key)"
     >
@@ -20,11 +21,31 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   tabs: { key: string; label: string; count?: number; disabled?: boolean; disabledReason?: string }[]
   modelValue: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
+
+// WAI-ARIA tabs: one tab stop for the strip; Left/Right/Home/End move the
+// selection across the enabled tabs and take focus with it.
+const strip = ref<HTMLElement | null>(null)
+function onKeydown(e: KeyboardEvent) {
+  const enabled = props.tabs.filter(t => !t.disabled)
+  if (!enabled.length) return
+  const at = enabled.findIndex(t => t.key === props.modelValue)
+  let next = -1
+  if (e.key === 'ArrowRight') next = (at + 1) % enabled.length
+  else if (e.key === 'ArrowLeft') next = (at - 1 + enabled.length) % enabled.length
+  else if (e.key === 'Home') next = 0
+  else if (e.key === 'End') next = enabled.length - 1
+  if (next < 0) return
+  e.preventDefault()
+  const key = enabled[next]!.key
+  emit('update:modelValue', key)
+  const i = props.tabs.findIndex(t => t.key === key)
+  nextTick(() => strip.value?.querySelectorAll<HTMLElement>('[role="tab"]')[i]?.focus())
+}
 </script>
 
 <style scoped>
@@ -44,11 +65,12 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 }
 .tab-strip-tab:hover:not(.active):not(.disabled) { color: var(--fg-1); }
 .tab-strip-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.tab-strip-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .tab-strip-tab.disabled { cursor: not-allowed; opacity: 0.5; }
 .tab-strip-tab.disabled:hover { color: var(--fg-3); }
 .tab-strip-count {
-  font-size: 11px; background: var(--surface-sunken); color: var(--fg-2);
+  font-size: 11px; font-variant-numeric: tabular-nums; background: var(--surface-sunken); color: var(--fg-2);
   border-radius: var(--r-pill); padding: 1px 7px; font-weight: 600;
 }
-.tab-strip-tab.active .tab-strip-count { background: var(--primary); color: #fff; }
+.tab-strip-tab.active .tab-strip-count { background: var(--primary-fill); color: #fff; }
 </style>

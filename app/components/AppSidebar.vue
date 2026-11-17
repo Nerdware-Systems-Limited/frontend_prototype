@@ -16,7 +16,7 @@
       <!-- M02 · Road Traffic Management - /api/v1/traffic/* -->
       <details v-if="canSeeModule('M02')" class="sidebar-group" :open="groupIsOpen('/traffic')">
         <summary class="sidebar-group-title">
-          Road Traffic Management<span class="sidebar-caret">▾</span>
+          Road Traffic Management<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/traffic')" class="sidebar-link" to="/traffic" :class="{ active: isActive('/traffic') }">Live Traffic Map</NuxtLink>
@@ -28,7 +28,7 @@
       <!-- M03 · Fleet & Vehicle Tracking - /api/v1/fleet/* -->
       <details v-if="canSeeModule('M03')" class="sidebar-group" :open="groupIsOpen('/fleet')">
         <summary class="sidebar-group-title">
-          Fleet & Vehicle Tracking<span class="sidebar-caret">▾</span>
+          Fleet & Vehicle Tracking<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/fleet')" class="sidebar-link" to="/fleet" :class="{ active: isActive('/fleet') }">Fleet Overview</NuxtLink>
@@ -42,7 +42,7 @@
       <!-- M04 · Public Transport Operations - /api/v1/public-transport/* -->
       <details v-if="canSeeModule('M04')" class="sidebar-group" :open="groupIsOpen('/public-transport')">
         <summary class="sidebar-group-title">
-          Public Transport<span class="sidebar-caret">▾</span>
+          Public Transport<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/public-transport')" class="sidebar-link" to="/public-transport" :class="{ active: isActive('/public-transport') }">Operations Overview</NuxtLink>
@@ -58,7 +58,7 @@
       <!-- M05 · Safety & Incident Management - /api/v1/safety/* -->
       <details v-if="canSeeModule('M05')" class="sidebar-group" :open="groupIsOpen('/safety')">
         <summary class="sidebar-group-title">
-          Safety & Incidents<span class="sidebar-caret">▾</span>
+          Safety & Incidents<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/safety')" class="sidebar-link" to="/safety" :class="{ active: isActive('/safety') }">Safety Overview</NuxtLink>
@@ -71,7 +71,7 @@
       <!-- M06 · Road Infrastructure - /api/v1/infrastructure/* -->
       <details v-if="canSeeModule('M06')" class="sidebar-group" :open="groupIsOpen('/infrastructure')">
         <summary class="sidebar-group-title">
-          Road Infrastructure<span class="sidebar-caret">▾</span>
+          Road Infrastructure<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/infrastructure/overview')" class="sidebar-link" to="/infrastructure/overview" :class="{ active: isActive('/infrastructure/overview') }">Overview</NuxtLink>
@@ -86,7 +86,7 @@
       <!-- M07a · Aviation - /api/v1/aviation-maritime/aviation/* -->
       <details v-if="canSeeModule('M07a')" class="sidebar-group" :open="groupIsOpen('/aviation')">
         <summary class="sidebar-group-title">
-          Aviation<span class="sidebar-caret">▾</span>
+          Aviation<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/aviation/overview')" class="sidebar-link" to="/aviation/overview" :class="{ active: isActive('/aviation/overview') }">Overview</NuxtLink>
@@ -101,7 +101,7 @@
       <!-- M07b · Maritime - /api/v1/aviation-maritime/maritime/* -->
       <details v-if="canSeeModule('M07b')" class="sidebar-group" :open="groupIsOpen('/maritime')">
         <summary class="sidebar-group-title">
-          Maritime<span class="sidebar-caret">▾</span>
+          Maritime<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/maritime/overview')" class="sidebar-link" to="/maritime/overview" :class="{ active: isActive('/maritime/overview') }">Overview</NuxtLink>
@@ -122,7 +122,7 @@
       <!-- M08 · Railway Management - /api/v1/railway/* -->
       <details v-if="canSeeModule('M08')" class="sidebar-group" :open="groupIsOpen('/railway')">
         <summary class="sidebar-group-title">
-          Railway<span class="sidebar-caret">▾</span>
+          Railway<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/railway')" class="sidebar-link" to="/railway" :class="{ active: isActive('/railway') }">Railway Overview</NuxtLink>
@@ -138,7 +138,7 @@
       <!-- M15 · Corridor & Trade - /api/v1/corridor/* (NCTTCA · KenTrade · LAPSSET) -->
       <details v-if="canSeeModule('M15')" class="sidebar-group" :open="groupIsOpen('/corridor')">
         <summary class="sidebar-group-title">
-          Corridor &amp; Trade<span class="sidebar-caret">▾</span>
+          Corridor &amp; Trade<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/corridor')" class="sidebar-link" to="/corridor" :class="{ active: isActive('/corridor') }">Overview</NuxtLink>
@@ -152,7 +152,7 @@
       <!-- M09 · Analytics & Reporting (AI/ML) - /api/v1/reports/*, /api/v1/query/* -->
       <details v-if="canSeeModule('M09')" class="sidebar-group" :open="groupIsOpen(['/analytics', '/reports', '/query-builder'])">
         <summary class="sidebar-group-title">
-          Analytics & Reporting<span class="sidebar-caret">▾</span>
+          Analytics & Reporting<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/analytics')" class="sidebar-link" to="/analytics" :class="{ active: isActive('/analytics') }">AI Predictive Workbench</NuxtLink>
@@ -164,7 +164,7 @@
       <!-- M12 · Data Integration Hub - /api/v1/integrations/* -->
       <details v-if="canSeeModule('M12')" class="sidebar-group" :open="groupIsOpen('/integrations')">
         <summary class="sidebar-group-title">
-          Integration Hub<span class="sidebar-caret">▾</span>
+          Integration Hub<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/integrations')" class="sidebar-link" to="/integrations" :class="{ active: isActive('/integrations') }">Upload & Connect</NuxtLink>
@@ -176,7 +176,7 @@
       <!-- M13 · GIS & Spatial Analysis - /api/v1/gis/*, /api/v1/geojson/* -->
       <details v-if="canSeeModule('M13')" class="sidebar-group" :open="groupIsOpen('/gis')">
         <summary class="sidebar-group-title">
-          GIS &amp; Spatial Analysis<span class="sidebar-caret">▾</span>
+          GIS &amp; Spatial Analysis<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/gis')" class="sidebar-link" to="/gis" :class="{ active: isActive('/gis') }">GIS Explorer</NuxtLink>
@@ -190,7 +190,7 @@
       <!-- M14 · Training Institutes - /api/v1/training/* -->
       <details v-if="canSeeModule('M14')" class="sidebar-group" :open="groupIsOpen('/training')">
         <summary class="sidebar-group-title">
-          Training Institutes<span class="sidebar-caret">▾</span>
+          Training Institutes<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/training')" class="sidebar-link" to="/training" :class="{ active: isActive('/training') }">Overview</NuxtLink>
@@ -203,7 +203,7 @@
       <!-- M11 · Notifications & Alerts - /api/v1/notifications/* -->
       <details v-if="canSeeModule('M11')" class="sidebar-group" :open="groupIsOpen('/notifications')">
         <summary class="sidebar-group-title">
-          Notifications<span class="sidebar-caret">▾</span>
+          Notifications<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/notifications')" class="sidebar-link" to="/notifications" :class="{ active: isActive('/notifications') }">Notification Feed</NuxtLink>
@@ -214,7 +214,7 @@
       <!-- M10 · User Management & Access Control - /api/v1/accounts/* + audit -->
       <details v-if="canSeeModule('M10')" class="sidebar-group" :open="groupIsOpen(['/agencies', '/users', '/roles', '/access-policies', '/admin/dashboards', '/audit'])">
         <summary class="sidebar-group-title">
-          Access Control<span class="sidebar-caret">▾</span>
+          Access Control<ChevronDown class="sidebar-caret" :size="12" aria-hidden="true" />
         </summary>
         <div class="sidebar-group-items">
           <NuxtLink v-if="canSee('/agencies')" class="sidebar-link" to="/agencies" :class="{ active: isActive('/agencies') }">Agencies</NuxtLink>
@@ -241,6 +241,8 @@
 </template>
 
 <script setup lang="ts">
+import { ChevronDown } from 'lucide-vue-next'
+
 const route = useRoute()
 const { mobileOpen: sidebarOpen } = useSidebar()
 

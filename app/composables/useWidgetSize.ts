@@ -12,19 +12,19 @@
 import { computed, inject, ref, type ComputedRef, type InjectionKey, type Ref } from 'vue'
 import { sizeClassFor, type SizeClass } from '~/utils/viz'
 
-export interface WidgetSize {
+export interface WidgetBodySize {
   width: Ref<number>
   height: Ref<number>
   sizeClass: ComputedRef<SizeClass>
 }
 
-export const WIDGET_SIZE_KEY: InjectionKey<WidgetSize> = Symbol('widget-size')
+export const WIDGET_SIZE_KEY: InjectionKey<WidgetBodySize> = Symbol('widget-size')
 
-export function makeWidgetSize(width: Ref<number>, height: Ref<number>): WidgetSize {
+export function makeWidgetSize(width: Ref<number>, height: Ref<number>): WidgetBodySize {
   // 0 before the first measurement - treat as 'm' so nothing flashes compact.
   return { width, height, sizeClass: computed(() => (width.value > 0 ? sizeClassFor(width.value) : 'm')) }
 }
 
-export function useWidgetSize(): WidgetSize {
+export function useWidgetSize(): WidgetBodySize {
   return inject(WIDGET_SIZE_KEY, null) ?? makeWidgetSize(ref(0), ref(0))
 }

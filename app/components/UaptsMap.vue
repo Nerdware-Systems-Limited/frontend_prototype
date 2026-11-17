@@ -1877,7 +1877,7 @@ const legendItems = computed(() => layerStates.value.filter(s => s.key !== 'keny
   cursor: pointer;
   text-align: left;
   border-radius: 4px;
-  transition: all 0.1s;
+  transition: background-color 0.1s, border-color 0.1s, color 0.1s, box-shadow 0.1s;
 }
 .uapts-layer-toggle:hover { background: var(--map-chrome-hover); }
 

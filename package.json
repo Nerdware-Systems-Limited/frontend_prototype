@@ -23,7 +23,7 @@
     "nuxt": "^4.4.5",
     "pinia": "^3.0.4",
     "protomaps-leaflet": "^5.1.0",
-    "vue": "^3.5.34",
+    "vue": "^3.5.44",
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
@@ -32,7 +32,7 @@
     "@types/d3-array": "^3.2.2",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.2.0",
-    "@vitejs/plugin-vue": "^6.0.8",
+    "@vitejs/plugin-vue": "^6.0.10",
     "@vitest/coverage-v8": "^5.0.3",
     "@vue/test-utils": "^2.4.6",
     "happy-dom": "^20.11.2",

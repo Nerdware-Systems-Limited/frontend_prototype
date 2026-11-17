@@ -10,8 +10,8 @@
     see the outcome before publishing.
   -->
   <div class="ap">
-    <div v-if="actionError" class="error-banner" role="alert" aria-live="polite">⚠ {{ actionError }}</div>
-    <div v-if="directoryError" class="error-banner" role="alert">⚠ {{ directoryError }}</div>
+    <div v-if="actionError" class="error-banner banner-icon-warn" role="alert" aria-live="polite">{{ actionError }}</div>
+    <div v-if="directoryError" class="error-banner banner-icon-warn" role="alert">{{ directoryError }}</div>
     <section class="ap-sec">
       <div class="ap-sec-title">Assigned to</div>
       <p v-if="!draft.length" class="ap-empty">Not assigned - only editors can open it. Add an audience below.</p>
@@ -262,13 +262,13 @@ const result = computed(() => {
 <style scoped>
 .ap { display: flex; flex-direction: column; gap: 14px; }
 .ap-sec { display: flex; flex-direction: column; gap: 8px; }
-.ap-sec-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+.ap-sec-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
 .ap-sec + .ap-sec { padding-top: 14px; border-top: 1px solid var(--border-subtle); }
 .ap-empty { font-size: 11.5px; color: var(--fg-3); margin: 0; }
 .ap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ap-item { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: 8px 10px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
 .ap-item-top { display: flex; align-items: center; gap: 8px; }
-.ap-scope { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); white-space: nowrap; }
+.ap-scope { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); white-space: nowrap; }
 .ap-who { flex: 1; font-size: 12px; color: var(--fg-1); }
 .ap-item-opts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 11px; color: var(--fg-2); }
 .ap-item-opts label { display: flex; align-items: center; gap: 4px; }
@@ -300,7 +300,7 @@ const result = computed(() => {
 .ap-winner.none { color: var(--fg-3); }
 .ap-trace { margin: 0; padding-left: 16px; font-size: 11px; color: var(--fg-2); display: flex; flex-direction: column; gap: 3px; }
 .ap-trace li.overridden, .ap-trace li.lower-priority, .ap-trace li.blocked-by-lock { color: var(--fg-3); }
-.ap-outcome { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
+.ap-outcome { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
 .ap-trace li.won .ap-outcome { color: var(--success-fg); }
 .ap-trace li.blocked-by-lock .ap-outcome { color: var(--warning-fg); }
 .ap-trace-scope { color: var(--fg-3); }

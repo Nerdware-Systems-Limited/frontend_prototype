@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <SectionTitle pill="Lamu Port · monthly">Port and corridor operations</SectionTitle>
   <div class="kpi-grid">

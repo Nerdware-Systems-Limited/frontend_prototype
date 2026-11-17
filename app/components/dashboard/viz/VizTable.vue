@@ -128,7 +128,7 @@ button.vt-list-label { cursor: pointer; }
 .vt th { position: sticky; top: 0; z-index: 1; padding: 0; }
 .vt td { padding: 6px 10px; }
 .vt-num { text-align: right; }
-.vt-caption { caption-side: top; text-align: left; font-size: 10px; color: var(--fg-3); padding-bottom: 4px; }
+.vt-caption { caption-side: top; text-align: left; font-size: 11px; color: var(--fg-3); padding-bottom: 4px; }
 .vt-sort {
   display: inline-flex; align-items: center; gap: 4px; width: 100%; padding: 7px 10px; background: none; border: 0; cursor: pointer;
   font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;

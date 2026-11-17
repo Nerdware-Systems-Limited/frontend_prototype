@@ -98,7 +98,7 @@ function deltaClass(s: KpiSeries) {
 
 <style scoped>
 .ck-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.ck-table th { text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); background: var(--surface-1); padding: 8px 13px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.ck-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); background: var(--surface-1); padding: 8px 13px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
 .ck-table td { padding: 9px 13px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
 .ck-table tbody tr:last-child td { border-bottom: none; }
 .ck-table tbody tr.clickable { cursor: pointer; }
@@ -107,11 +107,11 @@ function deltaClass(s: KpiSeries) {
 .ck-table tbody tr:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .num { text-align: right !important; }
 .fig { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-.unit { font-size: 10px; font-weight: 500; color: var(--fg-3); margin-left: 4px; }
+.unit { font-size: 11px; font-weight: 500; color: var(--fg-3); margin-left: 4px; }
 .muted { color: var(--fg-3); font-weight: 500; }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 9px; vertical-align: middle; }
 .ind-name { font-weight: 600; color: var(--fg-1); }
-.seg { display: inline-block; margin-left: 8px; font-size: 10px; color: var(--fg-2); background: var(--surface-sunken); padding: 1px 6px; border-radius: 2px; font-weight: 600; }
+.seg { display: inline-block; margin-left: 8px; font-size: 11px; color: var(--fg-2); background: var(--surface-sunken); padding: 1px 6px; border-radius: 2px; font-weight: 600; }
 .gap-col { min-width: 170px; }
 .trend-col { width: 110px; }
 .trend-col :deep(svg) { width: 96px; height: 26px; }

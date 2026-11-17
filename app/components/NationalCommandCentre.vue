@@ -15,7 +15,7 @@
 
   <!-- Global error banner - shown on partial or total fetch failure -->
   <div v-if="error" class="error-banner">
-    <span>⚠ {{ error }}</span>
+    <span class="banner-icon-warn">{{ error }}</span>
     <button type="button" class="error-retry-btn" :disabled="loading" @click="load">
       {{ loading ? 'Retrying…' : 'Retry' }}
     </button>
@@ -24,7 +24,7 @@
   <!-- ═══════════════════════════════════════════════════════════════
        1. NATIONAL TRANSPORT HEALTH - top-level KPI ribbon
   ════════════════════════════════════════════════════════════════ -->
-  <div class="section-label">
+  <div class="section-label" role="heading" aria-level="2">
     National transport health
     <span class="section-pill">6 domains</span>
   </div>
@@ -97,7 +97,7 @@
        detail - were removed as unlinked restatements of domains the ribbon
        above already summarizes and links out to; this one stays.)
   ════════════════════════════════════════════════════════════════ -->
-  <div class="section-label">
+  <div class="section-label" role="heading" aria-level="2">
     Road Safety &amp; Incident Management
     <span class="section-pill" v-if="safety">NTSA IRSMS · {{ freshnessLabel(safety.generated_at) }}</span>
   </div>
@@ -201,7 +201,7 @@
   <!-- ═══════════════════════════════════════════════════════════════
        3. GIS MAP + ACTIVE ALERTS WIDGET
   ════════════════════════════════════════════════════════════════ -->
-  <div class="section-label">National Incident Heatmap</div>
+  <div class="section-label" role="heading" aria-level="2">National Incident Heatmap</div>
 
   <div class="map-alerts-row">
     <CollapsibleSection class="map-wrap" title="Predictive risk hotspots & black spot clusters" storage-key="map:national-command-centre">
@@ -236,7 +236,7 @@
       <div class="map-legend-strip">
         <span class="map-legend-title">Risk tier</span>
         <span class="map-legend-item"><span class="map-dot" style="background:var(--destructive)"></span>Very high / critical</span>
-        <span class="map-legend-item"><span class="map-dot" style="background:#f97316"></span>High</span>
+        <span class="map-legend-item"><span class="map-dot" style="background:var(--traffic-orange)"></span>High</span>
         <span class="map-legend-item"><span class="map-dot" style="background:var(--warning)"></span>Medium</span>
         <span class="map-legend-item"><span class="map-dot" style="background:var(--border-strong)"></span>Low</span>
         <span class="map-legend-sep"></span>
@@ -291,9 +291,9 @@
   <!-- ═══════════════════════════════════════════════════════════════
        5. AGENCY DRILL-DOWN PREVIEWS (real data)
   ════════════════════════════════════════════════════════════════ -->
-  <div class="section-label">
+  <div class="section-label" role="heading" aria-level="2">
     Agency Drill-Downs
-    <span class="section-pill">11 agencies · RBAC scoped</span>
+    <span class="section-pill">11 operating agencies · RBAC scoped</span>
   </div>
 
   <!-- Row 1: Road infrastructure agencies -->
@@ -410,7 +410,7 @@
           <span class="badge good">{{ fmtNum(port.teu_throughput_30d) }}</span>
         </div>
         <div class="agency-row">
-          <span class="agency-row-label">Live vessels in port</span>
+          <span class="agency-row-label">Vessels tracked (AIS)</span>
           <span class="badge good">{{ fmtNum(maritime?.kpis.live_vessels ?? 0) }}</span>
         </div>
         <div class="agency-row">
@@ -1278,30 +1278,31 @@ const activeAlerts = computed((): AlertEntry[] => {
 
     const criticalBlackSpots = safety.value.black_spots_by_tier['critical'] ?? 0
     if (criticalBlackSpots > 0)
-      list.push({ severity: 'warning', title: `${fmtNum(criticalBlackSpots)} critical black spots active`, meta: 'NTSA KDE Analysis · Batch', to: '/safety/blackspots' })
+      list.push({ severity: 'warning', title: `${fmtNum(criticalBlackSpots)} critical black ${criticalBlackSpots === 1 ? 'spot' : 'spots'} active`, meta: 'NTSA KDE Analysis · Batch', to: '/safety/blackspots' })
   }
 
   if (fleet.value && fleet.value.governor_compliance.tamper_rate_pct > 5)
     list.push({ severity: 'warning', title: `Speed governor tamper rate: ${fmtPct(fleet.value.governor_compliance.tamper_rate_pct)}`, meta: 'NTSA iTIMS · Live', to: '/fleet/behaviour' })
 
   if (infra.value && infra.value.bridges.critical_count > 0)
-    list.push({ severity: 'warning', title: `${fmtNum(infra.value.bridges.critical_count)} bridges at critical condition`, meta: 'BMS · Batch survey', to: '/infrastructure/bridges' })
+    list.push({ severity: 'warning', title: `${fmtNum(infra.value.bridges.critical_count)} ${infra.value.bridges.critical_count === 1 ? 'bridge' : 'bridges'} in critical condition`, meta: 'BMS · Batch survey', to: '/infrastructure/bridges' })
 
   if (rail.value && rail.value.incidents_90d.fatal > 0)
-    list.push({ severity: 'critical', title: `${fmtNum(rail.value.incidents_90d.fatal)} fatal rail incidents (90d)`, meta: 'KRC Safety · Batch', to: '/railway/safety' })
+    list.push({ severity: 'critical', title: `${fmtNum(rail.value.incidents_90d.fatal)} fatal rail ${rail.value.incidents_90d.fatal === 1 ? 'incident' : 'incidents'} (90d)`, meta: 'KRC Safety · Batch', to: '/railway/safety' })
 
-  if (rail.value && rail.value.on_time_30d.on_time_pct < 70)
+  if (rail.value && rail.value.on_time_30d.total_operations > 0 && rail.value.on_time_30d.on_time_pct < 70)
     list.push({ severity: 'warning', title: `Rail OTP below benchmark: ${fmtPct(rail.value.on_time_30d.on_time_pct)}`, meta: 'KRC Ops · Live', to: '/railway/schedules' })
 
-  if (aviation.value && aviation.value.kpis.otp_pct < 80)
+  if (aviation.value && aviation.value.kpis.flights_total > 0 && aviation.value.kpis.otp_pct < 80)
     list.push({ severity: 'warning', title: `Aviation OTP below benchmark: ${fmtPct(aviation.value.kpis.otp_pct)}`, meta: 'KAA · Live', to: '/aviation/flights' })
 
   const offlineFeeds = integrations.value.filter(f => f.status === 'disconnected' || f.status === 'degraded')
   if (offlineFeeds.length > 0)
     list.push({
       severity: offlineFeeds.some(f => f.status === 'disconnected') ? 'critical' : 'warning',
-      title: `${offlineFeeds.length} agency feed(s) offline / degraded`,
-      meta: offlineFeeds.map(f => f.agency_code).join(', '),
+      title: `${offlineFeeds.length} agency ${offlineFeeds.length === 1 ? 'feed' : 'feeds'} offline or degraded`,
+      // One agency can run several feeds; name each agency once.
+      meta: [...new Set(offlineFeeds.map(f => f.agency_code))].join(', '),
       to: '/integrations/analytics',
     })
 
@@ -1486,7 +1487,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1500,7 +1501,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   background: var(--border-subtle);
 }
 .section-pill {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: var(--r-xs);
@@ -1553,7 +1554,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .badge {
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: var(--r-xs);
@@ -1580,7 +1581,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .spark-card-head {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1596,7 +1597,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .spark-amber { background: var(--warning); }
 .spark-green { background: var(--success); }
 .card-footer-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fg-3);
   padding: 6px 16px 10px;
   border-top: 1px solid var(--border-subtle);
@@ -1624,7 +1625,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .condition-bar { display: flex; height: 14px; border-radius: var(--r-xs); overflow: hidden; gap: 1px; }
 .condition-seg { min-width: 3px; }
 .condition-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-.condition-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--fg-2); }
+.condition-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--fg-2); }
 .condition-swatch { width: 9px; height: 9px; border-radius: var(--r-xs); display: inline-block; flex-shrink: 0; }
 
 /* ── Map + alerts row ──────────────────────────────────────────────── */
@@ -1638,7 +1639,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .map-wrap-head {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1649,7 +1650,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 }
 .map-head-meta {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--fg-3);
   white-space: nowrap;
@@ -1679,7 +1680,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   flex-wrap: wrap;
 }
 .map-legend-title {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1727,7 +1728,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   border-radius: var(--r-sm);
   padding: 7px 10px;
-  font-size: 10px;
+  font-size: 11px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1736,7 +1737,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   border: 1px solid var(--border-subtle);
 }
 .gis-legend-title {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   color: var(--fg-3);
   margin-bottom: 2px;
@@ -1761,7 +1762,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .alerts-head {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1771,7 +1772,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   gap: 6px;
 }
 .alerts-count {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
   padding: 1px 6px;
@@ -1824,7 +1825,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .alert-item-link:hover .alert-chevron { color: var(--primary); transform: translateX(3px); }
 .alert-main { flex: 1; min-width: 0; }
 .alert-title { font-size: 11.5px; font-weight: 600; color: var(--fg-1); line-height: 1.4; }
-.alert-meta { font-size: 10px; color: var(--fg-3); margin-top: 2px; font-family: var(--font-mono); }
+.alert-meta { font-size: 11px; color: var(--fg-3); margin-top: 2px; font-family: var(--font-mono); }
 .alert-chevron {
   flex-shrink: 0;
   font-size: 12px;
@@ -1850,7 +1851,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 }
 .integration-summary-value.warn { color: var(--warning-fg); }
 .integration-summary-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fg-3);
   margin-top: 3px;
   text-transform: uppercase;
@@ -1883,7 +1884,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
   color: var(--fg-2);
   border-radius: var(--r-xs);
   padding: 0 5px;
-  font-size: 9px;
+  font-size: 10.5px;
 }
 .feed-filter-chip--good.active { background: var(--success-fg); border-color: var(--success-fg); }
 .feed-filter-chip--warn.active { background: var(--warning-fg); border-color: var(--warning-fg); }
@@ -1891,7 +1892,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .feed-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .feed-table th {
   text-align: left;
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1904,9 +1905,9 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .feed-table tr:last-child td { border-bottom: none; }
 .feed-table tbody tr { transition: background-color var(--dur-fast) var(--ease-standard); }
 .feed-table tbody tr:hover td { background: var(--primary-wash); }
-.feed-mode { color: var(--fg-3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.feed-mode { color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .feed-num  { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
-.feed-time { white-space: nowrap; color: var(--fg-3); font-size: 10px; font-family: var(--font-mono); }
+.feed-time { white-space: nowrap; color: var(--fg-3); font-size: 11px; font-family: var(--font-mono); }
 .feed-empty { text-align: center; color: var(--fg-3); padding: 20px; font-size: 12px; }
 
 /* ── Agency drill-down grid ────────────────────────────────────────── */
@@ -1952,7 +1953,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 .agency-row-label { font-size: 10.5px; color: var(--fg-2); }
 .agency-loading { font-size: 11px; color: var(--fg-3); padding: 4px 0; }
 .agency-link {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1964,7 +1965,7 @@ const mapMarkers = computed((): MarkerSpec[] => {
 }
 .agency-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .section-link {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;

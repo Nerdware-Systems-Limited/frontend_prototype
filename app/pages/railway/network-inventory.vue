@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <!-- SGR / MGR comparison: grouped by the server over the chosen period and county -->
   <SectionTitle pill="Computed · Live Registry">SGR / MGR Comparison</SectionTitle>
@@ -327,7 +327,7 @@ function isDue(s: string | null | undefined) { return !!s && new Date(s).getTime
 .cc-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
 .cc-lines { font-size:12px; color:var(--fg-3); }
 .cc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-.cc-label { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); display:block; margin-bottom:2px; }
+.cc-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-3); display:block; margin-bottom:2px; }
 .cc-val { font-size:15px; font-weight:700; color:var(--fg-1); }
 .val-danger { color:var(--danger-fg); }
 .source-note { margin-top:10px; font-size:11px; color:var(--fg-3); border-top:1px solid var(--border-subtle); padding-top:10px; }

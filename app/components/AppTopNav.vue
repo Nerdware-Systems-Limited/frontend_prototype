@@ -73,6 +73,8 @@
         <span v-if="alertCount" class="badge">{{ alertCount }}</span>
       </button>
 
+      <a :href="guideUrl" target="_blank" rel="noopener" class="guide-link" title="Open the user guide">Help / User Guide</a>
+
       <NuxtLink to="/profile" class="avatar" :title="user?.full_name ?? 'Profile'">
         {{ userInitials }}
       </NuxtLink>
@@ -134,6 +136,8 @@
  * useState('navSubtitle'); each PageHeader sets it.
  */
 import { useNotificationStore } from '~/stores/notifications'
+
+const guideUrl = useRuntimeConfig().public.guideUrl
 import {
   Search, LayoutDashboard, TrafficCone, Truck, BusFront, ShieldAlert,
   Construction, Plane, Ship, TrainFront, BarChart3, Cable, MapPinned,

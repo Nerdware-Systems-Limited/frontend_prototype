@@ -10,7 +10,7 @@
     </template>
   </PageHeader>
 
-  <div v-if="error" class="error-banner">⚠ {{ error }}</div>
+  <div v-if="error" class="error-banner banner-icon-warn" role="alert">{{ error }}</div>
 
   <div class="ih-ribbon">
     <KpiTile label="Expected layers" :value="cov?.total ?? ''" :state="kpi" sub="active requirements in scope" />
@@ -26,7 +26,7 @@
     <table v-else class="stack-table">
       <thead><tr><th>Agency</th><th>Expected</th><th>Uploaded</th><th>Requested</th><th>Processing</th><th>Failed</th><th>Missing</th><th style="width:22%">Complete</th></tr></thead>
       <tbody>
-        <tr v-for="a in cov?.by_agency" :key="a.agency_code" class="is-clickable" @click="agency = agency === a.agency ? '' : a.agency">
+        <tr v-for="a in cov?.by_agency" :key="a.agency_code" class="is-clickable" tabindex="0" :aria-pressed="agency === a.agency" @click="agency = agency === a.agency ? '' : a.agency" @keydown.enter.self.prevent="agency = agency === a.agency ? '' : a.agency" @keydown.space.self.prevent="agency = agency === a.agency ? '' : a.agency">
           <td data-label="Agency"><strong>{{ a.agency_code }}</strong></td>
           <td data-label="Expected">{{ a.total }}</td>
           <td data-label="Uploaded">{{ a.uploaded }}</td>
