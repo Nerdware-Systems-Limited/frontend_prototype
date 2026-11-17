@@ -32,7 +32,7 @@
   <div id="operator-registry" class="card drill-target">
     <div class="card-body">
       <DataTable :table="operatorTable" row-key="id" title="Operator registry" export-name="uapts-operators" expandable filters-open
-                 placeholder="Search operator name, contact…" empty="No operators match the current filters.">
+                 placeholder="Search operator name…" empty="No operators match the current filters.">
         <template #cell-sacco_name="{ row }"><span style="font-weight:600">{{ row.sacco_name }}</span></template>
         <template #cell-service_quality_score="{ row }">
           <div class="util-bar-wrap"><div class="util-bar" :style="{ transform: `scaleX(${row.service_quality_score / 100})`, background: scoreBg(row.service_quality_score) }" /></div>
@@ -83,8 +83,6 @@ const REG_BADGE: Record<string, string> = { active: 'success', suspended: 'warni
 const operatorColumns: TableColumn[] = [
   { key: 'sacco_name', label: 'Operator', priority: 1, pin: 'left', minWidth: 170 },
   { key: 'registration_status', label: 'Status', type: 'badge', badge: REG_BADGE, options: REG_STATUSES, priority: 1 },
-  { key: 'contact_phone', label: 'Contact', priority: 3 },
-  { key: 'agency_code', label: 'Agency', priority: 3 },
   { key: 'route_count', label: 'Routes', type: 'num', priority: 2 },
   { key: 'fleet_size', label: 'Fleet', type: 'num', priority: 1 },
   { key: 'service_quality_score', label: 'Service Quality', type: 'num', digits: 0, priority: 1 },
